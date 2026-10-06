@@ -1,31 +1,32 @@
-# Render Blueprint — Projelio backend (NestJS API)
+# Render Blueprint — Projelio TEST KOPYASI backend'i
 #
-# ARTIK KULLANILMIYOR. Projelio 2026-08-30'da kendi sunucusuna taşındı:
-# API https://api.projelio.app, arayüz https://app.projelio.app
-# (bkz. deploy/docker-compose.prod.yml ve docs/vps-goc-plani.md).
+# YALNIZCA test-kopya dalında böyle (main'deki render.yaml askıdaki eski canlı
+# servisi tarif ediyor). Bu dal main'e BİRLEŞTİRİLMEZ.
 #
-# Render servisi ASKIYA ALINDI, silinmedi: geri dönüş yolu olarak bir süre
-# duruyor. Dosya de aynı sebeple duruyor — geri dönmek gerekirse servisin
-# hangi değişkenlerle ayağa kalktığı burada yazılı.
+# Arayüz: https://projelio-test-kopya.netlify.app (netlify.toml bu servisin
+# adresini derlemeye gömüyor — servis adı değişirse orası da değişmeli).
+# Veritabanı: eski Supabase `projelio` projesi; gerçek veri silindi, canlının
+# şeması + kurgusal demo verisi var (deploy/test-kopya-veritabani.mjs).
 #
-# Kullanımı: Render panelinde "New +" > "Blueprint" ile bu depoyu bağlayın.
-# Render bu dosyayı okuyup servisi otomatik oluşturur.
+# Free plan bilerek: ücret istenmiyor. 15 dk boşta kalınca uyur, ilk istek
+# ~30 sn sürer; uyurken gece işleri (yenileme, yedek vb.) koşmaz — test için
+# sorun değil.
 #
-# NOT: sync:false işaretli değişkenler gizli olduğu için bu dosyada TUTULMAZ;
-# Render panelinde Environment sekmesinden elle girilir.
+# Dış servisler bilerek TANIMSIZ: PayTR canlı, Resend, WhatsApp/WAHA, FCM,
+# Shopify, Instagram, Google/Microsoft. Kod tanımsız anahtarda o özelliği
+# sessizce kapatıyor; test kopyasından gerçek birine e-posta/mesaj/çekim gitmez.
 
 services:
   - type: web
-    name: projelio-api
+    name: projelio-test-kopya-api
     runtime: node
-    plan: starter # $7/ay — uykuya dalmaz (cron işleri ve WebSocket için gerekli)
-    region: frankfurt # Supabase projesi eu-central-1'de; aynı bölge = düşük gecikme
-    branch: main
+    plan: free
+    region: frankfurt
+    branch: test-kopya
+    autoDeploy: false
 
-    # Monorepo: kurulum ve derleme depo kökünden yapılır (npm workspaces).
     buildCommand: npm install && npm run build --workspace=backend
     startCommand: node backend/dist/main
-
     healthCheckPath: /health
 
     envVars:
@@ -33,109 +34,37 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: WEB_APP_URL
+        value: https://projelio-test-kopya.netlify.app
+      - key: CORS_ORIGINS
+        value: https://projelio-test-kopya.netlify.app
+      - key: BACKEND_URL
+        value: https://projelio-test-kopya-api.onrender.com
+      - key: API_PUBLIC_URL
+        value: https://projelio-test-kopya-api.onrender.com
+      - key: WEBAUTHN_RP_ID
+        value: projelio-test-kopya.netlify.app
+      - key: PAYTR_TEST_MODE
+        value: "1"
+      - key: AI_PROVIDERS
+        value: anthropic
+      - key: AI_PROMPT_CACHING
+        value: "true"
 
-      # --- Gizli değerler: Render panelinden girilecek ---
+      # Render kendisi üretir — canlıyla ortak olamaz.
       - key: JWT_SECRET
-        sync: false
+        generateValue: true
+      - key: HESAP_KIMLIK_ENC_KEY
+        generateValue: true
+
+      # Gizli: Blueprint formunda elle girilir (~/projelio-test-kopya-render.env).
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
-      # Habie mesajlaşma modülü — Habie APP_SECRETS içindeki "projelio" değeriyle AYNI olmalı
-      - key: HABIE_APP_SECRET
-        sync: false
+      # İsteğe bağlı: canlınınkinden AYRI, harcama limitli anahtar. Boş
+      # bırakılırsa Lio kapalı, uygulamanın geri kalanı çalışır.
       - key: ANTHROPIC_API_KEY
         sync: false
-      # Admin panelindeki "Anthropic bakiyesi" kartının gerçek maliyet verisini
-      # Cost Report API'sinden çekebilmesi için (bkz. AiCreditsService).
-      # console.anthropic.com > Settings > Admin keys'den alınır, normal
-      # ANTHROPIC_API_KEY'den farklıdır. Yoksa özellik sessizce kendi tahminine düşer.
-      - key: ANTHROPIC_ADMIN_API_KEY
-        sync: false
-      # Lio'ya iliştirilen SES dosyalarını yazıya çevirmek için (bkz.
-      # AiTranscriptionService). Anthropic modelleri ses kabul etmiyor, o yüzden
-      # yalnızca bu iş için ayrı bir sağlayıcı kullanılıyor. Yoksa ses ekleri
-      # net bir hata döner, asistanın geri kalanı etkilenmez.
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: VAPID_PUBLIC_KEY
-        sync: false
-      - key: VAPID_PRIVATE_KEY
-        sync: false
-      - key: VAPID_SUBJECT
-        sync: false
-
-      # Google ile giris + Drive dosya depolama (bkz. backend/.env.example)
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: GOOGLE_REDIRECT_URI
-        sync: false
-      - key: WEB_APP_URL
-        sync: false
-      # openssl rand -base64 32 ile uretin; kaybolursa tum Drive baglantilari kopar
-      - key: GOOGLE_TOKEN_ENC_KEY
-        sync: false
-
-      # OneDrive dosya depolama (bkz. backend/.env.example) — Azure Portal'daki
-      # uygulama kaydına production backend URL'i icin ikinci bir redirect URI
-      # eklenmeli (localhost'a ek olarak).
-      - key: MICROSOFT_CLIENT_ID
-        sync: false
-      - key: MICROSOFT_CLIENT_SECRET
-        sync: false
-      - key: MICROSOFT_REDIRECT_URI
-        sync: false
-      - key: MICROSOFT_TOKEN_ENC_KEY
-        sync: false
-      # E-posta modulunun gelen kutusu icin ayri donus adresi. Azure'daki
-      # uygulamaya Mail.ReadWrite + Mail.Send izinleri de eklenmeli.
-      # Bkz. docs/moduller/15-eposta-gelen-kutusu.md
-      - key: MICROSOFT_MAIL_REDIRECT_URI
-        sync: false
-
-      # Instagram'a dogrudan yayin (Business Login for Instagram).
-      # Meta uygulamasindaki "Instagram > API setup with Instagram login"
-      # bolumunden alinir; redirect URI olarak
-      # https://<backend>/social/instagram/callback eklenmeli.
-      # Bkz. docs/moduller/14-instagram-entegrasyonu.md
-      - key: INSTAGRAM_APP_ID
-        sync: false
-      - key: INSTAGRAM_APP_SECRET
-        sync: false
-      - key: INSTAGRAM_REDIRECT_URI
-        sync: false
-      # openssl rand -base64 32 ile uretin; kaybolursa tum Instagram
-      # baglantilari kopar ve hesaplar yeniden baglanmak zorunda kalir.
-      - key: SOCIAL_TOKEN_ENC_KEY
-        sync: false
-
-      # Sosyal hesap giris sifreleri (bkz. 076_sosyal_hesap_kimlik_bilgileri.sql).
-      # Jeton anahtarindan AYRI: biri sizarsa digeri etkilenmesin.
-      # openssl rand -base64 32 ile uretin; kaybolursa kayitli hesap sifreleri
-      # COZULEMEZ hale gelir. Ayni deger VPS .env'ine de girilmeli.
-      - key: SOCIAL_CREDENTIAL_ENC_KEY
-        sync: false
-
-      # Frontend'in adresi — CORS bu listeyle sınırlanır (virgülle çoğaltılabilir).
-      - key: CORS_ORIGINS
-        sync: false
-
-      # --- Genel ayarlar ---
-      - key: JWT_EXPIRES_IN
-        value: 7d
-      - key: ANTHROPIC_MODEL
-        value: claude-haiku-4-5-20251001
-
-      # --- AI kredi ekonomisi (bkz. backend/.env.example) ---
-      - key: AI_COMMISSION_RATE
-        value: "0.2"
-      - key: AI_CREDIT_UNIT_USD
-        value: "0.0001"
-      - key: AI_MIN_BALANCE_TO_START
-        value: "20"
-      - key: AI_WELCOME_CREDITS
-        value: "2000"
-      - key: AI_PROMPT_CACHING
-        value: "true"

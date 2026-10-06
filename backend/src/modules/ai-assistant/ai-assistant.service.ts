@@ -506,6 +506,10 @@ function compactTask(task: any): Record<string, unknown> {
     title: task.title,
     status: task.status,
     deadline: shortDate(task.deadline),
+    // Saat ve hatırlatma görünmezse Lio hangi göreve hatırlatma
+    // kurulabileceğini (saati olan) bilemez, hepsine saat sormak zorunda kalır.
+    deadlineTime: task.deadlineTime,
+    reminderLeadMinutes: task.reminderLeadMinutes,
     assignedTo: task.assignedTo,
     assignee: task.assignedToName,
     budget: task.budget,
@@ -1426,6 +1430,10 @@ export class AiAssistantService {
       "- Birden çok madde söylendiğinde create_todos ile TEK çağrıda ekle (en fazla 10 kalem).",
       "- Hatırlatma yalnızca SAAT verildiyse kurulur: reminderLeadMinutes'i dueTime olmadan " +
         "göndermek sessizce hiçbir şey yapmaz. Kullanıcı \"sabah 9'da hatırlat\" diyorsa ikisini birlikte ver.",
+      "- Proje/departman GÖREVLERİNDE de aynı kural: create_task/update_task'ta deadlineTime + " +
+        "reminderLeadMinutes. \"Takvimdeki görevlerimi yarım saat önce hatırlat\" -> görevleri oku, saati " +
+        "olanlara update_task ile reminderLeadMinutes=30 ver; saati olmayanları kullanıcıya say ve saat sor. " +
+        "Hatırlatma uygulama bildirimi olarak gelir (WhatsApp mesajı değil).",
       "- Panonun SIRASINI kullanıcı eliyle dizmiştir. reorder_todos'u yalnızca sırayla ilgili açık bir " +
         "istek varsa çağır, çağırırken de o kolondaki kartların tamamını gönder.",
       "- \"Şunu panomdan kaldır\" atanmış bir görevde SİLMEK değildir: isHidden=true yap, görev " +
@@ -3675,6 +3683,8 @@ export class AiAssistantService {
           title: task.title,
           status: task.status,
           deadline: shortDate(task.deadline),
+          deadlineTime: task.deadlineTime,
+          reminderLeadMinutes: task.reminderLeadMinutes,
           assignee: task.assignedToName,
           ...scope,
           overdue: deadline && deadline < now && task.status !== "completed" ? true : undefined,
@@ -4146,6 +4156,8 @@ export class AiAssistantService {
           budget: input.budget,
           parentTaskId: input.parentTaskId,
           outputId: input.outputId,
+          deadlineTime: input.deadlineTime,
+          reminderLeadMinutes: input.reminderLeadMinutes,
         };
         if (target.departmentId) {
           // Yetki DEPARTMAN kadrosuna göre; TasksService.createForDepartment
@@ -4170,6 +4182,13 @@ export class AiAssistantService {
             startDate: input.startDate,
             assignedTo: input.assignedTo,
             budget: input.budget,
+            // Görev hatırlatması (bkz. migration 057). Eskiden araçta bu alanlar
+            // yoktu: "yarım saat önce hatırlat" diyen kullanıcıya Lio
+            // "desteklenmiyor" diyordu, oysa arayüz ve zamanlanmış iş hazırdı.
+            // Saat görevde zaten varsa yalnızca ön süre gönderilebilir; CHECK
+            // kısıtı (saat yokken ön süre) tasksService'te değil DB'de yakalanır.
+            deadlineTime: input.deadlineTime,
+            reminderLeadMinutes: input.reminderLeadMinutes,
           },
           userId
         );
@@ -4213,6 +4232,8 @@ export class AiAssistantService {
               budget: item.budget,
               parentTaskId: item.parentTaskId,
               outputId: item.outputId,
+              deadlineTime: item.deadlineTime,
+              reminderLeadMinutes: item.reminderLeadMinutes,
             };
             const task = target.departmentId
               ? await this.tasksService.createForDepartment(target.departmentId, data, userId)

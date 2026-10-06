@@ -937,6 +937,13 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         budget: { type: "number" },
         parentTaskId: { type: "string", description: "Alt görev oluşturmak için üst görev id'si (opsiyonel)" },
         outputId: { type: "string", description: "Görevi bir çıktıya bağlar (opsiyonel)" },
+        deadlineTime: { type: "string", description: "Bitiş saati (HH:MM). Hatırlatma için ŞART." },
+        reminderLeadMinutes: {
+          type: "number",
+          description:
+            "Hatırlatma bitiş saatinden kaç dakika önce gönderilsin (0 = tam saatinde, 30 = yarım saat önce). " +
+            "Yalnızca deadlineTime da verildiyse (ya da görevde zaten saat varsa) işe yarar.",
+        },
       },
       // projectId ŞEMADA zorunlu değil çünkü departman görevlerinde hiç verilmez;
       // "ikisinden tam olarak biri" kuralı araç çalıştırılırken denetlenir.
@@ -946,7 +953,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "update_task",
     description:
-      "Bir görevin başlık/açıklama/tarih/atanan kişi/bütçe bilgilerini günceller. " +
+      "Bir görevin başlık/açıklama/tarih/saat/hatırlatma/atanan kişi/bütçe bilgilerini günceller. " +
       "Görevi bir çıktıya taşımak için outputId ver; çıktıdan çıkarmak için boş dize gönder.",
     input_schema: {
       type: "object",
@@ -959,6 +966,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         assignedTo: { type: "string" },
         budget: { type: "number" },
         outputId: { type: "string", description: "Görevi bu çıktıya taşır; boş dize çıktıdan çıkarır" },
+        deadlineTime: { type: "string", description: "HH:MM, temizlemek için boş dize. Saat silinirse hatırlatma da düşer." },
+        reminderLeadMinutes: {
+          type: "number",
+          description: "Hatırlatma kaç dakika önce gitsin (0 = tam saatinde). Görevde saat yoksa deadlineTime ile birlikte ver.",
+        },
       },
       required: ["taskId"],
     },
@@ -1020,6 +1032,8 @@ export const AI_TOOLS: Anthropic.Tool[] = [
               budget: { type: "number" },
               parentTaskId: { type: "string" },
               outputId: { type: "string", description: "Görevi bir çıktıya bağlar (opsiyonel)" },
+              deadlineTime: { type: "string", description: "HH:MM" },
+              reminderLeadMinutes: { type: "number", description: "Dakika; yalnızca deadlineTime ile" },
             },
             required: ["title", "deadline"],
           },

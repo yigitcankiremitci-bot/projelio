@@ -20,11 +20,18 @@ export const FB_API_VERSION = "v21.0";
  *   instagram_manage_insights Business Discovery (başka hesapların herkese açık verisi)
  *   pages_show_list          Kullanıcının Sayfalarını listelemek
  *   pages_read_engagement    Sayfa jetonu almak
+ *   business_management      İşletme portföyüne ait Sayfalar (me/accounts'ta görünmüyorlar)
  *
  * Hashtag araması ayrıca uygulamada "Instagram Public Content Access"
  * özelliğinin açık olmasını istiyor (izin değil, özellik).
  */
-export const FB_SCOPES = ["instagram_basic", "instagram_manage_insights", "pages_show_list", "pages_read_engagement"];
+export const FB_SCOPES = [
+  "instagram_basic",
+  "instagram_manage_insights",
+  "pages_show_list",
+  "pages_read_engagement",
+  "business_management",
+];
 
 /** Meta kuralı: bir Instagram hesabı 7 günde en fazla 30 farklı hashtag sorgulayabilir. */
 export const HASHTAG_HAFTALIK_SINIR = 30;

@@ -187,7 +187,32 @@ export class RakipTakibiService {
         access_token: uzun.access_token,
       })}`
     );
-    const tumSayfalar = sayfalar.data ?? [];
+    let tumSayfalar = sayfalar.data ?? [];
+    const izinler = await this.graph<{ data?: { permission: string; status: string }[] }>(
+      `me/permissions?${new URLSearchParams({ access_token: uzun.access_token })}`
+    ).catch(() => ({ data: [] as { permission: string; status: string }[] }));
+    const verilen = (izinler.data ?? []).filter((p) => p.status === "granted").map((p) => p.permission);
+
+    // İşletme portföyüne ait Sayfalar `me/accounts`'ta görünmüyor (kullanıcının
+    // Sayfada doğrudan rolü yok, portföy üzerinden erişiyor) — 2026-10-06'da
+    // tam olarak bu oldu: Sayfa seçildiği hâlde 0 Sayfa geldi. Portföyün kendi
+    // ve müşteri Sayfaları ayrıca sorulur (business_management izni gerekir).
+    if (tumSayfalar.length === 0) {
+      const alan = "id,name,access_token,instagram_business_account{id,username}";
+      const isletmeler = await this.graph<{ data?: any[] }>(
+        `me/businesses?${new URLSearchParams({
+          fields: `id,name,owned_pages.limit(100){${alan}},client_pages.limit(100){${alan}}`,
+          access_token: uzun.access_token,
+        })}`
+      ).catch((err) => {
+        this.logger.warn(`İşletme portföyü okunamadı: ${(err as Error).message}`);
+        return { data: [] as any[] };
+      });
+      tumSayfalar = (isletmeler.data ?? []).flatMap((b: any) => [
+        ...(b.owned_pages?.data ?? []),
+        ...(b.client_pages?.data ?? []),
+      ]);
+    }
     const adaylar = tumSayfalar.filter((p) => p?.instagram_business_account?.id && p.access_token);
     // İki ayrı durum, iki ayrı çözüm — tek mesaj kullanıcıyı yanlış yere
     // gönderiyordu (2026-10-06):
@@ -195,7 +220,7 @@ export class RakipTakibiService {
     //   · Sayfa geldi ama Instagram'sız → hesap Sayfaya Sayfa ayarlarından
     //     bağlı değil (yalnızca Hesap Merkezi bağlantısı API'ye görünmüyor)
     this.logger.log(
-      `Facebook bağlantısı: ${tumSayfalar.length} Sayfa, ${adaylar.length} tanesinde Instagram hesabı (${tumSayfalar
+      `Facebook bağlantısı: izinler [${verilen.join(",")}], ${tumSayfalar.length} Sayfa, ${adaylar.length} tanesinde Instagram hesabı (${tumSayfalar
         .map((p) => `${p.name ?? p.id}${p.instagram_business_account?.id ? "+ig" : ""}`)
         .join(", ")})`
     );
@@ -213,10 +238,6 @@ export class RakipTakibiService {
     const secilen =
       adaylar.find((p) => kendi.has(normalizeSocialHandle(p.instagram_business_account.username))) ?? adaylar[0];
 
-    const izinler = await this.graph<{ data?: { permission: string; status: string }[] }>(
-      `me/permissions?${new URLSearchParams({ access_token: uzun.access_token })}`
-    ).catch(() => ({ data: [] as { permission: string; status: string }[] }));
-
     // Kapsam başına tek bağlantı: yeniden bağlanınca eskisi değişir. Hashtag
     // takipleri bağlantıya bağlı — eski bağlantının etiketleri yenisine taşınır.
     const eski = await this.baglanti(scope);
@@ -227,7 +248,7 @@ export class RakipTakibiService {
       page_id: secilen.id,
       page_name: secilen.name ?? null,
       token_enc: socialTokenCrypto.encrypt(secilen.access_token),
-      scopes: (izinler.data ?? []).filter((p) => p.status === "granted").map((p) => p.permission),
+      scopes: verilen,
       hata: null,
       created_by: s.userId,
       updated_at: new Date().toISOString(),

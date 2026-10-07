@@ -262,6 +262,14 @@ www.yigitcankiremitci.com {
 	redir https://yigitcankiremitci.com{uri} permanent
 }
 
+# Dijital kartvizit (QR'ın açtığı sayfa). Ayrı konteyner yok: aynı yigitcan-web,
+# dosyalar o sitenin dist/ben/ klasöründe. Header yine BURADA YOK (yukarıya bkz).
+ben.yigitcankiremitci.com {
+	encode zstd gzip
+	rewrite * /ben{uri}
+	reverse_proxy yigitcan-web:80
+}
+
 # ------------------------------------------------------- budnal.app (ayrı proje)
 # Budnal bu VPS'te AYRI bir compose yığınında duruyor
 # (~projelio/apps/budnal/docker-compose.yml). budnal-app yalnız HTTP konuşuyor;

@@ -25,3 +25,4 @@ FROM caddy:2.11.4-alpine
 COPY deploy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/apps/web/dist /srv/web
 COPY brand /srv/brand
+COPY kartvizit /srv/kartvizit

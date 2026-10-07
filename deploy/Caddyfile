@@ -34,6 +34,31 @@ brand.projelio.app {
 	}
 }
 
+# ------------------------------------------------------ Dijital kartvizitler
+# <ad>.projelio.app → kartvizit/<ad>/ (Dockerfile.web /srv/kartvizit'e kopyalar).
+# Yeni kişi: klasörü kopyala, bu bloğa adını ekle, DNS'te A kaydı aç.
+# CSP zorlayıcı: sayfalarda satır içi script/style ve harici kaynak yok.
+# .vcf'nin text/vcard gitmesi şart; yoksa iOS "Kişilere ekle" önermez.
+firdevs.projelio.app {
+	root * /srv/kartvizit/{labels.2}
+	encode zstd gzip
+	file_server
+	@vcf path *.vcf
+	header @vcf {
+		Content-Type "text/vcard; charset=utf-8"
+		defer
+	}
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex"
+		Cache-Control "no-cache"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+	}
+}
+
 # ---------------------------------------------------------------- Uygulama
 # Web arayüzü. TLS otomatik (Let's Encrypt, HTTP-01) — bu yüzden 80 portu
 # internete açık kalmak ZORUNDA, yoksa sertifika yenilenemez.

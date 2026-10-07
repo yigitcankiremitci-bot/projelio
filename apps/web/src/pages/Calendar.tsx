@@ -180,6 +180,8 @@ export default function CalendarView() {
   // parmakla, klavyede ← / → ile (bkz. lib/useSwipeNavigate.ts).
   const swipe = useSwipeNavigate(step);
 
+  const yanPanel = isDesktop && view !== "week";
+
   const periodLabel = useMemo(() => {
     if (!data) return "";
     if (view === "day") return longDayLabel(data.from);
@@ -459,7 +461,10 @@ export default function CalendarView() {
       )}
 
       {/* ------------------------------------------------------------ Gövde */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexDirection: isDesktop ? "row" : "column" }}>
+      {/* Hafta görünümünde yan panel ızgaranın ALTINA iner: 7 sütun 320 px'lik
+          panelin yanında ~90 px'e düşüyor, blok başlıkları okunmuyordu. Gün ve
+          ay görünümünde panel yanda kalır — orada ızgaranın genişliğe ihtiyacı yok. */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexDirection: yanPanel ? "row" : "column" }}>
         {/* Kaydırma yalnızca ızgaranın üstünde: sağdaki ilerleme sütununda
             yatay kaydırma bir şey ifade etmiyor, orada da yakalarsak
             kullanıcı listeyi kaydırırken dönem değişirdi. */}
@@ -568,13 +573,30 @@ export default function CalendarView() {
               etkinlikler={etkinlikler}
               onOpenEtkinlik={setAcikEtkinlik}
               googleBloklari={googleBloklari}
+              onSelectDay={(day) => {
+                setSlideDir(0);
+                setAnchor(day);
+                setView("day");
+              }}
             />
           )}
             </div>
           </div>
         </div>
 
-        <div style={{ width: isDesktop ? 320 : "100%", flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={
+            yanPanel
+              ? { width: 320, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }
+              : {
+                  width: "100%",
+                  display: "grid",
+                  gridTemplateColumns: isDesktop ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)",
+                  gap: 16,
+                  alignItems: "start",
+                }
+          }
+        >
           {data && (
             <PlanProgressPanel
               progress={data.progress}

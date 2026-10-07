@@ -164,6 +164,7 @@ export const ilkAdimlar: TranslationDict = {
   "Blok kaydedilemedi.": "Couldn't save the block.",
   "Blok silinemedi.": "Couldn't delete the block.",
   "Tamamlandı işaretle": "Mark as done",
+  "Günlük görünümde aç": "Open in day view",
   "Tamamlandı işaretini kaldır": "Unmark as done",
   "Doluluk": "Utilization",
   "Plana sadakat": "Plan adherence",

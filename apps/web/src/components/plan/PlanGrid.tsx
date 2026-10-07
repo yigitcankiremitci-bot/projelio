@@ -41,6 +41,8 @@ interface Props {
   onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
   /** Google Takvim'e de gönderilmiş blokların id'leri — kutuda küçük bir işaret çıkar. */
   googleBloklari?: Set<string>;
+  /** Hafta görünümünde gün başlığına tıklanınca o günün günlük görünümünü açar. */
+  onSelectDay?: (day: string) => void;
 }
 
 /** Tüm gün şeridinde gün başına en fazla kaç satır; fazlası "+n" olur. */
@@ -70,6 +72,7 @@ export default function PlanGrid({
   etkinlikler,
   onOpenEtkinlik,
   googleBloklari,
+  onSelectDay,
 }: Props) {
   const c = useThemeColors();
   const days = useMemo(() => eachDay(from, to), [from, to]);
@@ -162,6 +165,7 @@ export default function PlanGrid({
             tumGunYuksekligi={tumGunYuksekligi}
             onOpenEtkinlik={onOpenEtkinlik}
             googleBloklari={googleBloklari}
+            onSelectDay={onSelectDay}
           />
         ))}
       </div>
@@ -169,7 +173,10 @@ export default function PlanGrid({
   );
 }
 
-const HEADER_HEIGHT = 40;
+// Başlık iki satır taşıyor: gün (ad + numara) ve o günün planlı süresi.
+// Süre başlıkta durmasa hafta görünümünde "hangi gün dolu" sorusunu yanıtlamak
+// için blokları tek tek toplamak gerekiyordu.
+const HEADER_HEIGHT = 58;
 
 interface ColumnProps {
   day: string;
@@ -193,6 +200,7 @@ interface ColumnProps {
   tumGunYuksekligi: number;
   onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
   googleBloklari?: Set<string>;
+  onSelectDay?: (day: string) => void;
 }
 
 function DayColumn({
@@ -217,6 +225,7 @@ function DayColumn({
   tumGunYuksekligi,
   onOpenEtkinlik,
   googleBloklari,
+  onSelectDay,
 }: ColumnProps) {
   const t = useT();
   const c = useThemeColors();
@@ -270,11 +279,23 @@ function DayColumn({
         // Çalışılmayan günler soluk: takvimde hafta sonunun görsel olarak
         // ayrışması, planın gerçekten kaç güne sığdığını okumayı kolaylaştırıyor.
         background: isWorkday ? c.surface : c.background,
+        // Bugünün sütunu hafifçe tonlanır; "şu an" çizgisi yalnızca mesai
+        // saatleri içinde görünüyor, akşam bakınca bugünü ayırt eden şey kalmıyordu.
+        backgroundImage: isToday ? `linear-gradient(${c.accent}0D, ${c.accent}0D)` : undefined,
       }}
     >
+      {/* Hafta görünümünde başlık, o günün günlük görünümüne açılır. Gün
+          görünümünde (single) zaten o gündeyiz, başlık tıklanmaz. */}
       <div
+        onClick={!single && onSelectDay ? () => onSelectDay(day) : undefined}
+        role={!single && onSelectDay ? "button" : undefined}
+        title={!single && onSelectDay ? t("Günlük görünümde aç") : undefined}
+        className={!single && onSelectDay ? "plan-gun-basligi" : undefined}
         style={{
           height: HEADER_HEIGHT,
+          cursor: !single && onSelectDay ? "pointer" : undefined,
+          flexDirection: "column",
+          gap: 2,
           borderBottom: `1px solid ${c.border}`,
           display: "flex",
           alignItems: "center",
@@ -291,13 +312,31 @@ function DayColumn({
           // Gün adı ÜSTTE, yalnızca gün numarası ALTTA. Yan yana "Pzt 28 Eyl"
           // telefonda (sütun ~45 px) sığmıyor, metinler komşu sütuna taşıp
           // birbirinin üstüne biniyordu. Ay zaten üstteki aralık başlığında yazılı.
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.1, minWidth: 0 }}>
-            <span style={{ fontSize: 11, color: isToday ? c.accent : c.textSecondary, fontWeight: 400, whiteSpace: "nowrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, lineHeight: 1.1, minWidth: 0 }}>
+            <span style={{ fontSize: 11, color: isToday ? c.accent : c.textSecondary, fontWeight: 500, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 0.4 }}>
               {t(WEEKDAY_LABELS[weekdayOf(day)])}
             </span>
-            <span style={{ fontSize: 15, fontVariantNumeric: "tabular-nums" }}>{Number(day.slice(8, 10))}</span>
+            {/* Bugün numarası dolu daire içinde: sütunlar daraldığında yalnızca
+                renk farkı gözden kaçıyordu. */}
+            <span
+              style={{
+                fontSize: 15,
+                fontVariantNumeric: "tabular-nums",
+                minWidth: 22,
+                height: 22,
+                borderRadius: 11,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: isToday ? c.accent : "transparent",
+                color: isToday ? c.onPrimary : c.textPrimary,
+              }}
+            >
+              {Number(day.slice(8, 10))}
+            </span>
           </div>
         )}
+        <GunOzeti blocks={blocks} />
       </div>
 
       {tumGunYuksekligi > 0 && (
@@ -372,7 +411,10 @@ function DayColumn({
               borderBottom: `1px solid ${c.border}`,
               opacity: 0.6,
             }}
-          />
+          >
+            {/* Yarım saat çizgisi: geniş sütunda 14:30'u gözle bulmak zordu. */}
+            <div style={{ position: "absolute", top: HOUR_HEIGHT / 2, left: 0, right: 0, borderTop: `1px dashed ${c.border}`, opacity: 0.7 }} />
+          </div>
         ))}
 
         {isToday && <NowLine startHour={startHour} hours={hours} />}
@@ -478,6 +520,10 @@ function BlockCard({
   const left = `calc(${(100 / layout.columns) * layout.column}% + 3px)`;
 
   const label = block.title ?? block.linkedTitle ?? block.focusAreaName ?? t("Blok");
+  // Başlık sığdığı kadar satıra yayılır. Tek satıra kesildiğinde hafta
+  // görünümünün dar sütunlarında yalnızca ilk kelime okunabiliyordu.
+  const detayVar = height > 40;
+  const baslikSatiri = Math.max(1, Math.floor((height - 8 - (detayVar ? 14 : 0)) / 15));
 
   return (
     <div
@@ -492,6 +538,7 @@ function BlockCard({
       }}
       onDoubleClick={(e) => e.stopPropagation()}
       title={`${block.startsAt}–${block.endsAt} · ${label}`}
+      className="plan-blok"
       style={{
         position: "absolute",
         top,
@@ -520,6 +567,7 @@ function BlockCard({
             onToggleDone();
           }}
           aria-label={done ? t("Tamamlandı işaretini kaldır") : t("Tamamlandı işaretle")}
+          className="plan-blok-onay"
           style={{
             width: 13,
             height: 13,
@@ -534,19 +582,23 @@ function BlockCard({
         />
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
+            className="plan-blok-baslik"
             style={{
               fontSize: 12,
               lineHeight: "15px",
+              fontWeight: 500,
               color: done ? c.completed : c.textPrimary,
+              textDecoration: done ? "line-through" : undefined,
               overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
+              display: "-webkit-box",
+              WebkitBoxOrient: "vertical",
+              WebkitLineClamp: baslikSatiri,
             }}
           >
             {label}
           </div>
-          {height > 40 && (
-            <div style={{ fontSize: 10, color: c.textSecondary, marginTop: 1 }}>
+          {detayVar && (
+            <div style={{ fontSize: 10, color: c.textSecondary, marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {block.startsAt}–{block.endsAt} · {formatDuration(block.plannedMinutes)}
               {block.source === "lio" && block.status === "planned" ? " · Lio" : ""}
               {googleda ? ` · ${t("Google")}` : ""}
@@ -627,5 +679,37 @@ function EtkinlikKutusu({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Gün başlığındaki özet: planlı toplam süre ve kaç bloğun bittiği. Atlanan
+ * bloklar sayılmaz — "bugün 6 saat planladım" derken vazgeçilen iş o
+ * rakamı şişirmemeli.
+ */
+function GunOzeti({ blocks }: { blocks: PlanTimeBlock[] }) {
+  const c = useThemeColors();
+  const sayilan = blocks.filter((b) => b.status !== "skipped");
+  if (sayilan.length === 0) {
+    return <span style={{ fontSize: 10, color: c.textSecondary, opacity: 0.6 }}>—</span>;
+  }
+  const toplam = sayilan.reduce((s, b) => s + b.plannedMinutes, 0);
+  const biten = sayilan.filter((b) => b.status === "done").length;
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        color: c.textSecondary,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        maxWidth: "100%",
+        padding: "0 4px",
+        fontVariantNumeric: "tabular-nums",
+      }}
+    >
+      {formatDuration(toplam)}
+      <span style={{ color: biten === sayilan.length ? c.completed : undefined }}> · {biten}/{sayilan.length}</span>
+    </span>
   );
 }

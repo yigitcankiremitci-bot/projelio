@@ -425,6 +425,34 @@ button:focus-visible {
   animation: plan-slide-prev 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Hafta görünümünde tıklanabilir gün başlığı (o günün günlük görünümünü açar).
+   Satır içi stil :hover yazamadığı için burada. */
+.plan-gun-basligi {
+  transition: background-color 120ms ease;
+}
+.plan-gun-basligi:hover {
+  background-color: rgba(128, 128, 128, 0.08);
+}
+
+/* Plan bloğu kendi genişliğine göre sadeleşir: telefonda hafta sütunu ~45 px
+   ve onay kutusu yazıya yer bırakmıyordu. Kutu gün görünümünde ve blok
+   penceresinde yine erişilebilir. Uzun kelime harf harf bölünmez, kesilir. */
+.plan-blok {
+  container-type: inline-size;
+}
+.plan-blok-baslik {
+  overflow-wrap: break-word;
+}
+@container (max-width: 70px) {
+  .plan-blok-onay {
+    display: none;
+  }
+  .plan-blok-baslik {
+    overflow-wrap: normal;
+    font-size: 11px;
+  }
+}
+
 /*
  * Ayarlar > Görünüm > "Hareketi azalt". İşletim sistemindeki tercihi (yukarıdaki
  * prefers-reduced-motion) beklemeden, uygulama içinden kapatılabilen sürüm —

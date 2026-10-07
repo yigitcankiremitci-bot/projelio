@@ -116,6 +116,12 @@ export class PlanningController {
     return this.planning.createLabel(req.user.userId, body);
   }
 
+  // NOT: "labels/:id" ile çakışmasın diye ondan önce tanımlı.
+  @Patch("labels/reorder")
+  reorderLabels(@Req() req: any, @Body("ids") ids: string[]) {
+    return this.planning.reorderLabels(req.user.userId, ids);
+  }
+
   @Patch("labels/:id")
   updateLabel(@Req() req: any, @Param("id") id: string, @Body() body: { name?: string; color?: string }) {
     return this.planning.updateLabel(req.user.userId, id, body);

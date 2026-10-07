@@ -4,6 +4,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { planning } from "../../api/planning";
 import { useT } from "../../lib/i18n";
 import { inputStyle } from "./PlanTargetsModal";
+import { EtiketDuzenleyici } from "./PlanEtiketYonetimi";
 
 /**
  * Renkli etiket hapı. Seçili değilken yalnızca renk noktası + ad; seçiliyken
@@ -15,11 +16,14 @@ export function EtiketHapi({
   secili,
   onClick,
   kucuk,
+  kaldirIsareti,
 }: {
   label: PlanLabel;
   secili: boolean;
   onClick?: () => void;
   kucuk?: boolean;
+  /** Seçiliyken × göster: tıklamanın etiketi bloktan çıkaracağı belli olsun. */
+  kaldirIsareti?: boolean;
 }) {
   const c = useThemeColors();
   return (
@@ -46,8 +50,23 @@ export function EtiketHapi({
     >
       <span style={{ width: 9, height: 9, borderRadius: 5, background: label.color, flexShrink: 0 }} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{label.name}</span>
+      {kaldirIsareti && secili && (
+        <span aria-hidden style={{ fontSize: 13, lineHeight: 1, color: c.textSecondary, marginLeft: 1 }}>
+          ×
+        </span>
+      )}
     </button>
   );
+}
+
+/**
+ * Yeni etiketin varsayılan rengi: henüz kullanılmayan ilk palet rengi — art
+ * arda açılan etiketlerin hepsi kırmızı olmasın. Sunucu Lio için aynı kuralı
+ * uyguluyor (PlanningService.resolveLabelNames).
+ */
+export function siradakiEtiketRengi(labels: PlanLabel[]): string | undefined {
+  const kullanilan = new Set(labels.map((l) => l.color.toUpperCase()));
+  return etiketRenkleri.find((r) => !kullanilan.has(r.toUpperCase()));
 }
 
 /** Paletten renk seçimi — serbest renk yok (bkz. `etiketRenkleri`). */
@@ -93,10 +112,13 @@ export function YeniEtiketFormu({
   onCreated,
   onCancel,
   varsayilanRenk,
+  odaklan = true,
 }: {
   onCreated: (label: PlanLabel) => void;
   onCancel?: () => void;
   varsayilanRenk?: string;
+  /** Düzenleme listesinin altında durduğunda odak çalınmasın. */
+  odaklan?: boolean;
 }) {
   const c = useThemeColors();
   const t = useT();
@@ -126,7 +148,7 @@ export function YeniEtiketFormu({
       style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}
     >
       <input
-        autoFocus
+        autoFocus={odaklan}
         value={ad}
         maxLength={40}
         onChange={(e) => setAd(e.target.value)}
@@ -169,52 +191,82 @@ export function YeniEtiketFormu({
 /**
  * Blok penceresindeki çoklu etiket seçimi. Yeni etiket buradan da açılabilir —
  * etiket ihtiyacı çoğu zaman bir bloğu düzenlerken doğuyor, ayrı bir yönetim
- * ekranına gidip geri dönmek o anı kaçırtıyordu.
+ * ekranına gidip geri dönmek o anı kaçırtıyordu. Aynı sebeple "Düzenle" ile
+ * sıra, ad, renk ve silme de burada açılır.
  */
 export default function PlanEtiketSecici({
   labels,
   seciliIdler,
   onChange,
-  onLabelCreated,
+  onLabelsChanged,
 }: {
   labels: PlanLabel[];
   seciliIdler: string[];
   onChange: (ids: string[]) => void;
-  onLabelCreated: (label: PlanLabel) => void;
+  /** Etiket listesi değişti (yeni, silinen, yeniden adlandırılan, sıra). */
+  onLabelsChanged: (labels: PlanLabel[]) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
   const [formAcik, setFormAcik] = useState(false);
+  const [duzenle, setDuzenle] = useState(false);
 
   const degistir = (id: string) =>
     onChange(seciliIdler.includes(id) ? seciliIdler.filter((x) => x !== id) : [...seciliIdler, id]);
 
-  // Yeni etiketin varsayılan rengi, henüz kullanılmayan ilk palet rengi:
-  // art arda açılan etiketlerin hepsi kırmızı olmasın.
-  const kullanilan = new Set(labels.map((l) => l.color.toUpperCase()));
-  const siradakiRenk = etiketRenkleri.find((r) => !kullanilan.has(r.toUpperCase()));
+  const siradakiRenk = siradakiEtiketRengi(labels);
+
+  const kucukDugme: React.CSSProperties = {
+    padding: "3px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    border: `1px dashed ${c.border}`,
+    background: "transparent",
+    color: c.textSecondary,
+    cursor: "pointer",
+  };
+
+  if (duzenle) {
+    return (
+      <div style={{ border: `1px solid ${c.border}`, borderRadius: 10, padding: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+        <EtiketDuzenleyici
+          labels={labels}
+          onChanged={(yeni) => {
+            onLabelsChanged(yeni);
+            // Silinen etiket bu bloğun seçiminden de düşsün; yoksa kaydederken
+            // sunucu "Etiket bulunamadı" derdi.
+            const kalan = seciliIdler.filter((id) => yeni.some((l) => l.id === id));
+            if (kalan.length !== seciliIdler.length) onChange(kalan);
+          }}
+        />
+        <button type="button" onClick={() => setDuzenle(false)} style={{ ...kucukDugme, alignSelf: "flex-end", borderStyle: "solid" }}>
+          {t("Bitti")}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {labels.map((l) => (
-          <EtiketHapi key={l.id} label={l} secili={seciliIdler.includes(l.id)} onClick={() => degistir(l.id)} kucuk />
+          <EtiketHapi
+            key={l.id}
+            label={l}
+            secili={seciliIdler.includes(l.id)}
+            onClick={() => degistir(l.id)}
+            kucuk
+            kaldirIsareti
+          />
         ))}
         {!formAcik && (
-          <button
-            type="button"
-            onClick={() => setFormAcik(true)}
-            style={{
-              padding: "3px 10px",
-              borderRadius: 999,
-              fontSize: 12,
-              border: `1px dashed ${c.border}`,
-              background: "transparent",
-              color: c.textSecondary,
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" onClick={() => setFormAcik(true)} style={kucukDugme}>
             + {t("Yeni etiket")}
+          </button>
+        )}
+        {!formAcik && labels.length > 0 && (
+          <button type="button" onClick={() => setDuzenle(true)} style={{ ...kucukDugme, border: "none", textDecoration: "underline" }}>
+            {t("Düzenle")}
           </button>
         )}
       </div>
@@ -223,7 +275,7 @@ export default function PlanEtiketSecici({
           varsayilanRenk={siradakiRenk}
           onCancel={() => setFormAcik(false)}
           onCreated={(label) => {
-            onLabelCreated(label);
+            onLabelsChanged([...labels, label]);
             onChange([...seciliIdler, label.id]);
             setFormAcik(false);
           }}

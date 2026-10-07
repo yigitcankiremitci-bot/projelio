@@ -86,6 +86,7 @@ export const planning = {
   createLabel: (body: { name: string; color: string }) => api.post<PlanLabel>("/planning/labels", body),
   updateLabel: (id: string, body: { name?: string; color?: string }) => api.patch<PlanLabel>(`/planning/labels/${id}`, body),
   deleteLabel: (id: string) => api.delete<{ ok: true }>(`/planning/labels/${id}`),
+  reorderLabels: (ids: string[]) => api.patch<PlanLabel[]>("/planning/labels/reorder", { ids }),
 
   // Dönemler
   getPeriod: (kind: PlanPeriodKind, date: string) =>

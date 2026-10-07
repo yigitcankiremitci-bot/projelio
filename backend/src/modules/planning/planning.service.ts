@@ -401,6 +401,29 @@ export class PlanningService {
     return mapLabel(data);
   }
 
+  /**
+   * Sıra önemli: bloğun rengi ilk etiketinkidir (bkz. PlanGrid BlockCard),
+   * yani sırayı değiştirmek blokların rengini de değiştirir. Hata yutulmaz —
+   * yarım kalmış bir sıralama arayüzde "kaydedildi" görünmesin.
+   */
+  async reorderLabels(userId: string, ids: string[]): Promise<PlanLabel[]> {
+    if (!Array.isArray(ids)) throw new BadRequestException("Etiket listesi geçersiz.");
+    const tekil = [...new Set(ids.filter((x) => typeof x === "string" && x))];
+    await this.assertLabelOwner(userId, tekil);
+    const sonuclar = await Promise.all(
+      tekil.map((id, index) =>
+        this.supabase.client
+          .from("plan_labels")
+          .update({ sort_order: index, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("user_id", userId)
+      )
+    );
+    const hata = sonuclar.find((r) => r.error)?.error;
+    if (hata) throw hata;
+    return this.listLabels(userId);
+  }
+
   /** Kalıcı siler; bloklardaki izi cascade ile gider (bkz. migration 150). */
   async deleteLabel(userId: string, id: string): Promise<{ ok: true }> {
     const { data, error } = await this.supabase.client

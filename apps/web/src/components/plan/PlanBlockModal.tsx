@@ -245,8 +245,8 @@ export default function PlanBlockModal({ block, draft, focusAreas, labels, onLab
         labels={etiketler}
         seciliIdler={labelIds}
         onChange={setLabelIds}
-        onLabelCreated={(label) => {
-          setEtiketler((list) => [...list, label]);
+        onLabelsChanged={(list) => {
+          setEtiketler(list);
           onLabelsChanged?.();
         }}
       />

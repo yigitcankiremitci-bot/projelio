@@ -178,6 +178,10 @@ export const ilkAdimlar: TranslationDict = {
   "Henüz etiketin yok.": "You don't have any labels yet.",
   "Rengi değiştir": "Change color",
   "Yeni etiket": "New label",
+  "Birden çok etiketli blok, bu listede en üstte olan etiketinin rengini alır.":
+    "A block with several labels takes the color of whichever is highest in this list.",
+  "Etiket adı": "Label name",
+  "Sıra kaydedilemedi.": "Couldn't save the order.",
   "\"{name}\" etiketi silinsin mi? Bloklardan da kaldırılır, bloklar silinmez.":
     "Delete the \"{name}\" label? It will be removed from blocks; the blocks themselves stay.",
   "Etiketler bloklarını renkle işaretler; bir bloğa birden çok etiket takabilirsin. Takvimin üstündeki şeritten etikete göre süzebilirsin.":

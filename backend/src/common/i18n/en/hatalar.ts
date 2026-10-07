@@ -1046,4 +1046,13 @@ export const hatalar: TranslationDict = {
     "Couldn't fetch posts right now; will retry tonight.",
   "Meta şu an yanıt vermedi; gece yeniden denenecek.":
     "Meta didn't respond right now; will retry tonight.",
+  "\"{name}\" adında bir etiketin zaten var.": "You already have a label named \"{name}\".",
+  "Bu adda bir etiketin zaten var.": "You already have a label with this name.",
+  "En fazla {n} etiket oluşturabilirsin.": "You can create at most {n} labels.",
+  "Etiket adı boş olamaz.": "Label name can't be empty.",
+  "Etiket adı en fazla {n} karakter olabilir.": "Label name can be at most {n} characters.",
+  "Etiket bulunamadı.": "Label not found.",
+  "Etiket listesi geçersiz.": "Invalid label list.",
+  "Etiket listesi çok uzun.": "Label list is too long.",
+  "Etiket rengi geçersiz.": "Invalid label color.",
 };

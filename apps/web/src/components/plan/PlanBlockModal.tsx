@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { PlanFocusArea, PlanTimeBlock } from "@projelio/shared";
+import type { PlanFocusArea, PlanLabel, PlanTimeBlock } from "@projelio/shared";
 import Modal from "../Modal";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { planning, type PlanBlockInput } from "../../api/planning";
@@ -7,6 +7,8 @@ import { formatDuration, timeToMinutes } from "../../lib/planGrid";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "./PlanTargetsModal";
 import { useT } from "../../lib/i18n";
 import { googleTakvimApi } from "../../api/googleTakvim";
+import PlanEtiketSecici from "./PlanEtiketSecici";
+import { IconCheck } from "../icons";
 
 interface Props {
   /** Var olan blok düzenleniyorsa dolu; yeni blokta boş. */
@@ -14,6 +16,10 @@ interface Props {
   /** Yeni blok için ön doldurulmuş değerler (grid'de çift tıklanan saat). */
   draft?: { blockDate: string; startsAt: string; endsAt: string };
   focusAreas: PlanFocusArea[];
+  /** Kullanıcının tüm etiketleri. */
+  labels: PlanLabel[];
+  /** Pencereden yeni etiket açıldığında takvimin listesi de tazelensin. */
+  onLabelsChanged?: () => void;
   onClose: () => void;
   onSaved: () => void;
   /** Google Takvim bağlı ve çalışıyor mu. false → "Google'a da ekle" seçeneği hiç görünmez. */
@@ -29,7 +35,7 @@ interface Props {
  * ona ayrılan zamandır. Modal bunu kullanıcıya açıkça söylüyor: takvimden bir
  * kutuyu kaldırırken "işim de gitti mi?" diye tereddüt etmemeli.
  */
-export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSaved, googleBagli, googleda }: Props) {
+export default function PlanBlockModal({ block, draft, focusAreas, labels, onLabelsChanged, onClose, onSaved, googleBagli, googleda }: Props) {
   const c = useThemeColors();
   const t = useT();
   const editing = Boolean(block);
@@ -40,6 +46,10 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
   const [title, setTitle] = useState(block?.title ?? "");
   const [note, setNote] = useState(block?.note ?? "");
   const [focusAreaId, setFocusAreaId] = useState(block?.focusAreaId ?? "");
+  const [labelIds, setLabelIds] = useState<string[]>(() => (block?.labels ?? []).map((l) => l.id));
+  // Pencerede açılan etiket hemen seçici listesinde görünsün; takvimin
+  // listesi ayrıca tazelenir ama o istek bitene kadar beklenmez.
+  const [etiketler, setEtiketler] = useState<PlanLabel[]>(labels);
   const [googleaEkle, setGoogleaEkle] = useState(Boolean(googleda));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +71,7 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         title: title.trim() || undefined,
         note: note.trim() || undefined,
         focusAreaId: focusAreaId || null,
+        labelIds,
       };
       let blockId = block?.id;
       if (block) {
@@ -88,6 +99,39 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
     } catch (err: any) {
       setError(String(err?.message ?? t("Blok kaydedilemedi.")));
     } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Tamamlandı / geri al. Takvimdeki küçük onay kutusuna isabet ettirmek zordu
+   * ve ıskalanan her tık bu pencereyi açıyordu; pencere açıldıysa iş buradan
+   * da bitirilebilsin. Formdaki kaydedilmemiş değişiklikler de birlikte
+   * kaydedilir — "tamamladım" demek düzenlemeyi çöpe atmamalı.
+   */
+  const tamamlaDegistir = async () => {
+    if (!block) return;
+    if (minutes <= 0) {
+      setError(t("Bitiş saati başlangıçtan sonra olmalı."));
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await planning.updateBlock(block.id, {
+        blockDate,
+        startsAt,
+        endsAt,
+        title: title.trim() || undefined,
+        note: note.trim() || undefined,
+        focusAreaId: focusAreaId || null,
+        labelIds,
+      });
+      await planning.setBlockStatus(block.id, block.status === "done" ? "planned" : "done");
+      onSaved();
+      onClose();
+    } catch (err: any) {
+      setError(String(err?.message ?? t("Blok kaydedilemedi.")));
       setSaving(false);
     }
   };
@@ -121,6 +165,40 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
         >
           {t("Bağlı iş:")} <strong style={{ color: c.textPrimary, fontWeight: 500 }}>{block.linkedTitle}</strong>
         </div>
+      )}
+
+      {block && (
+        <button
+          type="button"
+          onClick={tamamlaDegistir}
+          disabled={saving}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "10px 14px",
+            marginBottom: 16,
+            fontSize: 14,
+            fontWeight: 500,
+            borderRadius: 9,
+            border: `1px solid ${c.completed}`,
+            background: block.status === "done" ? c.surface : c.completed,
+            color: block.status === "done" ? c.completed : c.onPrimary,
+            cursor: saving ? "default" : "pointer",
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {block.status === "done" ? (
+            t("Tamamlandı · geri al")
+          ) : (
+            <>
+              <IconCheck size={16} />
+              {t("Tamamlandı olarak işaretle")}
+            </>
+          )}
+        </button>
       )}
 
       <label style={labelStyle(c)}>{t("Başlık")}</label>
@@ -161,6 +239,17 @@ export default function PlanBlockModal({ block, draft, focusAreas, onClose, onSa
       <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 4 }}>
         {t("Odak alanı seçilmeyen bloklar dağılım raporunda \"plan dışı\" görünür.")}
       </div>
+
+      <label style={{ ...labelStyle(c), marginTop: 14 }}>{t("Etiketler")}</label>
+      <PlanEtiketSecici
+        labels={etiketler}
+        seciliIdler={labelIds}
+        onChange={setLabelIds}
+        onLabelCreated={(label) => {
+          setEtiketler((list) => [...list, label]);
+          onLabelsChanged?.();
+        }}
+      />
 
       <label style={{ ...labelStyle(c), marginTop: 14 }}>{t("Not")}</label>
       <textarea

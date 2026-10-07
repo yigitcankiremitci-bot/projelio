@@ -104,6 +104,29 @@ export class PlanningController {
     return this.planning.archiveFocusArea(req.user.userId, id);
   }
 
+  // ---------------------------------------------------------------- Etiketler
+
+  @Get("labels")
+  listLabels(@Req() req: any) {
+    return this.planning.listLabels(req.user.userId);
+  }
+
+  @Post("labels")
+  createLabel(@Req() req: any, @Body() body: { name?: string; color?: string }) {
+    return this.planning.createLabel(req.user.userId, body);
+  }
+
+  @Patch("labels/:id")
+  updateLabel(@Req() req: any, @Param("id") id: string, @Body() body: { name?: string; color?: string }) {
+    return this.planning.updateLabel(req.user.userId, id, body);
+  }
+
+  /** Kalıcı siler: etiketler raporlara girmiyor, arşivlemenin koruyacağı bir geçmiş yok. */
+  @Delete("labels/:id")
+  deleteLabel(@Req() req: any, @Param("id") id: string) {
+    return this.planning.deleteLabel(req.user.userId, id);
+  }
+
   // ----------------------------------------------------------------- Dönemler
 
   @Get("periods")

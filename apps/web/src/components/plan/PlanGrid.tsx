@@ -21,6 +21,7 @@ import {
 } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
 import { etkinlikleriGunlereDagit, type EtkinlikParcasi } from "../../lib/googleTakvimGorunum";
+import { IconCheck } from "../icons";
 
 interface Props {
   from: string;
@@ -523,7 +524,10 @@ function BlockCard({
   // Başlık sığdığı kadar satıra yayılır. Tek satıra kesildiğinde hafta
   // görünümünün dar sütunlarında yalnızca ilk kelime okunabiliyordu.
   const detayVar = height > 40;
-  const baslikSatiri = Math.max(1, Math.floor((height - 8 - (detayVar ? 14 : 0)) / 15));
+  const etiketler = block.labels ?? [];
+  // Etiket satırı yalnızca başlığa en az bir satır bıraktığında çizilir.
+  const etiketSatiri = etiketler.length > 0 && height > 52;
+  const baslikSatiri = Math.max(1, Math.floor((height - 8 - (detayVar ? 14 : 0) - (etiketSatiri ? 18 : 0)) / 17));
 
   return (
     <div
@@ -560,32 +564,65 @@ function BlockCard({
         zIndex: 2,
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 4 }}>
+      {!etiketSatiri && etiketler.length > 0 && (
+        // Kısa blokta etiket satırına yer yok: sağ üstte yalnızca renk noktaları.
+        <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2, pointerEvents: "none" }}>
+          {etiketler.slice(0, 4).map((l) => (
+            <span key={l.id} style={{ width: 6, height: 6, borderRadius: 3, background: l.color }} />
+          ))}
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+        {/* Görünen kutu 18 px, tıklama alanı 30 px: eskiden 13 px'lik kutuyu
+            ıskalayan her tık bloğun penceresini açıyordu. Negatif kenar
+            boşluğu büyük alanın kartın düzenini itmemesi için. Iskalanan
+            tıklar için pencerede ayrıca "Tamamlandı" düğmesi var. */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggleDone();
           }}
+          onMouseDown={(e) => e.stopPropagation()}
+          draggable={false}
           aria-label={done ? t("Tamamlandı işaretini kaldır") : t("Tamamlandı işaretle")}
+          title={done ? t("Tamamlandı işaretini kaldır") : t("Tamamlandı işaretle")}
           className="plan-blok-onay"
           style={{
-            width: 13,
-            height: 13,
-            marginTop: 2,
+            width: 30,
+            height: 30,
+            margin: "-6px -4px -6px -7px",
             flexShrink: 0,
-            borderRadius: 4,
-            border: `1.5px solid ${done ? c.completed : c.border}`,
-            background: done ? c.completed : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "none",
+            background: "transparent",
             padding: 0,
             cursor: "pointer",
           }}
-        />
+        >
+          <span
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: 5,
+              border: `2px solid ${done ? c.completed : c.textSecondary}`,
+              background: done ? c.completed : c.surface,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxSizing: "border-box",
+            }}
+          >
+            {done && <IconCheck size={12} color={c.onPrimary} />}
+          </span>
+        </button>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             className="plan-blok-baslik"
             style={{
               fontSize: 12,
-              lineHeight: "15px",
+              lineHeight: "17px",
               fontWeight: 500,
               color: done ? c.completed : c.textPrimary,
               textDecoration: done ? "line-through" : undefined,
@@ -602,6 +639,35 @@ function BlockCard({
               {block.startsAt}–{block.endsAt} · {formatDuration(block.plannedMinutes)}
               {block.source === "lio" && block.status === "planned" ? " · Lio" : ""}
               {googleda ? ` · ${t("Google")}` : ""}
+            </div>
+          )}
+          {etiketSatiri && (
+            <div style={{ display: "flex", gap: 3, marginTop: 3, overflow: "hidden" }}>
+              {etiketler.map((l) => (
+                <span
+                  key={l.id}
+                  title={l.name}
+                  className="plan-etiket"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    flexShrink: 0,
+                    maxWidth: 90,
+                    height: 14,
+                    padding: "0 5px",
+                    borderRadius: 7,
+                    fontSize: 10,
+                    lineHeight: "14px",
+                    background: `${l.color}2E`,
+                    color: c.textPrimary,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: 3, background: l.color, flexShrink: 0 }} />
+                  <span className="plan-etiket-ad" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
+                </span>
+              ))}
             </div>
           )}
         </div>

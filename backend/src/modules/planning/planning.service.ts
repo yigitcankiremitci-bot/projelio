@@ -5,6 +5,7 @@ import type {
   PlanBlockStatus,
   PlanCalendarView,
   PlanFocusArea,
+  PlanLabel,
   PlanPeriod,
   PlanPeriodKind,
   PlanPeriodProgress,
@@ -60,6 +61,19 @@ const PERIOD_KINDS: PlanPeriodKind[] = ["day", "week", "month"];
 const BLOCK_STATUSES: PlanBlockStatus[] = ["planned", "done", "skipped"];
 const BLOCK_SOURCES: PlanBlockSource[] = ["manual", "lio", "routine"];
 const RITUAL_KINDS: PlanRitualKind[] = ["daily", "weekly", "monthly"];
+
+/**
+ * Blok okumalarının ortak seçimi. Etiketler ara tablo üzerinden gömülür
+ * (migration 150); tek yerde durmasının sebebi, bir okuma yolunun etiketleri
+ * unutup arayüzde blokları "etiketsiz" göstermesi.
+ */
+const BLOCK_SELECT =
+  "*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status), plan_block_labels(plan_labels(id, name, color, sort_order))";
+
+/** Kullanıcı başına etiket tavanı — filtre şeridi ve seçici bundan uzun bir listeyi taşıyamaz. */
+const LABEL_LIMIT = 60;
+const LABEL_NAME_MAX = 40;
+const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 /** Takvimin yan sütununda gösterilen "henüz planlanmamış" kart sayısı. */
 const UNSCHEDULED_LIMIT = 40;
@@ -269,6 +283,111 @@ export class PlanningService {
       )
     );
     return { ok: true };
+  }
+
+  // ======================================================================= Etiketler
+
+  async listLabels(userId: string): Promise<PlanLabel[]> {
+    const { data, error } = await this.supabase.client
+      .from("plan_labels")
+      .select("id, name, color, sort_order")
+      .eq("user_id", userId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(LABEL_LIMIT);
+    if (error) throw error;
+    return (data ?? []).map(mapLabel);
+  }
+
+  async createLabel(userId: string, body: { name?: string; color?: string }): Promise<PlanLabel> {
+    const name = normalizeLabelName(body.name);
+    const color = assertLabelColor(body.color);
+
+    const { data: mevcut, error: sayimHatasi } = await this.supabase.client
+      .from("plan_labels")
+      .select("sort_order")
+      .eq("user_id", userId)
+      .order("sort_order", { ascending: false })
+      .limit(LABEL_LIMIT);
+    if (sayimHatasi) throw sayimHatasi;
+    if ((mevcut ?? []).length >= LABEL_LIMIT) {
+      throw new BadRequestException(hataMetni("En fazla {n} etiket oluşturabilirsin.", { n: LABEL_LIMIT }));
+    }
+
+    const { data, error } = await this.supabase.client
+      .from("plan_labels")
+      .insert({ user_id: userId, name, color, sort_order: (mevcut?.[0]?.sort_order ?? -1) + 1 })
+      .select("id, name, color, sort_order")
+      .single();
+    if (error) {
+      if (error.code === "23505") throw new BadRequestException(hataMetni("\"{name}\" adında bir etiketin zaten var.", { name }));
+      throw error;
+    }
+    return mapLabel(data);
+  }
+
+  async updateLabel(userId: string, id: string, body: { name?: string; color?: string }): Promise<PlanLabel> {
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (body.name !== undefined) patch.name = normalizeLabelName(body.name);
+    if (body.color !== undefined) patch.color = assertLabelColor(body.color);
+
+    const { data, error } = await this.supabase.client
+      .from("plan_labels")
+      .update(patch)
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id, name, color, sort_order")
+      .maybeSingle();
+    if (error) {
+      if (error.code === "23505") throw new BadRequestException("Bu adda bir etiketin zaten var.");
+      throw error;
+    }
+    if (!data) throw new NotFoundException("Etiket bulunamadı.");
+    return mapLabel(data);
+  }
+
+  /** Kalıcı siler; bloklardaki izi cascade ile gider (bkz. migration 150). */
+  async deleteLabel(userId: string, id: string): Promise<{ ok: true }> {
+    const { data, error } = await this.supabase.client
+      .from("plan_labels")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new NotFoundException("Etiket bulunamadı.");
+    return { ok: true };
+  }
+
+  /**
+   * Bloğun etiketlerini verilen listeyle DEĞİŞTİRİR (ekle/çıkar değil). Ara
+   * tabloda user_id yok; bu yüzden hem bloğun hem her etiketin bu kullanıcıya
+   * ait olduğu yazmadan önce doğrulanır — başkasının etiket id'sini bloğuna
+   * takmak, o etiketin adını ve rengini okumak demek olurdu.
+   */
+  private async setBlockLabels(userId: string, blockId: string, labelIds: string[]): Promise<void> {
+    if (!Array.isArray(labelIds)) throw new BadRequestException("Etiket listesi geçersiz.");
+    const ids = [...new Set(labelIds.filter((x) => typeof x === "string" && x))];
+    if (ids.length > LABEL_LIMIT) throw new BadRequestException("Etiket listesi çok uzun.");
+
+    if (ids.length > 0) {
+      const { data, error } = await this.supabase.client
+        .from("plan_labels")
+        .select("id")
+        .eq("user_id", userId)
+        .in("id", ids);
+      if (error) throw error;
+      if ((data ?? []).length !== ids.length) throw new NotFoundException("Etiket bulunamadı.");
+    }
+
+    const { error: silmeHatasi } = await this.supabase.client.from("plan_block_labels").delete().eq("block_id", blockId);
+    if (silmeHatasi) throw silmeHatasi;
+    if (ids.length === 0) return;
+    const { error } = await this.supabase.client
+      .from("plan_block_labels")
+      .insert(ids.map((labelId) => ({ block_id: blockId, label_id: labelId })));
+    if (error) throw error;
   }
 
   // ======================================================================== Dönemler
@@ -506,7 +625,7 @@ export class PlanningService {
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
       .select(
-        "*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)"
+        BLOCK_SELECT
       )
       .eq("user_id", userId)
       .gte("block_date", from)
@@ -523,9 +642,13 @@ export class PlanningService {
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
       .insert({ user_id: userId, ...row })
-      .select("*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)")
+      .select(BLOCK_SELECT)
       .single();
     if (error) throw error;
+    if (body.labelIds !== undefined && body.labelIds.length > 0) {
+      await this.setBlockLabels(userId, data.id, body.labelIds);
+      return this.findBlock(userId, data.id);
+    }
     return mapBlock(data);
   }
 
@@ -540,13 +663,18 @@ export class PlanningService {
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
       .insert(rows)
-      .select("*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)");
+      .select(BLOCK_SELECT);
     if (error) throw error;
     return (data ?? []).map(mapBlock);
   }
 
   async updateBlock(userId: string, id: string, body: BlockInput): Promise<PlanTimeBlock> {
     const patch = await this.buildBlockRow(userId, body, false);
+    if (body.labelIds !== undefined) {
+      // Sahiplik önce: findBlock başkasının bloğunda NotFound fırlatır.
+      await this.findBlock(userId, id);
+      await this.setBlockLabels(userId, id, body.labelIds);
+    }
     if (Object.keys(patch).length === 0) return this.findBlock(userId, id);
 
     const { data, error } = await this.supabase.client
@@ -554,7 +682,7 @@ export class PlanningService {
       .update({ ...patch, updated_at: new Date().toISOString() })
       .eq("id", id)
       .eq("user_id", userId)
-      .select("*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)")
+      .select(BLOCK_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Blok bulunamadı.");
@@ -624,7 +752,7 @@ export class PlanningService {
       .update(patch)
       .eq("id", id)
       .eq("user_id", userId)
-      .select("*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)")
+      .select(BLOCK_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new NotFoundException("Blok bulunamadı.");
@@ -670,7 +798,7 @@ export class PlanningService {
   private async findBlock(userId: string, id: string): Promise<PlanTimeBlock> {
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
-      .select("*, plan_focus_areas(name, color), tasks(title, status), personal_todos(title, status)")
+      .select(BLOCK_SELECT)
       .eq("id", id)
       .eq("user_id", userId)
       .maybeSingle();
@@ -1037,10 +1165,11 @@ export class PlanningService {
     const start = normalizePeriodStart(k, date);
     const end = periodEnd(k, start);
 
-    const [period, blocks, focusAreas, ritual, preferences] = await Promise.all([
+    const [period, blocks, focusAreas, labels, ritual, preferences] = await Promise.all([
       this.ensurePeriod(userId, k, start),
       this.listBlocks(userId, start, end),
       this.listFocusAreas(userId),
+      this.listLabels(userId),
       this.getDueRitual(userId),
       this.getPreferences(userId),
     ]);
@@ -1056,7 +1185,7 @@ export class PlanningService {
       this.listUnscheduled(userId, blocks),
     ]);
 
-    return { kind: k, from: start, to: end, preferences, blocks, unscheduled, focusAreas, progress, ritual };
+    return { kind: k, from: start, to: end, preferences, blocks, unscheduled, focusAreas, labels, progress, ritual };
   }
 
   /**
@@ -1381,6 +1510,8 @@ export interface BlockInput {
   taskId?: string | null;
   personalTodoId?: string | null;
   source?: PlanBlockSource;
+  /** Verilirse bloğun etiketleri bu listeyle DEĞİŞTİRİLİR; boş dizi hepsini kaldırır. */
+  labelIds?: string[];
 }
 
 /**
@@ -1546,7 +1677,30 @@ function mapBlock(row: any): PlanTimeBlock {
     actualMinutes: row.actual_minutes ?? undefined,
     completedAt: row.completed_at ?? undefined,
     sortOrder: row.sort_order ?? 0,
+    labels: ((row.plan_block_labels ?? []) as any[])
+      .map((bl) => bl.plan_labels)
+      .filter(Boolean)
+      .map(mapLabel)
+      .sort((a, b) => a.sortOrder - b.sortOrder),
   };
+}
+
+function mapLabel(row: any): PlanLabel {
+  return { id: row.id, name: row.name, color: row.color, sortOrder: row.sort_order ?? 0 };
+}
+
+function normalizeLabelName(value: string | undefined): string {
+  const name = (value ?? "").trim().replace(/\s+/g, " ");
+  if (!name) throw new BadRequestException("Etiket adı boş olamaz.");
+  if (name.length > LABEL_NAME_MAX) {
+    throw new BadRequestException(hataMetni("Etiket adı en fazla {n} karakter olabilir.", { n: LABEL_NAME_MAX }));
+  }
+  return name;
+}
+
+function assertLabelColor(value: string | undefined): string {
+  if (!value || !HEX_COLOR.test(value)) throw new BadRequestException("Etiket rengi geçersiz.");
+  return value.toUpperCase();
 }
 
 function mapProgressRow(row: any): PlanProgressRow {

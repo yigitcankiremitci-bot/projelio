@@ -2527,6 +2527,19 @@ export interface PlanFocusArea {
   createdAt: string;
 }
 
+/**
+ * Takvim bloğuna takılan renkli etiket (migration 150). Odak alanından ayrı:
+ * odak alanı blok başına tektir ve hedef/dağılım raporuna sayılır; etiket
+ * serbest bir işarettir, bir bloğa birden çok takılabilir.
+ */
+export interface PlanLabel {
+  id: string;
+  name: string;
+  /** #RRGGBB — arayüz yalnızca `etiketRenkleri` paletinden seçtirir. */
+  color: string;
+  sortOrder: number;
+}
+
 export type PlanPeriodKind = "day" | "week" | "month";
 export type PlanPeriodStatus = "draft" | "active" | "closed";
 
@@ -2618,6 +2631,8 @@ export interface PlanTimeBlock {
   actualMinutes?: number;
   completedAt?: string;
   sortOrder: number;
+  /** Takılı etiketler, etiketlerin kendi sırasıyla. */
+  labels: PlanLabel[];
 }
 
 /**
@@ -2798,6 +2813,8 @@ export interface PlanCalendarView {
   /** Görünüm aralığına düşen, henüz bloğa bağlanmamış görevler. */
   unscheduled: PersonalBoardItem[];
   focusAreas: PlanFocusArea[];
+  /** Kullanıcının tüm etiketleri — blok penceresi ve filtre şeridi buradan beslenir. */
+  labels: PlanLabel[];
   progress: PlanPeriodProgress;
   /** Bugün bekleyen ritüel varsa dolu. */
   ritual?: PlanRitualPrompt;

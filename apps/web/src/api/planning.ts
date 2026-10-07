@@ -2,6 +2,7 @@ import type {
   PlanBlockStatus,
   PlanCalendarView,
   PlanFocusArea,
+  PlanLabel,
   PlanPeriod,
   PlanPeriodKind,
   PlanPeriodProgress,
@@ -22,6 +23,8 @@ export interface PlanBlockInput {
   note?: string;
   color?: string;
   focusAreaId?: string | null;
+  /** Verilirse bloğun etiketleri bu listeyle değiştirilir. */
+  labelIds?: string[];
   taskId?: string | null;
   personalTodoId?: string | null;
   source?: "manual" | "lio" | "routine";
@@ -78,6 +81,11 @@ export const planning = {
     api.patch<PlanFocusArea>(`/planning/focus-areas/${id}`, body),
   archiveFocusArea: (id: string) => api.delete<{ ok: true }>(`/planning/focus-areas/${id}`),
   reorderFocusAreas: (ids: string[]) => api.patch<{ ok: true }>("/planning/focus-areas/reorder", { ids }),
+
+  listLabels: () => api.get<PlanLabel[]>("/planning/labels"),
+  createLabel: (body: { name: string; color: string }) => api.post<PlanLabel>("/planning/labels", body),
+  updateLabel: (id: string, body: { name?: string; color?: string }) => api.patch<PlanLabel>(`/planning/labels/${id}`, body),
+  deleteLabel: (id: string) => api.delete<{ ok: true }>(`/planning/labels/${id}`),
 
   // Dönemler
   getPeriod: (kind: PlanPeriodKind, date: string) =>

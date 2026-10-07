@@ -34,6 +34,8 @@ import PlanMonthGrid from "../components/plan/PlanMonthGrid";
 import PlanProgressPanel from "../components/plan/PlanProgressPanel";
 import PlanTargetsModal from "../components/plan/PlanTargetsModal";
 import PlanBlockModal from "../components/plan/PlanBlockModal";
+import PlanEtiketYonetimi from "../components/plan/PlanEtiketYonetimi";
+import { EtiketHapi } from "../components/plan/PlanEtiketSecici";
 import RitualCard from "../components/plan/RitualCard";
 import SchedulePickerPanel from "../components/plan/SchedulePickerPanel";
 import { useT } from "../lib/i18n";
@@ -74,6 +76,11 @@ export default function CalendarView() {
   const [editingBlock, setEditingBlock] = useState<PlanTimeBlock | null>(null);
   const [draftBlock, setDraftBlock] = useState<{ blockDate: string; startsAt: string; endsAt: string } | null>(null);
   const [targetsOpen, setTargetsOpen] = useState(false);
+  const [etiketYonetimi, setEtiketYonetimi] = useState(false);
+  // Etiket filtresi: seçili etiketlerden HERHANGİ BİRİNİ taşıyan bloklar
+  // görünür. "Hepsini taşıyan" (VE) daha az sezgisel çıktı — iki etiket
+  // seçen kullanıcı ikisinin bloklarını birlikte görmeyi bekliyor.
+  const [etiketFiltresi, setEtiketFiltresi] = useState<string[]>([]);
   const [suggestion, setSuggestion] = useState<PlanSuggestionResult | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   // Ritüel kartı kapatıldığında bu oturumda tekrar açılmaz. Sunucu tarafında
@@ -181,6 +188,16 @@ export default function CalendarView() {
   const swipe = useSwipeNavigate(step);
 
   const yanPanel = isDesktop && view !== "week";
+
+  const etiketler = data?.labels ?? [];
+  // Silinmiş etiket filtrede kalırsa hiçbir blok görünmez ve sebebi anlaşılmaz.
+  const etkinFiltre = etiketFiltresi.filter((id) => etiketler.some((l) => l.id === id));
+  const gorunenBloklar = !data
+    ? []
+    : etkinFiltre.length === 0
+      ? data.blocks
+      : // `?? []`: çevrimdışı önbellekte etiketlerden önceki sürümün yanıtı durabilir.
+        data.blocks.filter((b) => (b.labels ?? []).some((l) => etkinFiltre.includes(l.id)));
 
   const periodLabel = useMemo(() => {
     if (!data) return "";
@@ -528,6 +545,48 @@ export default function CalendarView() {
             <span style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary }}>{periodLabel}</span>
           </div>
 
+          {/* ------------------------------------------- Etiket filtresi */}
+          {data && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+              {etiketler.map((l) => (
+                <EtiketHapi
+                  key={l.id}
+                  label={l}
+                  kucuk
+                  secili={etkinFiltre.includes(l.id)}
+                  onClick={() =>
+                    setEtiketFiltresi((f) => (f.includes(l.id) ? f.filter((x) => x !== l.id) : [...f, l.id]))
+                  }
+                />
+              ))}
+              {etkinFiltre.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEtiketFiltresi([])}
+                  style={{ padding: "3px 8px", fontSize: 12, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", textDecoration: "underline" }}
+                >
+                  {t("Filtreyi temizle")}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEtiketYonetimi(true)}
+                style={{
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  border: `1px dashed ${c.border}`,
+                  background: "transparent",
+                  color: c.textSecondary,
+                  cursor: "pointer",
+                  marginLeft: etiketler.length ? "auto" : 0,
+                }}
+              >
+                {etiketler.length ? t("Etiketleri düzenle") : `+ ${t("Etiket oluştur")}`}
+              </button>
+            </div>
+          )}
+
           {/* Kaydırma animasyonu: yeni dönem, gidilen yönün tersinden içeri
               süzülür. Sarmalayıcının overflow'u gizli — animasyon sırasında
               ızgara kenardan taşıp sayfayı yatay kaydırılabilir yapmasın.
@@ -542,7 +601,7 @@ export default function CalendarView() {
             <PlanMonthGrid
               from={data.from}
               to={data.to}
-              blocks={data.blocks}
+              blocks={gorunenBloklar}
               workdays={workdays}
               defaultBlockMinutes={blockMinutes}
               dayStart={dayStart}
@@ -560,7 +619,7 @@ export default function CalendarView() {
             <PlanGrid
               from={data.from}
               to={data.to}
-              blocks={data.blocks}
+              blocks={gorunenBloklar}
               dayStart={dayStart}
               dayEnd={dayEnd}
               workdays={workdays}
@@ -609,6 +668,10 @@ export default function CalendarView() {
       </div>
 
       {/* ----------------------------------------------------------- Modallar */}
+      {etiketYonetimi && (
+        <PlanEtiketYonetimi labels={etiketler} onClose={() => setEtiketYonetimi(false)} onChanged={load} />
+      )}
+
       {data && targetsOpen && (
         <PlanTargetsModal
           period={data.progress.period}
@@ -624,6 +687,8 @@ export default function CalendarView() {
           block={editingBlock ?? undefined}
           draft={draftBlock ?? undefined}
           focusAreas={data.focusAreas}
+          labels={etiketler}
+          onLabelsChanged={load}
           onClose={() => {
             setEditingBlock(null);
             setDraftBlock(null);

@@ -139,3 +139,22 @@ export const sidebarPatterns: Record<SidebarPatternKey, { label: string; backgro
     backgroundSize: "20px 20px",
   },
 };
+
+/**
+ * Takvim etiketlerinin seçilebilir renkleri (migration 150). Serbest renk
+ * seçici yerine sabit palet: kullanıcının seçtiği her renk hem açık hem koyu
+ * zeminde okunur kalmalı, blok kenarındaki odak alanı şeridiyle de
+ * karışmamalı. Tonlar orta doygunlukta — iki temada da aynı değer kullanılıyor.
+ */
+export const etiketRenkleri: readonly string[] = [
+  "#D9534F", // kırmızı
+  "#E8833A", // turuncu
+  "#D4A72C", // hardal
+  "#4FA35B", // yeşil
+  "#2E9E9A", // camgöbeği
+  "#3E7CB1", // mavi
+  "#5B6CC9", // çivit
+  "#8A5BB8", // mor
+  "#C2569A", // pembe
+  "#7D8796", // gri
+];

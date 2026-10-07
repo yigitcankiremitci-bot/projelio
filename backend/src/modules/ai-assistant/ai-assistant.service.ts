@@ -647,6 +647,7 @@ const ACTION_LABELS: Record<string, string> = {
   set_period_plan: "dönem planı kaydedildi",
   create_time_blocks: "zaman bloğu eklendi",
   update_time_block_status: "zaman bloğu güncellendi",
+  set_time_block_labels: "zaman bloğu etiketlendi",
   complete_ritual: "planlama oturumu kapatıldı",
   create_output: "çıktı oluşturuldu",
   update_output: "çıktı güncellendi",
@@ -3176,13 +3177,14 @@ export class AiAssistantService {
       case "set_period_plan":
       case "create_time_blocks":
       case "update_time_block_status":
+      case "set_time_block_labels":
       case "complete_ritual": {
         const label =
           toolName === "set_period_plan"
             ? t("Dönem planı kaydedildi")
             : toolName === "create_time_blocks"
               ? t("Takvime zaman bloğu eklendi")
-              : toolName === "update_time_block_status"
+              : toolName === "update_time_block_status" || toolName === "set_time_block_labels"
                 ? t("Zaman bloğu güncellendi")
                 : t("Planlama oturumu tamamlandı");
         return make(label, "/calendar");
@@ -4432,6 +4434,7 @@ export class AiAssistantService {
             saat: `${b.startsAt}-${b.endsAt}`,
             baslik: b.title ?? b.linkedTitle,
             alan: b.focusAreaName,
+            etiketler: b.labels.length ? b.labels.map((l) => l.name) : undefined,
             durum: b.status,
           })
         );
@@ -4441,6 +4444,9 @@ export class AiAssistantService {
         const incoming: any[] = Array.isArray(input.blocks) ? input.blocks : [];
         const blocks = [];
         for (const b of incoming) {
+          const etiketler = Array.isArray(b.labels)
+            ? await this.planningService.resolveLabelNames(userId, b.labels)
+            : [];
           blocks.push({
             blockDate: b.blockDate,
             startsAt: b.startsAt,
@@ -4449,6 +4455,7 @@ export class AiAssistantService {
             note: b.note,
             taskId: b.taskId,
             focusAreaId: b.focusAreaName ? await this.resolveFocusArea(userId, b.focusAreaName) : undefined,
+            labelIds: etiketler.map((l) => l.id),
             // Lio'nun koyduğu bloklar işaretlenir; kullanıcı "önerileri temizle"
             // dediğinde kendi elle koyduklarıyla karışmasınlar.
             source: "lio" as const,
@@ -4456,6 +4463,16 @@ export class AiAssistantService {
         }
         const created = await this.planningService.createBlocks(userId, blocks);
         return { eklenen: created.length };
+      }
+
+      case "set_time_block_labels": {
+        const block = await this.planningService.changeBlockLabels(
+          userId,
+          String(input.blockId ?? ""),
+          Array.isArray(input.add) ? input.add : [],
+          Array.isArray(input.remove) ? input.remove : []
+        );
+        return { id: block.id, etiketler: block.labels.map((l) => l.name) };
       }
 
       case "update_time_block_status": {

@@ -257,6 +257,7 @@ export const bildirimler: TranslationDict = {
   "dönem planı kaydedildi": "period plan saved",
   "zaman bloğu eklendi": "time block added",
   "zaman bloğu güncellendi": "time block updated",
+  "zaman bloğu etiketlendi": "time block labeled",
   "planlama oturumu kapatıldı": "planning session closed",
   "pano kartı güncellendi": "board card updated",
   "yapılacak eklendi": "to-do added",

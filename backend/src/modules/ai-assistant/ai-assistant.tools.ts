@@ -91,6 +91,7 @@ export const WRITE_TOOLS = new Set<string>([
   "set_period_plan",
   "create_time_blocks",
   "update_time_block_status",
+  "set_time_block_labels",
   "complete_ritual",
   // Google Takvim: kullanıcının kendi takvimine yazar, davetli yok (sendUpdates=none).
   "create_calendar_event",
@@ -1270,6 +1271,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
               focusAreaName: { type: "string", description: "Odak alanının adı. Yoksa oluşturulur." },
               taskId: { type: "string", description: "Kullanıcının erişebildiği bir proje/program görevinin id'si." },
               note: { type: "string" },
+              labels: {
+                type: "array",
+                items: { type: "string" },
+                description: "Renkli etiket adları (ör. [\"Acil\", \"Müşteri A\"]). Olmayan oluşturulur.",
+              },
             },
             required: ["blockDate", "startsAt", "endsAt"],
           },
@@ -1291,6 +1297,24 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         actualMinutes: { type: "number", description: "Gerçekten kaç dakika sürdü (opsiyonel)." },
       },
       required: ["blockId", "status"],
+    },
+  },
+  {
+    name: "set_time_block_labels",
+    description:
+      "Var olan bir takvim bloğuna renkli etiket ekler ya da çıkarır (\"yarınki toplantıya Acil etiketi koy\"). " +
+      "Etiket odak alanından AYRIDIR: rapora sayılmaz, bir bloğa birden çok takılabilir. " +
+      "Adlar büyük/küçük harf duyarsız eşleşir; kullanıcının mevcut etiketleri list_time_blocks çıktısında görünür, " +
+      "aynı anlamdaki bir etiket varsa yenisini açmak yerine onun adını kullan. Olmayan ad otomatik oluşturulur. " +
+      "Bloğun id'sini list_time_blocks ile bul.",
+    input_schema: {
+      type: "object",
+      properties: {
+        blockId: { type: "string" },
+        add: { type: "array", items: { type: "string" }, description: "Eklenecek etiket adları." },
+        remove: { type: "array", items: { type: "string" }, description: "Kaldırılacak etiket adları." },
+      },
+      required: ["blockId"],
     },
   },
   {

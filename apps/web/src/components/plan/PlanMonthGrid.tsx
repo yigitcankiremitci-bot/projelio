@@ -65,21 +65,18 @@ export default function PlanMonthGrid({
   }, [gridStart, to]);
 
   const summary = useMemo(() => {
-    const map = new Map<
-      string,
-      { planned: number; done: number; areas: Map<string, string>; etiketler: Map<string, { name: string; color: string }> }
-    >();
+    const map = new Map<string, { planned: number; done: number; areas: Map<string, string> }>();
     for (const b of blocks) {
       let entry = map.get(b.blockDate);
       if (!entry) {
-        entry = { planned: 0, done: 0, areas: new Map(), etiketler: new Map() };
+        entry = { planned: 0, done: 0, areas: new Map() };
         map.set(b.blockDate, entry);
       }
       if (b.status !== "skipped") entry.planned += b.plannedMinutes;
       if (b.status === "done") entry.done += b.actualMinutes ?? b.plannedMinutes;
       const name = b.focusAreaName ?? b.title ?? b.linkedTitle;
-      if (name) entry.areas.set(name, b.focusAreaColor ?? b.color ?? c.primary);
-      for (const l of b.labels ?? []) entry.etiketler.set(l.id, { name: l.name, color: l.color });
+      // Ay görünümünde de blok rengini etiket belirler (bkz. PlanGrid BlockCard).
+      if (name) entry.areas.set(name, b.labels?.[0]?.color ?? b.focusAreaColor ?? b.color ?? c.primary);
     }
     return map;
   }, [blocks, c.primary]);
@@ -162,15 +159,6 @@ export default function PlanMonthGrid({
                   >
                     {dayOfMonth(day)}
                   </span>
-                  {/* Günün etiketleri: ay görünümünde blok kutusu yok, renk
-                      noktası "o gün Acil iş var mı" sorusunu tek bakışta yanıtlıyor. */}
-                  {entry && entry.etiketler.size > 0 && (
-                    <span style={{ display: "flex", gap: 2, minWidth: 0, overflow: "hidden" }}>
-                      {[...entry.etiketler.values()].slice(0, 5).map((l) => (
-                        <span key={l.name} title={l.name} style={{ width: 7, height: 7, borderRadius: 4, background: l.color, flexShrink: 0 }} />
-                      ))}
-                    </span>
-                  )}
                   {entry && (
                     <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: "auto" }}>
                       {formatDuration(entry.planned)}

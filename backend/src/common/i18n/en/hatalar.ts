@@ -1055,4 +1055,5 @@ export const hatalar: TranslationDict = {
   "Etiket listesi geçersiz.": "Invalid label list.",
   "Etiket listesi çok uzun.": "Label list is too long.",
   "Etiket rengi geçersiz.": "Invalid label color.",
+  "Bir bloğa tek seferde en fazla 10 etiket verilebilir.": "At most 10 labels can be given to a block at once.",
 };

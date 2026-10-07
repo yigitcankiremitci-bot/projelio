@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { etiketRenkleri } from "@projelio/shared";
 import type {
   PersonalBoardItem,
   PlanBlockSource,
@@ -287,6 +288,60 @@ export class PlanningService {
 
   // ======================================================================= Etiketler
 
+  /** Verilen etiket id'lerinin HEPSİ bu kullanıcıya ait mi; değilse NotFound. */
+  private async assertLabelOwner(userId: string, ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    if (ids.length > LABEL_LIMIT) throw new BadRequestException("Etiket listesi çok uzun.");
+    const { data, error } = await this.supabase.client
+      .from("plan_labels")
+      .select("id")
+      .eq("user_id", userId)
+      .in("id", ids);
+    if (error) throw error;
+    if ((data ?? []).length !== ids.length) throw new NotFoundException("Etiket bulunamadı.");
+  }
+
+  /**
+   * Etiket ADLARINI id'ye çevirir; olmayanı oluşturur. Lio'nun yolu: model
+   * id ezberlemek yerine "Acil" der. Eşleşme büyük/küçük harf duyarsız
+   * (benzersizlik indeksi de öyle). Yeni etiketin rengi paletteki ilk
+   * kullanılmayan renk — art arda açılan etiketlerin hepsi aynı renk olmasın.
+   */
+  async resolveLabelNames(userId: string, names: string[]): Promise<PlanLabel[]> {
+    const istenen = [...new Set((names ?? []).map((n) => String(n ?? "").trim().replace(/\s+/g, " ")).filter(Boolean))];
+    if (istenen.length === 0) return [];
+    if (istenen.length > 10) throw new BadRequestException("Bir bloğa tek seferde en fazla 10 etiket verilebilir.");
+
+    const mevcut = await this.listLabels(userId);
+    const sonuc: PlanLabel[] = [];
+    for (const ad of istenen) {
+      const anahtar = ad.toLocaleLowerCase("tr");
+      const bulunan = mevcut.find((l) => l.name.toLocaleLowerCase("tr") === anahtar);
+      if (bulunan) {
+        sonuc.push(bulunan);
+        continue;
+      }
+      const kullanilan = new Set(mevcut.map((l) => l.color.toUpperCase()));
+      const renk = etiketRenkleri.find((r) => !kullanilan.has(r.toUpperCase())) ?? etiketRenkleri[mevcut.length % etiketRenkleri.length];
+      const yeni = await this.createLabel(userId, { name: ad, color: renk });
+      mevcut.push(yeni);
+      sonuc.push(yeni);
+    }
+    return sonuc;
+  }
+
+  /** Bloğun etiketlerine ekler/çıkarır (Lio). Diğer etiketlere dokunmaz. */
+  async changeBlockLabels(userId: string, blockId: string, ekle: string[], cikar: string[]): Promise<PlanTimeBlock> {
+    const blok = await this.findBlock(userId, blockId);
+    const eklenecek = await this.resolveLabelNames(userId, ekle);
+    // Çıkarılacak ad yoksa oluşturulmaz: listeden yalnızca var olanlar düşülür.
+    const cikarilacak = new Set((cikar ?? []).map((n) => String(n ?? "").trim().toLocaleLowerCase("tr")).filter(Boolean));
+    const ids = new Set(blok.labels.filter((l) => !cikarilacak.has(l.name.toLocaleLowerCase("tr"))).map((l) => l.id));
+    for (const l of eklenecek) ids.add(l.id);
+    await this.setBlockLabels(userId, blockId, [...ids]);
+    return this.findBlock(userId, blockId);
+  }
+
   async listLabels(userId: string): Promise<PlanLabel[]> {
     const { data, error } = await this.supabase.client
       .from("plan_labels")
@@ -371,15 +426,7 @@ export class PlanningService {
     const ids = [...new Set(labelIds.filter((x) => typeof x === "string" && x))];
     if (ids.length > LABEL_LIMIT) throw new BadRequestException("Etiket listesi çok uzun.");
 
-    if (ids.length > 0) {
-      const { data, error } = await this.supabase.client
-        .from("plan_labels")
-        .select("id")
-        .eq("user_id", userId)
-        .in("id", ids);
-      if (error) throw error;
-      if ((data ?? []).length !== ids.length) throw new NotFoundException("Etiket bulunamadı.");
-    }
+    await this.assertLabelOwner(userId, ids);
 
     const { error: silmeHatasi } = await this.supabase.client.from("plan_block_labels").delete().eq("block_id", blockId);
     if (silmeHatasi) throw silmeHatasi;
@@ -660,10 +707,40 @@ export class PlanningService {
     const rows = [];
     for (const b of blocks) rows.push({ user_id: userId, ...(await this.buildBlockRow(userId, b, true)) });
 
+    // Etiketler insert'ten ÖNCE doğrulanır: başkasının etiket id'si gelirse
+    // bloklar yazılmış ama etiketsiz kalmış olmasın.
+    const tumEtiketler = [...new Set(blocks.flatMap((b) => b.labelIds ?? []))];
+    await this.assertLabelOwner(userId, tumEtiketler);
+
     const { data, error } = await this.supabase.client
       .from("plan_time_blocks")
       .insert(rows)
       .select(BLOCK_SELECT);
+    if (error) throw error;
+    const created = data ?? [];
+    if (tumEtiketler.length === 0) return created.map(mapBlock);
+
+    // PostgREST toplu insert'te satırları gönderilen sırayla döndürür; blok
+    // ile etiket listesi bu sırayla eşleşiyor.
+    const baglar = created.flatMap((row: any, i: number) =>
+      [...new Set(blocks[i]?.labelIds ?? [])].map((labelId) => ({ block_id: row.id, label_id: labelId }))
+    );
+    if (baglar.length > 0) {
+      const { error: etiketHatasi } = await this.supabase.client.from("plan_block_labels").insert(baglar);
+      if (etiketHatasi) throw etiketHatasi;
+    }
+    return this.listBlocksByIds(userId, created.map((r: any) => r.id));
+  }
+
+  private async listBlocksByIds(userId: string, ids: string[]): Promise<PlanTimeBlock[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await this.supabase.client
+      .from("plan_time_blocks")
+      .select(BLOCK_SELECT)
+      .eq("user_id", userId)
+      .in("id", ids)
+      .order("block_date", { ascending: true })
+      .order("starts_at", { ascending: true });
     if (error) throw error;
     return (data ?? []).map(mapBlock);
   }

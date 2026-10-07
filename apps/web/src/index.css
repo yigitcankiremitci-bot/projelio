@@ -443,14 +443,6 @@ button:focus-visible {
 .plan-blok-baslik {
   overflow-wrap: break-word;
 }
-@container (max-width: 110px) {
-  .plan-etiket {
-    padding: 0 3px !important;
-  }
-  .plan-etiket-ad {
-    display: none;
-  }
-}
 @container (max-width: 70px) {
   .plan-blok-onay {
     display: none;

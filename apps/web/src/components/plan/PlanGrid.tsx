@@ -513,7 +513,12 @@ function BlockCard({
   const t = useT();
   const c = useThemeColors();
   const { top, height } = blockGeometry(block, startHour);
-  const accent = block.focusAreaColor ?? block.color ?? c.primary;
+  const etiketler = block.labels ?? [];
+  // Etiket bloğun RENGİNİ belirler (nokta ya da hap olarak eklenmez). Birden
+  // çok etiket varsa etiket listesindeki sırayla ilki (önce oluşturulan)
+  // kazanır; bloğun rengi hangi etiketi seçtiğin sıraya göre zıplamasın.
+  const etiketRengi = etiketler[0]?.color;
+  const accent = etiketRengi ?? block.focusAreaColor ?? block.color ?? c.primary;
   const done = block.status === "done";
   const skipped = block.status === "skipped";
 
@@ -524,10 +529,7 @@ function BlockCard({
   // Başlık sığdığı kadar satıra yayılır. Tek satıra kesildiğinde hafta
   // görünümünün dar sütunlarında yalnızca ilk kelime okunabiliyordu.
   const detayVar = height > 40;
-  const etiketler = block.labels ?? [];
-  // Etiket satırı yalnızca başlığa en az bir satır bıraktığında çizilir.
-  const etiketSatiri = etiketler.length > 0 && height > 52;
-  const baslikSatiri = Math.max(1, Math.floor((height - 8 - (detayVar ? 14 : 0) - (etiketSatiri ? 18 : 0)) / 17));
+  const baslikSatiri = Math.max(1, Math.floor((height - 8 - (detayVar ? 14 : 0)) / 17));
 
   return (
     <div
@@ -541,7 +543,7 @@ function BlockCard({
         onOpen();
       }}
       onDoubleClick={(e) => e.stopPropagation()}
-      title={`${block.startsAt}–${block.endsAt} · ${label}`}
+      title={`${block.startsAt}–${block.endsAt} · ${label}${etiketler.length ? ` · ${etiketler.map((l) => l.name).join(", ")}` : ""}`}
       className="plan-blok"
       style={{
         position: "absolute",
@@ -555,7 +557,16 @@ function BlockCard({
         border: `1px solid ${c.border}`,
         borderLeftWidth: 3,
         borderLeftColor: accent,
-        background: done ? "rgba(46,158,91,0.10)" : skipped ? c.background : c.surface,
+        // Etiketli blok etiketin renginde tonlanır; etiketsizde eski görünüm
+        // (bitmiş = yeşil ton). Etiketli bitmiş blokta yeşile dönmüyoruz:
+        // renk etiketi anlatıyor, bitmişliği onay kutusu ve üstü çizili başlık.
+        background: skipped
+          ? c.background
+          : etiketRengi
+            ? `${etiketRengi}${done ? "24" : "38"}`
+            : done
+              ? "rgba(46,158,91,0.10)"
+              : c.surface,
         boxShadow: "0 1px 2px rgba(26,31,41,0.06)",
         padding: "3px 6px",
         overflow: "hidden",
@@ -564,14 +575,6 @@ function BlockCard({
         zIndex: 2,
       }}
     >
-      {!etiketSatiri && etiketler.length > 0 && (
-        // Kısa blokta etiket satırına yer yok: sağ üstte yalnızca renk noktaları.
-        <div style={{ position: "absolute", top: 4, right: 4, display: "flex", gap: 2, pointerEvents: "none" }}>
-          {etiketler.slice(0, 4).map((l) => (
-            <span key={l.id} style={{ width: 6, height: 6, borderRadius: 3, background: l.color }} />
-          ))}
-        </div>
-      )}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
         {/* Görünen kutu 18 px, tıklama alanı 30 px: eskiden 13 px'lik kutuyu
             ıskalayan her tık bloğun penceresini açıyordu. Negatif kenar
@@ -639,35 +642,6 @@ function BlockCard({
               {block.startsAt}–{block.endsAt} · {formatDuration(block.plannedMinutes)}
               {block.source === "lio" && block.status === "planned" ? " · Lio" : ""}
               {googleda ? ` · ${t("Google")}` : ""}
-            </div>
-          )}
-          {etiketSatiri && (
-            <div style={{ display: "flex", gap: 3, marginTop: 3, overflow: "hidden" }}>
-              {etiketler.map((l) => (
-                <span
-                  key={l.id}
-                  title={l.name}
-                  className="plan-etiket"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 3,
-                    flexShrink: 0,
-                    maxWidth: 90,
-                    height: 14,
-                    padding: "0 5px",
-                    borderRadius: 7,
-                    fontSize: 10,
-                    lineHeight: "14px",
-                    background: `${l.color}2E`,
-                    color: c.textPrimary,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: 3, background: l.color, flexShrink: 0 }} />
-                  <span className="plan-etiket-ad" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
-                </span>
-              ))}
             </div>
           )}
         </div>

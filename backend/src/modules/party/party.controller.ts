@@ -287,13 +287,18 @@ export class PartyController {
     return this.partyService.deftereEkle(id, modul, req.user.userId);
   }
 
-  /** Kartvizit (fotoğraf ya da PDF): departmanın "Kartvizitler" klasörüne iner, karta bağlanır. */
+  /**
+   * Karta dosya: kartvizit (fotoğraf ya da PDF, "Kartvizitler" klasörü) ya da
+   * ?rol=ek ile ek dosya ("Kişi dosyaları/<Ad>/"). İkisi de departmanın
+   * klasörüne iner, karta bağlanır.
+   */
   @Post("party/:id/dosyalar")
   @UseGuards(UploadRateLimitGuard)
   @UseInterceptors(KARTVIZIT_YUKLEME)
   async dosyaEkle(
     @Param("id") id: string,
     @Query("departmentId") departmentId: string | undefined,
+    @Query("rol") rol: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
@@ -301,7 +306,8 @@ export class PartyController {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
     // multer dosya adını latin1 okuyor (bkz. iceAktar).
     file.originalname = Buffer.from(file.originalname, "latin1").toString("utf8");
-    return this.partyService.dosyaEkle(id, file, req.user.userId, { departmentId });
+    if (rol !== undefined && rol !== "kartvizit" && rol !== "ek") throw new BadRequestException("Geçersiz dosya rolü");
+    return this.partyService.dosyaEkle(id, file, req.user.userId, { departmentId, rol: rol === "ek" ? "ek" : "kartvizit" });
   }
 
   @Get("party/:id/dosyalar")

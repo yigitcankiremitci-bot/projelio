@@ -5,6 +5,7 @@ import type {
   MusteriSiparisListesi,
   OdemeYontemi,
   Party,
+  PartyDosyaRolu,
   PartyGorevi,
   ProjectFile,
 } from "@projelio/shared";
@@ -49,13 +50,14 @@ export const partyApi = {
   /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
   deftereEkle: (partyId: string, modul: string) => api.post<Party>(`/party/${partyId}/defter`, { modul }),
 
-  /** Kartvizit dosyaları (departmanın "Kartvizitler" klasöründe, karta bağlı). */
-  dosyalar: (partyId: string) => api.get<ProjectFile[]>(`/party/${partyId}/dosyalar`),
-  dosyaEkle: (partyId: string, dosya: File, departmentId?: string) => {
+  /** Kartın dosyaları: kartvizitler ve ek dosyalar (departmanın klasöründe, karta bağlı). */
+  dosyalar: (partyId: string) => api.get<{ rol: PartyDosyaRolu; dosya: ProjectFile }[]>(`/party/${partyId}/dosyalar`),
+  dosyaEkle: (partyId: string, dosya: File, departmentId?: string, rol: PartyDosyaRolu = "kartvizit") => {
     const fd = new FormData();
     fd.append("file", dosya);
-    const q = departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : "";
-    return api.uploadFile<ProjectFile>(`/party/${partyId}/dosyalar${q}`, fd);
+    const q = new URLSearchParams({ rol });
+    if (departmentId) q.set("departmentId", departmentId);
+    return api.uploadFile<ProjectFile>(`/party/${partyId}/dosyalar?${q}`, fd);
   },
   dosyaKaldir: (partyId: string, fileId: string) => api.delete(`/party/${partyId}/dosyalar/${fileId}`),
 

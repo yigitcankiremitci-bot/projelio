@@ -96,4 +96,12 @@ export const baglantilar: TranslationDict = {
   "+ Kişi ekle": "+ Add person",
   "Web sitesi ve sosyal medya": "Website and social media",
   "dolu": "filled in",
+
+  // ─────────────────────────────────────────────── Satır içi düzenleme, ek dosyalar
+  "Düzenleniyor: {ad}": "Editing: {ad}",
+  "+ Dosya ekle": "+ Add file",
+  "Ek dosyalar": "Attachments",
+  "Ek dosyalar (teklif, katalog…)": "Attachments (quotes, catalogs…)",
+  "Ek dosyalar ({n}) — son ekleneni açar": "Attachments ({n}) — opens the latest",
+  "Kart kaydedildi ama şu dosyalar yüklenemedi: {liste}": "The card was saved but these files couldn't be uploaded: {liste}",
 };

@@ -19,6 +19,7 @@ import {
   type PartyBaglanti,
   type PartyContact,
   type PartyDuplicate,
+  type PartyDosyaRolu,
   type PartyGorevi,
   type ProjectFile,
   type PartyRole,
@@ -36,7 +37,7 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconIdCard, IconTrash, IconUpload, IconX } from "./icons";
+import { IconIdCard, IconPaperclip, IconTrash, IconUpload, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { onLioActivity } from "../lib/liveRoom";
@@ -177,6 +178,7 @@ export default function CustomersPanel({
   const [sosyalAcik, setSosyalAcik] = useState(false);
   // Formda seçilen kartvizit: kart kaydedildikten sonra karta yüklenir.
   const [kartvizit, setKartvizit] = useState<File | null>(null);
+  const [ekDosyalar, setEkDosyalar] = useState<File[]>([]);
   // Form kapandıktan sonra görünmesi gereken uyarı (kart açıldı, kartvizit yüklenemedi).
   const [bildirim, setBildirim] = useState("");
   // Listedeki kartvizit simgesinden açılan dosya.
@@ -360,6 +362,7 @@ export default function CustomersPanel({
     });
     setEkSosyal([]);
     setKartvizit(null);
+    setEkDosyalar([]);
     setSilinenYetkililer([]);
     setSosyalAcik(false);
     setDuplicates([]);
@@ -391,6 +394,7 @@ export default function CustomersPanel({
     setDuplicates([]);
     setError("");
     setKartvizit(null);
+    setEkDosyalar([]);
     setSilinenYetkililer([]);
     setSosyalAcik(!!p.website || Object.values(p.sosyal ?? {}).some(Boolean));
     setFormMode({ kind: "edit", party: p });
@@ -524,13 +528,22 @@ export default function CustomersPanel({
         for (const id of silinenYetkililer) await api.delete(`/party-contacts/${id}`).catch(() => {});
       }
       if (kartvizit && partyId) {
-        await partyApi.dosyaEkle(partyId, kartvizit, jobId ? undefined : departmentId).catch((err) =>
+        await partyApi.dosyaEkle(partyId, kartvizit, jobId ? undefined : departmentId, "kartvizit").catch((err) =>
           setBildirim(
             t("Kart kaydedildi ama kartvizit yüklenemedi: {sebep}", {
               sebep: err instanceof Error ? err.message : t("bilinmeyen hata"),
             })
           )
         );
+      }
+      if (ekDosyalar.length && partyId) {
+        const yuklenemeyen: string[] = [];
+        for (const f of ekDosyalar) {
+          await partyApi.dosyaEkle(partyId, f, jobId ? undefined : departmentId, "ek").catch(() => yuklenemeyen.push(f.name));
+        }
+        if (yuklenemeyen.length) {
+          setBildirim(t("Kart kaydedildi ama şu dosyalar yüklenemedi: {liste}", { liste: yuklenemeyen.join(", ") }));
+        }
       }
       closeForm();
       load();
@@ -558,199 +571,36 @@ export default function CustomersPanel({
     });
   };
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-            {baglantiModu ? t("Bağlantı ve İlişkiler") : t("Müşteriler")}
-          </h5>
-          {profile.key !== "base" && !baglantiModu && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
-          )}
-        </div>
-        {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
-        ) : (
-          !fabAvailable && (
-            <button
-              onClick={() => (formMode ? closeForm() : openCreate())}
-              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-            >
-              {formMode ? t("Vazgeç") : baglantiModu ? t("+ Bağlantı ekle") : t("+ Müşteri ekle")}
-            </button>
-          )
-        )}
-      </div>
+  // Form açılınca görünür alana kaydırılır: üstte de açılsa altta da, kullanıcı
+  // açıldığını görmeli.
+  const formRef = useRef<HTMLDivElement>(null);
+  const formAnahtari = formMode ? (formMode.kind === "edit" ? formMode.party.id : "yeni") : null;
+  useEffect(() => {
+    if (formAnahtari) formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [formAnahtari]);
 
-      {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
-      {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
-
-      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
-          Bağlantılar'da sipariş yok; sekme de yok. */}
-      {!baglantiModu && (
-      <div style={{ display: "flex", gap: 6 }}>
-        {(["musteriler", "tahsilat"] as const).map((g) => (
-          <button
-            key={g}
-            onClick={() => setGorunum(g)}
-            style={{
-              fontSize: 13,
-              padding: "5px 12px",
-              borderRadius: 8,
-              border: `1px solid ${gorunum === g ? c.primary : c.border}`,
-              background: gorunum === g ? c.primary : "transparent",
-              color: gorunum === g ? c.onPrimary : c.textSecondary,
-              cursor: "pointer",
-            }}
-          >
-            {g === "musteriler" ? t("Müşteriler") : t("Tahsilat takibi")}
-          </button>
-        ))}
-      </div>
-      )}
-
-      {gorunum === "tahsilat" && !baglantiModu ? (
-        <TahsilatTakibi kapsamYolu={kapsamYolu} departmentId={jobId ? undefined : departmentId} />
-      ) : (
-      <>
-      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
-      )}
-
-      {/* Bağlantılar'ın şablonu ayrı: önem, tanışma yeri, sonraki temas, ilişki notu. */}
-      {canWrite && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => setExcelAcik(true)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 16px",
-              borderRadius: 8,
-              border: `1px solid ${c.primary}`,
-              background: "transparent",
-              color: c.primary,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            <IconUpload size={16} /> {t("Excel ile toplu ekle")}
-          </button>
-          <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
-            {baglantiModu
-              ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
-              : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
-          </span>
-        </div>
-      )}
-
-      {excelAcik && (
-        <MusteriExcelModal
-          scopePath={scopePath}
-          departmentId={departmentId}
-          baglanti={baglantiModu}
-          onClose={() => setExcelAcik(false)}
-          onDone={() => load()}
-        />
-      )}
-
-      {!loading && parties.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-                padding: "6px 12px",
-                borderRadius: 8,
-                background: c.background,
-                border: `1px solid ${c.border}`,
-                minWidth: 84,
-              }}
-            >
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
-              <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showToolbar && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("Ara…")}
-            style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
-          />
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as PartyRole | "")}
-            style={{ fontSize: 13, padding: "5px 6px" }}
-          >
-            <option value="">{t("Rol: tümü")}</option>
-            {rolSecenekleri.map((r) => (
-              <option key={r} value={r}>
-                {t(ROLE_LABELS[r], { ctx: "rol" })}
-              </option>
-            ))}
-          </select>
-          {baglantiModu && (
-            <select
-              value={onemFiltre}
-              onChange={(e) => setOnemFiltre(e.target.value as BaglantiOnem | "")}
-              style={{ fontSize: 13, padding: "5px 6px" }}
-              aria-label={t("Önem")}
-            >
-              <option value="">{t("Önem: tümü")}</option>
-              {BAGLANTI_ONEMLERI.map((o) => (
-                <option key={o} value={o}>
-                  {t(ONEM_LABELS[o])}
-                </option>
-              ))}
-            </select>
-          )}
-          {yonetici && (
-            <select
-              value={sorumluFiltre}
-              onChange={(e) => setSorumluFiltre(e.target.value)}
-              style={{ fontSize: 13, padding: "5px 6px" }}
-              aria-label={t("Sorumlu")}
-            >
-              <option value="">{t("Sorumlu: tümü")}</option>
-              <option value="-">{t("Sorumlusu olmayanlar")}</option>
-              {sorumluSecenekleri.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.ad}
-                </option>
-              ))}
-            </select>
-          )}
-          {hasActiveFilter && (
-            <button
-              onClick={() => {
-                setSearch("");
-                setRoleFilter(profile.defaultRole ?? "");
-                setSorumluFiltre("");
-                setOnemFiltre("");
-              }}
-              style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-            >
-              {t("Temizle")}
-            </button>
-          )}
-        </div>
-      )}
-
-      {formMode && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
+  // Form tek blok: yeni kayıtta listenin üstünde, düzenlemede DÜZENLENEN SATIRIN
+  // ALTINDA açılır. Eskiden hep üstte açılıyordu; uzun listenin sonundaki kişiye
+  // "Düzenle" deyince form ekranın dışında kalıyor, açıldığı bile anlaşılmıyordu.
+  const formAlani = formMode ? (
+        <div
+          ref={formRef}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            background: c.background,
+            borderRadius: 10,
+            padding: 10,
+            // Satırın içinde açıldığında listeden ayrılsın.
+            border: formMode.kind === "edit" ? `1px solid ${c.primary}` : "none",
+            scrollMarginTop: 12,
+          }}
+        >
           {formMode.kind === "edit" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kaydı düzenliyorsun")}</span>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>
+              {t("Düzenleniyor: {ad}", { ad: formMode.party.displayName })}
+            </span>
           )}
 
           <Field
@@ -1108,14 +958,24 @@ export default function CustomersPanel({
           )}
 
           {baglantiModu && (
-            <Field label={t("Kartvizit (fotoğraf ya da PDF)")}>
-              <input
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={(e) => setKartvizit(e.target.files?.[0] ?? null)}
-                style={{ fontSize: 12 }}
-              />
-            </Field>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Field label={t("Kartvizit (fotoğraf ya da PDF)")} style={{ flex: "1 1 200px" }}>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setKartvizit(e.target.files?.[0] ?? null)}
+                  style={{ fontSize: 12 }}
+                />
+              </Field>
+              <Field label={t("Ek dosyalar (teklif, katalog…)")} style={{ flex: "1 1 200px" }}>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setEkDosyalar(Array.from(e.target.files ?? []))}
+                  style={{ fontSize: 12 }}
+                />
+              </Field>
+            </div>
           )}
 
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
@@ -1138,7 +998,198 @@ export default function CustomersPanel({
             </button>
           </div>
         </div>
+  ) : null;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
+            {baglantiModu ? t("Bağlantı ve İlişkiler") : t("Müşteriler")}
+          </h5>
+          {profile.key !== "base" && !baglantiModu && (
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
+          )}
+        </div>
+        {!canWrite ? (
+          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
+        ) : (
+          !fabAvailable && (
+            <button
+              onClick={() => (formMode ? closeForm() : openCreate())}
+              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              {formMode ? t("Vazgeç") : baglantiModu ? t("+ Bağlantı ekle") : t("+ Müşteri ekle")}
+            </button>
+          )
+        )}
+      </div>
+
+      {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
+      {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
+
+      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
+          Bağlantılar'da sipariş yok; sekme de yok. */}
+      {!baglantiModu && (
+      <div style={{ display: "flex", gap: 6 }}>
+        {(["musteriler", "tahsilat"] as const).map((g) => (
+          <button
+            key={g}
+            onClick={() => setGorunum(g)}
+            style={{
+              fontSize: 13,
+              padding: "5px 12px",
+              borderRadius: 8,
+              border: `1px solid ${gorunum === g ? c.primary : c.border}`,
+              background: gorunum === g ? c.primary : "transparent",
+              color: gorunum === g ? c.onPrimary : c.textSecondary,
+              cursor: "pointer",
+            }}
+          >
+            {g === "musteriler" ? t("Müşteriler") : t("Tahsilat takibi")}
+          </button>
+        ))}
+      </div>
       )}
+
+      {gorunum === "tahsilat" && !baglantiModu ? (
+        <TahsilatTakibi kapsamYolu={kapsamYolu} departmentId={jobId ? undefined : departmentId} />
+      ) : (
+      <>
+      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
+      )}
+
+      {/* Bağlantılar'ın şablonu ayrı: önem, tanışma yeri, sonraki temas, ilişki notu. */}
+      {canWrite && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => setExcelAcik(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 16px",
+              borderRadius: 8,
+              border: `1px solid ${c.primary}`,
+              background: "transparent",
+              color: c.primary,
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <IconUpload size={16} /> {t("Excel ile toplu ekle")}
+          </button>
+          <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
+            {baglantiModu
+              ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
+              : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
+          </span>
+        </div>
+      )}
+
+      {excelAcik && (
+        <MusteriExcelModal
+          scopePath={scopePath}
+          departmentId={departmentId}
+          baglanti={baglantiModu}
+          onClose={() => setExcelAcik(false)}
+          onDone={() => load()}
+        />
+      )}
+
+      {!loading && parties.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {stats.map((s) => (
+            <div
+              key={s.label}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: c.background,
+                border: `1px solid ${c.border}`,
+                minWidth: 84,
+              }}
+            >
+              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
+              <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showToolbar && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("Ara…")}
+            style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
+          />
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value as PartyRole | "")}
+            style={{ fontSize: 13, padding: "5px 6px" }}
+          >
+            <option value="">{t("Rol: tümü")}</option>
+            {rolSecenekleri.map((r) => (
+              <option key={r} value={r}>
+                {t(ROLE_LABELS[r], { ctx: "rol" })}
+              </option>
+            ))}
+          </select>
+          {baglantiModu && (
+            <select
+              value={onemFiltre}
+              onChange={(e) => setOnemFiltre(e.target.value as BaglantiOnem | "")}
+              style={{ fontSize: 13, padding: "5px 6px" }}
+              aria-label={t("Önem")}
+            >
+              <option value="">{t("Önem: tümü")}</option>
+              {BAGLANTI_ONEMLERI.map((o) => (
+                <option key={o} value={o}>
+                  {t(ONEM_LABELS[o])}
+                </option>
+              ))}
+            </select>
+          )}
+          {yonetici && (
+            <select
+              value={sorumluFiltre}
+              onChange={(e) => setSorumluFiltre(e.target.value)}
+              style={{ fontSize: 13, padding: "5px 6px" }}
+              aria-label={t("Sorumlu")}
+            >
+              <option value="">{t("Sorumlu: tümü")}</option>
+              <option value="-">{t("Sorumlusu olmayanlar")}</option>
+              {sorumluSecenekleri.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.ad}
+                </option>
+              ))}
+            </select>
+          )}
+          {hasActiveFilter && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setRoleFilter(profile.defaultRole ?? "");
+                setSorumluFiltre("");
+                setOnemFiltre("");
+              }}
+              style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              {t("Temizle")}
+            </button>
+          )}
+        </div>
+      )}
+
+      {formMode?.kind === "create" && formAlani}
 
       {loading ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
@@ -1228,10 +1279,10 @@ export default function CustomersPanel({
                 {canWrite && (
                   <>
                     <button
-                      onClick={() => openEdit(p)}
+                      onClick={() => (formMode?.kind === "edit" && formMode.party.id === p.id ? closeForm() : openEdit(p))}
                       style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
                     >
-                      {t("Düzenle")}
+                      {formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
                     </button>
                     <button
                       onClick={() => handleArchive(p)}
@@ -1245,7 +1296,11 @@ export default function CustomersPanel({
                 )}
               </div>
 
-              {openPartyId === p.id && <PartyDetail
+              {formMode?.kind === "edit" && formMode.party.id === p.id && (
+                <div style={{ padding: "0 10px 10px" }}>{formAlani}</div>
+              )}
+
+              {openPartyId === p.id && !(formMode?.kind === "edit" && formMode.party.id === p.id) && <PartyDetail
                   party={p}
                   baglantiModu={baglantiModu}
                   baglantiYazar={baglantiYazar}
@@ -1734,63 +1789,120 @@ function KartDosyalari({
   party: Party;
   canWrite: boolean;
   departmentId?: string;
-  /** Listedeki kartvizit simgesi tazelensin. */
+  /** Listedeki simgeler tazelensin. */
   onDegisti: () => void;
 }) {
-  const c = useThemeColors();
   const t = useT();
-  const [dosyalar, setDosyalar] = useState<ProjectFile[]>([]);
+  const [dosyalar, setDosyalar] = useState<{ rol: PartyDosyaRolu; dosya: ProjectFile }[]>([]);
   const [acik, setAcik] = useState<ProjectFile | null>(null);
-  const [yukleniyor, setYukleniyor] = useState(false);
-  const [hata, setHata] = useState("");
-  const girdi = useRef<HTMLInputElement>(null);
 
   const yukle = () => {
     partyApi.dosyalar(party.id).then(setDosyalar).catch(() => setDosyalar([]));
   };
   useEffect(yukle, [party.id]);
-
-  const ekle = async (f: File | undefined) => {
-    if (!f) return;
-    setYukleniyor(true);
-    setHata("");
-    try {
-      await partyApi.dosyaEkle(party.id, f, departmentId);
-      yukle();
-      onDegisti();
-    } catch (err) {
-      setHata(err instanceof Error ? err.message : t("Yüklenemedi"));
-    } finally {
-      setYukleniyor(false);
-    }
-  };
-
-  const kaldir = async (d: ProjectFile) => {
-    await partyApi.dosyaKaldir(party.id, d.id).catch(() => {});
+  const degisti = () => {
     yukle();
     onDegisti();
   };
 
+  const ortak = { party, canWrite, departmentId, onAc: setAcik, onDegisti: degisti };
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, marginTop: 6 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+      <DosyaBolumu
+        {...ortak}
+        rol="kartvizit"
+        baslik={t("Kartvizit")}
+        ekleMetni={t("+ Kartvizit ekle")}
+        accept="image/*,application/pdf"
+        dosyalar={dosyalar.filter((d) => d.rol === "kartvizit").map((d) => d.dosya)}
+      />
+      <DosyaBolumu
+        {...ortak}
+        rol="ek"
+        baslik={t("Dosyalar")}
+        ekleMetni={t("+ Dosya ekle")}
+        dosyalar={dosyalar.filter((d) => d.rol === "ek").map((d) => d.dosya)}
+      />
+      {acik && <FilePreviewModal file={acik} onClose={() => setAcik(null)} />}
+    </div>
+  );
+}
+
+/** Kartvizit ya da ek dosya bölümü: liste + ekle + karttan kaldır. */
+function DosyaBolumu({
+  party,
+  canWrite,
+  departmentId,
+  rol,
+  baslik,
+  ekleMetni,
+  accept,
+  dosyalar,
+  onAc,
+  onDegisti,
+}: {
+  party: Party;
+  canWrite: boolean;
+  departmentId?: string;
+  rol: PartyDosyaRolu;
+  baslik: string;
+  ekleMetni: string;
+  accept?: string;
+  dosyalar: ProjectFile[];
+  onAc: (d: ProjectFile) => void;
+  onDegisti: () => void;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  const [yukleniyor, setYukleniyor] = useState(false);
+  const [hata, setHata] = useState("");
+  const girdi = useRef<HTMLInputElement>(null);
+
+  const ekle = async (secilen: FileList | null) => {
+    if (!secilen?.length) return;
+    setYukleniyor(true);
+    setHata("");
+    // Birden çok dosya sırayla: biri düşerse diğerleri yine yüklensin.
+    const hatalar: string[] = [];
+    for (const f of Array.from(secilen)) {
+      await partyApi
+        .dosyaEkle(party.id, f, departmentId, rol)
+        .catch((err) => hatalar.push(`${f.name}: ${err instanceof Error ? err.message : t("Yüklenemedi")}`));
+    }
+    setHata(hatalar.join(" · "));
+    setYukleniyor(false);
+    onDegisti();
+  };
+
+  const kaldir = async (d: ProjectFile) => {
+    await partyApi.dosyaKaldir(party.id, d.id).catch(() => {});
+    onDegisti();
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ color: c.textSecondary }}>{t("Kartvizit")}</span>
+        <span style={{ color: c.textSecondary }}>
+          {baslik}
+          {dosyalar.length > 0 && ` (${dosyalar.length})`}
+        </span>
         {canWrite && (
           <button
             onClick={() => girdi.current?.click()}
             disabled={yukleniyor}
             style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
-            {yukleniyor ? t("Yükleniyor…") : t("+ Kartvizit ekle")}
+            {yukleniyor ? t("Yükleniyor…") : ekleMetni}
           </button>
         )}
         <input
           ref={girdi}
           type="file"
-          accept="image/*,application/pdf"
+          accept={accept}
+          multiple={rol === "ek"}
           style={{ display: "none" }}
           onChange={(e) => {
-            void ekle(e.target.files?.[0]);
+            void ekle(e.target.files);
             e.target.value = "";
           }}
         />
@@ -1798,7 +1910,7 @@ function KartDosyalari({
       {dosyalar.map((d) => (
         <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
-            onClick={() => setAcik(d)}
+            onClick={() => onAc(d)}
             style={{ flex: 1, textAlign: "left", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {d.name}
@@ -1816,7 +1928,6 @@ function KartDosyalari({
         </div>
       ))}
       {hata && <span style={{ color: c.danger }}>{hata}</span>}
-      {acik && <FilePreviewModal file={acik} onClose={() => setAcik(null)} />}
     </div>
   );
 }
@@ -1833,7 +1944,7 @@ function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: st
   const site = safeExternalUrl(party.website);
   // Dar ekranda satır taşmasın: en çok 4 hesap; tamamı kartın içinde görünür.
   const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]).slice(0, 4);
-  if (!site && !hesaplar.length && !party.sonDosyaId) return null;
+  if (!site && !hesaplar.length && !party.sonKartvizitId && !party.sonEkId) return null;
 
   const simge = (ic: string) => (
     <svg
@@ -1867,18 +1978,36 @@ function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: st
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
-      {party.sonDosyaId && (
+      {party.sonKartvizitId && (
         <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onDosya(party.sonDosyaId!);
+            onDosya(party.sonKartvizitId!);
           }}
-          title={party.dosyaSayisi && party.dosyaSayisi > 1 ? t("Kartvizit ({n} dosya)", { n: party.dosyaSayisi }) : t("Kartvizit")}
+          title={
+            party.kartvizitSayisi && party.kartvizitSayisi > 1
+              ? t("Kartvizit ({n} dosya)", { n: party.kartvizitSayisi })
+              : t("Kartvizit")
+          }
           aria-label={t("Kartvizit")}
           style={kutu}
         >
           <IconIdCard size={15} />
+        </button>
+      )}
+      {party.sonEkId && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDosya(party.sonEkId!);
+          }}
+          title={t("Ek dosyalar ({n}) — son ekleneni açar", { n: party.ekSayisi ?? 1 })}
+          aria-label={t("Ek dosyalar")}
+          style={kutu}
+        >
+          <IconPaperclip size={15} />
         </button>
       )}
       {site && (

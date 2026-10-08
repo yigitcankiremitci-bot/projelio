@@ -20,6 +20,7 @@ import {
   type PartyBaglanti,
   type PartyContact,
   type PartyDuplicate,
+  type PartyDosyaRolu,
   type PartyGorevi,
   type PartyModulKey,
   type PartyRole,
@@ -393,7 +394,7 @@ export class PartyService {
     for (let i = 0; i < ids.length; i += 150) {
       const { data, error } = await this.supabase.client
         .from("file_links")
-        .select("target_id, file_id")
+        .select("target_id, file_id, party_rol")
         .eq("target_kind", "party")
         .in("target_id", ids.slice(i, i + 150))
         .not("file_id", "is", null)
@@ -403,8 +404,13 @@ export class PartyService {
       for (const r of (data ?? []) as any[]) {
         const p = kimlik.get(r.target_id);
         if (!p) continue;
-        p.dosyaSayisi = (p.dosyaSayisi ?? 0) + 1;
-        p.sonDosyaId ??= r.file_id;
+        if (r.party_rol === "ek") {
+          p.ekSayisi = (p.ekSayisi ?? 0) + 1;
+          p.sonEkId ??= r.file_id;
+        } else {
+          p.kartvizitSayisi = (p.kartvizitSayisi ?? 0) + 1;
+          p.sonKartvizitId ??= r.file_id;
+        }
       }
     }
   }
@@ -1009,11 +1015,26 @@ export class PartyService {
     throw new BadRequestException("Dosya eklemek için kartı modülün açık olduğu bir departmandan aç");
   }
 
-  /** Dosya adında yol ayırıcısı ve Drive'ın sevmediği karakterler olmasın. */
-  private dosyaAdi(party: Party, ozgunAd: string): string {
+  /** Dosya/klasör adında yol ayırıcısı ve Drive'ın sevmediği karakterler olmasın. */
+  private temizAd(ad: string, yedek: string): string {
+    return ad.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || yedek;
+  }
+
+  /**
+   * Dosyanın adı ve klasörü. Kartvizit "Kartvizitler/<Ad> - kartvizit.jpg"
+   * (Drive'da kartvizitler tek klasörde, kime ait olduğu adından okunur);
+   * ek dosya özgün adıyla "Kişi dosyaları/<Ad>/" altına — teklif ya da
+   * katalog adını değiştirmek kullanıcının dosyasını tanınmaz yapardı.
+   */
+  private dosyaYolu(party: Party, ozgunAd: string, rol: PartyDosyaRolu): { ad: string; yol: string } {
+    const kisi = this.temizAd(party.displayName, "Kart");
+    if (rol === "ek") {
+      const ad = this.temizAd(ozgunAd, "dosya");
+      return { ad, yol: `Kişi dosyaları/${kisi}/${ad}` };
+    }
     const uzanti = /\.[A-Za-z0-9]{1,5}$/.exec(ozgunAd)?.[0] ?? "";
-    const ad = party.displayName.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "Kartvizit";
-    return `${ad} - kartvizit${uzanti.toLowerCase()}`;
+    const ad = `${kisi} - kartvizit${uzanti.toLowerCase()}`;
+    return { ad, yol: `Kartvizitler/${ad}` };
   }
 
   /**
@@ -1024,18 +1045,19 @@ export class PartyService {
     partyId: string,
     file: Express.Multer.File,
     userId: string,
-    opts: { departmentId?: string; sizeLimit?: number } = {}
+    opts: { departmentId?: string; sizeLimit?: number; rol?: PartyDosyaRolu } = {}
   ): Promise<ProjectFile> {
     if (!file) throw new BadRequestException("Dosya gönderilmedi");
-    // Kartvizit: fotoğraf ya da PDF. Kartın altına herhangi bir dosya
-    // iliştirmek Dosyalar ekranının işi (orada önizleme, sürüm, paylaşım var).
-    if (!/^image\//.test(file.mimetype ?? "") && file.mimetype !== "application/pdf") {
+    const rol = opts.rol ?? "kartvizit";
+    // Kartvizit fotoğraf ya da PDF olmalı: listede kart simgesi önizleme açar.
+    // Ek dosyada tür serbest (teklif, katalog, sunum).
+    if (rol === "kartvizit" && !/^image\//.test(file.mimetype ?? "") && file.mimetype !== "application/pdf") {
       throw new BadRequestException("Kartvizit fotoğraf ya da PDF olmalı");
     }
     const party = await this.findOne(partyId);
     await this.assertKayitYazilir(party, userId);
-    const adli = { ...file, originalname: this.dosyaAdi(party, file.originalname) } as Express.Multer.File;
-    const yol = `Kartvizitler/${adli.originalname}`;
+    const { ad, yol } = this.dosyaYolu(party, file.originalname, rol);
+    const adli = { ...file, originalname: ad } as Express.Multer.File;
     const dosya = party.jobId
       ? await this.files.uploadInline(party.jobId, userId, adli, {}, { relativePath: yol }, opts.sizeLimit)
       : await this.files.uploadInlineForFlat(
@@ -1047,9 +1069,9 @@ export class PartyService {
         );
     const { error } = await this.supabase.client
       .from("file_links")
-      .insert({ file_id: dosya.id, target_kind: "party", target_id: partyId, created_by: userId });
+      .insert({ file_id: dosya.id, target_kind: "party", target_id: partyId, created_by: userId, party_rol: rol });
     if (error && (error as any).code !== "23505") throw error;
-    await this.logActivity(partyId, "sistem", "Kartvizit eklendi", userId);
+    await this.logActivity(partyId, "sistem", rol === "ek" ? `Dosya eklendi: ${ad}` : "Kartvizit eklendi", userId);
     return dosya;
   }
 
@@ -1058,11 +1080,11 @@ export class PartyService {
    * geçer (FilesService.findById): kartı görmek, dosyanın durduğu departman
    * klasörünü görmek demek değil. Erişilemeyen dosya sessizce elenir.
    */
-  async dosyalar(partyId: string, userId: string): Promise<ProjectFile[]> {
+  async dosyalar(partyId: string, userId: string): Promise<{ rol: PartyDosyaRolu; dosya: ProjectFile }[]> {
     await this.assertKayitOkunur(await this.findOne(partyId), userId);
     const { data, error } = await this.supabase.client
       .from("file_links")
-      .select("file_id")
+      .select("file_id, party_rol")
       .eq("target_kind", "party")
       .eq("target_id", partyId)
       .not("file_id", "is", null)
@@ -1070,9 +1092,15 @@ export class PartyService {
       .limit(LISTE_TAVANI);
     if (error) throw error;
     const dosyalar = await Promise.all(
-      ((data ?? []) as any[]).map((r) => this.files.findById(r.file_id, userId).then((x) => x.file).catch(() => null))
+      ((data ?? []) as any[]).map((r) =>
+        this.files
+          .findById(r.file_id, userId)
+          // Rolü boş eski bağlar (157 öncesi) kartvizitti.
+          .then((x) => ({ rol: (r.party_rol === "ek" ? "ek" : "kartvizit") as PartyDosyaRolu, dosya: x.file }))
+          .catch(() => null)
+      )
     );
-    return dosyalar.filter((d): d is ProjectFile => d !== null);
+    return dosyalar.filter((d): d is { rol: PartyDosyaRolu; dosya: ProjectFile } => d !== null);
   }
 
   /**
@@ -1080,12 +1108,12 @@ export class PartyService {
    * birden fazla kartvizit olabiliyor: dosya bir kez yüklenir, her kişiye
    * bağlanır. Dosyayı GÖREBİLMEK şart — başkasının dosya kimliğiyle bağ kurulmasın.
    */
-  async dosyaBagla(partyId: string, fileId: string, userId: string): Promise<void> {
+  async dosyaBagla(partyId: string, fileId: string, userId: string, rol: PartyDosyaRolu = "kartvizit"): Promise<void> {
     await this.assertKayitYazilir(await this.findOne(partyId), userId);
     await this.files.findById(fileId, userId);
     const { error } = await this.supabase.client
       .from("file_links")
-      .insert({ file_id: fileId, target_kind: "party", target_id: partyId, created_by: userId });
+      .insert({ file_id: fileId, target_kind: "party", target_id: partyId, created_by: userId, party_rol: rol });
     if (error && (error as any).code !== "23505") throw error;
   }
 

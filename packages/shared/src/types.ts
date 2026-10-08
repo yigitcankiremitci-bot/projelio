@@ -799,12 +799,14 @@ export interface Party {
   contactCount?: number;
   lastActivityAt?: string;
   /**
-   * Yalnızca Bağlantılar listesinde: karta bağlı dosya sayısı ve en son
-   * eklenenin kimliği (listede kartvizit simgesi). Dosyayı açmak ayrıca
-   * dosya yetkisinden geçer — kimlik yetki vermez.
+   * Yalnızca Bağlantılar listesinde: karta bağlı kartvizit ve ek dosya
+   * sayıları, en son eklenenlerin kimlikleri (listedeki simgeler). Dosyayı
+   * açmak ayrıca dosya yetkisinden geçer — kimlik yetki vermez.
    */
-  dosyaSayisi?: number;
-  sonDosyaId?: string;
+  kartvizitSayisi?: number;
+  sonKartvizitId?: string;
+  ekSayisi?: number;
+  sonEkId?: string;
 }
 
 /** Kurumdaki kişi. B2B'de firma bir, muhatap birden fazladır. */
@@ -853,6 +855,9 @@ export interface MusteriListesi {
   kartYazar: boolean;
   musteriler: Party[];
 }
+
+/** Kartın dosyasının rolü (file_links.party_rol, migration 157). */
+export type PartyDosyaRolu = "kartvizit" | "ek";
 
 /**
  * Karttan açılmış takip görevi (tasks.source_record_id = party.id). Görev

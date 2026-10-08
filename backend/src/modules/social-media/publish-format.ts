@@ -56,6 +56,27 @@ export function isQueueable(status: string, publishVia: string | null | undefine
   return status === "scheduled" || status === "approved" || status === "ready";
 }
 
+/**
+ * "Planlandı" bir gönderi en az bir hesaba gitmeli.
+ *
+ * Kuyruk gönderileri değil HEDEFLERİ tarıyor; hesapsız gönderinin hedef satırı
+ * olmadığı için kuyruk onu hiç görmüyor — hata yok, bildirim yok, takvimde
+ * "Planlandı" yazıyor ama saati gelince hiçbir şey çıkmıyor (2026-10-06: iki
+ * fuar paylaşımı böyle kayboldu). Kayıt anında reddetmek tek dürüst davranış.
+ *
+ * Yalnızca "scheduled": "Onaylandı"/"Hazır" iş akışı aşamaları, hesabı
+ * olmayan ekipler modülü takvim olarak kullanırken de onları seçebiliyor.
+ * Başka araçta zamanlanan içerik zaten buradan yayımlanmaz.
+ */
+export function hesapsizPlanHatasi(
+  status: string,
+  publishVia: string | null | undefined,
+  hesapSayisi: number
+): string | null {
+  if (status !== "scheduled" || publishVia === "external" || hesapSayisi > 0) return null;
+  return "Planlanan içerik için en az bir hesap seçilmeli; hesapsız içerik yayımlanamaz.";
+}
+
 /** Kullanıcı adının tek biçimi — web ile ortak (bkz. @projelio/shared sosyalHesap). */
 export const normalizeHandle = normalizeSocialHandle;
 

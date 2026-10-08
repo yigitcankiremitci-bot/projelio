@@ -292,6 +292,11 @@ export default function SocialPostComposer({
   /** Kayıt yoksa açar, varsa günceller. Medya yüklemesi de bunu kullanır. */
   const persist = async (): Promise<SocialPost> => {
     if (!form.title.trim()) throw new Error(t("Başlık gerekli"));
+    // Sunucu da reddediyor; burada yakalamak kullanıcıyı bir istek beklemekten
+    // kurtarıyor. Hesapsız planlanan içerik kuyruğa hiç girmiyordu.
+    if (form.status === "scheduled" && form.publishVia !== "external" && selected.length === 0) {
+      throw new Error(t("Planlanan içerik için en az bir hesap seçilmeli; hesapsız içerik yayımlanamaz."));
+    }
     const next = saved
       ? await socialMediaApi.updatePost(saved.id, body())
       : await socialMediaApi.createPost(scope, body());

@@ -11,7 +11,7 @@ import type {
 import { requireSafeUrl } from "../../common/safe-url";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
-import { isQueueable, normalizeHandle } from "./publish-format";
+import { hesapsizPlanHatasi, isQueueable, normalizeHandle } from "./publish-format";
 
 /**
  * Sosyal Medya modülünün (pd_sosyal_medya) servisi.
@@ -515,6 +515,12 @@ export class SocialMediaService {
     await this.assertCanWrite(scope, userId);
     if (!input.title?.trim()) throw new BadRequestException("Başlık gerekli");
     this.assertEnums(input);
+    const planHatasi = hesapsizPlanHatasi(
+      input.status ?? "draft",
+      input.publishVia,
+      input.accountIds?.length ?? 0
+    );
+    if (planHatasi) throw new BadRequestException(planHatasi);
 
     const { data, error } = await this.supabase.client
       .from("social_posts")
@@ -677,6 +683,17 @@ export class SocialMediaService {
     if (input.clicks !== undefined) patch.clicks = input.clicks;
     if (input.resultNote !== undefined) patch.result_note = nullable(input.resultNote);
     Object.assign(patch, this.publishViaColumns(input));
+
+    // Kayıttan SONRAKİ hâl denetlenir: hesap listesi gelmediyse mevcut hedefler
+    // sayılır. Daha önce hesapsız planlanmış bir gönderi de ilk düzenlemede
+    // yakalanır — sessizce kalmasındansa kullanıcı sebebi görsün.
+    const sonDurum = input.status ?? existing.status;
+    const sonYol = input.publishVia ?? existing.publish_via;
+    if (sonDurum === "scheduled" && sonYol !== "external") {
+      const hesapSayisi = input.accountIds ? input.accountIds.length : await this.hedefSayisi(id);
+      const planHatasi = hesapsizPlanHatasi(sonDurum, sonYol, hesapSayisi);
+      if (planHatasi) throw new BadRequestException(planHatasi);
+    }
 
     if (input.status !== undefined) {
       patch.status = input.status;
@@ -879,6 +896,15 @@ export class SocialMediaService {
 
     const { error: insError } = await this.supabase.client.from("social_post_collaborators").insert(rows);
     if (insError) throw insError;
+  }
+
+  private async hedefSayisi(postId: string): Promise<number> {
+    const { count, error } = await this.supabase.client
+      .from("social_post_targets")
+      .select("id", { count: "exact", head: true })
+      .eq("post_id", postId);
+    if (error) throw error;
+    return count ?? 0;
   }
 
   private async rawPost(id: string): Promise<any> {

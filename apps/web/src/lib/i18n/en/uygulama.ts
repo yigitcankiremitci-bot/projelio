@@ -486,6 +486,8 @@ export const uygulama: TranslationDict = {
   "Ad gerekli": "Name is required",
   "Apple Takvim'e ekle": "Add to Apple Calendar",
   "Başlık gerekli": "Title is required",
+  "Planlanan içerik için en az bir hesap seçilmeli; hesapsız içerik yayımlanamaz.":
+    "Select at least one account for scheduled content; content without an account can't be published.",
   "Bitiş saati başlangıçtan sonra olmalı": "The end time must be after the start time",
   "Bitiş saati başlangıçtan sonra olmalı.": "The end time must be after the start time.",
   "Destek talebin yanıtlandı": "Your support request has a reply",

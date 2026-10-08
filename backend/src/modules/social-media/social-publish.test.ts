@@ -6,6 +6,7 @@ import {
   buildCaption,
   denemeReelsHatasi,
   extractMetaError,
+  hesapsizPlanHatasi,
   instagramCollaborators,
   isQueueable,
   mediaFileIds,
@@ -95,6 +96,21 @@ describe("yayın kuyruğu kararı", () => {
 
   test("migration öncesi satır (publish_via yok) eskisi gibi davranır", () => {
     assert.equal(isQueueable("scheduled", null), true);
+  });
+});
+
+describe("hesapsız planlama", () => {
+  test("hesabı olmayan gönderi planlanamaz", () => {
+    // Hedef satırı yoksa kuyruk gönderiyi hiç görmüyor: sessizce yayımlanmıyordu.
+    assert.ok(hesapsizPlanHatasi("scheduled", "projelio", 0));
+    assert.ok(hesapsizPlanHatasi("scheduled", null, 0));
+  });
+
+  test("hesap seçiliyse, başka araçtaysa ya da planlı değilse engel yok", () => {
+    assert.equal(hesapsizPlanHatasi("scheduled", "projelio", 1), null);
+    assert.equal(hesapsizPlanHatasi("scheduled", "external", 0), null);
+    assert.equal(hesapsizPlanHatasi("draft", "projelio", 0), null);
+    assert.equal(hesapsizPlanHatasi("approved", "projelio", 0), null);
   });
 });
 

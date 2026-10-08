@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { cevaptaTaslakVar, icerikTuruSec, medyaEtiketi, taslakGosterimi, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
+import { cevaptaTaslakVar, icerikTuruSec, medyaEtiketi, taslakGosterimi, taslakIsteniyor, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
 
 test("ofsetsiz duvar saati İstanbul saatine göre UTC'ye çevrilir", () => {
   const d = zamaniCoz("2026-10-01T19:00", "Europe/Istanbul");
@@ -80,4 +80,11 @@ test("taslak gösterimi: sunucu bloğu hesap, tür, zaman, açıklama ve etiketl
   assert.match(metin, /Bölüm 3/);
   assert.match(metin, /Etiketler: #projelio/);
   assert.ok(cevaptaTaslakVar(metin, "Bölüm 3"));
+});
+
+test("taslak isteniyor: görmek isteyen kullanıcı ya da onay soran Lio", () => {
+  assert.equal(taslakIsteniyor("göster", "Taslak görüntüleniyor. Hemen planlanır mı?"), true);
+  assert.equal(taslakIsteniyor("Göster yeni halini", ""), true);
+  assert.equal(taslakIsteniyor("tamam", "Böyle planlayayım mı?"), true);
+  assert.equal(taslakIsteniyor("bugün kaç görevim var", "3 görevin var."), false);
 });

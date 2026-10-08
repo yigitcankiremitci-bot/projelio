@@ -166,3 +166,19 @@ export function taslakGosterimi(o: {
   if (o.etiketler?.trim()) satirlar.push("", `Etiketler: ${o.etiketler.trim()}`);
   return satirlar.join("\n");
 }
+
+/**
+ * Bu turda kullanıcıya açık taslak gösterilmeli mi — taslak bu turda
+ * değişmemiş olsa bile.
+ *
+ * NEDEN: 2026-10-08'de kullanıcı "göster" yazdı; Lio hiçbir araç çağırmadan
+ * "Taslak görüntüleniyor. Hemen planlanır mı?" dedi. Taslak o turda
+ * değişmediği için cevaptaTaslakVar korumasına hiç girmedi. Kullanıcı görmek
+ * istediyse ya da Lio planlama onayı soruyorsa, gösterilmemiş taslak cevaba
+ * sunucu tarafından eklenir.
+ */
+export function taslakIsteniyor(kullaniciMetni: string, cevap: string | null | undefined): boolean {
+  const k = kullaniciMetni.toLocaleLowerCase("tr");
+  if (/g[öo]ster|g[öo]reyim|g[öo]rmek|g[öo]rebilir|son h[aâ]l|yeni h[aâ]l/.test(k)) return true;
+  return /planla/.test((cevap ?? "").toLocaleLowerCase("tr"));
+}

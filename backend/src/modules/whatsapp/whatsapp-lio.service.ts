@@ -11,7 +11,7 @@ import type { WahaClient } from "./waha.client";
 import { decideLioKomut, devamCevabi, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
 import { yedekle, yedekSil, yedektenYukle } from "../social-media/medya-yedegi";
-import { cevaptaTaslakVar, medyaEtiketi, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
+import { cevaptaTaslakVar, medyaEtiketi, taslakIsteniyor, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -80,17 +80,36 @@ export class WhatsappLioService {
    * sayıyor; gösterimi modele bırakınca kullanıcı görmediği açıklamaya "evet"
    * diyebiliyordu (bkz. cevaptaTaslakVar). Hata cevabı engellemez: taslak
    * okunamazsa Lio'nun kendi cevabı gider.
+   *
+   * Taslak bu turda değişmediyse de: kullanıcı görmek istediyse ya da Lio
+   * planlama onayı soruyorsa, henüz gösterilmemiş açık taslaklar eklenir
+   * (bkz. taslakIsteniyor). "Gösterildi" bilgisi bellekte; dağıtımdan sonra
+   * boşalıyor ve Lio göstermeden onay istediğinde planlama hiç açılamıyordu.
+   * Eklenen taslak "dokunuldu" sayılır: bir sonraki mesajla planlanabilir olur.
    */
-  private async taslaklariGoster(userId: string, cevap: string | null | undefined): Promise<string | null | undefined> {
-    const idler = gelenMedya.buTurTaslaklari(userId);
-    if (!idler.length) return cevap;
+  private async taslaklariGoster(
+    userId: string,
+    kullaniciMetni: string,
+    cevap: string | null | undefined
+  ): Promise<string | null | undefined> {
+    const idler = new Set(gelenMedya.buTurTaslaklari(userId));
+    const dokunulmamis = new Set<string>();
     try {
+      if (taslakIsteniyor(kullaniciMetni, cevap)) {
+        for (const id of await this.acikTaslakIdleri(userId)) {
+          if (idler.has(id) || gelenMedya.planlanabilir(userId, id)) continue;
+          idler.add(id);
+          dokunulmamis.add(id);
+        }
+      }
+      if (!idler.size) return cevap;
       const { SosyalLioService: cls } = await import("../social-media/sosyal-lio.service");
       const sosyal = this.moduleRef.get(cls, { strict: false });
       const eklenecek: string[] = [];
       for (const id of idler) {
         const t = await sosyal.taslakGosterimi(id, userId);
         if (!cevaptaTaslakVar(cevap ?? "", t.aciklama)) eklenecek.push(t.metin);
+        if (dokunulmamis.has(id)) gelenMedya.taslakDokunuldu(userId, id);
       }
       if (!eklenecek.length) return cevap;
       return [cevap?.trim(), ...eklenecek].filter(Boolean).join("\n\n");
@@ -387,7 +406,7 @@ export class WhatsappLioService {
     // tamamını görmeli. 800'de kesilince "…Tamamı için" eki açıklamanın parçası
     // sanıldı ve kullanıcı olmayan cümleleri sildirmeye çalıştı (2026-09-30).
     const cevap = this.komutCevabi(result, gelenMedya.buTurTaslakVar(userId) ? TASLAK_CEVAP_SINIRI : undefined);
-    const reply = await this.taslaklariGoster(userId, cevap);
+    const reply = await this.taslaklariGoster(userId, text, cevap);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
   }
@@ -398,6 +417,21 @@ export class WhatsappLioService {
    * sonraki turda postId'yi ve mevcut açıklamayı bilmiyordu: düzeltme isteğinde
    * mediaId'yi postId diye verip taslağı baştan açmaya kalktı (2026-09-30).
    */
+  /** Planlanmamış açık taslaklar — acikTaslakNotu ile aynı pencere (son 24 saat, en çok 3). */
+  private async acikTaslakIdleri(userId: string): Promise<string[]> {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await this.supabase.client
+      .from("social_posts")
+      .select("id")
+      .eq("created_by", userId)
+      .is("archived_at", null)
+      .eq("status", "draft")
+      .gte("updated_at", since)
+      .order("updated_at", { ascending: false })
+      .limit(3);
+    return ((data ?? []) as { id: string }[]).map((p) => p.id);
+  }
+
   private async acikTaslakNotu(userId: string): Promise<string> {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data } = await this.supabase.client

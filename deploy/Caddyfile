@@ -39,7 +39,7 @@ brand.projelio.app {
 # Yeni kişi: klasörü kopyala, bu bloğa adını ekle, DNS'te A kaydı aç.
 # CSP zorlayıcı: sayfalarda satır içi script/style ve harici kaynak yok.
 # .vcf'nin text/vcard gitmesi şart; yoksa iOS "Kişilere ekle" önermez.
-firdevs.projelio.app {
+firdevs.projelio.app, selin.projelio.app {
 	root * /srv/kartvizit/{labels.2}
 	encode zstd gzip
 	file_server

@@ -3,6 +3,7 @@ import { LlmProviderRegistry } from "./providers/provider-registry";
 import { AiModelSettingsService } from "./ai-model-settings.service";
 import { AiAssistantController } from "./ai-assistant.controller";
 import { AiAssistantService } from "./ai-assistant.service";
+import { AiChatJobsService } from "./ai-chat-jobs.service";
 import { AiCreditsService } from "./ai-credits.service";
 import { AiCreditOrdersService } from "./ai-credit-orders.service";
 import { AiPaymentProvider } from "./ai-payment.provider";
@@ -118,6 +119,7 @@ import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
     LlmProviderRegistry,
     AiModelSettingsService,
     AiAssistantService,
+    AiChatJobsService,
     AiCreditsService,
     AiConversationsService,
     AiAttachmentsService,

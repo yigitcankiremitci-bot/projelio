@@ -1059,4 +1059,8 @@ export const hatalar: TranslationDict = {
 
   // Dijital kartvizit
   "Bu adres alınmış, başka bir adres seç.": "This address is taken, choose another one.",
+
+  // Lio arka plan turları (ai-chat-jobs.ts)
+  "Lio şu an önceki isteklerin üzerinde çalışıyor. Bitince tekrar dene.": "Lio is still working on your previous requests. Try again when they finish.",
+  "Lio'nun bu cevabı artık bulunamıyor. Sohbeti yeniden açıp son mesaja bak; tekrar göndermeden önce yapılanları kontrol et.": "This Lio reply can no longer be found. Reopen the conversation and check the last message; review what was done before sending again.",
 };

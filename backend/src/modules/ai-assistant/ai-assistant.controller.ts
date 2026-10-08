@@ -46,6 +46,9 @@ import {
 } from "./ai-credits.config";
 import { LlmProviderRegistry } from "./providers/provider-registry";
 import { AiModelSettingsService } from "./ai-model-settings.service";
+import { AiChatJobsService } from "./ai-chat-jobs.service";
+import { RealtimeGateway } from "../realtime/realtime.gateway";
+import { redactUrl } from "../../common/redact-url";
 
 @Controller("ai")
 @UseGuards(AuthGuard("jwt"))
@@ -60,8 +63,32 @@ export class AiAssistantController {
     private speechService: AiSpeechService,
     private creditOrders: AiCreditOrdersService,
     private payment: AiPaymentProvider,
-    private exportsService: AiExportsService
+    private exportsService: AiExportsService,
+    private jobs: AiChatJobsService,
+    private realtime: RealtimeGateway
   ) {}
+
+  /**
+   * `arkaPlan` istenmişse turu arka planda başlatıp yalnızca iş kimliğini
+   * döner; istemci sonucu `GET /ai/jobs/:id` ile sorar (neden: bkz.
+   * ai-chat-jobs.service.ts). İstenmemişse eski davranış: yanıt tur bitince.
+   * Bayrak isteğe bağlı, çünkü güncellenmemiş bir istemci (önbellekteki eski
+   * sürüm) bekleme biçimini bilmiyor.
+   *
+   * "Sayfa değişti" sinyali iş BİTİNCE gönderiliyor: RealtimeChangeInterceptor
+   * yanıt anında çalışıyor, ki bu yolda o an henüz hiçbir şey değişmemiş olur.
+   */
+  private arkaPlandaYaDaHemen<T>(req: any, arkaPlan: unknown, calistir: () => Promise<T>) {
+    if (arkaPlan !== true) return calistir();
+    const userId = String(req.user.userId);
+    const socketId = req.headers?.["x-socket-id"];
+    const method = String(req.method);
+    const path = redactUrl(String(req.originalUrl ?? req.url ?? ""));
+    const isId = this.jobs.baslat(userId, calistir, () => {
+      if (socketId) this.realtime.broadcastChange(String(socketId), userId, { method, path });
+    });
+    return { isId };
+  }
 
   // --- Sohbet ------------------------------------------------------------
 
@@ -76,28 +103,36 @@ export class AiAssistantController {
       conversationId?: string;
       tier?: string;
       attachmentIds?: string[];
+      arkaPlan?: boolean;
     }
   ) {
     // `tier` gövdede DURUYOR ama artık kullanılmıyor: kademe ve model kararı
     // adminde (bkz. ai-model-settings.service.ts). Alanı kaldırmak yerine yok
     // saymak, güncellenmemiş istemcilerin isteklerini kırmamak için.
-    return this.aiAssistantService.chat(
-      req.user.userId,
-      req.user.role,
-      body.message,
-      body.conversationId,
-      undefined,
-      body.attachmentIds,
-      // Cevabın dili arayüzün dilidir. Hesaptan okumak demo hesaplarında
-      // çalışmıyor: paylaşıldıkları için `users.locale` bilerek boş bırakılır.
-      { locale: istemciDili(req) }
+    // Dil isteğin içindeyken okunuyor: arka plan işi istek bittikten sonra da sürüyor.
+    const locale = istemciDili(req);
+    return this.arkaPlandaYaDaHemen(req, body.arkaPlan, () =>
+      this.aiAssistantService.chat(
+        req.user.userId,
+        req.user.role,
+        body.message,
+        body.conversationId,
+        undefined,
+        body.attachmentIds,
+        // Cevabın dili arayüzün dilidir. Hesaptan okumak demo hesaplarında
+        // çalışmıyor: paylaşıldıkları için `users.locale` bilerek boş bırakılır.
+        { locale }
+      )
     );
   }
 
   // Kritik bir işlemi kullanıcı onayından sonra (ya da vazgeçildiğinde) sonuçlandırır.
   @Post("confirm")
-  confirm(@Req() req: any, @Body() body: { actionId: string; confirmed: boolean }) {
-    return this.aiAssistantService.confirmAction(body.actionId, req.user.userId, !!body.confirmed);
+  confirm(@Req() req: any, @Body() body: { actionId: string; confirmed: boolean; arkaPlan?: boolean }) {
+    // Onaydan sonra tur kaldığı yerden sürüyor, yani bu da uzun sürebilir.
+    return this.arkaPlandaYaDaHemen(req, body.arkaPlan, () =>
+      this.aiAssistantService.confirmAction(body.actionId, req.user.userId, !!body.confirmed)
+    );
   }
 
   // Uzayan bir isteği (kredi eşiği ya da adım sınırı nedeniyle duraklatılmış)
@@ -105,15 +140,18 @@ export class AiAssistantController {
   @Post("continue")
   continueRun(
     @Req() req: any,
-    @Body() body: { runId: string; confirmed: boolean; tier?: string; approveAll?: boolean }
+    @Body() body: { runId: string; confirmed: boolean; tier?: string; approveAll?: boolean; arkaPlan?: boolean }
   ) {
-    return this.aiAssistantService.continueRun(
-      body.runId,
-      req.user.userId,
-      !!body.confirmed,
-      body.tier,
-      !!body.approveAll
+    return this.arkaPlandaYaDaHemen(req, body.arkaPlan, () =>
+      this.aiAssistantService.continueRun(body.runId, req.user.userId, !!body.confirmed, body.tier, !!body.approveAll)
     );
+  }
+
+  // Arka planda başlatılmış bir turun durumu (bkz. arkaPlandaYaDaHemen).
+  // Tur hatayla bittiyse hata burada, kendi durum koduyla döner.
+  @Get("jobs/:id")
+  job(@Req() req: any, @Param("id") id: string) {
+    return this.jobs.oku(String(req.user.userId), id);
   }
 
   // Kullanıcının seçebileceği model kademeleri (arayüzdeki model seçici bunu okur).

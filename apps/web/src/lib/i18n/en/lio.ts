@@ -242,4 +242,7 @@ export const lio: TranslationDict = {
   "Kopyalanamadı": "Couldn't copy",
   "Birden fazla seç": "Select multiple",
   Sen: "You",
+
+  // Arka plan turunun beklemesi (api/aiChat.ts isinSonucunuBekle)
+  "Lio'nun cevabı beklenenden uzun sürdü. Sohbeti yeniden açıp son mesaja bak; tekrar göndermeden önce yapılanları kontrol et.": "Lio's reply is taking longer than expected. Reopen the conversation and check the last message; review what was done before sending again.",
 };

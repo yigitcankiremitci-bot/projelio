@@ -1,5 +1,5 @@
 import { cevirmenSuAn } from "../lib/i18n/anlik";
-import { api, API_URL } from "./client";
+import { api, API_URL, ApiError } from "./client";
 
 export interface AiChatMessage {
   role: "user" | "assistant";
@@ -252,17 +252,87 @@ export interface AiModelSettingsResponse {
   health: AiHealth;
 }
 
+/** Sunucunun arka planda başlattığı turun kimliği (bkz. backend ai-chat-jobs.service.ts). */
+type IsBaslatildi = { isId: string };
+type IsDurumu<T> = { durum: "calisiyor" } | { durum: "bitti"; sonuc: T };
+
+/** Yoklama aralığı: Lio'nun tek adımı birkaç saniye sürüyor, daha sık sormak boşa istek. */
+const YOKLAMA_ARALIGI_MS = 1_500;
+/**
+ * Bekleme tavanı. Sunucu çalışan işi 30 dakikada siler; bundan kısa tutuluyor
+ * çünkü sekiz adımlık bir tur bunun çok altında biter — tavana varmak bir
+ * şeyin asılı kaldığı anlamına gelir.
+ */
+const EN_UZUN_BEKLEME_MS = 15 * 60_000;
+/** Ağ hatasında üst üste kaç yoklamanın tekrar deneneceği (mobilde ağ geçişi, kısa kopma). */
+const AG_HATASI_TOLERANSI = 8;
+
+/**
+ * Arka planda başlatılan turun sonucunu bekler.
+ *
+ * NEDEN: tek uzun istek 30 saniyelik istemci zaman aşımına takılıyordu ve
+ * kullanıcı "sunucu yanıt vermedi" görürken Lio arkada işi bitiriyordu
+ * (gerekçe: backend ai-chat-jobs.service.ts). Burada her istek kısa.
+ *
+ * Yalnızca AĞ hataları (status 0) ve 5xx tekrar denenir: işin kendi hatası
+ * (402 bakiye, 400…) ya da 404 (iş yok — sunucu yeniden başlamış) kesin
+ * sonuçtur, beklemeye devam etmek kullanıcıyı boşuna oyalar.
+ *
+ * Sunucu henüz güncellenmemişse (bayrağı tanımıyor) ilk yanıt doğrudan
+ * sonucun kendisidir — o da olduğu gibi döner.
+ */
+export async function isinSonucunuBekle<T>(
+  ilk: T | IsBaslatildi,
+  sor: (isId: string) => Promise<IsDurumu<T>>,
+  bekle: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+  simdi: () => number = Date.now
+): Promise<T> {
+  if (!ilk || typeof ilk !== "object" || typeof (ilk as IsBaslatildi).isId !== "string") return ilk as T;
+  const { isId } = ilk as IsBaslatildi;
+  const baslangic = simdi();
+  let agHatasi = 0;
+  while (simdi() - baslangic < EN_UZUN_BEKLEME_MS) {
+    await bekle(YOKLAMA_ARALIGI_MS);
+    try {
+      const durum = await sor(isId);
+      agHatasi = 0;
+      if (durum.durum === "bitti") return durum.sonuc;
+    } catch (err) {
+      const gecici = err instanceof ApiError && (err.status === 0 || err.status >= 500);
+      if (!gecici || ++agHatasi > AG_HATASI_TOLERANSI) throw err;
+    }
+  }
+  throw new ApiError(
+    cevirmenSuAn()("Lio'nun cevabı beklenenden uzun sürdü. Sohbeti yeniden açıp son mesaja bak; tekrar göndermeden önce yapılanları kontrol et."),
+    0
+  );
+}
+
+const isiSor = <T>(isId: string) => api.get<IsDurumu<T>>(`/ai/jobs/${encodeURIComponent(isId)}`);
+
 export const aiChat = {
   // Kademe/model GÖNDERİLMEZ: hangi modelin çalışacağına yönetici karar verir
   // (bkz. backend ai-model-settings.service.ts). Sunucu gövdedeki tier alanını
   // zaten yok sayıyor; buradan da göndermiyoruz.
-  send: (message: string, conversationId?: string, attachmentIds?: string[]) =>
-    api.post<AiChatResult>("/ai/chat", { message, conversationId, attachmentIds }),
-  confirm: (actionId: string, confirmed: boolean) =>
-    api.post<AiConfirmResult>("/ai/confirm", { actionId, confirmed }),
+  //
+  // Üçü de `arkaPlan` ile gider: tur sunucuda arka planda çalışır, sonuç
+  // yoklanarak alınır (bkz. isinSonucunuBekle). Çağıranlar için imza aynı.
+  send: async (message: string, conversationId?: string, attachmentIds?: string[]) =>
+    isinSonucunuBekle(
+      await api.post<AiChatResult | IsBaslatildi>("/ai/chat", { message, conversationId, attachmentIds, arkaPlan: true }),
+      isiSor<AiChatResult>
+    ),
+  confirm: async (actionId: string, confirmed: boolean) =>
+    isinSonucunuBekle(
+      await api.post<AiConfirmResult | IsBaslatildi>("/ai/confirm", { actionId, confirmed, arkaPlan: true }),
+      isiSor<AiConfirmResult>
+    ),
   // Duraklatılmış bir isteği sürdürür/durdurur. Kademe değiştirilemez.
-  continueRun: (runId: string, confirmed: boolean, approveAll?: boolean) =>
-    api.post<AiChatResult>("/ai/continue", { runId, confirmed, approveAll }),
+  continueRun: async (runId: string, confirmed: boolean, approveAll?: boolean) =>
+    isinSonucunuBekle(
+      await api.post<AiChatResult | IsBaslatildi>("/ai/continue", { runId, confirmed, approveAll, arkaPlan: true }),
+      isiSor<AiChatResult>
+    ),
   getModels: () => api.get<{ maxAttachments: number }>("/ai/models"),
   /** Sağlayıcı durumu — yalnızca admin çağırabilir. */
   getHealth: () => api.get<AiHealth>("/ai/health"),

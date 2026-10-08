@@ -389,6 +389,18 @@ export class AiAttachmentsService {
   }
 
   /**
+   * Sabitlenmiş bir görselin/PDF'in kendisi — adı ve türüyle. Lio'nun okuduğu
+   * kartvizit fotoğrafı, açtığı bağlantı kartına dosya olarak bağlansın diye
+   * (create_connections). Sahiplik getBinary'deki gibi doğrulanır.
+   */
+  getFile(userId: string, id: string): { name: string; mimeType: string; buffer: Buffer } | undefined {
+    this.sweep();
+    const record = this.prepared.get(id);
+    if (!record || record.userId !== userId || !record.base64) return undefined;
+    return { name: record.name, mimeType: record.mimeType, buffer: Buffer.from(record.base64, "base64") };
+  }
+
+  /**
    * Sabitlenmiş bir tablonun satırları (süresi dolduysa undefined).
    *
    * read_sheet ve import_* araçlarının tek veri kaynağı. Sahiplik burada

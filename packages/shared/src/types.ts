@@ -747,6 +747,10 @@ export interface Party {
   partyType: PartyType;
   displayName: string;
   legalName?: string;
+  /** Kişinin çalıştığı şirket/kurum — serbest metin (migration 155). */
+  kurum?: string;
+  /** Kişinin görevi ("Pazarlama Müdürü"). legalName ile karıştırma. */
+  unvan?: string;
 
   taxNumber?: string;
   taxOffice?: string;

@@ -23,5 +23,19 @@ export const baglantilar: TranslationDict = {
   "Kartı bu deftere eklemek için orada da yazma yetkin olmalı": "You need write access there too to add the card to that list",
 
   "Geçersiz sosyal hesap": "Invalid social media account",
+  "Departman bu kartın şirketinde değil": "That department isn't in this card's company",
+  "Dosya eklemek için kartı modülün açık olduğu bir departmandan aç":
+    "To add a file, open the card from a department where the module is enabled",
+  "Kartvizit fotoğraf ya da PDF olmalı": "The business card must be a photo or a PDF",
+
+  // Lio: kartvizitten toplu bağlantı (onay penceresi ve etkinlik kartı)
+  "Bağlantı ve İlişkiler'e {n} kişi eklenecek:": {
+    one: "{n} person will be added to Contacts & Relationships:",
+    other: "{n} people will be added to Contacts & Relationships:",
+  },
+  "Nerede tanışıldı: {yer}": "Where you met: {yer}",
+  "Zaten kayıtlı, atlanacak: {liste}": "Already registered, will be skipped: {liste}",
+  "{n} bağlantı kartı açıldı": { one: "{n} contact card created", other: "{n} contact cards created" },
+  "Eklenecek kişi yok": "No one to add",
   "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
 };

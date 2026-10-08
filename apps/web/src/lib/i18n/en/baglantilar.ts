@@ -76,4 +76,14 @@ export const baglantilar: TranslationDict = {
   "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
   "Örn. ornek.com": "E.g. example.com",
   "Son kullanılanlar:": "Recently used:",
+
+  // ─────────────────────────────────────────────── Kurum, unvan, kartvizit dosyası
+  "Şirket / kurum": "Company / organization",
+  "Çalıştığı şirket ya da kurum": "Where they work",
+  "Örn. Pazarlama Müdürü": "E.g. Marketing Manager",
+  "Kartvizit": "Business card",
+  "+ Kartvizit ekle": "+ Add business card",
+  "Kartvizit (fotoğraf ya da PDF)": "Business card (photo or PDF)",
+  "Karttan kaldır": "Remove from card",
+  "Kart kaydedildi ama kartvizit yüklenemedi: {sebep}": "The card was saved but the business card couldn't be uploaded: {sebep}",
 };

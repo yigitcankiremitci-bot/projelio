@@ -48,6 +48,11 @@ export const CRITICAL_TOOLS = new Set<string>([
   // geri alınamaz ve karşı tarafta bir insan okur. Kullanıcı ne yazdığını
   // görmeden gitmemeli.
   "create_support_request",
+  // Bağlantı kartları: Lio kartvizit fotoğrafını OKUYARAK açıyor. Okuma hatası
+  // (yanlış ad, kayan telefon) sessizce deftere girmesin; kullanıcı açılacak
+  // kişileri onay penceresinde görüp onaylar. Toplu araç olduğu için 30 kart
+  // tek tıkla açılır — tek tek onay istemek kartvizit kolaylığını yok ederdi.
+  "create_connections",
 ]);
 
 // Veri DEĞİŞTİREN ama kritik olmayan araçlar. Kritik olanlar yukarıda;
@@ -110,6 +115,7 @@ export const WRITE_TOOLS = new Set<string>([
   "update_customer",
   // Toplu kart açma; önizleme varsayılan (bkz. import_tasks_from_sheet).
   "import_customers_from_sheet",
+  "update_connection",
   // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
@@ -1759,6 +1765,108 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         onizleme: { type: "boolean", description: "Varsayılan true." },
       },
       required: ["dosyaKimligi"],
+    },
+  },
+  // --- Bağlantı ve İlişkiler (party, ayrı defter — migration 153) ----------
+  // Müşteri araçlarından AYRI: model "müşteri" ile "bağlantı"yı karıştırırsa
+  // rakip satış listesine düşerdi. Araç adı bu kararı modele bırakmıyor.
+  {
+    name: "list_connections",
+    description:
+      "Bağlantı ve İlişkiler modülündeki kartları listeler (fuarda tanışılanlar, rakipler, olası işbirlikçiler — " +
+      "müşteri OLMAYAN dış kişiler): partyId, ad, kurum, unvan, önem, nerede tanışıldı, sonraki temas. " +
+      "organizationId ya da jobId'den biri verilmeli.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string" },
+        jobId: { type: "string" },
+        query: { type: "string", description: "Ada, kuruma, e-postaya, telefona ya da tanışma yerine göre süzgeç." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_connections",
+    description:
+      "Bağlantı ve İlişkiler modülüne bir ya da birden çok kişi kartı açar — kartvizit fotoğraflarından okunan " +
+      "kişiler için TEK çağrı yap (en çok 30). Kullanıcı açılacak listeyi onay penceresinde görür; aynı ad ya da " +
+      "e-postayla zaten kayıtlı olanlar atlanır. Kartvizitte olmayan bilgiyi UYDURMA, okunamayan alanı boş bırak. " +
+      "kartvizitDosyasi verilirse fotoğraf kişinin kartına dosya olarak eklenir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        departmentId: {
+          type: "string",
+          description: "Kartvizit dosyasının ineceği departman (modülün açık olduğu). Verilmezse uygun olanı seçilir.",
+        },
+        kisiler: {
+          type: "array",
+          maxItems: 30,
+          items: {
+            type: "object",
+            properties: {
+              displayName: { type: "string", description: "Kişinin adı soyadı (yalnızca kurumsa kurum adı)." },
+              partyType: { type: "string", enum: ["person", "company"], description: "Varsayılan person." },
+              roles: {
+                type: "array",
+                items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
+                description: "Kullanıcı söylemediyse verme (contact).",
+              },
+              kurum: { type: "string", description: "Kişinin çalıştığı şirket/kurum (kartvizitteki firma adı)." },
+              unvan: { type: "string", description: "Kişinin görevi (Pazarlama Müdürü)." },
+              email: { type: "string" },
+              phone: { type: "string", description: "Kartvizitte birden fazla numara varsa cep telefonu." },
+              website: { type: "string" },
+              linkedin: { type: "string", description: "LinkedIn profil adresi ya da in/ad-soyad." },
+              instagram: { type: "string", description: "@kullaniciadi ya da profil adresi." },
+              onem: { type: "string", enum: ["yuksek", "orta", "dusuk"], description: "Kullanıcı söylemediyse verme (orta)." },
+              tanismaYeri: { type: "string", description: "Nerede tanışıldı (fuar/etkinlik adı). Kullanıcı söylemediyse sor." },
+              tanismaTarihi: { type: "string", description: "YYYY-AA-GG." },
+              sonrakiTemas: { type: "string", description: "Ne zaman dönülecek, YYYY-AA-GG." },
+              iliskiNotu: { type: "string", description: "Yalnızca bu modülde görünen not (rakip, ortak iş fikri…)." },
+              kartvizitDosyasi: {
+                type: "string",
+                description: "Bu kişinin kartvizitinin göründüğü görselin dosyaKimligi (\"Şu an açık dosyalar\" listesinden).",
+              },
+            },
+            required: ["displayName"],
+          },
+        },
+      },
+      required: ["kisiler"],
+    },
+  },
+  {
+    name: "update_connection",
+    description:
+      "Bağlantı ve İlişkiler'deki bir kartı günceller. Yalnızca DEĞİŞEN alanları ver; roles verilirse mevcut " +
+      "rollere EKLENİR. partyId'yi list_connections'tan al.",
+    input_schema: {
+      type: "object",
+      properties: {
+        partyId: { type: "string" },
+        displayName: { type: "string" },
+        roles: {
+          type: "array",
+          items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
+        },
+        kurum: { type: "string", description: "Kişinin çalıştığı şirket/kurum (kartvizitteki firma adı)." },
+        unvan: { type: "string", description: "Kişinin görevi (Pazarlama Müdürü)." },
+        email: { type: "string" },
+        phone: { type: "string", description: "Kartvizitte birden fazla numara varsa cep telefonu." },
+        website: { type: "string" },
+        linkedin: { type: "string", description: "LinkedIn profil adresi ya da in/ad-soyad." },
+        instagram: { type: "string", description: "@kullaniciadi ya da profil adresi." },
+        onem: { type: "string", enum: ["yuksek", "orta", "dusuk"], description: "Kullanıcı söylemediyse verme (orta)." },
+        tanismaYeri: { type: "string", description: "Nerede tanışıldı (fuar/etkinlik adı). Kullanıcı söylemediyse sor." },
+        tanismaTarihi: { type: "string", description: "YYYY-AA-GG." },
+        sonrakiTemas: { type: "string", description: "Ne zaman dönülecek, YYYY-AA-GG." },
+        iliskiNotu: { type: "string", description: "Yalnızca bu modülde görünen not (rakip, ortak iş fikri…)." },
+      },
+      required: ["partyId"],
     },
   },
   // --- Gruplar, organizasyonlar ve departmanlar --------------------------

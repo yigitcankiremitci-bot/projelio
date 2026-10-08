@@ -26,6 +26,8 @@ import {
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { AccessService } from "../../common/access/access.service";
+import { FilesService, type ProjectFile } from "../files/files.service";
+import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
 import {
@@ -70,6 +72,8 @@ function mapParty(row: any): Party {
     partyType: row.party_type,
     displayName: row.display_name,
     legalName: row.legal_name ?? undefined,
+    kurum: row.kurum ?? undefined,
+    unvan: row.unvan ?? undefined,
     taxNumber: row.tax_number ?? undefined,
     taxOffice: row.tax_office ?? undefined,
     email: row.email ?? undefined,
@@ -145,7 +149,8 @@ export class PartyService {
   constructor(
     private supabase: SupabaseService,
     private moduleMembers: ModuleMembersService,
-    private accessService: AccessService
+    private accessService: AccessService,
+    private files: FilesService
   ) {}
 
   private readonly OWNER_JOIN = "*, owner:users!party_owner_user_id_fkey(full_name)";
@@ -477,6 +482,8 @@ export class PartyService {
         party_type: payload.partyType ?? "company",
         display_name: payload.displayName.trim(),
         legal_name: payload.legalName ?? null,
+        kurum: payload.kurum?.trim().slice(0, 200) || null,
+        unvan: payload.unvan?.trim().slice(0, 150) || null,
         tax_number: payload.taxNumber ?? null,
         tax_office: payload.taxOffice ?? null,
         email: payload.email ?? null,
@@ -609,6 +616,8 @@ export class PartyService {
       party_type: p.partyType ?? "company",
       display_name: p.displayName.trim(),
       legal_name: p.legalName ?? null,
+      kurum: p.kurum?.trim().slice(0, 200) || null,
+      unvan: p.unvan?.trim().slice(0, 150) || null,
       tax_number: p.taxNumber ?? null,
       tax_office: p.taxOffice ?? null,
       email: p.email ?? null,
@@ -742,6 +751,8 @@ export class PartyService {
     assign("party_type", payload.partyType);
     assign("display_name", payload.displayName?.trim());
     assign("legal_name", payload.legalName);
+    assign("kurum", payload.kurum === undefined ? undefined : payload.kurum.trim().slice(0, 200) || null);
+    assign("unvan", payload.unvan === undefined ? undefined : payload.unvan.trim().slice(0, 150) || null);
     assign("tax_number", payload.taxNumber);
     assign("tax_office", payload.taxOffice);
     assign("email", payload.email);
@@ -925,6 +936,134 @@ export class PartyService {
     );
     const guncel = await this.findOne(id, { baglanti: true });
     return this.gorunur(guncel, { ...e, [hedef]: hedefErisim });
+  }
+
+  // ============================================================ Dosyalar (kartvizit)
+
+  /**
+   * Kartın dosyalarının ineceği yer.
+   *
+   * İşte (serbest çalışan) işin dosya ağacı. Şirkette DEPARTMANIN klasörü:
+   * şirket klasörü bütün kadroya açık, rakiplerin kartvizitleri herkesin
+   * Dosyalar ekranına düşerdi. Departman verilmezse kullanıcının üyesi olduğu
+   * ve modülün açık olduğu ilk departman seçilir (Lio böyle yükler).
+   */
+  private async dosyaDepartmani(party: Party, userId: string, departmentId?: string): Promise<string> {
+    const orgId = party.organizationId!;
+    if (departmentId) {
+      const { data } = await this.supabase.client
+        .from("departments")
+        .select("organization_id")
+        .eq("id", departmentId)
+        .maybeSingle();
+      if (data?.organization_id !== orgId) throw new BadRequestException("Departman bu kartın şirketinde değil");
+      return departmentId;
+    }
+    const modul = party.modules.includes(BAGLANTI_MODUL_KEY) ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY;
+    const { data: acik } = await this.supabase.client
+      .from("organization_modules")
+      .select("department_id")
+      .eq("organization_id", orgId)
+      .eq("module_key", modul)
+      .not("department_id", "is", null);
+    for (const r of (acik ?? []) as any[]) {
+      if ((await this.accessService.departmentAccess(r.department_id, userId).catch(() => null))?.canView) {
+        return r.department_id;
+      }
+    }
+    throw new BadRequestException("Dosya eklemek için kartı modülün açık olduğu bir departmandan aç");
+  }
+
+  /** Dosya adında yol ayırıcısı ve Drive'ın sevmediği karakterler olmasın. */
+  private dosyaAdi(party: Party, ozgunAd: string): string {
+    const uzanti = /\.[A-Za-z0-9]{1,5}$/.exec(ozgunAd)?.[0] ?? "";
+    const ad = party.displayName.replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) || "Kartvizit";
+    return `${ad} - kartvizit${uzanti.toLowerCase()}`;
+  }
+
+  /**
+   * Karta dosya (kartvizit fotoğrafı ya da PDF) ekler: dosya "Kartvizitler"
+   * klasörüne iner, karta file_links ile bağlanır. Kartı değiştirebilen ekler.
+   */
+  async dosyaEkle(
+    partyId: string,
+    file: Express.Multer.File,
+    userId: string,
+    opts: { departmentId?: string; sizeLimit?: number } = {}
+  ): Promise<ProjectFile> {
+    if (!file) throw new BadRequestException("Dosya gönderilmedi");
+    // Kartvizit: fotoğraf ya da PDF. Kartın altına herhangi bir dosya
+    // iliştirmek Dosyalar ekranının işi (orada önizleme, sürüm, paylaşım var).
+    if (!/^image\//.test(file.mimetype ?? "") && file.mimetype !== "application/pdf") {
+      throw new BadRequestException("Kartvizit fotoğraf ya da PDF olmalı");
+    }
+    const party = await this.findOne(partyId);
+    await this.assertKayitYazilir(party, userId);
+    const adli = { ...file, originalname: this.dosyaAdi(party, file.originalname) } as Express.Multer.File;
+    const yol = `Kartvizitler/${adli.originalname}`;
+    const dosya = party.jobId
+      ? await this.files.uploadInline(party.jobId, userId, adli, {}, { relativePath: yol }, opts.sizeLimit)
+      : await this.files.uploadInlineForFlat(
+          { kind: "department", id: await this.dosyaDepartmani(party, userId, opts.departmentId) },
+          userId,
+          adli,
+          { relativePath: yol },
+          opts.sizeLimit
+        );
+    const { error } = await this.supabase.client
+      .from("file_links")
+      .insert({ file_id: dosya.id, target_kind: "party", target_id: partyId, created_by: userId });
+    if (error && (error as any).code !== "23505") throw error;
+    await this.logActivity(partyId, "sistem", "Kartvizit eklendi", userId);
+    return dosya;
+  }
+
+  /**
+   * Karta bağlı dosyalar. Her dosya kullanıcının dosya yetkisinden ayrıca
+   * geçer (FilesService.findById): kartı görmek, dosyanın durduğu departman
+   * klasörünü görmek demek değil. Erişilemeyen dosya sessizce elenir.
+   */
+  async dosyalar(partyId: string, userId: string): Promise<ProjectFile[]> {
+    await this.assertKayitOkunur(await this.findOne(partyId), userId);
+    const { data, error } = await this.supabase.client
+      .from("file_links")
+      .select("file_id")
+      .eq("target_kind", "party")
+      .eq("target_id", partyId)
+      .not("file_id", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+    const dosyalar = await Promise.all(
+      ((data ?? []) as any[]).map((r) => this.files.findById(r.file_id, userId).then((x) => x.file).catch(() => null))
+    );
+    return dosyalar.filter((d): d is ProjectFile => d !== null);
+  }
+
+  /**
+   * Zaten yüklenmiş bir dosyayı karta bağlar. Lio'nun okuduğu tek fotoğrafta
+   * birden fazla kartvizit olabiliyor: dosya bir kez yüklenir, her kişiye
+   * bağlanır. Dosyayı GÖREBİLMEK şart — başkasının dosya kimliğiyle bağ kurulmasın.
+   */
+  async dosyaBagla(partyId: string, fileId: string, userId: string): Promise<void> {
+    await this.assertKayitYazilir(await this.findOne(partyId), userId);
+    await this.files.findById(fileId, userId);
+    const { error } = await this.supabase.client
+      .from("file_links")
+      .insert({ file_id: fileId, target_kind: "party", target_id: partyId, created_by: userId });
+    if (error && (error as any).code !== "23505") throw error;
+  }
+
+  /** Bağı koparır; dosya klasörde kalır (silmek Dosyalar ekranının işi). */
+  async dosyaKaldir(partyId: string, fileId: string, userId: string): Promise<void> {
+    await this.assertKayitYazilir(await this.findOne(partyId), userId);
+    const { error } = await this.supabase.client
+      .from("file_links")
+      .delete()
+      .eq("file_id", fileId)
+      .eq("target_kind", "party")
+      .eq("target_id", partyId);
+    if (error) throw error;
   }
 
   // ============================================================ Görevler

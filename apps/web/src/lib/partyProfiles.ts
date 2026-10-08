@@ -153,6 +153,8 @@ export const BAGLANTI_PROFILE: PartyProfile = {
   detail: (p) => {
     const t = cevirmenSuAn();
     return joinDetail(
+      // "Pazarlama Müdürü, ABC Ajans" — kişinin kim olduğu ilk bakışta.
+      [p.unvan, p.kurum].filter(Boolean).join(", ") || undefined,
       p.roles.map((r) => t(ROLE_LABELS[r], { ctx: "rol" })).join(", "),
       p.baglanti?.tanismaYeri,
       p.phone ?? p.email

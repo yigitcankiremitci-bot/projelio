@@ -55,7 +55,10 @@ export type MusteriAlani =
   | "iliskiNotu"
   // Bağlantı şablonunda; kart alanı party.sosyal (migration 154).
   | "linkedin"
-  | "instagram";
+  | "instagram"
+  // Bağlantı şablonunda; kişinin şirketi ve görevi (migration 155).
+  | "kurum"
+  | "unvan";
 
 /**
  * Hangi defterin şablonu. Okuyucu türe göre YALNIZCA o şablonun sütunlarını
@@ -245,7 +248,31 @@ const sutun = (alan: MusteriAlani) => MUSTERI_SUTUNLARI.find((s) => s.alan === a
  * kart müşteriye dönüşünce satış ekibi onu okur; not İlişki notuna yazılır.
  */
 export const BAGLANTI_SUTUNLARI: Sutun[] = [
-  { ...sutun("displayName"), ornek: "Ayşe Yılmaz" },
+  {
+    ...sutun("displayName"),
+    // Müşteri şablonunda "Firma" da ad sayılır; burada firma Şirket / kurum
+    // sütunu. Kendi listesini getiren birinde ["Firma", "Ad Soyad"] sırası
+    // kişinin adı yerine şirketin adını karta yazardı.
+    esAdlar: ["ad", "adı", "ad soyad", "adı soyadı", "isim", "kişi", "kisi", "name", "full name"],
+    aciklama: "Zorunlu. Kişinin adı soyadı (ya da yalnızca kurumsa kurumun adı).",
+    ornek: "Ayşe Yılmaz",
+  },
+  {
+    alan: "kurum",
+    baslik: "Şirket / kurum",
+    esAdlar: ["şirket / kurum", "şirket", "sirket", "kurum", "firma", "firma adı", "organizasyon", "company", "organization"],
+    genislik: 24,
+    aciklama: "Kişinin çalıştığı şirket ya da kurum.",
+    ornek: "ABC Ajans",
+  },
+  {
+    alan: "unvan",
+    baslik: "Unvan",
+    esAdlar: ["unvan", "görev", "gorev", "pozisyon", "title", "job title", "position"],
+    genislik: 20,
+    aciklama: "Kişinin görevi.",
+    ornek: "Pazarlama Müdürü",
+  },
   sutun("partyType"),
   {
     ...sutun("roles"),
@@ -349,6 +376,8 @@ const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string
   onem: { baslik: "Priority", aciklama: "High, Medium or Low. Empty means Medium. The list is sorted by this first.", ornek: "High" },
   tanismaYeri: { baslik: "Where met", aciklama: "Name of the fair, event or meeting.", ornek: "Istanbul Fair 2026" },
   sonrakiTemas: { baslik: "Next follow-up", aciklama: "When to get back in touch: DD.MM.YYYY or YYYY-MM-DD.", ornek: "15.10.2026" },
+  kurum: { baslik: "Company / organization", aciklama: "The company or organization the person works for.", ornek: "ABC Agency" },
+  unvan: { baslik: "Job title", aciklama: "The person's role.", ornek: "Marketing Manager" },
   linkedin: { baslik: "LinkedIn", aciklama: "Profile URL or in/first-last.", ornek: "linkedin.com/in/emma-clarke" },
   instagram: { baslik: "Instagram", aciklama: "@username or profile URL.", ornek: "@emmaclarke" },
   iliskiNotu: {
@@ -795,6 +824,8 @@ export function planMusteriImport(
       }
       b.iliskiNotu = al("iliskiNotu");
       party.baglanti = b;
+      party.kurum = al("kurum");
+      party.unvan = al("unvan");
       // Tanınmayan hesap kartı düşürmez: hesap boş kalır, uyarı olur.
       const sosyal: Party["sosyal"] = {};
       for (const [alan, ad] of [["linkedin", "LinkedIn"], ["instagram", "Instagram"]] as const) {

@@ -29,6 +29,8 @@ import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./sip
 
 /** Şablon dosyası: 1000 satırlık dolu bir xlsx bile 1 MB'ı bulmuyor, 5 MB bol. */
 const SABLON_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+/** Kartvizit: telefon fotoğrafı birkaç MB; doğrudan yükleme tavanı (8 MB) zaten bunu taşır. */
+const KARTVIZIT_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 import { AccessService } from "../../common/access/access.service";
 
 /** Kartın açıldığı defter; gelmezse ya da tanınmazsa Müşteriler (eski istemciler). */
@@ -283,6 +285,36 @@ export class PartyController {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
     if (!isPartyModulKey(modul)) throw new BadRequestException("Geçersiz modül");
     return this.partyService.deftereEkle(id, modul, req.user.userId);
+  }
+
+  /** Kartvizit (fotoğraf ya da PDF): departmanın "Kartvizitler" klasörüne iner, karta bağlanır. */
+  @Post("party/:id/dosyalar")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(KARTVIZIT_YUKLEME)
+  async dosyaEkle(
+    @Param("id") id: string,
+    @Query("departmentId") departmentId: string | undefined,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    if (!file) throw new BadRequestException("Dosya bulunamadı");
+    // multer dosya adını latin1 okuyor (bkz. iceAktar).
+    file.originalname = Buffer.from(file.originalname, "latin1").toString("utf8");
+    return this.partyService.dosyaEkle(id, file, req.user.userId, { departmentId });
+  }
+
+  @Get("party/:id/dosyalar")
+  async dosyalar(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.dosyalar(id, req.user.userId);
+  }
+
+  @Delete("party/:id/dosyalar/:fileId")
+  async dosyaKaldir(@Param("id") id: string, @Param("fileId") fileId: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.partyService.dosyaKaldir(id, fileId, req.user.userId);
+    return { success: true };
   }
 
   /** Karttan açılmış takip görevleri (kullanıcının görebildikleri). */

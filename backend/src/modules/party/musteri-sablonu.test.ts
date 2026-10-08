@@ -277,6 +277,16 @@ describe("Bağlantı ve İlişkiler şablonu", () => {
     assert.equal(plan.uyarilar.length, 1);
   });
 
+  test("kendi listesinde Firma önce gelse de ad kişinin adı olur, firma kuruma yazılır", () => {
+    const plan = planMusteriImport(sayfa([["Firma", "Ad Soyad", "Unvan"], ["ABC Ajans", "Ayşe Yılmaz", "Müdür"]]), {
+      tur: "baglanti",
+    });
+    const p = plan.planlanan[0].party;
+    assert.equal(p.displayName, "Ayşe Yılmaz");
+    assert.equal(p.kurum, "ABC Ajans");
+    assert.equal(p.unvan, "Müdür");
+  });
+
   test("rakip ve işbirliği rolleri tanınır", () => {
     const plan = planMusteriImport(sayfa([["Ad", "Rol"], ["X", "Rakip, İşbirliği"]]), { tur: "baglanti" });
     assert.deepEqual(plan.planlanan[0].party.roles, ["competitor", "collaborator"]);

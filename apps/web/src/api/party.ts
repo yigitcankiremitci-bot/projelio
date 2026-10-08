@@ -6,6 +6,7 @@ import type {
   OdemeYontemi,
   Party,
   PartyGorevi,
+  ProjectFile,
 } from "@projelio/shared";
 import { api, API_URL } from "./client";
 import { TOKEN_KEY } from "../lib/session";
@@ -47,6 +48,16 @@ export const partyApi = {
 
   /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
   deftereEkle: (partyId: string, modul: string) => api.post<Party>(`/party/${partyId}/defter`, { modul }),
+
+  /** Kartvizit dosyaları (departmanın "Kartvizitler" klasöründe, karta bağlı). */
+  dosyalar: (partyId: string) => api.get<ProjectFile[]>(`/party/${partyId}/dosyalar`),
+  dosyaEkle: (partyId: string, dosya: File, departmentId?: string) => {
+    const fd = new FormData();
+    fd.append("file", dosya);
+    const q = departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : "";
+    return api.uploadFile<ProjectFile>(`/party/${partyId}/dosyalar${q}`, fd);
+  },
+  dosyaKaldir: (partyId: string, fileId: string) => api.delete(`/party/${partyId}/dosyalar/${fileId}`),
 
   /** Karttan açılmış takip görevleri. */
   gorevler: (partyId: string) => api.get<PartyGorevi[]>(`/party/${partyId}/gorevler`),

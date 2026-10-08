@@ -62,7 +62,17 @@ import { musteriSayfasiniSec } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole } from "../party/party-dedup";
 import { AccessService } from "../../common/access/access.service";
-import { isReferenceValue, MUSTERI_MODUL_KEY, type Party, type PartyAddress, type PartyRole } from "@projelio/shared";
+import {
+  BAGLANTI_MODUL_KEY,
+  isPartyRole,
+  isReferenceValue,
+  MUSTERI_MODUL_KEY,
+  type BaglantiOnem,
+  type Party,
+  type PartyAddress,
+  type PartyBaglanti,
+  type PartyRole,
+} from "@projelio/shared";
 import { AiExportsService } from "./ai-exports.service";
 import { type ExportFormat, type ExportTable } from "./ai-export-builder";
 import {
@@ -490,6 +500,54 @@ function customerFields(input: Record<string, any>): Partial<Party> {
     phone: str(input.phone),
     website: str(input.website),
     notes: str(input.notes),
+  };
+}
+
+/** Bağlantı kartının Lio'ya dönen özeti. */
+function connectionSummary(p: Party) {
+  return pruneEmpty({
+    partyId: p.id,
+    ad: p.displayName,
+    kurum: p.kurum,
+    unvan: p.unvan,
+    roller: p.roles,
+    onem: p.baglanti?.onem,
+    tanismaYeri: p.baglanti?.tanismaYeri,
+    sonrakiTemas: p.baglanti?.sonrakiTemas,
+    eposta: p.email,
+    telefon: p.phone,
+    musteriDefterinde: p.modules.includes(MUSTERI_MODUL_KEY) || undefined,
+  });
+}
+
+/**
+ * create_connections / update_connection'ın alanları. Verilmeyenler undefined
+ * kalır. Sosyal hesap ve bağlantı alanları YALNIZCA verildiyse nesne olur:
+ * update'te boş nesne mevcut değerleri silerdi.
+ */
+function connectionFields(input: Record<string, any>): Partial<Party> {
+  const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v).trim());
+  const sosyal: Record<string, string> = {};
+  for (const k of ["linkedin", "instagram"] as const) if (input[k] !== undefined) sosyal[k] = str(input[k]) ?? "";
+  const baglanti = pruneEmpty({
+    onem: ["yuksek", "orta", "dusuk"].includes(input.onem) ? (input.onem as BaglantiOnem) : undefined,
+    tanismaYeri: str(input.tanismaYeri),
+    tanismaTarihi: str(input.tanismaTarihi),
+    sonrakiTemas: str(input.sonrakiTemas),
+    iliskiNotu: str(input.iliskiNotu),
+  });
+  return {
+    partyType: input.partyType === "person" || input.partyType === "company" ? input.partyType : undefined,
+    // Tanınmayan rol sessizce düşer (sunucu zaten reddederdi; tek yanlış rol
+    // bütün kartı düşürmesin).
+    roles: Array.isArray(input.roles) && input.roles.some(isPartyRole) ? input.roles.filter(isPartyRole) : undefined,
+    kurum: str(input.kurum),
+    unvan: str(input.unvan),
+    email: str(input.email),
+    phone: str(input.phone),
+    website: str(input.website),
+    sosyal: Object.keys(sosyal).length ? (sosyal as Party["sosyal"]) : undefined,
+    baglanti: Object.keys(baglanti).length ? (baglanti as PartyBaglanti) : undefined,
   };
 }
 
@@ -1508,6 +1566,13 @@ export class AiAssistantService {
         "(type: receivable/payable). Bu henüz gerçekleşmemiş paradır — gelir/gider defterine (add_budget_transaction) YAZMA.",
       "- MÜŞTERİLER (crm_musteri) de kendi araçlarıyla çalışır: list_customers / create_customer / update_customer. " +
         "Yeni kart açmadan önce list_customers ile aynı adda kart var mı bak.",
+      "- BAĞLANTI VE İLİŞKİLER ayrı bir defterdir: fuarda/toplantıda tanışılan, müşteri OLMAYAN kişiler, rakipler, " +
+        "olası işbirlikçiler. Araçları list_connections / create_connections / update_connection — bunları " +
+        "create_customer ile AÇMA, rakip satış listesine düşer. Kullanıcı kartvizit fotoğrafı verip \"bağlantılara " +
+        "ekle\" dediğinde: her kartvizitten ad, şirket (kurum), unvan, telefon, e-posta, web, LinkedIn/Instagram'ı oku; " +
+        "okuyamadığını UYDURMA, boş bırak. Nerede tanışıldığını kullanıcı söylemediyse bir kez sor; bilmiyorsa boş geç. " +
+        "Sonra TEK create_connections çağrısıyla hepsini gönder, her kişiye kartvizitinin görüldüğü dosyaKimligi'ni " +
+        "kartvizitDosyasi olarak ver. Kullanıcı listeyi onay penceresinde görür — ayrıca sohbette onay isteme.",
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
         "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
@@ -3143,6 +3208,11 @@ export class AiAssistantService {
         return make(label);
       }
 
+      case "create_connections": {
+        const count = Array.isArray(result?.acilan) ? result.acilan.length : 0;
+        return count ? make(t("{n} bağlantı kartı açıldı", { n: count })) : null;
+      }
+
       case "import_customers_from_sheet": {
         const count = Number(result?.acilan ?? 0);
         return count ? make(t("Dosyadan {n} müşteri kartı açıldı", { n: count })) : null;
@@ -3680,6 +3750,36 @@ export class AiAssistantService {
           "{ad} için Projelio hesabı açılacak ve {eposta} adresine giriş bağlantısı gönderilecek.\nDepartman: {departmanlar}\nŞifreyi kişi ilk girişte kendisi belirler.",
           { ad: String(input.fullName ?? ""), eposta: String(input.email ?? ""), departmanlar: departmanlar || "-" }
         );
+      }
+
+      case "create_connections": {
+        // Onay penceresinde KİŞİLER görünmeli: kartvizit okuması yanlış bir ad
+        // ya da telefon üretebilir ve kullanıcı bunu kayıttan önce görmeli.
+        const kisiler: Record<string, any>[] = Array.isArray(input.kisiler) ? input.kisiler.slice(0, 30) : [];
+        const scope = await this.customerScope(userId, input).catch(() => null);
+        const satirlar: string[] = [];
+        const atlanacak: string[] = [];
+        for (const k of kisiler) {
+          const ad = String(k.displayName ?? "").trim();
+          if (!ad) continue;
+          const kopya = scope
+            ? await this.partyService.checkDuplicates(scope, { displayName: ad, email: k.email }, userId).catch(() => [])
+            : [];
+          if (kopya.length) {
+            atlanacak.push(ad);
+            continue;
+          }
+          const kim = [k.unvan, k.kurum].filter(Boolean).join(", ");
+          const iletisim = [k.phone, k.email].filter(Boolean).join(" · ");
+          satirlar.push(`• ${ad}${kim ? ` — ${kim}` : ""}${iletisim ? ` (${iletisim})` : ""}`);
+        }
+        const yer = kisiler.find((k) => k.tanismaYeri)?.tanismaYeri;
+        return [
+          t("Bağlantı ve İlişkiler'e {n} kişi eklenecek:", { n: satirlar.length }),
+          ...satirlar,
+          ...(yer ? [t("Nerede tanışıldı: {yer}", { yer })] : []),
+          ...(atlanacak.length ? [t("Zaten kayıtlı, atlanacak: {liste}", { liste: atlanacak.join(", ") })] : []),
+        ].join("\n");
       }
 
       case "create_support_request": {
@@ -5386,6 +5486,41 @@ export class AiAssistantService {
         return customerSummary(party);
       }
 
+      // ============================================================ Bağlantılar
+      case "list_connections": {
+        const scope = await this.customerScope(userId, input);
+        const q = String(input.query ?? "").trim().toLocaleLowerCase("tr");
+        const { baglantilar } = await this.partyService.baglantilarim(scope, userId);
+        return baglantilar
+          .filter(
+            (p) =>
+              !q ||
+              [p.displayName, p.kurum, p.email, p.phone, p.baglanti?.tanismaYeri].some((v) =>
+                v?.toLocaleLowerCase("tr").includes(q)
+              )
+          )
+          .slice(0, 50)
+          .map((p) => connectionSummary(p));
+      }
+
+      case "create_connections":
+        return this.createConnections(userId, input);
+
+      case "update_connection": {
+        const existing = await this.partyService.findOne(String(input.partyId ?? ""));
+        if (!existing.modules.includes(BAGLANTI_MODUL_KEY)) {
+          throw new BadRequestException("Bu kart Bağlantı ve İlişkiler'de değil");
+        }
+        const patch: Partial<Party> = { ...connectionFields(input) };
+        if (input.displayName !== undefined) patch.displayName = String(input.displayName);
+        if (patch.roles) patch.roles = patch.roles.reduce((acc, r) => addRole(acc, r), existing.roles);
+        // Sosyal hesaplar tek nesne olarak yazılıyor: yalnızca söylenen hesap
+        // değişsin, diğerleri silinmesin.
+        if (patch.sosyal) patch.sosyal = { ...existing.sosyal, ...patch.sosyal };
+        const party = await this.partyService.update(existing.id, patch, userId);
+        return connectionSummary(party);
+      }
+
       // ============================================================ WhatsApp
       case "whatsapp_search_customers":
         return this.whatsappLio.searchCustomers(userId, String(input.query ?? ""));
@@ -6113,6 +6248,86 @@ export class AiAssistantService {
    * organizasyonu/işi görebilmek yetmez, taşeron müşteri listesini göremez
    * (bkz. PartyController). Yazma yetkisi ayrıca PartyService içinde.
    */
+  /**
+   * Kartvizitlerden toplu bağlantı. Onay penceresinden (CRITICAL_TOOLS) geçmiş
+   * olarak gelir; burada yine de yinelenen kontrolü yapılır — onayla çalıştırma
+   * arasında başka biri aynı kişiyi eklemiş olabilir.
+   *
+   * Bir kişinin hatası diğerlerini düşürmez: kartvizit okumasında tek bir
+   * bozuk LinkedIn adresi yüzünden 20 kartın açılmaması kabul edilemezdi.
+   */
+  private async createConnections(userId: string, input: Record<string, any>) {
+    const scope = await this.customerScope(userId, input);
+    const kisiler: Record<string, any>[] = Array.isArray(input.kisiler) ? input.kisiler.slice(0, 30) : [];
+    if (!kisiler.length) throw new BadRequestException("Eklenecek kişi yok");
+    const departmentId = input.departmentId ? String(input.departmentId) : undefined;
+
+    const acilan: { partyId: string; ad: string }[] = [];
+    const atlanan: { ad: string; mevcutKart: string }[] = [];
+    const uyarilar: string[] = [];
+    // Aynı fotoğrafta birden fazla kartvizit olabilir: dosya bir kez yüklenir.
+    const yuklenen = new Map<string, string>();
+
+    for (const k of kisiler) {
+      const ad = String(k.displayName ?? "").trim();
+      if (!ad) continue;
+      const alanlar = connectionFields(k);
+      const kopya = await this.partyService
+        .checkDuplicates(scope, { displayName: ad, email: alanlar.email }, userId)
+        .catch(() => []);
+      if (kopya.length) {
+        atlanan.push({ ad, mevcutKart: kopya[0].party.displayName });
+        continue;
+      }
+      const payload = { ...alanlar, displayName: ad, partyType: alanlar.partyType ?? "person", source: "lio" };
+      let party: Party;
+      try {
+        party = await this.partyService.create({ ...scope, departmentId }, payload, userId, BAGLANTI_MODUL_KEY);
+      } catch (err) {
+        // Okunan sosyal hesap tanınmadıysa kart onsuz açılır.
+        if (!payload.sosyal) throw err;
+        uyarilar.push(`${ad}: ${(err as Error).message} — hesap eklenmeden açıldı`);
+        party = await this.partyService.create(
+          { ...scope, departmentId },
+          { ...payload, sosyal: undefined },
+          userId,
+          BAGLANTI_MODUL_KEY
+        );
+      }
+      acilan.push({ partyId: party.id, ad });
+
+      const dosyaKimligi = k.kartvizitDosyasi ? String(k.kartvizitDosyasi) : "";
+      if (!dosyaKimligi) continue;
+      try {
+        const mevcut = yuklenen.get(dosyaKimligi);
+        if (mevcut) {
+          await this.partyService.dosyaBagla(party.id, mevcut, userId);
+        } else {
+          const dosya = this.attachmentsService.getFile(userId, dosyaKimligi);
+          if (!dosya) {
+            uyarilar.push(`${ad}: kartvizit görseli artık açık değil, dosya eklenmedi`);
+            continue;
+          }
+          const yuklenenDosya = await this.partyService.dosyaEkle(
+            party.id,
+            {
+              originalname: dosya.name,
+              mimetype: dosya.mimeType,
+              buffer: dosya.buffer,
+              size: dosya.buffer.length,
+            } as Express.Multer.File,
+            userId,
+            { departmentId }
+          );
+          yuklenen.set(dosyaKimligi, yuklenenDosya.id);
+        }
+      } catch (err) {
+        uyarilar.push(`${ad}: kartvizit dosyası eklenemedi (${(err as Error).message})`);
+      }
+    }
+    return { acilan, atlanan, uyarilar };
+  }
+
   private async customerScope(
     userId: string,
     input: Record<string, any>

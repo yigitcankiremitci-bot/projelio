@@ -104,4 +104,6 @@ export const baglantilar: TranslationDict = {
   "Ek dosyalar (teklif, katalog…)": "Attachments (quotes, catalogs…)",
   "Ek dosyalar ({n}) — son ekleneni açar": "Attachments ({n}) — opens the latest",
   "Kart kaydedildi ama şu dosyalar yüklenemedi: {liste}": "The card was saved but these files couldn't be uploaded: {liste}",
+  "{n} kişi kayıtlı": { one: "{n} person registered", other: "{n} people registered" },
+  "E-posta gönder": "Send email",
 };

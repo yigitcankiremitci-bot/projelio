@@ -106,7 +106,8 @@ export default function ModulePage() {
 
   return (
     <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Geri hapı ile başlık arası 14px: 6px'te ikisi yapışık görünüyordu. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {/* Uygulamanın her yerindeki geri hapı (bkz. EntityCover CoverBackLink).
             Burada kapak olmadığı için sayfa zeminine uygun "floating" hâli.
             Önceden düz bir yazı bağlantısıydı; tek bu sayfa farklı duruyordu. */}

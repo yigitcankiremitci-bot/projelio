@@ -3,7 +3,9 @@ import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
   KARTVIZIT_SOSYAL,
+  EPOSTA_IKON,
   KARTVIZIT_SOSYAL_IKON,
+  TELEFON_IKON,
   kartvizitSosyalNormallestir,
   WEB_SITESI_IKON,
   MUSTERI_MODUL_KEY,
@@ -37,7 +39,7 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconIdCard, IconPaperclip, IconTrash, IconUpload, IconX } from "./icons";
+import { IconEdit, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { onLioActivity } from "../lib/liveRoom";
@@ -181,6 +183,8 @@ export default function CustomersPanel({
   const [ekDosyalar, setEkDosyalar] = useState<File[]>([]);
   // Form kapandıktan sonra görünmesi gereken uyarı (kart açıldı, kartvizit yüklenemedi).
   const [bildirim, setBildirim] = useState("");
+  // Kartın hangi sekmede açılacağı (kişi sayısı simgesi → Kişiler).
+  const [detaySekmesi, setDetaySekmesi] = useState<"contacts" | undefined>();
   // Listedeki kartvizit simgesinden açılan dosya.
   const [onizlenen, setOnizlenen] = useState<ProjectFile | null>(null);
   const dosyaAc = (fileId: string) => {
@@ -1003,10 +1007,9 @@ export default function CustomersPanel({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        {/* Panelin kendi başlığı yok: modül sayfasının başlığı ya da şirket
+            sekmesinin adı zaten modülün adı — iki kez yazıyordu. */}
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
-            {baglantiModu ? t("Bağlantı ve İlişkiler") : t("Müşteriler")}
-          </h5>
           {profile.key !== "base" && !baglantiModu && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
           )}
@@ -1058,35 +1061,6 @@ export default function CustomersPanel({
       <>
       {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
         <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
-      )}
-
-      {/* Bağlantılar'ın şablonu ayrı: önem, tanışma yeri, sonraki temas, ilişki notu. */}
-      {canWrite && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-          <button
-            onClick={() => setExcelAcik(true)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 16px",
-              borderRadius: 8,
-              border: `1px solid ${c.primary}`,
-              background: "transparent",
-              color: c.primary,
-              fontSize: 14,
-              fontWeight: 500,
-              cursor: "pointer",
-            }}
-          >
-            <IconUpload size={16} /> {t("Excel ile toplu ekle")}
-          </button>
-          <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
-            {baglantiModu
-              ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
-              : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
-          </span>
-        </div>
       )}
 
       {excelAcik && (
@@ -1233,7 +1207,10 @@ export default function CustomersPanel({
               >
                 <button
                   type="button"
-                  onClick={() => setOpenPartyId(openPartyId === p.id ? null : p.id)}
+                  onClick={() => {
+                    setDetaySekmesi(undefined);
+                    setOpenPartyId(openPartyId === p.id ? null : p.id);
+                  }}
                   style={{
                     flex: 1,
                     minWidth: 0,
@@ -1275,14 +1252,28 @@ export default function CustomersPanel({
                     </div>
                   )}
                 </button>
-                <SatirSimgeleri party={p} onDosya={dosyaAc} />
+                <SatirSimgeleri
+                  party={p}
+                  onDosya={dosyaAc}
+                  onKisiler={() => {
+                    // Kişi sayısına basınca kart Kişiler sekmesinde açılır.
+                    setDetaySekmesi("contacts");
+                    setOpenPartyId(p.id);
+                  }}
+                />
                 {canWrite && (
                   <>
                     <button
                       onClick={() => (formMode?.kind === "edit" && formMode.party.id === p.id ? closeForm() : openEdit(p))}
-                      style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+                      aria-label={formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
+                      title={formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
+                      style={{ display: "inline-flex", padding: 4, background: "transparent", border: "none", cursor: "pointer" }}
                     >
-                      {formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
+                      {formMode?.kind === "edit" && formMode.party.id === p.id ? (
+                        <IconX size={15} color={c.primary} />
+                      ) : (
+                        <IconEdit size={15} color={c.textSecondary} />
+                      )}
                     </button>
                     <button
                       onClick={() => handleArchive(p)}
@@ -1301,6 +1292,8 @@ export default function CustomersPanel({
               )}
 
               {openPartyId === p.id && !(formMode?.kind === "edit" && formMode.party.id === p.id) && <PartyDetail
+                  key={`${p.id}-${detaySekmesi ?? ""}`}
+                  ilkSekme={detaySekmesi}
                   party={p}
                   baglantiModu={baglantiModu}
                   baglantiYazar={baglantiYazar}
@@ -1318,6 +1311,36 @@ export default function CustomersPanel({
             </div>
           ))}
           </div>
+        </div>
+      )}
+
+      {/* Toplu ekleme en altta ve sade: her gün kullanılan bir düğme değil,
+          listenin önünde dikkat çekmesin. Bağlantılar'ın şablonu ayrı (önem,
+          tanışma yeri, sonraki temas, ilişki notu). */}
+      {canWrite && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 4 }}>
+          <button
+            onClick={() => setExcelAcik(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 10px",
+              borderRadius: 6,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textSecondary,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            <IconUpload size={13} /> {t("Excel ile toplu ekle")}
+          </button>
+          <span style={{ flex: "1 1 200px", fontSize: 11, color: c.textSecondary }}>
+            {baglantiModu
+              ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
+              : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
+          </span>
         </div>
       )}
       </>
@@ -1370,6 +1393,7 @@ function TemasRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
  */
 function PartyDetail({
   party,
+  ilkSekme,
   baglantiModu,
   baglantiYazar,
   departmentId,
@@ -1380,6 +1404,7 @@ function PartyDetail({
   organizationId,
 }: {
   party: Party;
+  ilkSekme?: "contacts";
   baglantiModu: boolean;
   /** Müşteriler'de: kullanıcı Bağlantılar'a da yazabiliyor mu ("Bağlantılara ekle"). */
   baglantiYazar: boolean;
@@ -1394,7 +1419,7 @@ function PartyDetail({
   const c = useThemeColors();
   const t = useT();
   const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "iliski" | "gorevler">(
-    baglantiModu ? "iliski" : "siparisler"
+    ilkSekme ?? (baglantiModu ? "iliski" : "siparisler")
   );
   const [gorevler, setGorevler] = useState<PartyGorevi[]>([]);
   const [gorevAcik, setGorevAcik] = useState(false);
@@ -1938,13 +1963,24 @@ function DosyaBolumu({
  * Adresler tutamaçtan üretilir (KARTVIZIT_SOSYAL), kullanıcının yazdığı URL
  * href'e girmez; web sitesi safeExternalUrl'den geçer.
  */
-function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: string) => void }) {
+function SatirSimgeleri({
+  party,
+  onDosya,
+  onKisiler,
+}: {
+  party: Party;
+  onDosya: (fileId: string) => void;
+  onKisiler: () => void;
+}) {
   const c = useThemeColors();
   const t = useT();
   const site = safeExternalUrl(party.website);
-  // Dar ekranda satır taşmasın: en çok 4 hesap; tamamı kartın içinde görünür.
-  const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]).slice(0, 4);
-  if (!site && !hesaplar.length && !party.sonKartvizitId && !party.sonEkId) return null;
+  // Hepsi gösterilir; dar ekranda simge grubu alt satıra kayar (flexWrap).
+  const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]);
+  const telefon = party.phone?.replace(/[^\d+]/g, "");
+  const eposta = party.email?.trim();
+  const kisi = party.partyType !== "person" ? party.contactCount ?? 0 : 0;
+  if (!site && !hesaplar.length && !party.sonKartvizitId && !party.sonEkId && !telefon && !eposta && !kisi) return null;
 
   const simge = (ic: string) => (
     <svg
@@ -1975,9 +2011,38 @@ function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: st
     cursor: "pointer",
   } as const;
   const durdur = (e: React.MouseEvent) => e.stopPropagation();
+  // Simgenin yanındaki küçük sayı (kişi, dosya): birden fazlaysa görünür.
+  const sayi = (n?: number) =>
+    n && n > 1 ? <span style={{ fontSize: 10, marginLeft: 1, color: c.textSecondary }}>{n}</span> : null;
+  const sayacli = { ...kutu, width: "auto", minWidth: 24, padding: "0 3px" } as const;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+      {kisi > 0 && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onKisiler();
+          }}
+          title={t("{n} kişi kayıtlı", { n: kisi })}
+          aria-label={t("{n} kişi kayıtlı", { n: kisi })}
+          style={sayacli}
+        >
+          <IconUser size={15} />
+          <span style={{ fontSize: 10, marginLeft: 1, color: c.textSecondary }}>{kisi}</span>
+        </button>
+      )}
+      {telefon && (
+        <a href={`tel:${telefon}`} onClick={durdur} title={party.phone} aria-label={t("Ara")} style={kutu}>
+          {simge(TELEFON_IKON)}
+        </a>
+      )}
+      {eposta && (
+        <a href={`mailto:${eposta}`} onClick={durdur} title={eposta} aria-label={t("E-posta gönder")} style={kutu}>
+          {simge(EPOSTA_IKON)}
+        </a>
+      )}
       {party.sonKartvizitId && (
         <button
           type="button"
@@ -1991,9 +2056,10 @@ function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: st
               : t("Kartvizit")
           }
           aria-label={t("Kartvizit")}
-          style={kutu}
+          style={sayacli}
         >
           <IconIdCard size={15} />
+          {sayi(party.kartvizitSayisi)}
         </button>
       )}
       {party.sonEkId && (
@@ -2005,9 +2071,10 @@ function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: st
           }}
           title={t("Ek dosyalar ({n}) — son ekleneni açar", { n: party.ekSayisi ?? 1 })}
           aria-label={t("Ek dosyalar")}
-          style={kutu}
+          style={sayacli}
         >
           <IconPaperclip size={15} />
+          {sayi(party.ekSayisi)}
         </button>
       )}
       {site && (

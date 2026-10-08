@@ -362,11 +362,9 @@ export class PartyService {
     if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
     const hepsi = await this.findAll(scope);
     const yonetici = a.canManageTeam;
-    return {
-      yonetici,
-      kartYazar: a.canWrite,
-      musteriler: yonetici ? hepsi : hepsi.filter((p) => musteriYetkisi(a, p.ownerUserId, userId).okur),
-    };
+    const musteriler = yonetici ? hepsi : hepsi.filter((p) => musteriYetkisi(a, p.ownerUserId, userId).okur);
+    await this.kisiSayilariniEkle(musteriler);
+    return { yonetici, kartYazar: a.canWrite, musteriler };
   }
 
   /**
@@ -379,7 +377,7 @@ export class PartyService {
     const a = await this.access(scope, userId, BAGLANTI_MODUL_KEY);
     if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
     const baglantilar = await this.findAll(scope, { moduller: [BAGLANTI_MODUL_KEY], baglanti: true });
-    await this.dosyaOzetleriniEkle(baglantilar);
+    await Promise.all([this.dosyaOzetleriniEkle(baglantilar), this.kisiSayilariniEkle(baglantilar)]);
     return { yonetici: a.canManageTeam, kartYazar: a.canWrite, baglantilar };
   }
 
@@ -411,6 +409,27 @@ export class PartyService {
           p.kartvizitSayisi = (p.kartvizitSayisi ?? 0) + 1;
           p.sonKartvizitId ??= r.file_id;
         }
+      }
+    }
+  }
+
+  /**
+   * Şirket/kurum kartlarındaki kişi sayısı (listede "3 kişi" simgesi).
+   * Kişi kartlarında sayılmıyor: orada kişi zaten kartın kendisi.
+   */
+  private async kisiSayilariniEkle(kartlar: Party[]): Promise<void> {
+    const kurumlar = new Map(kartlar.filter((p) => p.partyType !== "person").map((p) => [p.id, p]));
+    const ids = [...kurumlar.keys()];
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await this.supabase.client
+        .from("party_contact")
+        .select("party_id")
+        .in("party_id", ids.slice(i, i + 150))
+        .is("archived_at", null);
+      if (error) return;
+      for (const r of (data ?? []) as any[]) {
+        const p = kurumlar.get(r.party_id);
+        if (p) p.contactCount = (p.contactCount ?? 0) + 1;
       }
     }
   }

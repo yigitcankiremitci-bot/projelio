@@ -3,7 +3,9 @@ import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
   KARTVIZIT_SOSYAL,
+  KARTVIZIT_SOSYAL_IKON,
   kartvizitSosyalNormallestir,
+  WEB_SITESI_IKON,
   MUSTERI_MODUL_KEY,
   safeExternalUrl,
   type KartvizitSosyal,
@@ -34,12 +36,13 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconTrash, IconUpload, IconX } from "./icons";
+import { IconIdCard, IconTrash, IconUpload, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { onLioActivity } from "../lib/liveRoom";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { partyApi } from "../api/party";
+import { filesApi } from "../api/files";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
@@ -160,6 +163,15 @@ export default function CustomersPanel({
   const [kartvizit, setKartvizit] = useState<File | null>(null);
   // Form kapandıktan sonra görünmesi gereken uyarı (kart açıldı, kartvizit yüklenemedi).
   const [bildirim, setBildirim] = useState("");
+  // Listedeki kartvizit simgesinden açılan dosya.
+  const [onizlenen, setOnizlenen] = useState<ProjectFile | null>(null);
+  const dosyaAc = (fileId: string) => {
+    filesApi
+      .getById(fileId)
+      .then(setOnizlenen)
+      // Kartı görmek, dosyanın durduğu departman klasörünü görmek demek değil.
+      .catch((err) => setBildirim(err instanceof Error ? err.message : t("Dosya açılamadı")));
+  };
   const [duplicates, setDuplicates] = useState<PartyDuplicate[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<PartyRole | "">(profile.defaultRole ?? "");
@@ -522,6 +534,7 @@ export default function CustomersPanel({
       </div>
 
       {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
+      {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
 
       {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
           Bağlantılar'da sipariş yok; sekme de yok. */}
@@ -1078,6 +1091,7 @@ export default function CustomersPanel({
                     </div>
                   )}
                 </button>
+                <SatirSimgeleri party={p} onDosya={dosyaAc} />
                 {canWrite && (
                   <>
                     <button
@@ -1392,7 +1406,7 @@ function PartyDetail({
       {tab === "iliski" ? (
         <>
           <IliskiOzeti baglanti={party.baglanti} />
-          <KartDosyalari party={party} canWrite={canWrite} departmentId={departmentId} />
+          <KartDosyalari party={party} canWrite={canWrite} departmentId={departmentId} onDegisti={onDegisti} />
         </>
       ) : tab === "gorevler" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1562,7 +1576,18 @@ function KartBaglantilari({ party }: { party: Party }) {
  * durur, karta bağlıdır (bkz. backend PartyService.dosyaEkle). Görmek için
  * dosyanın klasörüne de erişim gerekir; erişilemeyen dosya listede çıkmaz.
  */
-function KartDosyalari({ party, canWrite, departmentId }: { party: Party; canWrite: boolean; departmentId?: string }) {
+function KartDosyalari({
+  party,
+  canWrite,
+  departmentId,
+  onDegisti,
+}: {
+  party: Party;
+  canWrite: boolean;
+  departmentId?: string;
+  /** Listedeki kartvizit simgesi tazelensin. */
+  onDegisti: () => void;
+}) {
   const c = useThemeColors();
   const t = useT();
   const [dosyalar, setDosyalar] = useState<ProjectFile[]>([]);
@@ -1583,6 +1608,7 @@ function KartDosyalari({ party, canWrite, departmentId }: { party: Party; canWri
     try {
       await partyApi.dosyaEkle(party.id, f, departmentId);
       yukle();
+      onDegisti();
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Yüklenemedi"));
     } finally {
@@ -1593,6 +1619,7 @@ function KartDosyalari({ party, canWrite, departmentId }: { party: Party; canWri
   const kaldir = async (d: ProjectFile) => {
     await partyApi.dosyaKaldir(party.id, d.id).catch(() => {});
     yukle();
+    onDegisti();
   };
 
   return (
@@ -1641,6 +1668,92 @@ function KartDosyalari({ party, canWrite, departmentId }: { party: Party; canWri
       ))}
       {hata && <span style={{ color: c.danger }}>{hata}</span>}
       {acik && <FilePreviewModal file={acik} onClose={() => setAcik(null)} />}
+    </div>
+  );
+}
+
+/**
+ * Liste satırındaki küçük simgeler: kartvizit/dosya, web sitesi, sosyal
+ * hesaplar. Tıklayınca gider; satırın kendisi (kartı açma) tetiklenmez.
+ * Adresler tutamaçtan üretilir (KARTVIZIT_SOSYAL), kullanıcının yazdığı URL
+ * href'e girmez; web sitesi safeExternalUrl'den geçer.
+ */
+function SatirSimgeleri({ party, onDosya }: { party: Party; onDosya: (fileId: string) => void }) {
+  const c = useThemeColors();
+  const t = useT();
+  const site = safeExternalUrl(party.website);
+  // Dar ekranda satır taşmasın: en çok 4 hesap; tamamı kartın içinde görünür.
+  const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]).slice(0, 4);
+  if (!site && !hesaplar.length && !party.sonDosyaId) return null;
+
+  const simge = (ic: string) => (
+    <svg
+      viewBox="0 0 24 24"
+      width={15}
+      height={15}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      // Sabit çizim (shared/kartvizit.ts), kullanıcı verisi değil.
+      dangerouslySetInnerHTML={{ __html: ic }}
+    />
+  );
+  const kutu = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    color: c.textSecondary,
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+  } as const;
+  const durdur = (e: React.MouseEvent) => e.stopPropagation();
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 2, flexShrink: 0 }}>
+      {party.sonDosyaId && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDosya(party.sonDosyaId!);
+          }}
+          title={party.dosyaSayisi && party.dosyaSayisi > 1 ? t("Kartvizit ({n} dosya)", { n: party.dosyaSayisi }) : t("Kartvizit")}
+          aria-label={t("Kartvizit")}
+          style={kutu}
+        >
+          <IconIdCard size={15} />
+        </button>
+      )}
+      {site && (
+        <a href={site} target="_blank" rel="noopener noreferrer" onClick={durdur} title={party.website} aria-label={t("Web sitesi")} style={kutu}>
+          {simge(WEB_SITESI_IKON)}
+        </a>
+      )}
+      {hesaplar.map((s) => {
+        const tutamac = party.sosyal[s.anahtar]!;
+        return (
+          <a
+            key={s.anahtar}
+            href={s.adres(tutamac)}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={durdur}
+            title={`${s.ad}: ${s.gorunen(tutamac)}`}
+            aria-label={s.ad}
+            style={kutu}
+          >
+            {simge(KARTVIZIT_SOSYAL_IKON[s.anahtar])}
+          </a>
+        );
+      })}
     </div>
   );
 }

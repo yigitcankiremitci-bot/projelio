@@ -792,6 +792,13 @@ export interface Party {
   ownerName?: string;
   contactCount?: number;
   lastActivityAt?: string;
+  /**
+   * Yalnızca Bağlantılar listesinde: karta bağlı dosya sayısı ve en son
+   * eklenenin kimliği (listede kartvizit simgesi). Dosyayı açmak ayrıca
+   * dosya yetkisinden geçer — kimlik yetki vermez.
+   */
+  dosyaSayisi?: number;
+  sonDosyaId?: string;
 }
 
 /** Kurumdaki kişi. B2B'de firma bir, muhatap birden fazladır. */

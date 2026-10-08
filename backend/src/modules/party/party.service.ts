@@ -373,7 +373,35 @@ export class PartyService {
     const a = await this.access(scope, userId, BAGLANTI_MODUL_KEY);
     if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
     const baglantilar = await this.findAll(scope, { moduller: [BAGLANTI_MODUL_KEY], baglanti: true });
+    await this.dosyaOzetleriniEkle(baglantilar);
     return { yonetici: a.canManageTeam, kartYazar: a.canWrite, baglantilar };
+  }
+
+  /**
+   * Listedeki kartlara dosya sayısı ve en son dosyanın kimliği (kartvizit
+   * simgesi). Kart kimlikleri 150'lik parçalarla sorgulanıyor: yüzlerce
+   * kimlik tek `in` filtresinde istek adresini taşırırdı.
+   */
+  private async dosyaOzetleriniEkle(kartlar: Party[]): Promise<void> {
+    const kimlik = new Map(kartlar.map((p) => [p.id, p]));
+    const ids = [...kimlik.keys()];
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await this.supabase.client
+        .from("file_links")
+        .select("target_id, file_id")
+        .eq("target_kind", "party")
+        .in("target_id", ids.slice(i, i + 150))
+        .not("file_id", "is", null)
+        .order("created_at", { ascending: false });
+      // Simge bir kolaylık: okunamazsa liste yine açılsın.
+      if (error) return;
+      for (const r of (data ?? []) as any[]) {
+        const p = kimlik.get(r.target_id);
+        if (!p) continue;
+        p.dosyaSayisi = (p.dosyaSayisi ?? 0) + 1;
+        p.sonDosyaId ??= r.file_id;
+      }
+    }
   }
 
   /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */

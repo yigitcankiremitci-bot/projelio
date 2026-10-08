@@ -86,4 +86,6 @@ export const baglantilar: TranslationDict = {
   "Kartvizit (fotoğraf ya da PDF)": "Business card (photo or PDF)",
   "Karttan kaldır": "Remove from card",
   "Kart kaydedildi ama kartvizit yüklenemedi: {sebep}": "The card was saved but the business card couldn't be uploaded: {sebep}",
+  "Kartvizit ({n} dosya)": { one: "Business card ({n} file)", other: "Business card ({n} files)" },
+  "Dosya açılamadı": "Couldn't open the file",
 };

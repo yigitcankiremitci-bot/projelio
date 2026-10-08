@@ -27,3 +27,4 @@ export * from "./ilerleyis";
 export * from "./rakip";
 export * from "./kartvizit";
 export * from "./kartvizitLogo";
+export * from "./projeTakvimi";

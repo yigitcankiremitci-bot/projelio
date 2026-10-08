@@ -111,6 +111,7 @@ export const BILDIRIM_KATEGORILERI: BildirimKategorisi[] = [
       { tip: "task_due_24h", etiket: "Görev bitimine 24 saat kala" }, // dil:anahtar
       { tip: "task_due_1h", etiket: "Görev bitimine 1 saat kala" }, // dil:anahtar
       { tip: "project_deadline_24h", etiket: "Proje bitimine 24 saat kala" }, // dil:anahtar
+      { tip: "project_event", etiket: "Proje takviminde etkinliğe eklendiğimde" }, // dil:anahtar
     ],
   },
   {

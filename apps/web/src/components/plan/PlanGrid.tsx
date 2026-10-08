@@ -44,6 +44,12 @@ interface Props {
   googleBloklari?: Set<string>;
   /** Hafta görünümünde gün başlığına tıklanınca o günün günlük görünümünü açar. */
   onSelectDay?: (day: string) => void;
+  /**
+   * Bloklarda "tamamlandı" kutusu çizilmez. Proje takvimi ızgarayı ortak
+   * etkinlikler için kullanıyor (bkz. components/projeTakvimi): toplantının
+   * "bitti" işareti yok, kutu orada yalnızca yanlışlıkla tıklanacak bir şey olurdu.
+   */
+  onayKutusuYok?: boolean;
 }
 
 /** Tüm gün şeridinde gün başına en fazla kaç satır; fazlası "+n" olur. */
@@ -74,6 +80,7 @@ export default function PlanGrid({
   onOpenEtkinlik,
   googleBloklari,
   onSelectDay,
+  onayKutusuYok,
 }: Props) {
   const c = useThemeColors();
   const days = useMemo(() => eachDay(from, to), [from, to]);
@@ -167,6 +174,7 @@ export default function PlanGrid({
             onOpenEtkinlik={onOpenEtkinlik}
             googleBloklari={googleBloklari}
             onSelectDay={onSelectDay}
+            onayKutusuYok={onayKutusuYok}
           />
         ))}
       </div>
@@ -202,6 +210,7 @@ interface ColumnProps {
   onOpenEtkinlik?: (e: GoogleTakvimEtkinligi) => void;
   googleBloklari?: Set<string>;
   onSelectDay?: (day: string) => void;
+  onayKutusuYok?: boolean;
 }
 
 function DayColumn({
@@ -227,6 +236,7 @@ function DayColumn({
   onOpenEtkinlik,
   googleBloklari,
   onSelectDay,
+  onayKutusuYok,
 }: ColumnProps) {
   const t = useT();
   const c = useThemeColors();
@@ -452,6 +462,7 @@ function DayColumn({
             onOpen={() => onOpenBlock(block)}
             onToggleDone={() => onToggleDone(block)}
             googleda={googleBloklari?.has(block.id) ?? false}
+            onayKutusuYok={onayKutusuYok}
           />
         ))}
 
@@ -502,6 +513,7 @@ function BlockCard({
   onOpen,
   onToggleDone,
   googleda,
+  onayKutusuYok,
 }: {
   block: PlanTimeBlock;
   startHour: number;
@@ -509,6 +521,7 @@ function BlockCard({
   onOpen: () => void;
   onToggleDone: () => void;
   googleda: boolean;
+  onayKutusuYok?: boolean;
 }) {
   const t = useT();
   const c = useThemeColors();
@@ -580,6 +593,7 @@ function BlockCard({
             ıskalayan her tık bloğun penceresini açıyordu. Negatif kenar
             boşluğu büyük alanın kartın düzenini itmemesi için. Iskalanan
             tıklar için pencerede ayrıca "Tamamlandı" düğmesi var. */}
+        {!onayKutusuYok && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -620,6 +634,7 @@ function BlockCard({
             {done && <IconCheck size={12} color={c.onPrimary} />}
           </span>
         </button>
+        )}
         <div style={{ minWidth: 0, flex: 1 }}>
           <div
             className="plan-blok-baslik"

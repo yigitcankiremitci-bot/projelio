@@ -12,6 +12,7 @@ import { genel } from "./genel";
 import { ekipHesaplari } from "./ekip-hesaplari";
 import { iseAlim } from "./ise-alim";
 import { googleTakvim } from "./google-takvim";
+import { projeTakvimi } from "./proje-takvimi";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -43,4 +44,5 @@ export const en: TranslationDict = {
   ...katalog,
   ...genel,
   ...googleTakvim,
+  ...projeTakvimi,
 };

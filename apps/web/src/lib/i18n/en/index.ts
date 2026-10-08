@@ -27,6 +27,7 @@ import { uygulama } from "./uygulama";
 import { arkadaslar } from "./arkadaslar";
 import { bildirimTercihleri } from "./bildirimTercihleri";
 import { kartvizit } from "./kartvizit";
+import { projeTakvimi } from "./projeTakvimi";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -86,4 +87,5 @@ export const en: TranslationDict = {
   ...demoRandevu,
   ...googleTakvim,
   ...arkadaslar,
+  ...projeTakvimi,
 };

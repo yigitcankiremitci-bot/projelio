@@ -4,7 +4,16 @@
  */
 
 export type TakvimIsleme = "yeni" | "gorev" | "yoksay";
-export type TakvimEtkinlikKaynagi = "google" | "projelio";
+/**
+ * Izgaradaki salt okunur kutunun nereden geldiği. İlk ikisi Google
+ * etkinlikleri ("projelio" = Projelio'dan Google'a yazılmış); son üçü Google'la
+ * ilgisiz ama aynı kutu düzeniyle çizilen Projelio kayıtları — ayrı bir çizim
+ * yolu açmak ızgaranın çakışma yerleşimini ikiye bölerdi (bkz. projeTakvimi.ts):
+ *   proje — proje takvimindeki ortak etkinlik
+ *   plan  — kullanıcının kendi plan bloğu (proje takviminde, yalnızca ona)
+ *   gorev — görevin bitiş günü
+ */
+export type TakvimEtkinlikKaynagi = "google" | "projelio" | "proje" | "plan" | "gorev";
 
 export interface GoogleTakvimOzeti {
   id: string;
@@ -52,6 +61,9 @@ export interface GoogleTakvimEtkinligi {
   gorevId?: string;
   gorevBasligi?: string;
   isleme: TakvimIsleme;
+  /** kaynak = "proje": etkinliğin projesi ve kendi id'si (tıklanınca açmak için). */
+  projeId?: string;
+  projeEtkinlikId?: string;
 }
 
 /** Projelio'dan Google'a yeni etkinlik. Saatler kullanıcının yerel saatidir. */

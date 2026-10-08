@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  ProjeEtkinligi,
   GoogleTakvimDurumu,
   GoogleTakvimEtkinligi,
   PlanCalendarView,
@@ -8,6 +9,9 @@ import type {
 } from "@projelio/shared";
 import { useNavigate } from "react-router-dom";
 import { googleTakvimApi } from "../api/googleTakvim";
+import { projeTakvimiApi } from "../api/projeTakvimi";
+import { projeEtkinliginiTakvimOgesine } from "@projelio/shared";
+import ProjeEtkinlikModal from "../components/projeTakvimi/ProjeEtkinlikModal";
 import GoogleEtkinlikModal from "../components/googleTakvim/GoogleEtkinlikModal";
 import { useThemeColors } from "../theme/useThemeColors";
 import { planning, type PlanSuggestionResult } from "../api/planning";
@@ -145,6 +149,34 @@ export default function CalendarView() {
     // `data` her yüklemede yenilendiği için odaklanmada da tazelenir; sunucu
     // aynı aralığı bir dakikadan sık Google'a sormuyor.
   }, [googleCalisiyor, data, etkinlikleriYukle]);
+
+  // Proje takvimlerinden kişiyi ilgilendiren etkinlikler (migration 152).
+  // Salt okunur kutu olarak çizilir; kopyası yazılmaz, proje takviminde
+  // taşınan toplantı burada da yerini değiştirir. Google'dan bağımsız:
+  // Google bağlı olmasa da görünürler.
+  const [projeEtkinlikleri, setProjeEtkinlikleri] = useState<ProjeEtkinligi[]>([]);
+  const [acikProjeEtkinligi, setAcikProjeEtkinligi] = useState<ProjeEtkinligi | null>(null);
+  const projeEtkinlikleriniYukle = useCallback(() => {
+    if (!gFrom || !gTo) return;
+    projeTakvimiApi
+      .benim(gFrom, gTo)
+      .then(setProjeEtkinlikleri)
+      .catch(() => setProjeEtkinlikleri([]));
+  }, [gFrom, gTo]);
+  useEffect(projeEtkinlikleriniYukle, [projeEtkinlikleriniYukle, data]);
+
+  const tumKutular = useMemo(
+    () => [...etkinlikler, ...projeEtkinlikleri.map(projeEtkinliginiTakvimOgesine)],
+    [etkinlikler, projeEtkinlikleri]
+  );
+  const kutuyuAc = (e: GoogleTakvimEtkinligi) => {
+    if (e.kaynak === "proje") {
+      const pe = projeEtkinlikleri.find((x) => x.id === e.projeEtkinlikId);
+      if (pe) setAcikProjeEtkinligi(pe);
+      return;
+    }
+    setAcikEtkinlik(e);
+  };
 
   const googleBloklari = useMemo(
     () => new Set(etkinlikler.filter((e) => e.planBlokId).map((e) => e.planBlokId!)),
@@ -610,8 +642,8 @@ export default function CalendarView() {
                 setView("day");
               }}
               onDropItem={dropItem}
-              etkinlikler={etkinlikler}
-              onOpenEtkinlik={setAcikEtkinlik}
+              etkinlikler={tumKutular}
+              onOpenEtkinlik={kutuyuAc}
             />
           )}
 
@@ -629,8 +661,8 @@ export default function CalendarView() {
               onCreateAt={(blockDate, startsAt, endsAt) => setDraftBlock({ blockDate, startsAt, endsAt })}
               onMoveBlock={moveBlock}
               onDropItem={dropItem}
-              etkinlikler={etkinlikler}
-              onOpenEtkinlik={setAcikEtkinlik}
+              etkinlikler={tumKutular}
+              onOpenEtkinlik={kutuyuAc}
               googleBloklari={googleBloklari}
               onSelectDay={(day) => {
                 setSlideDir(0);
@@ -696,6 +728,16 @@ export default function CalendarView() {
           onSaved={load}
           googleBagli={googleCalisiyor}
           googleda={editingBlock ? googleBloklari.has(editingBlock.id) : false}
+        />
+      )}
+
+      {acikProjeEtkinligi && (
+        <ProjeEtkinlikModal
+          projectId={acikProjeEtkinligi.projectId}
+          etkinlik={acikProjeEtkinligi}
+          projeyeGitGoster
+          onClose={() => setAcikProjeEtkinligi(null)}
+          onSaved={projeEtkinlikleriniYukle}
         />
       )}
 

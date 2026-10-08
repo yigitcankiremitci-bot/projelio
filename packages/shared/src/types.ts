@@ -2088,6 +2088,8 @@ export interface NotificationPayload {
     // Linki OLUŞTURANA gider; aynı anda e-posta da yollanır. Kim indirdiği
     // yalnızca linkte e-posta kapısı varsa bilinir, uydurulmaz.
     | "file_link_downloaded"
+    // Proje takviminde bir etkinliğe katılımcı olarak eklendin (bkz. migration 152).
+    | "project_event"
     // Admin panelinden yöneticinin yazdığı mesaj (bkz. modules/admin/admin-mesaj.service.ts).
     // Bildirim çanı bu tipi görünce mesajın tamamını bir pencerede açar: gövde
     // listede tek satıra sığmayacak kadar uzun olabilir.

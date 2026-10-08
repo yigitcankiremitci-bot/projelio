@@ -20,6 +20,7 @@ import BudgetPanel, { BudgetPanelHandle } from "../components/panels/BudgetPanel
 import OutputsPanel, { OutputsPanelHandle } from "../components/OutputsPanel";
 import FilesPanel from "../components/FilesPanel";
 import LinkedFilesPanel from "../components/LinkedFilesPanel";
+import ProjeTakvimi from "../components/projeTakvimi/ProjeTakvimi";
 import ProcessPanel, { ProcessNavState, ViewMode, computeInitialProcessNavDates } from "../components/panels/ProcessPanel";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
@@ -76,6 +77,12 @@ export default function ProjectDetail() {
   const activeTab: ProjectTab = validTabs.includes(tabParam as ProjectTab) ? (tabParam as ProjectTab) : "tasks";
   const setActiveTab = (next: ProjectTab) => {
     setSearchParams(next === "tasks" ? {} : { tab: next }, { replace: true });
+  };
+  // Süreç sekmesinin iki yüzü: görev akışı ve proje takvimi. Seçim de URL'de
+  // (?gorunum=takvim) — takvim bildirimi doğrudan takvime açılabilsin diye.
+  const surecTakvimi = searchParams.get("gorunum") === "takvim";
+  const setSurecTakvimi = (takvim: boolean) => {
+    setSearchParams(takvim ? { tab: "process", gorunum: "takvim" } : { tab: "process" }, { replace: true });
   };
   const [activeTaskId, setActiveTaskId] = useState<string | undefined>(undefined);
   const [extendingDeadline, setExtendingDeadline] = useState(false);
@@ -762,6 +769,39 @@ export default function ProjectDetail() {
             </>
           )}
           {activeTab === "process" && (
+            <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+              {[
+                { takvim: false, etiket: t("Görevler") },
+                { takvim: true, etiket: t("Takvim") },
+              ].map((s) => (
+                <button
+                  key={String(s.takvim)}
+                  onClick={() => setSurecTakvimi(s.takvim)}
+                  aria-pressed={surecTakvimi === s.takvim}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    border: `1px solid ${surecTakvimi === s.takvim ? c.primary : c.border}`,
+                    background: surecTakvimi === s.takvim ? c.primary : c.surface,
+                    color: surecTakvimi === s.takvim ? "#fff" : c.textPrimary,
+                    cursor: "pointer",
+                  }}
+                >
+                  {s.etiket}
+                </button>
+              ))}
+            </div>
+          )}
+          {activeTab === "process" && surecTakvimi && (
+            <ProjeTakvimi
+              project={project}
+              tasks={tasks}
+              onEditTask={setEditingTask}
+              baslangicTarihi={searchParams.get("tarih") ?? undefined}
+            />
+          )}
+          {activeTab === "process" && !surecTakvimi && (
             <ProcessPanel
               project={project}
               tasks={tasks}

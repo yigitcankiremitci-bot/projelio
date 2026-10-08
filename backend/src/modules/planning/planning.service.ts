@@ -707,6 +707,28 @@ export class PlanningService {
     return (data ?? []).map(mapBlock);
   }
 
+  /**
+   * Kullanıcının bir projenin görevlerine ayırdığı KENDİ blokları — proje
+   * takviminde yalnızca ona gösterilir (bkz. CalendarService.projeTakvimi).
+   * Filtre yine `user_id`: proje takvimine bakan biri başkasının planını
+   * buradan göremez, güvenlik notundaki kural burada da geçerli.
+   */
+  async listBlocksForProject(userId: string, projectId: string, from: string, to: string): Promise<PlanTimeBlock[]> {
+    const { data, error } = await this.supabase.client
+      .from("plan_time_blocks")
+      // `tasks!inner`: görevi bu projede olmayan (ya da göreve bağlı
+      // olmayan) bloklar sonuçtan düşer.
+      .select(BLOCK_SELECT.replace("tasks(title, status)", "tasks!inner(title, status, project_id)"))
+      .eq("user_id", userId)
+      .eq("tasks.project_id", projectId)
+      .gte("block_date", from)
+      .lte("block_date", to)
+      .order("block_date", { ascending: true })
+      .order("starts_at", { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapBlock);
+  }
+
   async createBlock(userId: string, body: BlockInput): Promise<PlanTimeBlock> {
     const row = await this.buildBlockRow(userId, body, true);
     const { data, error } = await this.supabase.client

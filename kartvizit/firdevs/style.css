@@ -152,3 +152,19 @@ dialog button { margin-top: 16px; width: 100%; padding: 13px; border: 0; border-
   transition: opacity .2s ease, transform .2s ease;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+.lang {
+  display: flex; justify-content: flex-end; gap: 2px;
+  width: fit-content; margin: 0 0 12px auto;
+  padding: 3px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+}
+.lang button {
+  min-width: 44px; padding: 6px 12px;
+  border: 0; border-radius: 999px;
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 600; letter-spacing: .06em;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.lang button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }

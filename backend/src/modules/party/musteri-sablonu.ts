@@ -14,7 +14,7 @@
 // (bkz. ai-assistant/ai-sheet-import.ts ile aynı ayrım).
 
 import * as ExcelJS from "exceljs";
-import type { BaglantiOnem, Locale, Party, PartyRole, PartyType } from "@projelio/shared";
+import { kartvizitSosyalNormallestir, type BaglantiOnem, type Locale, type Party, type PartyRole, type PartyType } from "@projelio/shared";
 import { BadRequestException } from "@nestjs/common";
 import {
   cellText,
@@ -52,7 +52,10 @@ export type MusteriAlani =
   | "onem"
   | "tanismaYeri"
   | "sonrakiTemas"
-  | "iliskiNotu";
+  | "iliskiNotu"
+  // Bağlantı şablonunda; kart alanı party.sosyal (migration 154).
+  | "linkedin"
+  | "instagram";
 
 /**
  * Hangi defterin şablonu. Okuyucu türe göre YALNIZCA o şablonun sütunlarını
@@ -278,6 +281,22 @@ export const BAGLANTI_SUTUNLARI: Sutun[] = [
   sutun("email"),
   sutun("phone"),
   sutun("website"),
+  {
+    alan: "linkedin",
+    baslik: "LinkedIn",
+    esAdlar: ["linkedin", "linked in", "linkedin profili"],
+    genislik: 26,
+    aciklama: "Profil adresi ya da in/ad-soyad.",
+    ornek: "linkedin.com/in/ayse-yilmaz",
+  },
+  {
+    alan: "instagram",
+    baslik: "Instagram",
+    esAdlar: ["instagram", "insta", "ig"],
+    genislik: 18,
+    aciklama: "@kullaniciadi ya da profil adresi.",
+    ornek: "@ayseyilmaz",
+  },
   sutun("city"),
   sutun("contactName"),
   sutun("contactPhone"),
@@ -330,6 +349,8 @@ const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string
   onem: { baslik: "Priority", aciklama: "High, Medium or Low. Empty means Medium. The list is sorted by this first.", ornek: "High" },
   tanismaYeri: { baslik: "Where met", aciklama: "Name of the fair, event or meeting.", ornek: "Istanbul Fair 2026" },
   sonrakiTemas: { baslik: "Next follow-up", aciklama: "When to get back in touch: DD.MM.YYYY or YYYY-MM-DD.", ornek: "15.10.2026" },
+  linkedin: { baslik: "LinkedIn", aciklama: "Profile URL or in/first-last.", ornek: "linkedin.com/in/emma-clarke" },
+  instagram: { baslik: "Instagram", aciklama: "@username or profile URL.", ornek: "@emmaclarke" },
   iliskiNotu: {
     baslik: "Relationship note",
     aciklama: "Visible only in Contacts & Relationships; never shown to the sales team, even if the contact becomes a customer.",
@@ -774,6 +795,16 @@ export function planMusteriImport(
       }
       b.iliskiNotu = al("iliskiNotu");
       party.baglanti = b;
+      // Tanınmayan hesap kartı düşürmez: hesap boş kalır, uyarı olur.
+      const sosyal: Party["sosyal"] = {};
+      for (const [alan, ad] of [["linkedin", "LinkedIn"], ["instagram", "Instagram"]] as const) {
+        const deger = al(alan);
+        if (!deger) continue;
+        const tutamac = kartvizitSosyalNormallestir(alan, deger);
+        if (tutamac) sosyal[alan] = tutamac;
+        else uyarilar.push({ satir: satirNo, sebep: `"${deger}" ${ad} hesabı olarak tanınmadı, boş bırakıldı` });
+      }
+      if (Object.keys(sosyal).length) party.sosyal = sosyal;
     }
     const [city, district, line] = [al("city"), al("district"), al("address")];
     if (city || district || line) party.address = { city, district, line };

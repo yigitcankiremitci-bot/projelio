@@ -17,6 +17,7 @@ function party(over: Partial<Party> = {}): Party {
     displayName: "Örnek",
     roles: ["lead"],
     modules: ["crm_musteri"],
+    sosyal: {},
     status: "active",
     data: {},
     createdAt: "2026-08-12T00:00:00Z",

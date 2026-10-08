@@ -263,6 +263,20 @@ describe("Bağlantı ve İlişkiler şablonu", () => {
     });
   });
 
+  test("LinkedIn ve Instagram tutamaca çevrilir; tanınmayan hesap uyarı olur, kart düşmez", () => {
+    const plan = planMusteriImport(
+      sayfa([
+        ["Ad", "LinkedIn", "Instagram"],
+        ["A", "https://www.linkedin.com/in/ayse-yilmaz/", "@ayse.y"],
+        ["B", "instagram.com/yanlis", "ok"],
+      ]),
+      { tur: "baglanti" }
+    );
+    assert.deepEqual(plan.planlanan[0].party.sosyal, { linkedin: "ayse-yilmaz", instagram: "ayse.y" });
+    assert.deepEqual(plan.planlanan[1].party.sosyal, { instagram: "ok" });
+    assert.equal(plan.uyarilar.length, 1);
+  });
+
   test("rakip ve işbirliği rolleri tanınır", () => {
     const plan = planMusteriImport(sayfa([["Ad", "Rol"], ["X", "Rakip, İşbirliği"]]), { tur: "baglanti" });
     assert.deepEqual(plan.planlanan[0].party.roles, ["competitor", "collaborator"]);

@@ -21,4 +21,7 @@ export const baglantilar: TranslationDict = {
   "Bağlantı ve İlişkiler modülü burada açık değil": "The Contacts & Relationships module isn't enabled here",
   "Müşteriler modülü burada açık değil": "The Customers module isn't enabled here",
   "Kartı bu deftere eklemek için orada da yazma yetkin olmalı": "You need write access there too to add the card to that list",
+
+  "Geçersiz sosyal hesap": "Invalid social media account",
+  "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
 };

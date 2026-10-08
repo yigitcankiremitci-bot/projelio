@@ -1,6 +1,7 @@
 // Veritabanı şemasıyla birebir eşleşen paylaşılan tipler
 
 import type { Locale } from "./i18n";
+import type { KartvizitSosyal } from "./kartvizit";
 
 // "demo": herkese açık demo şirketinin (@celikhan.test) kadrosu (migration 109).
 // Yetki açısından "freelancer" ile aynı — kod yalnızca "admin"i kontrol ediyor;
@@ -754,6 +755,11 @@ export interface Party {
   phone?: string;
   website?: string;
   address?: PartyAddress;
+  /**
+   * Sosyal medya TUTAMAÇLARI (migration 154) — kartvizitle aynı biçim; adres
+   * KARTVIZIT_SOSYAL'deki tanımdan üretilir.
+   */
+  sosyal: KartvizitSosyal;
 
   roles: PartyRole[];
   status: PartyStatus;

@@ -2,10 +2,14 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
+  KARTVIZIT_SOSYAL,
+  kartvizitSosyalNormallestir,
   MUSTERI_MODUL_KEY,
   PARTY_MODUL_KEYS,
   isPartyRole,
   type BaglantiListesi,
+  type KartvizitSosyal,
+  type KartvizitSosyalAnahtar,
   type ModuleAccess,
   type MusteriIceAktarmaSonucu,
   type MusteriListesi,
@@ -72,6 +76,7 @@ function mapParty(row: any): Party {
     phone: row.phone ?? undefined,
     website: row.website ?? undefined,
     address: row.address ?? undefined,
+    sosyal: row.sosyal ?? {},
     roles: row.roles ?? [],
     status: row.status,
     source: row.source ?? undefined,
@@ -240,6 +245,27 @@ export class PartyService {
     ata("iliski_notu", metin(b.iliskiNotu, 5000));
     const { error } = await this.supabase.client.from("party_baglanti").upsert(satir, { onConflict: "party_id" });
     if (error) throw error;
+  }
+
+  /**
+   * Sosyal hesapları tutamaca çevirir (kartvizitle aynı kural). Tanınmayan
+   * hesap türü ya da biçim REDDEDİLİR: "linkedin" alanına bir Instagram adresi
+   * yapıştırılırsa sessizce yanlış profile bağlanmasın. Boş değer alanı siler.
+   */
+  private sosyalDogrula(sosyal: unknown): KartvizitSosyal | undefined {
+    if (sosyal === undefined) return undefined;
+    if (!sosyal || typeof sosyal !== "object" || Array.isArray(sosyal)) throw new BadRequestException("Geçersiz sosyal hesap");
+    const sonuc: KartvizitSosyal = {};
+    for (const [anahtar, deger] of Object.entries(sosyal as Record<string, unknown>)) {
+      const tanim = KARTVIZIT_SOSYAL.find((s) => s.anahtar === anahtar);
+      if (!tanim) throw new BadRequestException("Geçersiz sosyal hesap");
+      const tutamac = kartvizitSosyalNormallestir(anahtar as KartvizitSosyalAnahtar, String(deger ?? ""));
+      if (tutamac === null) {
+        throw new BadRequestException(hataMetni("{hesap} hesabı tanınmadı", { hesap: tanim.ad }));
+      }
+      if (tutamac) sonuc[anahtar as KartvizitSosyalAnahtar] = tutamac;
+    }
+    return sonuc;
   }
 
   /** Bilinmeyen rolü reddeder (eskiden istemciden geldiği gibi yazılıyordu). */
@@ -414,6 +440,7 @@ export class PartyService {
   ): Promise<Party> {
     if (!payload.displayName?.trim()) throw new BadRequestException("Ad gerekli");
     this.rolleriDogrula(payload.roles);
+    const sosyal = this.sosyalDogrula(payload.sosyal);
     await this.assertCanWrite(scope, userId, modul);
     const baglantiDefteri = modul === BAGLANTI_MODUL_KEY;
 
@@ -454,8 +481,9 @@ export class PartyService {
         tax_office: payload.taxOffice ?? null,
         email: payload.email ?? null,
         phone: payload.phone ?? null,
-        website: payload.website ?? null,
+        website: payload.website?.trim() || null,
         address: payload.address ?? null,
+        sosyal: sosyal ?? {},
         // Bağlantılar'da varsayılan "potansiyel müşteri" değil: oradaki
         // kişilerin çoğu müşteri adayı değil, tanışıklık.
         roles: payload.roles?.length ? payload.roles : [baglantiDefteri ? "contact" : "lead"],
@@ -587,6 +615,8 @@ export class PartyService {
       phone: p.phone ?? null,
       website: p.website ?? null,
       address: p.address ?? null,
+      // Plan (musteri-sablonu) tutamaçları zaten doğruladı.
+      sosyal: p.sosyal ?? {},
       roles: p.roles?.length ? p.roles : [baglantiDefteri ? "contact" : "lead"],
       status: "active",
       source,
@@ -678,6 +708,7 @@ export class PartyService {
   async update(id: string, payload: Partial<Party>, userId?: string): Promise<Party> {
     const existing = await this.findOne(id, { baglanti: true });
     this.rolleriDogrula(payload.roles);
+    const sosyal = this.sosyalDogrula(payload.sosyal);
     let e: Erisimler | null = null;
     if (userId) {
       e = await this.erisimler(existing, userId);
@@ -715,7 +746,8 @@ export class PartyService {
     assign("tax_office", payload.taxOffice);
     assign("email", payload.email);
     assign("phone", payload.phone);
-    assign("website", payload.website);
+    assign("website", payload.website === undefined ? undefined : payload.website.trim() || null);
+    assign("sosyal", sosyal);
     assign("address", payload.address);
     assign("roles", payload.roles);
     assign("status", payload.status);

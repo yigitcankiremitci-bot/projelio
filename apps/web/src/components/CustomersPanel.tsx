@@ -2,7 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
+  KARTVIZIT_SOSYAL,
+  kartvizitSosyalNormallestir,
   MUSTERI_MODUL_KEY,
+  safeExternalUrl,
+  type KartvizitSosyal,
+  type KartvizitSosyalAnahtar,
   type BaglantiOnem,
   type DepartmentMember,
   type ModuleAccess,
@@ -63,6 +68,9 @@ function emptyForm() {
     phone: "",
     taxNumber: "",
     notes: "",
+    website: "",
+    // Kullanıcının yazdığı hâliyle ("@ad", tam adres); sunucu tutamaca çevirir.
+    sosyal: {} as Partial<Record<KartvizitSosyalAnahtar, string>>,
     // Boş = kaydı açan üstlenir (sunucu varsayılanı).
     ownerUserId: "",
     // Yalnızca Bağlantılar.
@@ -82,22 +90,32 @@ function bugunYmd(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// Fuar dönüşü kartlar art arda girilir; tanışma yeri her seferinde aynıdır.
-// Son girilen hatırlanır — yalnızca bu tarayıcıda bir kolaylık, kaybolsa da olur.
-const SON_TANISMA_YERI = "projelio_son_tanisma_yeri";
-function sonTanismaYeri(): string {
-  try {
-    return localStorage.getItem(SON_TANISMA_YERI) ?? "";
-  } catch {
-    return "";
+// Formda her zaman görünen sosyal hesaplar; diğerleri "Başka hesap ekle" ile açılır.
+const VARSAYILAN_SOSYAL: KartvizitSosyalAnahtar[] = ["linkedin", "instagram"];
+
+/**
+ * Fuar dönüşü kartlar art arda girilir; tanışma yeri ve tarihi her seferinde
+ * aynıdır. Öneriler, bu defterdeki kartlardan (yer, tarih) çiftleri olarak
+ * çıkarılır — en son açılan kartınki önce. Tarayıcıya değil kayıtlara
+ * dayandığı için başka cihazda, ekip arkadaşının girdiğinde de çalışır.
+ */
+function tanismaOnerileri(parties: Party[]): { yer: string; tarih?: string }[] {
+  const gorulen = new Set<string>();
+  const sonuc: { yer: string; tarih?: string }[] = [];
+  for (const p of [...parties].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+    const yer = p.baglanti?.tanismaYeri?.trim();
+    if (!yer) continue;
+    const tarih = p.baglanti?.tanismaTarihi;
+    const anahtar = `${yer.toLocaleLowerCase("tr")}|${tarih ?? ""}`;
+    if (gorulen.has(anahtar)) continue;
+    gorulen.add(anahtar);
+    sonuc.push({ yer, tarih });
   }
+  return sonuc;
 }
-function sonTanismaYeriniYaz(deger: string) {
-  try {
-    if (deger.trim()) localStorage.setItem(SON_TANISMA_YERI, deger.trim());
-  } catch {
-    /* gizli pencere: hatırlamasa da olur */
-  }
+
+function gunAyYil(ymd: string): string {
+  return ymd.slice(0, 10).split("-").reverse().join(".");
 }
 
 /**
@@ -222,6 +240,13 @@ export default function CustomersPanel({
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
 
   const bugun = bugunYmd();
+  const oneriler = useMemo(() => (baglantiModu ? tanismaOnerileri(parties) : []), [parties, baglantiModu]);
+  const yerOnerileri = useMemo(() => Array.from(new Set(oneriler.map((o) => o.yer))), [oneriler]);
+  // Görünür sosyal alanlar: varsayılanlar + kullanıcının açtıkları + kayıtta dolu olanlar.
+  const [ekSosyal, setEkSosyal] = useState<KartvizitSosyalAnahtar[]>([]);
+  const gorunenSosyal = KARTVIZIT_SOSYAL.map((s) => s.anahtar).filter(
+    (k) => VARSAYILAN_SOSYAL.includes(k) || ekSosyal.includes(k) || !!form.sosyal[k]
+  );
 
   const visible = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
@@ -278,8 +303,11 @@ export default function CustomersPanel({
     setForm({
       ...emptyForm(),
       role: profile.defaultRole ?? (baglantiModu ? "contact" : "lead"),
-      tanismaYeri: baglantiModu ? sonTanismaYeri() : "",
+      // En son girilen yer ve tarih hazır gelir; değiştirmek tek tık.
+      tanismaYeri: oneriler[0]?.yer ?? "",
+      tanismaTarihi: oneriler[0]?.tarih ?? "",
     });
+    setEkSosyal([]);
     setDuplicates([]);
     setError("");
     setFormMode({ kind: "create" });
@@ -295,6 +323,8 @@ export default function CustomersPanel({
       taxNumber: p.taxNumber ?? "",
       notes: p.notes ?? "",
       ownerUserId: p.ownerUserId ?? "",
+      website: p.website ?? "",
+      sosyal: { ...p.sosyal },
       onem: p.baglanti?.onem ?? "orta",
       tanismaYeri: p.baglanti?.tanismaYeri ?? "",
       tanismaTarihi: p.baglanti?.tanismaTarihi ?? "",
@@ -346,10 +376,22 @@ export default function CustomersPanel({
       setError(t("Ad gerekli"));
       return;
     }
+    // Sosyal hesap biçimi kaydetmeden önce denetlenir; sunucu da aynı kuralla reddeder.
+    const sosyal: KartvizitSosyal = {};
+    for (const [k, v] of Object.entries(form.sosyal) as [KartvizitSosyalAnahtar, string][]) {
+      const tutamac = kartvizitSosyalNormallestir(k, v ?? "");
+      if (tutamac === null) {
+        setError(t("{hesap} hesabı tanınmadı", { hesap: KARTVIZIT_SOSYAL.find((x) => x.anahtar === k)?.ad ?? k }));
+        return;
+      }
+      if (tutamac) sosyal[k] = tutamac;
+    }
     setError("");
     setSaving(true);
     try {
       const payload = {
+        website: form.website.trim(),
+        sosyal,
         displayName: form.displayName.trim(),
         partyType: form.partyType,
         roles: [form.role],
@@ -384,7 +426,6 @@ export default function CustomersPanel({
       } else {
         await api.post(scopePath, payload);
       }
-      if (baglantiModu) sonTanismaYeriniYaz(form.tanismaYeri);
       closeForm();
       load();
     } catch (err) {
@@ -659,11 +700,22 @@ export default function CustomersPanel({
               <Field label={t("Nerede tanışıldı")} style={{ flex: "2 1 180px" }}>
                 <input
                   value={form.tanismaYeri}
-                  onChange={(e) => setForm((f) => ({ ...f, tanismaYeri: e.target.value }))}
+                  onChange={(e) => {
+                    const yer = e.target.value;
+                    // Bilinen bir yer seçildiyse ve tarih boşsa, o yerin tarihi de gelsin.
+                    const eslesen = oneriler.find((o) => o.yer === yer && o.tarih);
+                    setForm((f) => ({ ...f, tanismaYeri: yer, tanismaTarihi: f.tanismaTarihi || eslesen?.tarih || "" }));
+                  }}
+                  list="baglanti-tanisma-yerleri"
                   placeholder={t("Örn. İstanbul Fuarı 2026")}
                   maxLength={200}
                   style={{ width: "100%" }}
                 />
+                <datalist id="baglanti-tanisma-yerleri">
+                  {yerOnerileri.map((y) => (
+                    <option key={y} value={y} />
+                  ))}
+                </datalist>
               </Field>
               <Field label={t("Tanışma tarihi")} style={{ flex: "1 1 130px" }}>
                 <input
@@ -673,6 +725,32 @@ export default function CustomersPanel({
                   style={{ width: "100%" }}
                 />
               </Field>
+              {oneriler.length > 0 && (
+                <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Son kullanılanlar:")}</span>
+                  {oneriler.slice(0, 4).map((o) => {
+                    const secili = form.tanismaYeri === o.yer && (form.tanismaTarihi || undefined) === o.tarih;
+                    return (
+                      <button
+                        key={`${o.yer}|${o.tarih ?? ""}`}
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, tanismaYeri: o.yer, tanismaTarihi: o.tarih ?? "" }))}
+                        style={{
+                          fontSize: 11,
+                          padding: "2px 8px",
+                          borderRadius: 999,
+                          border: `1px solid ${secili ? c.primary : c.border}`,
+                          background: secili ? c.primary : "transparent",
+                          color: secili ? c.onPrimary : c.textSecondary,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {o.tarih ? `${o.yer} · ${gunAyYil(o.tarih)}` : o.yer}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
               <Field label={t("Sonraki temas")} style={{ flex: "1 1 130px" }}>
                 <input
                   type="date"
@@ -701,6 +779,46 @@ export default function CustomersPanel({
               />
             </Field>
           </div>
+
+          <Field label={t("Web sitesi")}>
+            <input
+              value={form.website}
+              onChange={(e) => setForm((f) => ({ ...f, website: e.target.value }))}
+              placeholder={t("Örn. ornek.com")}
+              style={{ width: "100%" }}
+            />
+          </Field>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {gorunenSosyal.map((k) => {
+              const tanim = KARTVIZIT_SOSYAL.find((s) => s.anahtar === k)!;
+              return (
+                <Field key={k} label={tanim.ad} style={{ flex: "1 1 160px" }}>
+                  <input
+                    value={form.sosyal[k] ?? ""}
+                    onChange={(e) => setForm((f) => ({ ...f, sosyal: { ...f.sosyal, [k]: e.target.value } }))}
+                    placeholder={t("@{ornek} ya da profil adresi", { ornek: tanim.ornek })}
+                    style={{ width: "100%" }}
+                  />
+                </Field>
+              );
+            })}
+          </div>
+          {gorunenSosyal.length < KARTVIZIT_SOSYAL.length && (
+            <select
+              value=""
+              onChange={(e) => e.target.value && setEkSosyal((l) => [...l, e.target.value as KartvizitSosyalAnahtar])}
+              style={{ alignSelf: "flex-start", fontSize: 12, padding: "4px 6px" }}
+              aria-label={t("Başka hesap ekle")}
+            >
+              <option value="">{t("+ Başka hesap ekle")}</option>
+              {KARTVIZIT_SOSYAL.filter((s) => !gorunenSosyal.includes(s.anahtar)).map((s) => (
+                <option key={s.anahtar} value={s.anahtar}>
+                  {s.ad}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Bağlantılar'da fatura kesilmiyor; hızlı girişte fazladan alan olmasın. */}
           {!baglantiModu && (
@@ -1130,6 +1248,8 @@ function PartyDetail({
         </div>
       )}
 
+      <KartBaglantilari party={party} />
+
       {defterButonu && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 }}>
           {!defterSoru ? (
@@ -1300,6 +1420,32 @@ function IliskiOzeti({ baglanti }: { baglanti?: PartyBaglanti }) {
       ) : (
         <p style={{ margin: "4px 0 0", color: c.textSecondary }}>{t("İlişki notu yok. Düzenle ile ekleyebilirsin.")}</p>
       )}
+    </div>
+  );
+}
+
+/** Kartın web sitesi ve sosyal hesapları. Adresler tutamaçtan üretilir, kullanıcının yazdığı URL href'e girmez. */
+function KartBaglantilari({ party }: { party: Party }) {
+  const c = useThemeColors();
+  const site = safeExternalUrl(party.website);
+  const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]);
+  if (!site && !hesaplar.length) return null;
+  const link = { fontSize: 12, color: c.primary, textDecoration: "none" } as const;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
+      {site && (
+        <a href={site} target="_blank" rel="noopener noreferrer" style={link}>
+          {party.website!.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+        </a>
+      )}
+      {hesaplar.map((s) => {
+        const tutamac = party.sosyal[s.anahtar]!;
+        return (
+          <a key={s.anahtar} href={s.adres(tutamac)} target="_blank" rel="noopener noreferrer" style={link}>
+            {s.ad}: {s.gorunen(tutamac)}
+          </a>
+        );
+      })}
     </div>
   );
 }

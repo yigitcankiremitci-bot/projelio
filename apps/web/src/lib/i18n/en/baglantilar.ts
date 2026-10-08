@@ -68,4 +68,12 @@ export const baglantilar: TranslationDict = {
   "{n} satır okundu, eklenecek yeni bağlantı yok.": "{n} rows read, no new contacts to add.",
   "{n} bağlantıyı ekle": { one: "Add {n} contact", other: "Add {n} contacts" },
   "Bağlantıları ekle": "Add contacts",
+
+  // ─────────────────────────────────────────────── Web ve sosyal hesaplar, öneriler
+  "@{ornek} ya da profil adresi": "@{ornek} or profile URL",
+  "+ Başka hesap ekle": "+ Add another account",
+  "Başka hesap ekle": "Add another account",
+  "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
+  "Örn. ornek.com": "E.g. example.com",
+  "Son kullanılanlar:": "Recently used:",
 };

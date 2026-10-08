@@ -62,6 +62,7 @@ import { EkipHesaplariModule } from "./modules/ekip-hesaplari/ekip-hesaplari.mod
 import { IseAlimModule } from "./modules/ise-alim/ise-alim.module";
 import { PasskeysModule } from "./modules/passkeys/passkeys.module";
 import { BilgiKartiModule } from "./modules/bilgi-karti/bilgi-karti.module";
+import { KartvizitModule } from "./modules/kartvizit/kartvizit.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
 import { WhatsappModule } from "./modules/whatsapp/whatsapp.module";
 import { ShopifyModule } from "./modules/shopify/shopify.module";
@@ -147,6 +148,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Bilgi kartı: şirketin/işin künyesi, belgeleri ve diğer modüllerden
     // toplanan özeti (bkz. 107_bilgi_karti.sql).
     BilgiKartiModule,
+    KartvizitModule,
     // E-posta modülünün gelen kutusu (Outlook/Graph, bkz. 064_mail_accounts.sql).
     MailboxModule,
     // WhatsApp köprüsü: QR ile bağlanan numara üzerinden bildirim (bkz. 080_whatsapp.sql).

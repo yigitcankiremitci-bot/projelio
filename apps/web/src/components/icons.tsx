@@ -595,3 +595,15 @@ export function IconEyeOff({ size = 18, color = "currentColor" }: IconProps) {
     </svg>
   );
 }
+
+// Dijital kartvizit: kişi kartındaki QR rozeti ve kartvizit penceresi.
+export function IconQr({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <path d="M14 14h3v3h-3zM20.5 14v.01M14 20.5v.01M17.5 20.5h3v-3" />
+    </svg>
+  );
+}

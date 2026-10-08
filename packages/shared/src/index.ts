@@ -25,3 +25,5 @@ export * from "./bildirimSesleri";
 export * from "./icerikAnalizi";
 export * from "./ilerleyis";
 export * from "./rakip";
+export * from "./kartvizit";
+export * from "./kartvizitLogo";

@@ -48,6 +48,7 @@ import {
 } from "../lib/fontScale";
 import HomeTargetModal from "../components/HomeTargetModal";
 import EditProfileModal from "../components/EditProfileModal";
+import KartvizitModal from "../components/kartvizit/KartvizitModal";
 import { useHomeTarget } from "../lib/homeTarget";
 import { useAppPrefs } from "../lib/appPrefs";
 import { useTour } from "../lib/tour/TourContext";
@@ -367,6 +368,7 @@ export default function Settings() {
   const homeTarget = useHomeTarget();
   const [homeTargetModalOpen, setHomeTargetModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [kartvizitOpen, setKartvizitOpen] = useState(false);
   const [me, setMe] = useState<User | null>(null);
   const [username, setUsername] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
@@ -1219,8 +1221,13 @@ export default function Settings() {
             setProfileModalOpen(false);
             void loadMe();
           }}
+          onKartvizit={() => {
+            setProfileModalOpen(false);
+            setKartvizitOpen(true);
+          }}
         />
       )}
+      {kartvizitOpen && <KartvizitModal onClose={() => setKartvizitOpen(false)} onProfilDegisti={() => void loadMe()} />}
     </div>
   );
 }

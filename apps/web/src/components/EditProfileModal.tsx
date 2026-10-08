@@ -7,16 +7,18 @@ import { cropAvatarImage } from "../lib/imageProcessing";
 import type { CropArea } from "../lib/imageProcessing";
 import Modal from "./Modal";
 import AvatarCropper from "./AvatarCropper";
-import { IconUser } from "./icons";
+import { IconQr, IconUser } from "./icons";
 import { useT } from "../lib/i18n";
 
 interface Props {
   user: User;
   onClose: () => void;
   onSaved: () => void;
+  /** Verilirse altta "Dijital kartvizit" bağlantısı görünür (bkz. KartvizitModal). */
+  onKartvizit?: () => void;
 }
 
-export default function EditProfileModal({ user, onClose, onSaved }: Props) {
+export default function EditProfileModal({ user, onClose, onSaved, onKartvizit }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [fullName, setFullName] = useState(user.fullName);
@@ -159,6 +161,32 @@ export default function EditProfileModal({ user, onClose, onSaved }: Props) {
         >
           {loading ? t("Kaydediliyor…") : t("Kaydet")}
         </button>
+
+        {onKartvizit && (
+          <button
+            type="button"
+            onClick={onKartvizit}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: `1px dashed ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 14,
+              textAlign: "left",
+              cursor: "pointer",
+            }}
+          >
+            <IconQr size={18} color={c.accentDark} />
+            <span style={{ flex: 1 }}>
+              <strong style={{ fontWeight: 600 }}>{t("Dijital kartvizit")}</strong>
+              <span style={{ color: c.textSecondary }}> · {t("QR kodlu, kendi adresinde, ücretsiz")}</span>
+            </span>
+          </button>
+        )}
       </form>
     </Modal>
   );

@@ -5,8 +5,9 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import CardDescription from "./CardDescription";
-import { IconUser, IconSettings } from "./icons";
+import { IconUser, IconSettings, IconQr } from "./icons";
 import EditProfileModal from "./EditProfileModal";
+import KartvizitModal from "./kartvizit/KartvizitModal";
 import { useT } from "../lib/i18n";
 
 // Dar ekranda kart, kendisinin altında duran iş kartlarından yer çalıyordu:
@@ -115,6 +116,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
   // Katlanabilir kartta düzenleme simgesi ikinci dokunuşla gelir (bkz. onClick).
   const [gearArmed, setGearArmed] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [kartvizit, setKartvizit] = useState(false);
 
   const reload = () => {
     api.get<User>("/auth/me").then(setUser).catch(() => setUser(null));
@@ -166,7 +168,7 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
   const capsuleRightInset = AVATAR_SIZE / 2;
   const gearVisible = isDesktop ? avatarHovered : collapsed ? tapped && gearArmed : tapped;
   // Modal açıkken kart normal boyutuna dönsün — arkada büyümüş halde durması dikkat dağıtıyor.
-  const active = isDesktop && hovered && !editing;
+  const active = isDesktop && hovered && !editing && !kartvizit;
   // Kapsül görünür mü: katlanabilir değilse her zaman, katlanabilirse dokunulduğunda.
   const capsuleOpen = !collapsed || tapped;
 
@@ -413,9 +415,55 @@ export default function ProfileCard({ bleedRight = 0, compact = false, collapsib
             <IconSettings size={compact ? 16 : 20} color="#fff" />
           </span>
         </div>
+
+        {/* Dijital kartvizit rozeti. Fotoğrafın sol alt köşesinde, halkanın
+            üstüne binen küçük bir QR: göze batmıyor ama kartın kendisinde
+            durduğu için aranınca hemen bulunuyor. Fotoğrafa dokunma/üzerine
+            gelme davranışından bağımsız — tek dokunuşla pencereyi açar. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setTapped(false);
+            setKartvizit(true);
+          }}
+          aria-label={t("Dijital kartvizit")}
+          title={t("Dijital kartvizit · QR")}
+          style={{
+            position: "absolute",
+            left: compact ? -2 : 0,
+            bottom: compact ? -2 : 2,
+            width: compact ? 22 : 30,
+            height: compact ? 22 : 30,
+            padding: 0,
+            borderRadius: "50%",
+            border: `2px solid ${c.surface}`,
+            background: c.primaryDark,
+            display: "grid",
+            placeItems: "center",
+            cursor: "pointer",
+            boxShadow: "0 3px 10px rgba(28,34,44,0.3)",
+            zIndex: 3,
+            transform: active ? "scale(1.08)" : "scale(1)",
+            transition: "transform 300ms ease",
+          }}
+        >
+          <IconQr size={compact ? 12 : 15} color={c.accent} />
+        </button>
       </div>
 
-      {editing && <EditProfileModal user={user} onClose={() => setEditing(false)} onSaved={reload} />}
+      {editing && (
+        <EditProfileModal
+          user={user}
+          onClose={() => setEditing(false)}
+          onSaved={reload}
+          onKartvizit={() => {
+            setEditing(false);
+            setKartvizit(true);
+          }}
+        />
+      )}
+      {kartvizit && <KartvizitModal onClose={() => setKartvizit(false)} onProfilDegisti={reload} />}
     </div>
   );
 }

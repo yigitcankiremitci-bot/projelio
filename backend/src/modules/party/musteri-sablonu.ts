@@ -14,7 +14,7 @@
 // (bkz. ai-assistant/ai-sheet-import.ts ile aynı ayrım).
 
 import * as ExcelJS from "exceljs";
-import type { Locale, Party, PartyRole, PartyType } from "@projelio/shared";
+import type { BaglantiOnem, Locale, Party, PartyRole, PartyType } from "@projelio/shared";
 import { BadRequestException } from "@nestjs/common";
 import {
   cellText,
@@ -47,7 +47,20 @@ export type MusteriAlani =
   | "contactName"
   | "contactPhone"
   | "contactEmail"
-  | "notes";
+  | "notes"
+  // Yalnızca Bağlantı ve İlişkiler şablonunda (migration 153).
+  | "onem"
+  | "tanismaYeri"
+  | "sonrakiTemas"
+  | "iliskiNotu";
+
+/**
+ * Hangi defterin şablonu. Okuyucu türe göre YALNIZCA o şablonun sütunlarını
+ * arar: müşteri içe aktarmasında "Önem" sütunu tanınsaydı değeri hiçbir yere
+ * yazılmaz ama "kullanılmayan sütunlar" listesinde de görünmezdi — veri
+ * sessizce kaybolurdu.
+ */
+export type SablonTuru = "musteri" | "baglanti";
 
 interface Sutun {
   alan: MusteriAlani;
@@ -71,6 +84,26 @@ const ROLLER: { etiket: string; en: string; rol: PartyRole; esAdlar: string[] }[
   { etiket: "Tedarikçi", en: "Supplier", rol: "supplier", esAdlar: ["tedarikçi", "tedarikci", "supplier", "vendor"] },
   { etiket: "Distribütör", en: "Distributor", rol: "distributor", esAdlar: ["distribütör", "distributor", "bayi", "dealer"] },
   { etiket: "Diğer", en: "Other", rol: "other", esAdlar: ["diğer", "diger", "other"] },
+  { etiket: "Bağlantı", en: "Contact", rol: "contact", esAdlar: ["bağlantı", "baglanti", "tanıdık", "contact", "connection"] },
+  { etiket: "Rakip", en: "Competitor", rol: "competitor", esAdlar: ["rakip", "rakip firma", "competitor"] },
+  {
+    etiket: "İşbirliği",
+    en: "Collaborator",
+    rol: "collaborator",
+    esAdlar: ["işbirliği", "isbirligi", "iş ortağı", "is ortagi", "collaborator", "collaboration"],
+  },
+];
+
+/** Şablonun açılır listesinde hangi roller önerilir (okuyucu hepsini tanır). */
+const SABLON_ROLLERI: Record<SablonTuru, PartyRole[]> = {
+  musteri: ["customer", "lead", "supplier", "distributor", "other"],
+  baglanti: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"],
+};
+
+const ONEMLER: { etiket: string; en: string; onem: BaglantiOnem; esAdlar: string[] }[] = [
+  { etiket: "Yüksek", en: "High", onem: "yuksek", esAdlar: ["yüksek", "yuksek", "önemli", "high", "a"] },
+  { etiket: "Orta", en: "Medium", onem: "orta", esAdlar: ["orta", "normal", "medium", "b"] },
+  { etiket: "Düşük", en: "Low", onem: "dusuk", esAdlar: ["düşük", "dusuk", "low", "c"] },
 ];
 
 const TURLER: { etiket: string; en: string; tur: PartyType; esAdlar: string[] }[] = [
@@ -201,6 +234,68 @@ export const MUSTERI_SUTUNLARI: Sutun[] = [
   },
 ];
 
+const sutun = (alan: MusteriAlani) => MUSTERI_SUTUNLARI.find((s) => s.alan === alan)!;
+
+/**
+ * Bağlantı ve İlişkiler şablonu: fuar dönüşü hızlı doldurulsun diye fatura
+ * alanları (unvan, vergi no, vergi dairesi, adres) YOK. Genel "Not" da yok:
+ * kart müşteriye dönüşünce satış ekibi onu okur; not İlişki notuna yazılır.
+ */
+export const BAGLANTI_SUTUNLARI: Sutun[] = [
+  { ...sutun("displayName"), ornek: "Ayşe Yılmaz" },
+  sutun("partyType"),
+  {
+    ...sutun("roles"),
+    aciklama: "Bağlantı, Rakip, İşbirliği, Aday müşteri, Tedarikçi, Distribütör ya da Diğer. Birden fazlaysa virgülle ayırın. Boşsa Bağlantı.",
+    ornek: "Rakip, İşbirliği",
+    secenekler: SABLON_ROLLERI.baglanti.map((r) => ROLLER.find((x) => x.rol === r)!.etiket),
+  },
+  {
+    alan: "onem",
+    baslik: "Önem",
+    esAdlar: ["önem", "onem", "öncelik", "oncelik", "priority"],
+    genislik: 10,
+    aciklama: "Yüksek, Orta ya da Düşük. Boşsa Orta. Liste önce buna göre sıralanır.",
+    ornek: "Yüksek",
+    secenekler: ONEMLER.map((o) => o.etiket),
+  },
+  {
+    alan: "tanismaYeri",
+    baslik: "Nerede tanışıldı",
+    esAdlar: ["nerede tanışıldı", "tanışma yeri", "tanisma yeri", "fuar", "etkinlik", "kaynak", "where met", "event"],
+    genislik: 24,
+    aciklama: "Fuar, etkinlik ya da toplantının adı.",
+    ornek: "İstanbul Fuarı 2026",
+  },
+  {
+    alan: "sonrakiTemas",
+    baslik: "Sonraki temas",
+    esAdlar: ["sonraki temas", "takip tarihi", "dönüş tarihi", "next follow-up", "follow-up"],
+    genislik: 14,
+    aciklama: "Ne zaman dönülecek: GG.AA.YYYY ya da YYYY-AA-GG.",
+    ornek: "15.10.2026",
+  },
+  sutun("email"),
+  sutun("phone"),
+  sutun("website"),
+  sutun("city"),
+  sutun("contactName"),
+  sutun("contactPhone"),
+  sutun("contactEmail"),
+  {
+    alan: "iliskiNotu",
+    baslik: "İlişki notu",
+    esAdlar: ["ilişki notu", "iliski notu", "not", "notlar", "açıklama", "aciklama", "notes", "note"],
+    genislik: 40,
+    aciklama: "Yalnızca Bağlantı ve İlişkiler'de görünür; kart müşteriye dönüşse bile satış ekibine açılmaz.",
+    ornek: "Rakip ama ihracatta birlikte iş yapılabilir.",
+  },
+];
+
+export function sablonSutunlari(tur: SablonTuru): Sutun[] {
+  return tur === "baglanti" ? BAGLANTI_SUTUNLARI : MUSTERI_SUTUNLARI;
+}
+
 /**
  * İngilizce şablonun metinleri. Ayrı bir tablo, çünkü bunlar arayüz metni
  * değil DOSYA İÇERİĞİ: çeviri sözlüğünden geçselerdi okuyucu İngilizce
@@ -232,9 +327,23 @@ const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string
   contactPhone: { baslik: "Contact phone", aciklama: "", ornek: "+44 7700 900000" },
   contactEmail: { baslik: "Contact email", aciklama: "", ornek: "emma@harborlogistics.com" },
   notes: { baslik: "Notes", aciklama: "Free-form note.", ornek: "Monthly shipping agreement." },
+  onem: { baslik: "Priority", aciklama: "High, Medium or Low. Empty means Medium. The list is sorted by this first.", ornek: "High" },
+  tanismaYeri: { baslik: "Where met", aciklama: "Name of the fair, event or meeting.", ornek: "Istanbul Fair 2026" },
+  sonrakiTemas: { baslik: "Next follow-up", aciklama: "When to get back in touch: DD.MM.YYYY or YYYY-MM-DD.", ornek: "15.10.2026" },
+  iliskiNotu: {
+    baslik: "Relationship note",
+    aciklama: "Visible only in Contacts & Relationships; never shown to the sales team, even if the contact becomes a customer.",
+    ornek: "A competitor, but we could work together on exports.",
+  },
 };
 
-const METIN = {
+/** Bağlantı şablonunda Rol sütununun İngilizce açıklaması (müşteri şablonundan farklı). */
+const EN_BAGLANTI_ROL = {
+  aciklama: "Contact, Competitor, Collaborator, Lead, Supplier, Distributor or Other. Separate several with commas. Empty means Contact.",
+  ornek: "Competitor, Collaborator",
+};
+
+const METIN_MUSTERI = {
   tr: {
     veriSayfasi: "Müşteriler",
     rehberSayfasi: "Nasıl doldurulur",
@@ -269,15 +378,52 @@ const METIN = {
   },
 } satisfies Record<Locale, Record<string, string>>;
 
+const METIN_BAGLANTI = {
+  tr: {
+    veriSayfasi: "Bağlantılar",
+    rehberSayfasi: "Nasıl doldurulur",
+    dosya: "Projelio bağlantı şablonu.xlsx",
+    baslik: "Projelio bağlantı şablonu",
+    sutun: "Sütun",
+    aciklama: "Açıklama",
+    ornek: "Örnek",
+    istegeBagli: "İsteğe bağlı.",
+    yukleme: "Yükleme",
+    yuklemeMetni:
+      `"Bağlantılar" sayfasını doldurup dosyayı Bağlantı ve İlişkiler ekranındaki "Excel ile toplu ekle" ` +
+      "penceresinden yükleyin. Önce kaç kart açılacağı gösterilir, onayınızdan sonra yazılır. Aynı adla ya da " +
+      "e-postayla zaten kayıtlı olanlar atlanır. Kartlar müşteri listesine KARIŞMAZ. " +
+      "Sütunların sırası ve bu sayfa önemli değil; başlıkları değiştirmeyin.",
+  },
+  en: {
+    veriSayfasi: "Contacts",
+    rehberSayfasi: "How to fill in",
+    dosya: "Projelio contacts template.xlsx",
+    baslik: "Projelio contacts template",
+    sutun: "Column",
+    aciklama: "Description",
+    ornek: "Example",
+    istegeBagli: "Optional.",
+    yukleme: "Uploading",
+    yuklemeMetni:
+      `Fill in the "Contacts" sheet and upload the file from "Bulk add from Excel" on the Contacts & ` +
+      "Relationships screen. You'll first see how many cards will be created; they're written only after you " +
+      "confirm. Contacts already registered with the same name or email are skipped. They stay OUT of your " +
+      "customer list. Column order and this sheet don't matter; don't change the headings.",
+  },
+} satisfies Record<Locale, Record<string, string>>;
+
+const METIN: Record<SablonTuru, typeof METIN_MUSTERI> = { musteri: METIN_MUSTERI, baglanti: METIN_BAGLANTI };
+
 /** Türkçe veri sayfasının adı (geriye uyumluluk: Lio ve CSV okuması bunu kullanıyor). */
-export const SABLON_SAYFA_ADI = METIN.tr.veriSayfasi;
-export const SABLON_DOSYA_ADI = METIN.tr.dosya;
+export const SABLON_SAYFA_ADI = METIN_MUSTERI.tr.veriSayfasi;
+export const SABLON_DOSYA_ADI = METIN_MUSTERI.tr.dosya;
 /** İndirilecek dosyanın adı, şablonun dilinde. */
-export function sablonDosyaAdi(dil: Locale): string {
-  return METIN[dil].dosya;
+export function sablonDosyaAdi(dil: Locale, tur: SablonTuru = "musteri"): string {
+  return METIN[tur][dil].dosya;
 }
-/** Veri sayfası sayılan adlar — iki dilin şablonu da tanınır. */
-const VERI_SAYFALARI = [METIN.tr.veriSayfasi, METIN.en.veriSayfasi];
+/** Veri sayfası sayılan adlar — iki türün, iki dilin şablonu da tanınır. */
+const VERI_SAYFALARI = [METIN_MUSTERI, METIN_BAGLANTI].flatMap((m) => [m.tr.veriSayfasi, m.en.veriSayfasi]);
 /** Şablonun kaç satırına açılır liste ve metin biçimi uygulanacağı. */
 const SABLON_SATIR = 1000;
 
@@ -290,24 +436,42 @@ const SABLON_SATIR = 1000;
  * kullanıcı silmeyi unutursa "Deniz Lojistik" adında sahte bir müşteri açılırdı.
  * Veri sayfası İLK sayfa — Lio sayfa adı verilmezse ilk sayfayı okur.
  */
-export async function musteriSablonuOlustur(dil: Locale = "tr"): Promise<Buffer> {
-  const m = METIN[dil];
-  // Sütunun o dildeki metinleri; Türkçe tanım MUSTERI_SUTUNLARI'nda.
+export async function musteriSablonuOlustur(dil: Locale = "tr", tur: SablonTuru = "musteri"): Promise<Buffer> {
+  const m = METIN[tur][dil];
+  const SUTUNLAR = sablonSutunlari(tur);
+  const rolEtiketleri = SABLON_ROLLERI[tur].map((r) => ROLLER.find((x) => x.rol === r)!);
+  // Sütunun o dildeki metinleri; Türkçe tanım MUSTERI_SUTUNLARI / BAGLANTI_SUTUNLARI'nda.
   const yerel = (s: Sutun) =>
     dil === "en"
-      ? { ...EN[s.alan], secenekler: s.alan === "roles" ? ROLLER.map((r) => r.en) : s.alan === "partyType" ? TURLER.map((t) => t.en) : undefined }
-      : { baslik: s.baslik, aciklama: s.aciklama, ornek: s.ornek, secenekler: s.secenekler };
+      ? {
+          ...EN[s.alan],
+          ...(tur === "baglanti" && s.alan === "roles" ? EN_BAGLANTI_ROL : {}),
+          secenekler:
+            s.alan === "roles"
+              ? rolEtiketleri.map((r) => r.en)
+              : s.alan === "partyType"
+                ? TURLER.map((t) => t.en)
+                : s.alan === "onem"
+                  ? ONEMLER.map((o) => o.en)
+                  : undefined,
+        }
+      : {
+          baslik: s.baslik,
+          aciklama: s.aciklama,
+          ornek: s.ornek,
+          secenekler: s.alan === "roles" ? rolEtiketleri.map((r) => r.etiket) : s.secenekler,
+        };
 
   const wb = new Workbook();
   wb.creator = "Projelio";
   wb.title = m.baslik;
 
   const veri = wb.addWorksheet(m.veriSayfasi, { views: [{ state: "frozen", ySplit: 1 }] });
-  veri.columns = MUSTERI_SUTUNLARI.map((s) => ({ header: yerel(s).baslik, key: s.alan, width: s.genislik }));
+  veri.columns = SUTUNLAR.map((s) => ({ header: yerel(s).baslik, key: s.alan, width: s.genislik }));
   const baslik = veri.getRow(1);
   baslik.font = { bold: true, color: { argb: "FFFFFFFF" } };
   baslik.height = 20;
-  MUSTERI_SUTUNLARI.forEach((s, i) => {
+  SUTUNLAR.forEach((s, i) => {
     const hucre = baslik.getCell(i + 1);
     // Paletin ana ve vurgu renkleri (packages/shared/src/theme.ts): zorunlu sütun vurgu renginde.
     hucre.fill = { type: "pattern", pattern: "solid", fgColor: { argb: s.zorunlu ? "FFC0813F" : "FF3E4858" } };
@@ -339,7 +503,7 @@ export async function musteriSablonuOlustur(dil: Locale = "tr"): Promise<Buffer>
     { header: m.ornek, key: "ornek", width: 34 },
   ];
   rehber.getRow(1).font = { bold: true };
-  for (const s of MUSTERI_SUTUNLARI) {
+  for (const s of SUTUNLAR) {
     const y = yerel(s);
     rehber.addRow({ sutun: y.baslik, aciklama: y.aciklama || m.istegeBagli, ornek: y.ornek });
   }
@@ -439,21 +603,23 @@ function baslikAnahtari(value: unknown): string {
  */
 export function musteriSutunlariniBul(
   basliklar: string[],
-  esleme: Partial<Record<MusteriAlani, string>> = {}
+  esleme: Partial<Record<MusteriAlani, string>> = {},
+  tur: SablonTuru = "musteri"
 ): Map<MusteriAlani, number> {
+  const SUTUNLAR = sablonSutunlari(tur);
   const anahtarlar = basliklar.map(baslikAnahtari);
   const sonuc = new Map<MusteriAlani, number>();
   const kullanilan = new Set<number>();
 
   for (const [alan, baslik] of Object.entries(esleme) as [MusteriAlani, string][]) {
-    if (!MUSTERI_SUTUNLARI.some((s) => s.alan === alan) || !baslik) continue;
+    if (!SUTUNLAR.some((s) => s.alan === alan) || !baslik) continue;
     const i = resolveColumn(basliklar, baslik);
     if (i >= 0 && i < basliklar.length) {
       sonuc.set(alan, i);
       kullanilan.add(i);
     }
   }
-  for (const s of MUSTERI_SUTUNLARI) {
+  for (const s of SUTUNLAR) {
     if (sonuc.has(s.alan)) continue;
     const adaylar = [s.baslik, EN[s.alan].baslik, ...s.esAdlar].map(baslikAnahtari);
     const i = anahtarlar.findIndex((a, idx) => !kullanilan.has(idx) && adaylar.includes(a));
@@ -478,6 +644,27 @@ function rolleriCoz(deger: string): { roller: PartyRole[]; taninmayan: string[] 
   return { roller, taninmayan };
 }
 
+function onemiCoz(deger: string): BaglantiOnem | undefined {
+  const d = normalizeKey(deger);
+  return ONEMLER.find((o) => normalizeKey(o.etiket) === d || normalizeKey(o.en) === d || o.esAdlar.includes(d))?.onem;
+}
+
+/**
+ * GG.AA.YYYY ya da YYYY-AA-GG → YYYY-AA-GG. Excel tarih hücresi cellText'ten
+ * zaten YYYY-AA-GG geliyor. Takvimde olmayan gün (31.02) tanınmaz.
+ */
+export function tarihiCoz(deger: string): string | undefined {
+  let y: number, a: number, g: number;
+  const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(deger.trim());
+  const tr = /^(\d{1,2})[./](\d{1,2})[./](\d{4})$/.exec(deger.trim());
+  if (iso) [y, a, g] = [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  else if (tr) [y, a, g] = [Number(tr[3]), Number(tr[2]), Number(tr[1])];
+  else return undefined;
+  const d = new Date(Date.UTC(y, a - 1, g));
+  if (d.getUTCFullYear() !== y || d.getUTCMonth() !== a - 1 || d.getUTCDate() !== g) return undefined;
+  return `${y}-${String(a).padStart(2, "0")}-${String(g).padStart(2, "0")}`;
+}
+
 function turuCoz(deger: string): PartyType | undefined {
   const d = normalizeKey(deger);
   return TURLER.find((t) => normalizeKey(t.etiket) === d || normalizeKey(t.en) === d || t.esAdlar.includes(d))?.tur;
@@ -497,11 +684,14 @@ export function planMusteriImport(
     basliksatiri?: number;
     ilkSatir?: number;
     sonSatir?: number;
+    tur?: SablonTuru;
   } = {}
 ): MusteriPlani & { uyarilar: { satir: number; sebep: string }[] } {
+  const tur = opts.tur ?? "musteri";
+  const baglanti = tur === "baglanti";
   const baslikIndex = Math.max(0, (opts.basliksatiri ?? 1) - 1);
   const basliklar = (sheet.rows[baslikIndex] ?? []).map((h) => String(h ?? ""));
-  const sutunlar = musteriSutunlariniBul(basliklar, opts.esleme);
+  const sutunlar = musteriSutunlariniBul(basliklar, opts.esleme, tur);
 
   const eslesenSutunlar: Record<string, string> = {};
   for (const [alan, i] of sutunlar) eslesenSutunlar[alan] = basliklar[i];
@@ -557,7 +747,7 @@ export function planMusteriImport(
       if (taninmayan.length) {
         uyarilar.push({
           satir: satirNo,
-          sebep: `"${taninmayan.join(", ")}" rolü tanınmadı${roller.length ? "" : ", Aday müşteri sayıldı"}`,
+          sebep: `"${taninmayan.join(", ")}" rolü tanınmadı${roller.length ? "" : baglanti ? ", Bağlantı sayıldı" : ", Aday müşteri sayıldı"}`,
         });
       }
     }
@@ -568,6 +758,23 @@ export function planMusteriImport(
     party.phone = al("phone");
     party.website = al("website");
     party.notes = al("notes");
+    if (baglanti) {
+      const b: NonNullable<Party["baglanti"]> = { onem: "orta" };
+      const onem = al("onem");
+      if (onem) {
+        const cozulen = onemiCoz(onem);
+        if (cozulen) b.onem = cozulen;
+        else uyarilar.push({ satir: satirNo, sebep: `"${onem}" önemi tanınmadı, Orta sayıldı` });
+      }
+      b.tanismaYeri = al("tanismaYeri")?.slice(0, 200);
+      const temas = al("sonrakiTemas");
+      if (temas) {
+        b.sonrakiTemas = tarihiCoz(temas);
+        if (!b.sonrakiTemas) uyarilar.push({ satir: satirNo, sebep: `"${temas}" tarihi okunamadı, sonraki temas boş bırakıldı` });
+      }
+      b.iliskiNotu = al("iliskiNotu");
+      party.baglanti = b;
+    }
     const [city, district, line] = [al("city"), al("district"), al("address")];
     if (city || district || line) party.address = { city, district, line };
 

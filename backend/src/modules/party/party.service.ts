@@ -1,26 +1,62 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type {
-  ModuleAccess,
-  MusteriIceAktarmaSonucu,
-  MusteriListesi,
-  Party,
-  PartyActivity,
-  PartyActivityType,
-  PartyContact,
-  PartyDuplicate,
-  PartyRole,
+import {
+  BAGLANTI_MODUL_KEY,
+  BAGLANTI_ONEMLERI,
+  MUSTERI_MODUL_KEY,
+  PARTY_MODUL_KEYS,
+  isPartyRole,
+  type BaglantiListesi,
+  type ModuleAccess,
+  type MusteriIceAktarmaSonucu,
+  type MusteriListesi,
+  type Party,
+  type PartyActivity,
+  type PartyActivityType,
+  type PartyBaglanti,
+  type PartyContact,
+  type PartyDuplicate,
+  type PartyGorevi,
+  type PartyModulKey,
+  type PartyRole,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { AccessService } from "../../common/access/access.service";
-import { kartDuzenlemeHatasi, musteriYetkisi } from "./siparis-erisim";
+import { musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
+import {
+  baglantiAlaniOkunur,
+  baglantiAlaniYazilir,
+  deftereEklemeHatasi,
+  kartDuzenlemeKarari,
+  kayitOkunur,
+  kayitYazilir,
+  kayitYonetilir,
+  type Erisimler,
+} from "./baglanti-erisim";
 import { hataMetni } from "../../common/i18n/index";
 import { MAX_IMPORT_ROWS, type SheetData } from "../ai-assistant/ai-sheet-import";
 import { mevcutlariAyikla, planMusteriImport, type MusteriAlani } from "./musteri-sablonu";
 
-// Müşteri modülü bu varlığa bakar; yetki de o modülün üzerinden çözülür.
-const MODULE_KEY = "crm_musteri";
+// Kapsam düzeyindeki yetkinin varsayılan modülü. Kayda bağlı yetki ise
+// kaydın durduğu defterlerden okunur (bkz. baglanti-erisim.ts).
+const MODULE_KEY = MUSTERI_MODUL_KEY;
+
+/**
+ * party_baglanti gömmesi. PK aynı zamanda FK olduğu için PostgREST bire-bir
+ * sayıp nesne döndürüyor; sürüme göre dizi de gelebilir, ikisi de okunuyor.
+ */
+function mapBaglanti(embed: any): PartyBaglanti | undefined {
+  const r = Array.isArray(embed) ? embed[0] : embed;
+  if (!r) return undefined;
+  return {
+    onem: r.onem,
+    tanismaYeri: r.tanisma_yeri ?? undefined,
+    tanismaTarihi: r.tanisma_tarihi ?? undefined,
+    sonrakiTemas: r.sonraki_temas ?? undefined,
+    iliskiNotu: r.iliski_notu ?? undefined,
+  };
+}
 
 function mapParty(row: any): Party {
   return {
@@ -39,6 +75,8 @@ function mapParty(row: any): Party {
     roles: row.roles ?? [],
     status: row.status,
     source: row.source ?? undefined,
+    // Migration 153 öncesi satırlarda sütun yok: o kayıtlar müşteri defterinde.
+    modules: row.modules ?? [MUSTERI_MODUL_KEY],
     ownerUserId: row.owner_user_id ?? undefined,
     parentPartyId: row.parent_party_id ?? undefined,
     linkedUserId: row.linked_user_id ?? undefined,
@@ -50,6 +88,7 @@ function mapParty(row: any): Party {
     updatedAt: row.updated_at,
     archivedAt: row.archived_at ?? undefined,
     ownerName: row.owner?.full_name ?? undefined,
+    baglanti: row.party_baglanti === undefined ? undefined : mapBaglanti(row.party_baglanti),
   };
 }
 
@@ -105,39 +144,113 @@ export class PartyService {
   ) {}
 
   private readonly OWNER_JOIN = "*, owner:users!party_owner_user_id_fkey(full_name)";
+  // Bağlantı alanları yalnızca yetkisi olana dönülür; gömme her zaman
+  // okunur, karar dönüşte verilir (bkz. gorunur).
+  private readonly BAGLANTI_JOIN = `${this.OWNER_JOIN}, party_baglanti(*)`;
 
   // ============================================================ Yetki
 
-  /** crm_musteri modülündeki yetki; sipariş servisi de aynı kapıdan geçer. */
-  async access(scope: PartyScope, userId?: string): Promise<ModuleAccess> {
+  /**
+   * Bir modüldeki kapsam yetkisi. Varsayılan crm_musteri: sipariş servisi ve
+   * eski çağıranlar aynı kapıdan geçer.
+   */
+  async access(scope: PartyScope, userId?: string, modul: PartyModulKey = MODULE_KEY): Promise<ModuleAccess> {
     return scope.jobId
-      ? this.moduleMembers.resolveJobAccess(scope.jobId, MODULE_KEY, userId)
+      ? this.moduleMembers.resolveJobAccess(scope.jobId, modul, userId)
       : this.moduleMembers.resolveOrganizationAccess(
           scope.organizationId!,
-          MODULE_KEY,
+          modul,
           userId,
           scope.departmentId
         );
   }
 
+  /** Kaydın durduğu defterlerin her birindeki yetki. */
+  private async erisimler(party: Party, userId: string): Promise<Erisimler> {
+    const e: Erisimler = {};
+    await Promise.all(
+      party.modules
+        .filter((m): m is PartyModulKey => (PARTY_MODUL_KEYS as readonly string[]).includes(m))
+        .map(async (m) => {
+          e[m] = await this.access(this.scopeOf(party), userId, m);
+        })
+    );
+    return e;
+  }
+
   /**
-   * Okuma yetkisi. assertCanWrite'in aksine FAIL-CLOSED: userId yoksa reddeder.
+   * Kayda bağlı okuma. assertKayitYazilir'in aksine FAIL-CLOSED: userId yoksa
+   * reddeder.
    *
    * NEDEN: by-id okuma uçları (findOne/contacts/activities) eskiden HİÇBİR yetki
    * kontrolü yapmıyordu — giriş yapmış herhangi biri, hatta partner verisine
    * erişimi olmaması gereken bir taşeron bile, UUID'yi bilen herkes başka bir
    * organizasyonun müşteri/tedarikçi kaydını (ve kişilerini, PII) okuyabiliyordu.
    * Liste uçları zaten kontrol ediyordu; by-id uçları atlanmıştı (bkz. controller).
+   *
+   * Kapsamdaki crm_musteri yetkisine bakmak da yetmez:
+   * yalnızca Bağlantılar'da duran bir kartı Müşteriler yetkisiyle açmak
+   * mümkün olmamalı (bkz. baglanti-erisim.ts).
    */
-  private async assertCanRead(scope: PartyScope, userId?: string): Promise<void> {
+  private async assertKayitOkunur(party: Party, userId?: string): Promise<Erisimler> {
     if (!userId) throw new ForbiddenException("Bu kaydı görme yetkin yok");
-    const a = await this.access(scope, userId);
-    if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    const e = await this.erisimler(party, userId);
+    if (!kayitOkunur(party.modules, e)) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    return e;
   }
 
-  private async assertCanWrite(scope: PartyScope, userId?: string): Promise<void> {
+  /** Kayda bağlı yazma. assertCanWrite gibi userId yoksa (sistem çağrısı) geçer. */
+  private async assertKayitYazilir(party: Party, userId?: string): Promise<void> {
     if (!userId) return;
-    const a = await this.access(scope, userId);
+    const e = await this.erisimler(party, userId);
+    if (!kayitYazilir(party.modules, e)) {
+      throw new ForbiddenException(
+        "Müşteri kaydını yalnızca organizasyon sahibi, departman yöneticisi veya modüle atanmış kişiler değiştirebilir"
+      );
+    }
+  }
+
+  /** Bağlantı alanlarını yetkisi olmayana göstermeden kartı döndürür. */
+  private gorunur(party: Party, e: Erisimler): Party {
+    if (!party.baglanti || baglantiAlaniOkunur(party.modules, e)) return party;
+    const { baglanti: _gizli, ...kalan } = party;
+    return kalan;
+  }
+
+  /** Bağlantılar'ın alanlarını yazar (yoksa açar). */
+  private async baglantiYaz(partyId: string, b: Partial<PartyBaglanti>): Promise<void> {
+    if (b.onem !== undefined && !(BAGLANTI_ONEMLERI as readonly string[]).includes(b.onem)) {
+      throw new BadRequestException("Geçersiz önem");
+    }
+    const tarih = (v: string | undefined) => {
+      if (v === undefined) return undefined;
+      if (!v) return null;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new BadRequestException("Tarih YYYY-AA-GG biçiminde olmalı");
+      return v;
+    };
+    const metin = (v: string | undefined, tavan: number) => (v === undefined ? undefined : v.trim().slice(0, tavan) || null);
+    const satir: Record<string, unknown> = { party_id: partyId, updated_at: new Date().toISOString() };
+    const ata = (k: string, v: unknown) => {
+      if (v !== undefined) satir[k] = v;
+    };
+    ata("onem", b.onem);
+    ata("tanisma_yeri", metin(b.tanismaYeri, 200));
+    ata("tanisma_tarihi", tarih(b.tanismaTarihi));
+    ata("sonraki_temas", tarih(b.sonrakiTemas));
+    ata("iliski_notu", metin(b.iliskiNotu, 5000));
+    const { error } = await this.supabase.client.from("party_baglanti").upsert(satir, { onConflict: "party_id" });
+    if (error) throw error;
+  }
+
+  /** Bilinmeyen rolü reddeder (eskiden istemciden geldiği gibi yazılıyordu). */
+  private rolleriDogrula(roles: unknown): void {
+    if (roles === undefined) return;
+    if (!Array.isArray(roles) || !roles.every(isPartyRole)) throw new BadRequestException("Geçersiz rol");
+  }
+
+  private async assertCanWrite(scope: PartyScope, userId?: string, modul: PartyModulKey = MODULE_KEY): Promise<void> {
+    if (!userId) return;
+    const a = await this.access(scope, userId, modul);
     if (!a.canWrite) {
       throw new ForbiddenException(
         "Müşteri kaydını yalnızca organizasyon sahibi, departman yöneticisi veya modüle atanmış kişiler değiştirebilir"
@@ -167,12 +280,26 @@ export class PartyService {
 
   // ============================================================ Okuma
 
-  async findAll(scope: PartyScope, opts: { role?: PartyRole; includeArchived?: boolean } = {}): Promise<Party[]> {
+  /**
+   * Kapsamdaki kartlar — VARSAYILAN olarak yalnızca Müşteriler defteri.
+   *
+   * Diğer modüllerin müşteri seçicileri (fatura, alacak-borç, ürün
+   * tedarikçisi) ve Lio buradan okuyor; süzülmeseydi Bağlantılar'daki rakip
+   * fatura seçicisinde çıkardı. `moduller` yalnızca o defterleri isteyen
+   * çağıranlar için (Bağlantılar listesi, yinelenen kontrolü).
+   */
+  async findAll(
+    scope: PartyScope,
+    opts: { role?: PartyRole; includeArchived?: boolean; moduller?: readonly PartyModulKey[]; baglanti?: boolean } = {}
+  ): Promise<Party[]> {
+    const moduller = opts.moduller ?? [MUSTERI_MODUL_KEY];
+    if (!moduller.length) return [];
     let query = this.supabase.client
       .from("party")
-      .select(this.OWNER_JOIN)
+      .select(opts.baglanti ? this.BAGLANTI_JOIN : this.OWNER_JOIN)
       // Birleştirilmiş kayıtlar listede görünmez; hedefleri zaten listede.
       .is("merged_into_id", null)
+      .overlaps("modules", moduller as string[])
       .order("display_name", { ascending: true });
 
     query = scope.jobId ? query.eq("job_id", scope.jobId) : query.eq("organization_id", scope.organizationId);
@@ -205,17 +332,30 @@ export class PartyService {
     };
   }
 
-  /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */
-  async viewOne(id: string, userId?: string): Promise<Party> {
-    const party = await this.findOne(id);
-    await this.assertCanRead(this.scopeOf(party), userId);
-    return party;
+  /**
+   * Bağlantı ve İlişkiler ekranının listesi. Müşteriler'den farkı: sahiplik
+   * süzmesi YOK — bu bir yönetim defteri, modülü okuyabilen herkes hepsini
+   * görür. Kartlar bağlantı alanlarıyla gelir (liste zaten bu modülün
+   * yetkisiyle açıldı).
+   */
+  async baglantilarim(scope: PartyScope, userId: string): Promise<BaglantiListesi> {
+    const a = await this.access(scope, userId, BAGLANTI_MODUL_KEY);
+    if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+    const baglantilar = await this.findAll(scope, { moduller: [BAGLANTI_MODUL_KEY], baglanti: true });
+    return { yonetici: a.canManageTeam, kartYazar: a.canWrite, baglantilar };
   }
 
-  async findOne(id: string): Promise<Party> {
+  /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */
+  async viewOne(id: string, userId?: string): Promise<Party> {
+    const party = await this.findOne(id, { baglanti: true });
+    const e = await this.assertKayitOkunur(party, userId);
+    return this.gorunur(party, e);
+  }
+
+  async findOne(id: string, opts: { baglanti?: boolean } = {}): Promise<Party> {
     const { data, error } = await this.supabase.client
       .from("party")
-      .select(this.OWNER_JOIN)
+      .select(opts.baglanti ? this.BAGLANTI_JOIN : this.OWNER_JOIN)
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -230,33 +370,59 @@ export class PartyService {
    * girmiş olabilirsiniz" uyarısı için kullanır; vergi numarası eşleşmesi
    * kaydı tamamen engeller.
    */
+  /** Kullanıcının bu kapsamda okuyabildiği defterler. */
+  private async okunanModuller(scope: PartyScope, userId: string): Promise<PartyModulKey[]> {
+    const okunan = await Promise.all(
+      PARTY_MODUL_KEYS.map(async (m) => ((await this.access(scope, userId, m)).canRead ? m : null))
+    );
+    return okunan.filter((m): m is PartyModulKey => m !== null);
+  }
+
+  /**
+   * Aday havuzu: kullanıcının OKUYABİLDİĞİ defterlerdeki kartlar. Göremediği
+   * defteri de taramak "bu adla bir kayıt var" uyarısıyla oradaki kartın
+   * varlığını ve adını sızdırırdı (satışçıya yönetimin rakip listesini).
+   * userId yoksa (sistem çağrısı: Shopify) bütün defterler.
+   *
+   * Vergi numarası tekilliği defterden bağımsız (party_org_tax_uniq): göremediği
+   * defterdeki kartla çakışan kayıt yine açılmaz, yalnızca adı söylenmez.
+   */
   async checkDuplicates(
     scope: PartyScope,
-    input: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string }
+    input: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string },
+    userId?: string
   ): Promise<PartyDuplicate[]> {
-    // Aday havuzu tüm kayıtlar: benzerlik karşılaştırması normalleştirme
-    // gerektirdiği için SQL'de değil bellekte yapılıyor. Organizasyon başına
-    // müşteri sayısı bu ölçekte sorun çıkarmaz; büyürse trigram indeksine geçilir.
-    const candidates = await this.findAll(scope);
+    const moduller = userId ? await this.okunanModuller(scope, userId) : PARTY_MODUL_KEYS;
+    // Benzerlik karşılaştırması normalleştirme gerektirdiği için SQL'de değil
+    // bellekte yapılıyor. Organizasyon başına kart sayısı bu ölçekte sorun
+    // çıkarmaz; büyürse trigram indeksine geçilir.
+    const candidates = await this.findAll(scope, { moduller });
     return findDuplicates(input, candidates);
   }
 
   // ============================================================ Yazma
 
+  /**
+   * Kart açar. `modul` kartın hangi defterde açıldığı: Bağlantılar'da açılan
+   * kart Müşteriler'de görünmez (bkz. migration 153).
+   */
   async create(
     scope: PartyScope,
     payload: Partial<Party> & { displayName?: string },
-    userId?: string
+    userId?: string,
+    modul: PartyModulKey = MODULE_KEY
   ): Promise<Party> {
     if (!payload.displayName?.trim()) throw new BadRequestException("Ad gerekli");
-    await this.assertCanWrite(scope, userId);
+    this.rolleriDogrula(payload.roles);
+    await this.assertCanWrite(scope, userId, modul);
+    const baglantiDefteri = modul === BAGLANTI_MODUL_KEY;
 
     // Çalışan açtığı müşteriyi kendisi üstlenir; başkasına atamak yöneticinin
     // kararı (bkz. kartDuzenlemeHatasi). Yönetici birini seçtiyse o kişi
     // şirketin ekibinde olmalı.
     let sorumlu = userId ?? null;
     if (payload.ownerUserId && userId && payload.ownerUserId !== userId) {
-      const a = await this.access(scope, userId);
+      const a = await this.access(scope, userId, modul);
       if (!a.canManageTeam) throw new ForbiddenException("Müşteriyi başka bir çalışana yalnızca yönetici atayabilir");
       await this.assertAtanabilir(scope, payload.ownerUserId);
       sorumlu = payload.ownerUserId;
@@ -264,11 +430,11 @@ export class PartyService {
       sorumlu = payload.ownerUserId;
     }
 
-    const duplicates = await this.checkDuplicates(scope, {
-      displayName: payload.displayName,
-      taxNumber: payload.taxNumber,
-      email: payload.email,
-    });
+    const duplicates = await this.checkDuplicates(
+      scope,
+      { displayName: payload.displayName, taxNumber: payload.taxNumber, email: payload.email },
+      userId
+    );
     const blocking = duplicates.find((d) => d.severity === "block");
     if (blocking) {
       throw new BadRequestException(
@@ -290,9 +456,12 @@ export class PartyService {
         phone: payload.phone ?? null,
         website: payload.website ?? null,
         address: payload.address ?? null,
-        roles: payload.roles?.length ? payload.roles : ["lead"],
+        // Bağlantılar'da varsayılan "potansiyel müşteri" değil: oradaki
+        // kişilerin çoğu müşteri adayı değil, tanışıklık.
+        roles: payload.roles?.length ? payload.roles : [baglantiDefteri ? "contact" : "lead"],
         status: payload.status ?? "active",
         source: payload.source ?? null,
+        modules: [modul],
         // Sorumlu belirtilmediyse kaydı açan kişi üstlenir; sahipsiz müşteri
         // kimsenin takip etmediği müşteridir.
         owner_user_id: sorumlu,
@@ -310,6 +479,12 @@ export class PartyService {
     }
 
     const party = mapParty(row);
+    if (baglantiDefteri) {
+      // Bağlantı alanları olmadan da kart işe yarar; satırı yine açıyoruz ki
+      // önem "orta" olarak sıralamaya girsin.
+      await this.baglantiYaz(party.id, payload.baglanti ?? {});
+      party.baglanti = (await this.findOne(party.id, { baglanti: true })).baglanti;
+    }
     await this.logActivity(party.id, "sistem", "Kayıt oluşturuldu", userId);
     return party;
   }
@@ -339,11 +514,15 @@ export class PartyService {
       ilkSatir?: number;
       sonSatir?: number;
       kaynak?: string;
+      modul?: PartyModulKey;
     } = {}
   ): Promise<MusteriIceAktarmaSonucu> {
-    await this.assertCanWrite(scope, userId);
-    const plan = planMusteriImport(sheet, opts);
-    const mevcut = await this.findAll(scope, { includeArchived: true });
+    const modul = opts.modul ?? MODULE_KEY;
+    await this.assertCanWrite(scope, userId, modul);
+    const plan = planMusteriImport(sheet, { ...opts, tur: modul === BAGLANTI_MODUL_KEY ? "baglanti" : "musteri" });
+    // Yalnızca okuyabildiği defterlerle karşılaştırılır: "zaten kayıtlı: X"
+    // satırı göremediği defterdeki kartın adını söylerdi (bkz. checkDuplicates).
+    const mevcut = await this.findAll(scope, { includeArchived: true, moduller: await this.okunanModuller(scope, userId) });
     const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
     const islenecek = yeni.slice(0, MAX_IMPORT_ROWS);
 
@@ -368,7 +547,7 @@ export class PartyService {
     };
     if (sonuc.onizleme || !islenecek.length) return sonuc;
 
-    const { olusan, hatalar } = await this.createMany(scope, islenecek, userId, opts.kaynak ?? "excel");
+    const { olusan, hatalar } = await this.createMany(scope, islenecek, userId, opts.kaynak ?? "excel", modul);
     return { ...sonuc, acilan: olusan.length, hatalar };
   }
 
@@ -389,9 +568,12 @@ export class PartyService {
     scope: PartyScope,
     rows: { satir: number; party: Partial<Party> & { displayName: string }; kisi?: Partial<PartyContact> }[],
     userId: string,
-    source: string
+    source: string,
+    modul: PartyModulKey = MODULE_KEY
   ): Promise<{ olusan: { satir: number; party: Party }[]; hatalar: { satir: number; sebep: string }[] }> {
-    await this.assertCanWrite(scope, userId);
+    await this.assertCanWrite(scope, userId, modul);
+    const baglantiDefteri = modul === BAGLANTI_MODUL_KEY;
+    for (const r of rows) this.rolleriDogrula(r.party.roles);
 
     const kayit = (p: Partial<Party> & { displayName: string }) => ({
       organization_id: scope.organizationId ?? null,
@@ -405,9 +587,10 @@ export class PartyService {
       phone: p.phone ?? null,
       website: p.website ?? null,
       address: p.address ?? null,
-      roles: p.roles?.length ? p.roles : ["lead"],
+      roles: p.roles?.length ? p.roles : [baglantiDefteri ? "contact" : "lead"],
       status: "active",
       source,
+      modules: [modul],
       // Bkz. create(): sahipsiz müşteri kimsenin takip etmediği müşteridir.
       owner_user_id: userId,
       data: {},
@@ -454,6 +637,24 @@ export class PartyService {
           occurred_at: new Date().toISOString(),
         }))
       );
+      if (baglantiDefteri) {
+        // Önem/tanışma yeri satırları da toplu; plan bunları zaten doğruladı
+        // (onem ONEMLER'den, tarih tarihiCoz'dan geçti).
+        const { error } = await this.supabase.client.from("party_baglanti").insert(
+          olusan.map((o) => {
+            const b = rows.find((r) => r.satir === o.satir)?.party.baglanti;
+            return {
+              party_id: o.party.id,
+              onem: b?.onem ?? "orta",
+              tanisma_yeri: b?.tanismaYeri ?? null,
+              tanisma_tarihi: b?.tanismaTarihi ?? null,
+              sonraki_temas: b?.sonrakiTemas ?? null,
+              iliski_notu: b?.iliskiNotu ?? null,
+            };
+          })
+        );
+        if (error) hatalar.push({ satir: 0, sebep: "bağlantı bilgileri (önem, tanışma yeri) eklenemedi" });
+      }
       const kisiler = olusan
         .map((o) => ({ o, kisi: rows.find((r) => r.satir === o.satir)?.kisi }))
         .filter((x) => x.kisi?.name?.trim())
@@ -475,21 +676,29 @@ export class PartyService {
   }
 
   async update(id: string, payload: Partial<Party>, userId?: string): Promise<Party> {
-    const existing = await this.findOne(id);
+    const existing = await this.findOne(id, { baglanti: true });
+    this.rolleriDogrula(payload.roles);
+    let e: Erisimler | null = null;
     if (userId) {
-      const a = await this.access(this.scopeOf(existing), userId);
+      e = await this.erisimler(existing, userId);
       // Boş dize "sorumluyu kaldır" demek; yalnızca yönetici yapabilir.
       const yeni = payload.ownerUserId === undefined ? undefined : payload.ownerUserId || null;
-      const hata = kartDuzenlemeHatasi(a, existing.ownerUserId, yeni, userId);
+      const hata = kartDuzenlemeKarari(existing.modules, e, existing.ownerUserId, yeni, userId);
       if (hata) throw new ForbiddenException(hata);
       if (yeni && yeni !== existing.ownerUserId) await this.assertAtanabilir(this.scopeOf(existing), yeni);
+      if (payload.baglanti !== undefined && !baglantiAlaniYazilir(existing.modules, e)) {
+        throw new ForbiddenException("Bağlantı bilgilerini yalnızca Bağlantı ve İlişkiler modülünde yazar olanlar değiştirebilir");
+      }
+    } else if (payload.baglanti !== undefined && !existing.modules.includes(BAGLANTI_MODUL_KEY)) {
+      throw new BadRequestException("Bu kart Bağlantı ve İlişkiler'de değil");
     }
 
     if (payload.taxNumber && payload.taxNumber !== existing.taxNumber) {
-      const duplicates = await this.checkDuplicates(this.scopeOf(existing), {
-        taxNumber: payload.taxNumber,
-        excludeId: id,
-      });
+      const duplicates = await this.checkDuplicates(
+        this.scopeOf(existing),
+        { taxNumber: payload.taxNumber, excludeId: id },
+        userId
+      );
       if (duplicates.some((d) => d.severity === "block")) {
         throw new BadRequestException("Bu vergi numarası başka bir kayıtta kullanılıyor");
       }
@@ -516,21 +725,20 @@ export class PartyService {
     assign("data", payload.data);
     assign("notes", payload.notes);
 
-    const { data: row, error } = await this.supabase.client
-      .from("party")
-      .update(patch)
-      .eq("id", id)
-      .select(this.OWNER_JOIN)
-      .maybeSingle();
-    if (error) throw error;
-    if (!row) throw new NotFoundException("Kayıt bulunamadı");
-    return mapParty(row);
+    const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
+    if (error) {
+      if ((error as any).code === "23505") throw new BadRequestException("Bu vergi numarası başka bir kayıtta kullanılıyor");
+      throw error;
+    }
+    if (payload.baglanti !== undefined) await this.baglantiYaz(id, payload.baglanti);
+    const guncel = await this.findOne(id, { baglanti: true });
+    return e ? this.gorunur(guncel, e) : guncel;
   }
 
   /** Arşivleme — silme değil. Geçmiş kayıtlardaki referanslar korunur. */
   async archive(id: string, userId?: string): Promise<void> {
     const existing = await this.findOne(id);
-    await this.assertCanWrite(this.scopeOf(existing), userId);
+    await this.assertKayitYazilir(existing, userId);
     const { error } = await this.supabase.client
       .from("party")
       .update({ archived_at: new Date().toISOString() })
@@ -540,7 +748,7 @@ export class PartyService {
 
   async restore(id: string, userId?: string): Promise<Party> {
     const existing = await this.findOne(id);
-    await this.assertCanWrite(this.scopeOf(existing), userId);
+    await this.assertKayitYazilir(existing, userId);
     const { data: row, error } = await this.supabase.client
       .from("party")
       .update({ archived_at: null })
@@ -557,8 +765,9 @@ export class PartyService {
    * `customer` rolü eklenir, `lead` silinmez.
    */
   async addRoleTo(id: string, role: PartyRole, userId?: string): Promise<Party> {
+    if (!isPartyRole(role)) throw new BadRequestException("Geçersiz rol");
     const existing = await this.findOne(id);
-    await this.assertCanWrite(this.scopeOf(existing), userId);
+    await this.assertKayitYazilir(existing, userId);
     const next = addRole(existing.roles, role);
     if (next.length === existing.roles.length) return existing;
 
@@ -583,11 +792,16 @@ export class PartyService {
     const target = await this.findOne(targetId);
     if (source.mergedIntoId) throw new BadRequestException("Bu kayıt zaten birleştirilmiş");
 
-    const scope = this.scopeOf(target);
     if (!userId) return target;
-    const a = await this.access(scope, userId);
-    if (!a.canManageTeam) {
+    // İki kartın da yöneticisi olmak gerekiyor: yalnızca hedefe bakılsaydı,
+    // Müşteriler yöneticisi Bağlantılar'daki bir kartı kendi defterine
+    // birleştirip ilişki notlarını oraya taşıyabilirdi.
+    const [eKaynak, eHedef] = await Promise.all([this.erisimler(source, userId), this.erisimler(target, userId)]);
+    if (!kayitYonetilir(source.modules, eKaynak) || !kayitYonetilir(target.modules, eHedef)) {
       throw new ForbiddenException("Birleştirmeyi yalnızca modül yöneticisi yapabilir");
+    }
+    if (source.organizationId !== target.organizationId || source.jobId !== target.jobId) {
+      throw new BadRequestException("Farklı kapsamlardaki kayıtlar birleştirilemez");
     }
 
     await this.supabase.client.from("party_contact").update({ party_id: targetId }).eq("party_id", sourceId);
@@ -596,10 +810,22 @@ export class PartyService {
     // Kaynağın rolleri hedefe aktarılır: birleşen kayıt "tedarikçi" ise hedef
     // de artık tedarikçidir.
     const mergedRoles = source.roles.reduce((acc, r) => addRole(acc, r), target.roles);
+    // Defterler de birleşir: Bağlantılar'daki kart müşteriyle birleşince
+    // hedef iki defterde de görünür. Kaynağın bağlantı alanları, hedefte
+    // yoksa ona geçer (varsa hedefinki kalır — kullanıcı onu tutmayı seçti).
+    const mergedModules = Array.from(new Set([...target.modules, ...source.modules]));
     await this.supabase.client
       .from("party")
-      .update({ roles: mergedRoles, updated_at: new Date().toISOString() })
+      .update({ roles: mergedRoles, modules: mergedModules, updated_at: new Date().toISOString() })
       .eq("id", targetId);
+    const { data: hedefBaglanti } = await this.supabase.client
+      .from("party_baglanti")
+      .select("party_id")
+      .eq("party_id", targetId)
+      .maybeSingle();
+    if (!hedefBaglanti) {
+      await this.supabase.client.from("party_baglanti").update({ party_id: targetId }).eq("party_id", sourceId);
+    }
 
     await this.supabase.client
       .from("party")
@@ -610,10 +836,116 @@ export class PartyService {
     return this.findOne(targetId);
   }
 
+  // ============================================================ Defterler
+
+  /** Modül bu kapsamda (şirketin bir departmanında ya da işte) açık mı. */
+  private async modulAcik(scope: PartyScope, modul: PartyModulKey): Promise<boolean> {
+    const q = scope.jobId
+      ? this.supabase.client.from("job_modules").select("id", { count: "exact", head: true }).eq("job_id", scope.jobId)
+      : this.supabase.client
+          .from("organization_modules")
+          .select("id", { count: "exact", head: true })
+          .eq("organization_id", scope.organizationId);
+    const { count, error } = await q.eq("module_key", modul);
+    if (error) throw error;
+    return (count ?? 0) > 0;
+  }
+
+  /**
+   * Kartı bir deftere daha alır: "Müşteri yap" (Bağlantılar → Müşteriler) ya
+   * da "Bağlantılara ekle". Kopya açılmaz, taşınmaz — aynı kart iki listede
+   * görünür. Kural: iki modülde de yazma yetkisi (bkz. deftereEklemeHatasi).
+   *
+   * Müşteri defterine giren karta `customer` rolü eklenir (rol eklenir,
+   * silinmez: "rakip" rozeti durur). Bağlantılar'a giren kartın bağlantı
+   * satırı açılır ki önem sıralamasına girsin. İlişki notu müşteri tarafına
+   * HİÇBİR ŞEKİLDE geçmez; ayrı tabloda kalır.
+   */
+  async deftereEkle(id: string, hedef: PartyModulKey, userId: string): Promise<Party> {
+    const existing = await this.findOne(id, { baglanti: true });
+    if (existing.archivedAt) throw new BadRequestException("Arşivdeki kart başka bir deftere eklenemez");
+    if (existing.modules.includes(hedef)) {
+      return this.gorunur(existing, await this.erisimler(existing, userId));
+    }
+    const scope = this.scopeOf(existing);
+    const [e, hedefErisim, acik] = await Promise.all([
+      this.erisimler(existing, userId),
+      this.access(scope, userId, hedef),
+      this.modulAcik(scope, hedef),
+    ]);
+    const hata = deftereEklemeHatasi(existing.modules, e, hedef, hedefErisim, acik);
+    if (hata) throw new ForbiddenException(hata);
+
+    const patch: Record<string, unknown> = {
+      modules: [...existing.modules, hedef],
+      updated_at: new Date().toISOString(),
+    };
+    if (hedef === MUSTERI_MODUL_KEY) patch.roles = addRole(existing.roles, "customer");
+    const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
+    if (error) throw error;
+    if (hedef === BAGLANTI_MODUL_KEY) await this.baglantiYaz(id, {});
+
+    await this.logActivity(
+      id,
+      "sistem",
+      hedef === MUSTERI_MODUL_KEY ? "Müşteriler'e eklendi" : "Bağlantı ve İlişkiler'e eklendi",
+      userId
+    );
+    const guncel = await this.findOne(id, { baglanti: true });
+    return this.gorunur(guncel, { ...e, [hedef]: hedefErisim });
+  }
+
+  // ============================================================ Görevler
+
+  /**
+   * Karttan açılmış takip görevleri. Görev departmanın listesinde yaşar
+   * (TaskFromRecordModal, source_record_id = kart); burada kullanıcının
+   * GÖREBİLDİĞİ görevler süzülüp özet döner. Kartı görmek, görevin durduğu
+   * departmanı görmek demek değil: Satış'tan açılan görev Yönetim'den bakana
+   * ancak Satış'ı görebiliyorsa gösterilir.
+   */
+  async kartGorevleri(partyId: string, userId: string): Promise<PartyGorevi[]> {
+    await this.assertKayitOkunur(await this.findOne(partyId), userId);
+    const { data, error } = await this.supabase.client
+      .from("tasks")
+      .select("id, title, status, deadline, department_id, project_id, archived_at, assigned_user:users!tasks_assigned_to_fkey(full_name)")
+      .eq("source_record_id", partyId)
+      .in("source_module_key", PARTY_MODUL_KEYS as string[])
+      .is("archived_at", null)
+      .order("deadline", { ascending: true })
+      .limit(50);
+    if (error) throw error;
+
+    const gorur = new Map<string, boolean>();
+    const bak = async (anahtar: string, fn: () => Promise<boolean>) => {
+      if (!gorur.has(anahtar)) gorur.set(anahtar, await fn().catch(() => false));
+      return gorur.get(anahtar)!;
+    };
+    const sonuc: PartyGorevi[] = [];
+    for (const r of (data ?? []) as any[]) {
+      const gorunur = r.department_id
+        ? await bak(`d:${r.department_id}`, async () => (await this.accessService.departmentAccess(r.department_id, userId)).canView)
+        : r.project_id
+          ? await bak(`p:${r.project_id}`, () => this.accessService.canViewProject(r.project_id, userId))
+          : false;
+      if (!gorunur) continue;
+      sonuc.push({
+        id: r.id,
+        title: r.title,
+        status: r.status,
+        deadline: r.deadline ?? undefined,
+        departmentId: r.department_id ?? undefined,
+        projectId: r.project_id ?? undefined,
+        assignedToName: r.assigned_user?.full_name ?? undefined,
+      });
+    }
+    return sonuc;
+  }
+
   // ============================================================ Kişiler
 
   async findContacts(partyId: string, userId?: string): Promise<PartyContact[]> {
-    await this.assertCanRead(this.scopeOf(await this.findOne(partyId)), userId);
+    await this.assertKayitOkunur(await this.findOne(partyId), userId);
     const { data, error } = await this.supabase.client
       .from("party_contact")
       .select("*")
@@ -628,7 +960,7 @@ export class PartyService {
   async addContact(partyId: string, payload: Partial<PartyContact>, userId?: string): Promise<PartyContact> {
     if (!payload.name?.trim()) throw new BadRequestException("Kişi adı gerekli");
     const party = await this.findOne(partyId);
-    await this.assertCanWrite(this.scopeOf(party), userId);
+    await this.assertKayitYazilir(party, userId);
 
     // Birincil muhatap tektir; yenisi işaretlenirse eskisi düşer.
     if (payload.isPrimary) {
@@ -664,7 +996,7 @@ export class PartyService {
       .maybeSingle();
     if (!contact) throw new NotFoundException("Kişi bulunamadı");
     const party = await this.findOne(contact.party_id);
-    await this.assertCanWrite(this.scopeOf(party), userId);
+    await this.assertKayitYazilir(party, userId);
 
     const { error } = await this.supabase.client
       .from("party_contact")
@@ -676,7 +1008,7 @@ export class PartyService {
   // ============================================================ Aktivite
 
   async findActivities(partyId: string, userId?: string): Promise<PartyActivity[]> {
-    await this.assertCanRead(this.scopeOf(await this.findOne(partyId)), userId);
+    await this.assertKayitOkunur(await this.findOne(partyId), userId);
     const { data, error } = await this.supabase.client
       .from("party_activity")
       .select("*, users!party_activity_user_id_fkey(full_name)")
@@ -690,7 +1022,7 @@ export class PartyService {
   async addActivity(partyId: string, payload: Partial<PartyActivity>, userId?: string): Promise<PartyActivity> {
     if (!payload.summary?.trim()) throw new BadRequestException("Açıklama gerekli");
     const party = await this.findOne(partyId);
-    await this.assertCanWrite(this.scopeOf(party), userId);
+    await this.assertKayitYazilir(party, userId);
     return this.logActivity(
       partyId,
       (payload.type as PartyActivityType) ?? "not",

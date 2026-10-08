@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { MusteriIceAktarmaSonucu } from "@projelio/shared";
+import { BAGLANTI_MODUL_KEY, type MusteriIceAktarmaSonucu } from "@projelio/shared";
 import { api } from "../api/client";
 import { partyApi } from "../api/party";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -11,6 +11,8 @@ interface Props {
   /** Müşteri listesinin yolu (ör. /organizations/:id/party); yükleme `${yol}/import`. */
   scopePath: string;
   departmentId?: string;
+  /** Bağlantı ve İlişkiler defterine yükler: ayrı şablon (önem, tanışma yeri…), kartlar müşteri listesine girmez. */
+  baglanti?: boolean;
   onClose: () => void;
   /** Kartlar açıldıktan sonra liste tazelensin. */
   onDone: () => void;
@@ -25,7 +27,7 @@ interface Props {
  * Dosya iki kez gönderiliyor çünkü sunucu iki istek arasında durum tutmuyor
  * (bkz. PartyController.iceAktar).
  */
-export default function MusteriExcelModal({ scopePath, departmentId, onClose, onDone }: Props) {
+export default function MusteriExcelModal({ scopePath, departmentId, baglanti = false, onClose, onDone }: Props) {
   const c = useThemeColors();
   const t = useT();
   const girdi = useRef<HTMLInputElement>(null);
@@ -44,6 +46,7 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
       fd.append("file", f);
       const q = new URLSearchParams({ onizleme: onizleme ? "1" : "0" });
       if (departmentId) q.set("departmentId", departmentId);
+      if (baglanti) q.set("modul", BAGLANTI_MODUL_KEY);
       const r = await api.uploadFile<MusteriIceAktarmaSonucu>(`${scopePath}/import?${q}`, fd);
       setSonuc(r);
       if (!onizleme) onDone();
@@ -64,7 +67,10 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
 
   const sablonuIndir = () => {
     setHata("");
-    partyApi.sablonuIndir(t("Projelio müşteri şablonu") + ".xlsx").catch(() => setHata(t("Şablon indirilemedi.")));
+    const ad = baglanti ? t("Projelio bağlantı şablonu") : t("Projelio müşteri şablonu");
+    partyApi
+      .sablonuIndir(ad + ".xlsx", baglanti ? BAGLANTI_MODUL_KEY : undefined)
+      .catch(() => setHata(t("Şablon indirilemedi.")));
   };
 
   const bitti = sonuc && !sonuc.onizleme;
@@ -99,14 +105,16 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
   );
 
   return (
-    <Modal title={t("Excel ile toplu müşteri ekle")} onClose={onClose}>
+    <Modal title={baglanti ? t("Excel ile toplu bağlantı ekle") : t("Excel ile toplu müşteri ekle")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {!bitti && (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {adim(1, t("Şablonu indirip doldurun"))}
               <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>
-                {t("Her satır bir müşteri. Yalnızca Ad zorunlu; sütunların açıklaması dosyanın ikinci sayfasında.")}
+                {baglanti
+                  ? t("Her satır bir bağlantı. Yalnızca Ad zorunlu; önem, nerede tanışıldığı ve sonraki temas da yazılabilir.")
+                  : t("Her satır bir müşteri. Yalnızca Ad zorunlu; sütunların açıklaması dosyanın ikinci sayfasında.")}
               </p>
               <button
                 onClick={sablonuIndir}
@@ -161,7 +169,9 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
                   {dosya ? dosya.name : t("Dosyayı buraya bırakın ya da seçmek için tıklayın")}
                 </span>
                 <span style={{ fontSize: 12, color: c.textSecondary }}>
-                  {t("Kendi müşteri listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.")}
+                  {baglanti
+                    ? t("Kendi listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.")
+                    : t("Kendi müşteri listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.")}
                 </span>
                 <input
                   ref={girdi}
@@ -198,13 +208,19 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
           >
             {bitti ? (
               <div style={{ fontSize: 15, fontWeight: 500, color: c.success }}>
-                {t("{n} müşteri kartı açıldı.", { n: sonuc.acilan ?? 0 })}
+                {baglanti
+                  ? t("{n} bağlantı kartı açıldı.", { n: sonuc.acilan ?? 0 })
+                  : t("{n} müşteri kartı açıldı.", { n: sonuc.acilan ?? 0 })}
               </div>
             ) : (
               <div style={{ fontSize: 15, fontWeight: 500 }}>
                 {sonuc.acilacak > 0
-                  ? t("{n} satır okundu, {m} müşteri eklenecek.", { n: sonuc.okunanSatir, m: sonuc.acilacak })
-                  : t("{n} satır okundu, eklenecek yeni müşteri yok.", { n: sonuc.okunanSatir })}
+                  ? baglanti
+                    ? t("{n} satır okundu, {m} bağlantı eklenecek.", { n: sonuc.okunanSatir, m: sonuc.acilacak })
+                    : t("{n} satır okundu, {m} müşteri eklenecek.", { n: sonuc.okunanSatir, m: sonuc.acilacak })
+                  : baglanti
+                    ? t("{n} satır okundu, eklenecek yeni bağlantı yok.", { n: sonuc.okunanSatir })
+                    : t("{n} satır okundu, eklenecek yeni müşteri yok.", { n: sonuc.okunanSatir })}
               </div>
             )}
 
@@ -287,7 +303,13 @@ export default function MusteriExcelModal({ scopePath, departmentId, onClose, on
               opacity: !dosya || !sonuc || sonuc.acilacak === 0 ? 0.5 : 1,
             }}
           >
-            {sonuc && sonuc.acilacak > 0 ? t("{n} müşteriyi ekle", { n: sonuc.acilacak }) : t("Müşterileri ekle")}
+            {sonuc && sonuc.acilacak > 0
+              ? baglanti
+                ? t("{n} bağlantıyı ekle", { n: sonuc.acilacak })
+                : t("{n} müşteriyi ekle", { n: sonuc.acilacak })
+              : baglanti
+                ? t("Bağlantıları ekle")
+                : t("Müşterileri ekle")}
           </button>
         )}
       </div>

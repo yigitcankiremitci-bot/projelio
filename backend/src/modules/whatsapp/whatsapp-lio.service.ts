@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import type { WhatsappMessage, WhatsappThread } from "@projelio/shared";
+import { MUSTERI_MODUL_KEY } from "@projelio/shared";
 import { getWebAppUrl } from "../../common/config/env";
 import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
@@ -137,6 +138,9 @@ export class WhatsappLioService {
       .select("id, display_name, phone, organization_id, job_id, roles, party_contact(name, phone, is_primary, archived_at)")
       .is("archived_at", null)
       .is("merged_into_id", null)
+      // Yalnızca müşteri defteri. Buradaki yetki "organizasyonu görebiliyor
+      // mu"; Bağlantılar'daki kartlar (rakipler) o yetkiyle açılmamalı.
+      .contains("modules", [MUSTERI_MODUL_KEY])
       .limit(40);
     req = phone ? req.or(`phone.ilike.%${phone.slice(-9)}%,display_name.ilike.%${q}%`) : req.ilike("display_name", `%${q}%`);
     const { data } = await req;

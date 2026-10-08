@@ -153,7 +153,7 @@ function ModuleSurfaceContent({
 
   if (isEntityModule(moduleKey)) {
     // Ortak varlığa yazar: iki departman AYNI kayıtları görür, yalnızca görünüm
-    // profili değişir.
+    // profili değişir. Müşteriler ve Bağlantılar aynı tablonun iki defteri.
     return (
       <CustomersPanel
         organizationId={organizationId}
@@ -161,6 +161,7 @@ function ModuleSurfaceContent({
         departmentKey={departmentKey}
         jobId={jobId}
         canWrite={canWrite}
+        moduleKey={moduleKey}
       />
     );
   }

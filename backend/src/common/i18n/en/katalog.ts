@@ -223,6 +223,9 @@ export const katalog: TranslationDict = {
   "Şikayet ve Öneri": "Complaints & suggestions",
   "Teknik Destek": "Technical support",
   "Müşteri": "Customers",
+  "Bağlantı ve İlişkiler": "Contacts & Relationships",
+  "Müşteri olmayan dış bağlantıları tek yerde toplar: fuarda tanışılan kişiler, rakipler, olası işbirlikçiler. Önem sırası, nerede tanışıldığı ve bir sonraki temas tarihiyle takip edilir; müşteriye dönüşen kart Müşteriler'e taşınmadan geçer.":
+    "Keeps your non-customer contacts in one place: people you met at fairs, competitors, potential collaborators. Track them by priority, where you met and the next follow-up date; a contact who becomes a customer moves to Customers without being copied.",
   "Kimlik ve Yön": "Identity & Direction",
   "Marka Kimliği": "Brand Identity",
   "Hesaplar": "Accounts",

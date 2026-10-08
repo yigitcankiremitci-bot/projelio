@@ -583,6 +583,7 @@ const BY_KEY: Record<string, Draw> = {
   spd_musteri_modulu: addressBook,
   mid_musteri_modulu: addressBook,
   crm_musteri: addressBook,
+  baglantilar: rings,
 
   // Operasyon / üretim
   oud_tedarik: cart,

@@ -62,7 +62,7 @@ import { musteriSayfasiniSec } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole } from "../party/party-dedup";
 import { AccessService } from "../../common/access/access.service";
-import { isReferenceValue, type Party, type PartyAddress, type PartyRole } from "@projelio/shared";
+import { isReferenceValue, MUSTERI_MODUL_KEY, type Party, type PartyAddress, type PartyRole } from "@projelio/shared";
 import { AiExportsService } from "./ai-exports.service";
 import { type ExportFormat, type ExportTable } from "./ai-export-builder";
 import {
@@ -5368,6 +5368,9 @@ export class AiAssistantService {
 
       case "update_customer": {
         const existing = await this.partyService.findOne(String(input.partyId ?? ""));
+        // Müşteri araçları müşteri defterine bakar; Bağlantılar'daki karta bu
+        // yoldan dokunulmaz (model kimliği başka bir yerden okumuş olabilir).
+        if (!existing.modules.includes(MUSTERI_MODUL_KEY)) throw new BadRequestException("Bu kart Müşteriler'de değil");
         const patch: Partial<Party> = { ...customerFields(input) };
         if (input.displayName !== undefined) patch.displayName = String(input.displayName);
         if (input.status !== undefined) patch.status = input.status;

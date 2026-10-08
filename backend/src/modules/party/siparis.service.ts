@@ -9,6 +9,7 @@ import {
   type MusteriTahsilati,
   type OdemeYontemi,
   type Party,
+  MUSTERI_MODUL_KEY,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { paraBirimiDogrula, requireAmount, requireOneOf } from "../../common/validation/input";
@@ -442,6 +443,10 @@ export class SiparisService {
   // ============================================================ Yardımcılar
 
   private async yetkiIste(party: Party, userId: string, ne: "okur" | "yazar"): Promise<void> {
+    // Sipariş müşteri defterinin işi. Yalnızca Bağlantılar'da duran karta
+    // sipariş açılırsa kart satış ekibinin raporuna sessizce girerdi; önce
+    // "Müşteri yap" ile defterine alınmalı.
+    if (!party.modules.includes(MUSTERI_MODUL_KEY)) throw new ForbiddenException("Bu kart Müşteriler'de değil");
     const a = await this.partyService.access(this.partyService.scopeOf(party), userId);
     const y = musteriYetkisi(a, party.ownerUserId, userId);
     if (ne === "okur" ? !y.okur : !y.siparisYazar) {

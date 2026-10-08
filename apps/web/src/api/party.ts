@@ -1,4 +1,12 @@
-import type { MusteriListesi, MusteriSiparisi, MusteriSiparisListesi, OdemeYontemi } from "@projelio/shared";
+import type {
+  BaglantiListesi,
+  MusteriListesi,
+  MusteriSiparisi,
+  MusteriSiparisListesi,
+  OdemeYontemi,
+  Party,
+  PartyGorevi,
+} from "@projelio/shared";
 import { api, API_URL } from "./client";
 import { TOKEN_KEY } from "../lib/session";
 import { etkinDil } from "../lib/i18n/depo";
@@ -12,9 +20,11 @@ export const partyApi = {
    * indirmesiyle aynı yol. Şablonun İÇİ de arayüzün dilinde üretiliyor; bu
    * istek client.ts'ten geçmediği için dil başlığı yok, ?dil= ile gidiyor.
    */
-  sablonuIndir: async (dosyaAdi: string): Promise<void> => {
+  sablonuIndir: async (dosyaAdi: string, modul?: string): Promise<void> => {
     const token = localStorage.getItem(TOKEN_KEY);
-    const res = await fetch(`${API_URL}/party-template?dil=${etkinDil()}`, {
+    const q = new URLSearchParams({ dil: etkinDil() });
+    if (modul) q.set("modul", modul);
+    const res = await fetch(`${API_URL}/party-template?${q}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) throw new Error("Şablon indirilemedi.");
@@ -33,6 +43,18 @@ export const partyApi = {
   musterilerim: (scopePath: string, departmentId?: string) =>
     api.get<MusteriListesi>(
       `${scopePath}/musterilerim${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`
+    ),
+
+  /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
+  deftereEkle: (partyId: string, modul: string) => api.post<Party>(`/party/${partyId}/defter`, { modul }),
+
+  /** Karttan açılmış takip görevleri. */
+  gorevler: (partyId: string) => api.get<PartyGorevi[]>(`/party/${partyId}/gorevler`),
+
+  /** Bağlantı ve İlişkiler ekranı: modülü okuyan herkes hepsini, bağlantı alanlarıyla alır. */
+  baglantilarim: (kapsamYolu: string, departmentId?: string) =>
+    api.get<BaglantiListesi>(
+      `${kapsamYolu}/baglantilar${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`
     ),
 };
 

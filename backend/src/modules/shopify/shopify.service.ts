@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
-import { tahsilEdilen, type Party, type ShopifyMagazaOzeti, type ShopifyOzeti } from "@projelio/shared";
+import { MUSTERI_MODUL_KEY, tahsilEdilen, type Party, type ShopifyMagazaOzeti, type ShopifyOzeti } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { AccessService } from "../../common/access/access.service";
 import { createTokenCrypto } from "../../common/crypto/token-crypto";
@@ -718,6 +718,10 @@ export class ShopifyService {
         .select("id, data")
         .eq("organization_id", magaza.organization_id)
         .is("merged_into_id", null)
+        // Yalnızca müşteri defteri: Bağlantılar'daki bir kartla e-posta
+        // eşleşip sipariş oraya düşseydi Müşteriler'de görünmeyen bir kartın
+        // tahsilatı kasaya yazılırdı (migration 153).
+        .contains("modules", [MUSTERI_MODUL_KEY])
         // ilike joker karakterleri kaçırılıyor: e-postadaki "_" tek karakter
         // eşleşmesine dönüp başka birinin kartını bulmasın.
         .ilike("email", k.email.replace(/[\\%_]/g, (c) => `\\${c}`))

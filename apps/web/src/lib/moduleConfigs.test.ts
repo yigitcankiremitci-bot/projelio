@@ -16,8 +16,9 @@ import type { ModuleFieldConfig, ModuleRecordConfig } from "./moduleConfigs";
 // 046'da iki müşteri anahtarı (mid_musteri_modulu, spd_musteri_modulu) tek
 // crm_musteri'de birleşti; crm_musteri ortak `party` varlığına yazdığı için
 // module_records tanımı YOKTUR, kendi paneli vardır.
+// baglantilar (153) aynı party tablosunun ikinci defteri; o da kayıt tanımsız.
 const CATALOG_KEYS = [
-  "crm_musteri",
+  "crm_musteri", "baglantilar",
   "bt_ag_guvenlik", "bt_donanim", "bt_yazilim",
   "fm_alacak_borc", "fm_analiz_rapor", "fm_butce_hazirlama", "fm_fatura", "fm_finansal_planlama",
   "fm_nakit_akis", "fm_risk_yonetimi", "fm_sermaye_yatirim_takip", "fm_vergi_takip",
@@ -97,9 +98,9 @@ describe("katalog kapsama", () => {
     assert.deepEqual(beklenmeyen, [], "sessizce generic fallback'e düşen modül var");
   });
 
-  test("36 kayıt tanımı + 1 varlık modülü tanımlı", () => {
+  test("36 kayıt tanımı + 2 varlık modülü tanımlı", () => {
     assert.equal(entries.length, 36);
-    assert.equal(ENTITY_MODULE_KEYS.length, 1);
+    assert.equal(ENTITY_MODULE_KEYS.length, 2);
   });
 
   test("varlık modülleri katalogda var ama kayıt tanımı YOK", () => {

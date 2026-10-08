@@ -1,8 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DepartmentMember, JobMember, Party, PartyActivity, PartyContact, PartyDuplicate, PartyRole } from "@projelio/shared";
+import {
+  BAGLANTI_MODUL_KEY,
+  BAGLANTI_ONEMLERI,
+  MUSTERI_MODUL_KEY,
+  type BaglantiOnem,
+  type DepartmentMember,
+  type ModuleAccess,
+  type JobMember,
+  type Party,
+  type PartyActivity,
+  type PartyBaglanti,
+  type PartyContact,
+  type PartyDuplicate,
+  type PartyGorevi,
+  type PartyRole,
+} from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { ALL_ROLES, ROLE_COLORS, ROLE_LABELS, STATUS_LABELS, profileFor } from "../lib/partyProfiles";
+import {
+  ALL_ROLES,
+  BAGLANTI_PROFILE,
+  BAGLANTI_ROLES,
+  ONEM_LABELS,
+  ROLE_COLORS,
+  ROLE_LABELS,
+  profileFor,
+} from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { IconTrash, IconUpload, IconX } from "./icons";
@@ -14,6 +37,7 @@ import { partyApi } from "../api/party";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
+import TaskFromRecordModal from "./TaskFromRecordModal";
 
 interface Props {
   organizationId?: string;
@@ -22,6 +46,8 @@ interface Props {
   departmentKey?: string;
   jobId?: string;
   canWrite?: boolean;
+  /** crm_musteri ya da baglantilar — aynı panel, iki defter (migration 153). */
+  moduleKey?: string;
 }
 
 type FormMode = { kind: "create" } | { kind: "edit"; party: Party } | null;
@@ -39,7 +65,39 @@ function emptyForm() {
     notes: "",
     // Boş = kaydı açan üstlenir (sunucu varsayılanı).
     ownerUserId: "",
+    // Yalnızca Bağlantılar.
+    onem: "orta" as BaglantiOnem,
+    tanismaYeri: "",
+    tanismaTarihi: "",
+    sonrakiTemas: "",
+    iliskiNotu: "",
   };
+}
+
+const ONEM_SIRASI: Record<BaglantiOnem, number> = { yuksek: 0, orta: 1, dusuk: 2 };
+
+/** Yerel takvimde bugün, YYYY-MM-DD (toISOString UTC'ye kayar, gece yarısı yanlış gün verir). */
+function bugunYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Fuar dönüşü kartlar art arda girilir; tanışma yeri her seferinde aynıdır.
+// Son girilen hatırlanır — yalnızca bu tarayıcıda bir kolaylık, kaybolsa da olur.
+const SON_TANISMA_YERI = "projelio_son_tanisma_yeri";
+function sonTanismaYeri(): string {
+  try {
+    return localStorage.getItem(SON_TANISMA_YERI) ?? "";
+  } catch {
+    return "";
+  }
+}
+function sonTanismaYeriniYaz(deger: string) {
+  try {
+    if (deger.trim()) localStorage.setItem(SON_TANISMA_YERI, deger.trim());
+  } catch {
+    /* gizli pencere: hatırlamasa da olur */
+  }
 }
 
 /**
@@ -50,6 +108,10 @@ function emptyForm() {
  * Önceden iki ayrı modül anahtarı iki ayrı kayıt tutuyordu ve aynı firma
  * iki kere giriliyordu.
  * Bkz. database/migrations/046_party_and_customer_merge.sql
+ *
+ * Bağlantı ve İlişkiler (baglantilar) da bu paneli kullanır: aynı tablo,
+ * ayrı defter (migration 153). Farkları: sahiplik süzmesi yok, sipariş ve
+ * tahsilat yok, kartta önem / tanışma yeri / sonraki temas / ilişki notu var.
  */
 export default function CustomersPanel({
   organizationId,
@@ -57,10 +119,13 @@ export default function CustomersPanel({
   departmentKey,
   jobId,
   canWrite = true,
+  moduleKey,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
-  const profile = profileFor(departmentKey);
+  const baglantiModu = moduleKey === BAGLANTI_MODUL_KEY;
+  const profile = baglantiModu ? BAGLANTI_PROFILE : profileFor(departmentKey);
+  const rolSecenekleri = baglantiModu ? BAGLANTI_ROLES : ALL_ROLES;
 
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +136,7 @@ export default function CustomersPanel({
   const [duplicates, setDuplicates] = useState<PartyDuplicate[]>([]);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<PartyRole | "">(profile.defaultRole ?? "");
+  const [onemFiltre, setOnemFiltre] = useState<BaglantiOnem | "">("");
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
   const { pushUndo } = useUndo();
   const { user } = useCurrentUser();
@@ -90,17 +156,19 @@ export default function CustomersPanel({
   // kaydırma başa dönüyordu — sayfa kendi kendine yenileniyor gibi görünüyordu.
   const load = (ilk = false) => {
     if (ilk === true) setLoading(true);
-    partyApi
-      .musterilerim(scopePath, jobId ? undefined : departmentId)
+    const istek = baglantiModu
+      ? partyApi.baglantilarim(kapsamYolu, jobId ? undefined : departmentId).then((r) => ({ kartlar: r.baglantilar, yonetici: r.yonetici }))
+      : partyApi.musterilerim(scopePath, jobId ? undefined : departmentId).then((r) => ({ kartlar: r.musteriler, yonetici: r.yonetici }));
+    istek
       .then((r) => {
-        setParties(r.musteriler);
+        setParties(r.kartlar);
         setYonetici(r.yonetici);
       })
       .catch(() => setParties([]))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => load(true), [scopePath, departmentId]);
+  useEffect(() => load(true), [scopePath, departmentId, baglantiModu]);
 
   // Atanabilecek kişiler: departmanın ya da işin ekibi. Şirket düzeyinde
   // (departmansız) açılan panelde ekip listesi yok; orada yönetici yalnızca
@@ -132,6 +200,17 @@ export default function CustomersPanel({
       .sort((a, b) => a.ad.localeCompare(b.ad, "tr"));
   }, [ekip, parties, user?.id]);
 
+  // Müşteriler'de "Bağlantılara ekle" yalnızca orada da yazabilene gösterilir;
+  // karar yine sunucuda (bkz. backend baglanti-erisim.ts deftereEklemeHatasi).
+  const [baglantiYazar, setBaglantiYazar] = useState(false);
+  useEffect(() => {
+    if (baglantiModu || !canWrite) return setBaglantiYazar(false);
+    api
+      .get<ModuleAccess>(`${kapsamYolu}/module-access?moduleKey=${BAGLANTI_MODUL_KEY}`)
+      .then((a) => setBaglantiYazar(a.canWrite))
+      .catch(() => setBaglantiYazar(false));
+  }, [kapsamYolu, baglantiModu, canWrite]);
+
   // Excel şablonu Lio'ya verilince kartlar Lio'nun tarafında açılıyor; kullanıcı
   // bu ekrandaysa listeyi kendisi tazelemek zorunda kalmasın.
   useEffect(() => onLioActivity(() => load()), [scopePath]);
@@ -142,36 +221,65 @@ export default function CustomersPanel({
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
 
+  const bugun = bugunYmd();
+
   const visible = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
-    return parties.filter((p) => {
+    const suzulen = parties.filter((p) => {
       if (roleFilter && !p.roles.includes(roleFilter)) return false;
+      if (onemFiltre && p.baglanti?.onem !== onemFiltre) return false;
       if (sorumluFiltre && (sorumluFiltre === "-" ? !!p.ownerUserId : p.ownerUserId !== sorumluFiltre)) return false;
       if (!q) return true;
-      return [p.displayName, p.legalName, p.email, p.phone, p.taxNumber]
+      return [p.displayName, p.legalName, p.email, p.phone, p.taxNumber, p.baglanti?.tanismaYeri]
         .filter(Boolean)
         .join(" ")
         .toLocaleLowerCase("tr")
         .includes(q);
     });
-  }, [parties, search, roleFilter, sorumluFiltre]);
+    if (!baglantiModu) return suzulen;
+    // Önce önem, sonra en yakın temas tarihi (tarihsizler sona), sonra ad:
+    // fuar dönüşü "kime önce dönmeliyim" sorusunun cevabı listenin başı olsun.
+    return [...suzulen].sort((a, b) => {
+      const o = ONEM_SIRASI[a.baglanti?.onem ?? "orta"] - ONEM_SIRASI[b.baglanti?.onem ?? "orta"];
+      if (o) return o;
+      const ta = a.baglanti?.sonrakiTemas ?? "9999";
+      const tb = b.baglanti?.sonrakiTemas ?? "9999";
+      if (ta !== tb) return ta < tb ? -1 : 1;
+      return a.displayName.localeCompare(b.displayName, "tr");
+    });
+  }, [parties, search, roleFilter, onemFiltre, sorumluFiltre, baglantiModu]);
 
-  const hasActiveFilter = search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "") || sorumluFiltre !== "";
+  const hasActiveFilter =
+    search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "") || sorumluFiltre !== "" || onemFiltre !== "";
   const showToolbar = parties.length > TOOLBAR_THRESHOLD || hasActiveFilter;
 
   const stats = useMemo(
-    () => [
-      { label: t("Toplam"), value: String(parties.length) },
-      { label: t("Müşteri"), value: String(parties.filter((p) => p.roles.includes("customer")).length) },
-      { label: t("Potansiyel"), value: String(parties.filter((p) => p.roles.includes("lead")).length) },
-    ],
-    [parties]
+    () =>
+      baglantiModu
+        ? [
+            { label: t("Toplam"), value: String(parties.length) },
+            { label: t("Yüksek önem"), value: String(parties.filter((p) => p.baglanti?.onem === "yuksek").length) },
+            {
+              label: t("Temas zamanı gelen"),
+              value: String(parties.filter((p) => p.baglanti?.sonrakiTemas && p.baglanti.sonrakiTemas <= bugun).length),
+            },
+          ]
+        : [
+            { label: t("Toplam"), value: String(parties.length) },
+            { label: t("Müşteri"), value: String(parties.filter((p) => p.roles.includes("customer")).length) },
+            { label: t("Potansiyel"), value: String(parties.filter((p) => p.roles.includes("lead")).length) },
+          ],
+    [parties, baglantiModu, bugun]
   );
 
   // ============================================================ Eylemler
 
   const openCreate = () => {
-    setForm({ ...emptyForm(), role: profile.defaultRole ?? "lead" });
+    setForm({
+      ...emptyForm(),
+      role: profile.defaultRole ?? (baglantiModu ? "contact" : "lead"),
+      tanismaYeri: baglantiModu ? sonTanismaYeri() : "",
+    });
     setDuplicates([]);
     setError("");
     setFormMode({ kind: "create" });
@@ -187,6 +295,11 @@ export default function CustomersPanel({
       taxNumber: p.taxNumber ?? "",
       notes: p.notes ?? "",
       ownerUserId: p.ownerUserId ?? "",
+      onem: p.baglanti?.onem ?? "orta",
+      tanismaYeri: p.baglanti?.tanismaYeri ?? "",
+      tanismaTarihi: p.baglanti?.tanismaTarihi ?? "",
+      sonrakiTemas: p.baglanti?.sonrakiTemas ?? "",
+      iliskiNotu: p.baglanti?.iliskiNotu ?? "",
     });
     setDuplicates([]);
     setError("");
@@ -203,8 +316,8 @@ export default function CustomersPanel({
   // modal içinde (bkz. Modal.tsx) "+" ulaşılamadığı için orada geri gelir.
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
-    canWrite && fabAvailable ? { label: t("Müşteri ekle"), onClick: openCreate } : null,
-    [canWrite, fabAvailable, organizationId, departmentId, jobId],
+    canWrite && fabAvailable ? { label: baglantiModu ? t("Bağlantı ekle") : t("Müşteri ekle"), onClick: openCreate } : null,
+    [canWrite, fabAvailable, organizationId, departmentId, jobId, baglantiModu],
     FAB_PRIORITY.panel
   );
 
@@ -220,6 +333,7 @@ export default function CustomersPanel({
         taxNumber: form.taxNumber || undefined,
         email: form.email || undefined,
         excludeId: formMode?.kind === "edit" ? formMode.party.id : undefined,
+        ...(departmentId && !jobId ? { departmentId } : {}),
       });
       setDuplicates(found);
     } catch {
@@ -242,7 +356,21 @@ export default function CustomersPanel({
         email: form.email || undefined,
         phone: form.phone || undefined,
         taxNumber: form.taxNumber || undefined,
-        notes: form.notes || undefined,
+        // Bağlantılar'da genel not alanı yok: kart müşteriye dönüşünce satış
+        // ekibi `notes`'u okur. Not ilişki notuna yazılır (yalnızca bu modül).
+        ...(baglantiModu ? {} : { notes: form.notes || undefined }),
+        ...(baglantiModu
+          ? {
+              modul: BAGLANTI_MODUL_KEY,
+              baglanti: {
+                onem: form.onem,
+                tanismaYeri: form.tanismaYeri,
+                tanismaTarihi: form.tanismaTarihi,
+                sonrakiTemas: form.sonrakiTemas,
+                iliskiNotu: form.iliskiNotu,
+              } satisfies Partial<PartyBaglanti>,
+            }
+          : {}),
         // Yalnızca yönetici gönderir: çalışanın alanı yok, sunucu da başkasına
         // atamayı reddediyor. Boş = oluştururken "ben", düzenlerken dokunma.
         ...(yonetici && form.ownerUserId ? { ownerUserId: form.ownerUserId } : {}),
@@ -256,6 +384,7 @@ export default function CustomersPanel({
       } else {
         await api.post(scopePath, payload);
       }
+      if (baglantiModu) sonTanismaYeriniYaz(form.tanismaYeri);
       closeForm();
       load();
     } catch (err) {
@@ -270,7 +399,7 @@ export default function CustomersPanel({
     if (openPartyId === p.id) setOpenPartyId(null);
     load();
     pushUndo({
-      label: t("Müşteri arşivleme"),
+      label: baglantiModu ? t("Bağlantı arşivleme") : t("Müşteri arşivleme"),
       run: async () => {
         await api.patch(`/party/${p.id}/restore`, {});
         load();
@@ -286,8 +415,10 @@ export default function CustomersPanel({
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Müşteriler")}</h5>
-          {profile.key !== "base" && (
+          <h5 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>
+            {baglantiModu ? t("Bağlantı ve İlişkiler") : t("Müşteriler")}
+          </h5>
+          {profile.key !== "base" && !baglantiModu && (
             <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
           )}
         </div>
@@ -299,13 +430,15 @@ export default function CustomersPanel({
               onClick={() => (formMode ? closeForm() : openCreate())}
               style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              {formMode ? t("Vazgeç") : t("+ Müşteri ekle")}
+              {formMode ? t("Vazgeç") : baglantiModu ? t("+ Bağlantı ekle") : t("+ Müşteri ekle")}
             </button>
           )
         )}
       </div>
 
-      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor. */}
+      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
+          Bağlantılar'da sipariş yok; sekme de yok. */}
+      {!baglantiModu && (
       <div style={{ display: "flex", gap: 6 }}>
         {(["musteriler", "tahsilat"] as const).map((g) => (
           <button
@@ -325,15 +458,17 @@ export default function CustomersPanel({
           </button>
         ))}
       </div>
+      )}
 
-      {gorunum === "tahsilat" ? (
+      {gorunum === "tahsilat" && !baglantiModu ? (
         <TahsilatTakibi kapsamYolu={kapsamYolu} departmentId={jobId ? undefined : departmentId} />
       ) : (
       <>
-      {!loading && !yonetici && parties.length > 0 && (
+      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
         <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
       )}
 
+      {/* Bağlantılar'ın şablonu ayrı: önem, tanışma yeri, sonraki temas, ilişki notu. */}
       {canWrite && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
           <button
@@ -355,7 +490,9 @@ export default function CustomersPanel({
             <IconUpload size={16} /> {t("Excel ile toplu ekle")}
           </button>
           <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
-            {t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
+            {baglantiModu
+              ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
+              : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
           </span>
         </div>
       )}
@@ -364,6 +501,7 @@ export default function CustomersPanel({
         <MusteriExcelModal
           scopePath={scopePath}
           departmentId={departmentId}
+          baglanti={baglantiModu}
           onClose={() => setExcelAcik(false)}
           onDone={() => load()}
         />
@@ -406,12 +544,27 @@ export default function CustomersPanel({
             style={{ fontSize: 13, padding: "5px 6px" }}
           >
             <option value="">{t("Rol: tümü")}</option>
-            {ALL_ROLES.map((r) => (
+            {rolSecenekleri.map((r) => (
               <option key={r} value={r}>
                 {t(ROLE_LABELS[r], { ctx: "rol" })}
               </option>
             ))}
           </select>
+          {baglantiModu && (
+            <select
+              value={onemFiltre}
+              onChange={(e) => setOnemFiltre(e.target.value as BaglantiOnem | "")}
+              style={{ fontSize: 13, padding: "5px 6px" }}
+              aria-label={t("Önem")}
+            >
+              <option value="">{t("Önem: tümü")}</option>
+              {BAGLANTI_ONEMLERI.map((o) => (
+                <option key={o} value={o}>
+                  {t(ONEM_LABELS[o])}
+                </option>
+              ))}
+            </select>
+          )}
           {yonetici && (
             <select
               value={sorumluFiltre}
@@ -434,6 +587,7 @@ export default function CustomersPanel({
                 setSearch("");
                 setRoleFilter(profile.defaultRole ?? "");
                 setSorumluFiltre("");
+                setOnemFiltre("");
               }}
               style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
@@ -454,7 +608,7 @@ export default function CustomersPanel({
               value={form.displayName}
               onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
               onBlur={checkDuplicates}
-              placeholder={t("Örn. ABC Yazılım Ltd. Şti.")}
+              placeholder={baglantiModu ? t("Örn. Ayşe Yılmaz ya da ABC Ajans") : t("Örn. ABC Yazılım Ltd. Şti.")}
               style={{ width: "100%" }}
             />
           </Field>
@@ -476,14 +630,59 @@ export default function CustomersPanel({
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as PartyRole }))}
                 style={{ width: "100%" }}
               >
-                {ALL_ROLES.map((r) => (
+                {rolSecenekleri.map((r) => (
                   <option key={r} value={r}>
                     {t(ROLE_LABELS[r], { ctx: "rol" })}
                   </option>
                 ))}
               </select>
             </Field>
+            {baglantiModu && (
+              <Field label={t("Önem")} style={{ flex: 1 }}>
+                <select
+                  value={form.onem}
+                  onChange={(e) => setForm((f) => ({ ...f, onem: e.target.value as BaglantiOnem }))}
+                  style={{ width: "100%" }}
+                >
+                  {BAGLANTI_ONEMLERI.map((o) => (
+                    <option key={o} value={o}>
+                      {t(ONEM_LABELS[o])}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
+
+          {baglantiModu && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Field label={t("Nerede tanışıldı")} style={{ flex: "2 1 180px" }}>
+                <input
+                  value={form.tanismaYeri}
+                  onChange={(e) => setForm((f) => ({ ...f, tanismaYeri: e.target.value }))}
+                  placeholder={t("Örn. İstanbul Fuarı 2026")}
+                  maxLength={200}
+                  style={{ width: "100%" }}
+                />
+              </Field>
+              <Field label={t("Tanışma tarihi")} style={{ flex: "1 1 130px" }}>
+                <input
+                  type="date"
+                  value={form.tanismaTarihi}
+                  onChange={(e) => setForm((f) => ({ ...f, tanismaTarihi: e.target.value }))}
+                  style={{ width: "100%" }}
+                />
+              </Field>
+              <Field label={t("Sonraki temas")} style={{ flex: "1 1 130px" }}>
+                <input
+                  type="date"
+                  value={form.sonrakiTemas}
+                  onChange={(e) => setForm((f) => ({ ...f, sonrakiTemas: e.target.value }))}
+                  style={{ width: "100%" }}
+                />
+              </Field>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 8 }}>
             <Field label={t("E-posta")} style={{ flex: 1 }}>
@@ -503,15 +702,18 @@ export default function CustomersPanel({
             </Field>
           </div>
 
-          <Field label={t("Vergi / TC No")}>
-            <input
-              value={form.taxNumber}
-              onChange={(e) => setForm((f) => ({ ...f, taxNumber: e.target.value }))}
-              onBlur={checkDuplicates}
-              placeholder={t("Fatura kesilecekse gerekli")}
-              style={{ width: "100%" }}
-            />
-          </Field>
+          {/* Bağlantılar'da fatura kesilmiyor; hızlı girişte fazladan alan olmasın. */}
+          {!baglantiModu && (
+            <Field label={t("Vergi / TC No")}>
+              <input
+                value={form.taxNumber}
+                onChange={(e) => setForm((f) => ({ ...f, taxNumber: e.target.value }))}
+                onBlur={checkDuplicates}
+                placeholder={t("Fatura kesilecekse gerekli")}
+                style={{ width: "100%" }}
+              />
+            </Field>
+          )}
 
           {yonetici && (
             <Field label={t("Sorumlu çalışan")}>
@@ -532,14 +734,26 @@ export default function CustomersPanel({
             </Field>
           )}
 
-          <Field label={t("Not")}>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-              rows={2}
-              style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
-            />
-          </Field>
+          {baglantiModu ? (
+            <Field label={t("İlişki notu — yalnızca bu modülde görünür")}>
+              <textarea
+                value={form.iliskiNotu}
+                onChange={(e) => setForm((f) => ({ ...f, iliskiNotu: e.target.value }))}
+                rows={3}
+                placeholder={t("Örn. Rakip ama ihracat tarafında birlikte iş yapılabilir.")}
+                style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
+              />
+            </Field>
+          ) : (
+            <Field label={t("Not")}>
+              <textarea
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                style={{ width: "100%", resize: "vertical", fontFamily: "inherit" }}
+              />
+            </Field>
+          )}
 
           {duplicates.length > 0 && (
             <div
@@ -590,7 +804,9 @@ export default function CustomersPanel({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : parties.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-          {t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
+          {baglantiModu
+            ? t("Henüz bağlantı yok. Fuarda, toplantıda tanıştığın kişileri buraya ekle; müşteri listesine karışmazlar.")
+            : t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
           {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
         </p>
       ) : visible.length === 0 ? (
@@ -643,6 +859,14 @@ export default function CustomersPanel({
                         {t(ROLE_LABELS[r], { ctx: "rol" })}
                       </span>
                     ))}
+                    {baglantiModu && p.baglanti?.onem === "yuksek" && (
+                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, background: c.accent, color: c.onPrimary }}>
+                        {t("Yüksek önem")}
+                      </span>
+                    )}
+                    {baglantiModu && p.baglanti?.sonrakiTemas && (
+                      <TemasRozeti tarih={p.baglanti.sonrakiTemas} bugun={bugun} />
+                    )}
                   </div>
                   {(profile.detail(p) || yonetici) && (
                     <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
@@ -672,13 +896,18 @@ export default function CustomersPanel({
 
               {openPartyId === p.id && <PartyDetail
                   party={p}
+                  baglantiModu={baglantiModu}
+                  baglantiYazar={baglantiYazar}
+                  departmentId={jobId ? undefined : departmentId}
+                  onDegisti={() => load()}
                   canWrite={canWrite}
                   // Sipariş/tahsilat yazma hakkı sorumluluktan gelir (bkz.
                   // backend siparis-erisim.ts): modülde salt okur olan satışçı
                   // da kendisine atanan müşterinin tahsilatını girer.
                   siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
                   profile={profile.primaryActionLabel}
-                  organizationId={organizationId}
+                  // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
+                  organizationId={baglantiModu ? undefined : organizationId}
                 />}
             </div>
           ))}
@@ -709,6 +938,24 @@ function Field({
 }
 
 /**
+ * Sonraki temas tarihi: geçtiyse kırmızı, bugünse vurgulu, ileride sade.
+ * Tarih karşılaştırması metinle (YYYY-MM-DD sözlük sırası = takvim sırası).
+ */
+function TemasRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
+  const c = useThemeColors();
+  const t = useT();
+  const gecti = tarih < bugun;
+  const bugunMu = tarih === bugun;
+  const renk = gecti ? c.danger : bugunMu ? c.accent : c.textSecondary;
+  const [y, a, g] = tarih.split("-");
+  return (
+    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
+      {bugunMu ? t("Bugün temas") : gecti ? t("Temas gecikti · {tarih}", { tarih: `${g}.${a}.${y}` }) : t("Temas · {tarih}", { tarih: `${g}.${a}.${y}` })}
+    </span>
+  );
+}
+
+/**
  * Müşteri kartının altı: temas geçmişi ve kurumdaki kişiler.
  *
  * Geçmiş akışına diğer modüller de yazar (fatura kesildi, destek talebi
@@ -716,12 +963,22 @@ function Field({
  */
 function PartyDetail({
   party,
+  baglantiModu,
+  baglantiYazar,
+  departmentId,
+  onDegisti,
   canWrite,
   siparisYazar,
   profile,
   organizationId,
 }: {
   party: Party;
+  baglantiModu: boolean;
+  /** Müşteriler'de: kullanıcı Bağlantılar'a da yazabiliyor mu ("Bağlantılara ekle"). */
+  baglantiYazar: boolean;
+  /** Takip görevi departmanın görev listesine yazılır; departman dışında (serbest çalışan) görev köprüsü yok. */
+  departmentId?: string;
+  onDegisti: () => void;
   canWrite: boolean;
   siparisYazar: boolean;
   profile: string;
@@ -729,7 +986,33 @@ function PartyDetail({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler">("siparisler");
+  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "iliski" | "gorevler">(
+    baglantiModu ? "iliski" : "siparisler"
+  );
+  const [gorevler, setGorevler] = useState<PartyGorevi[]>([]);
+  const [gorevAcik, setGorevAcik] = useState(false);
+  // "Müşteri yap" iki adımlı: kart satış ekibinin listesine de girer ve geri
+  // alma düğmesi yok — tek tıkla olmamalı.
+  const [defterSoru, setDefterSoru] = useState(false);
+  const [defterHata, setDefterHata] = useState("");
+  const hedefDefter = baglantiModu ? MUSTERI_MODUL_KEY : BAGLANTI_MODUL_KEY;
+  const defterButonu =
+    canWrite && !party.modules.includes(hedefDefter) && (baglantiModu || baglantiYazar);
+
+  const deftereEkle = async () => {
+    setBusy(true);
+    setDefterHata("");
+    try {
+      await partyApi.deftereEkle(party.id, hedefDefter);
+      setDefterSoru(false);
+      onDegisti();
+      load();
+    } catch (err) {
+      setDefterHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
+    } finally {
+      setBusy(false);
+    }
+  };
   const [siparisSayisi, setSiparisSayisi] = useState(0);
   // null = şirket kartı değil ya da kullanıcının alacak/borç defterini görme
   // yetkisi yok; sekme o zaman hiç çıkmaz (bkz. useMusteriAlacakBorcu).
@@ -742,6 +1025,7 @@ function PartyDetail({
   const load = () => {
     api.get<PartyActivity[]>(`/party/${party.id}/activities`).then(setActivities).catch(() => setActivities([]));
     api.get<PartyContact[]>(`/party/${party.id}/contacts`).then(setContacts).catch(() => setContacts([]));
+    if (baglantiModu) partyApi.gorevler(party.id).then(setGorevler).catch(() => setGorevler([]));
   };
 
   useEffect(load, [party.id]);
@@ -792,9 +1076,20 @@ function PartyDetail({
       }}
     >
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
-          {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
-        </button>
+        {baglantiModu ? (
+          <>
+            <button onClick={() => setTab("iliski")} style={tabStyle(tab === "iliski")}>
+              {t("İlişki")}
+            </button>
+            <button onClick={() => setTab("gorevler")} style={tabStyle(tab === "gorevler")}>
+              {t("Görevler")} {gorevler.length > 0 && `(${gorevler.length})`}
+            </button>
+          </>
+        ) : (
+          <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
+            {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
+          </button>
+        )}
         <button onClick={() => setTab("activity")} style={tabStyle(tab === "activity")}>
           {t("Geçmiş")} {activities.length > 0 && `(${activities.length})`}
         </button>
@@ -835,7 +1130,96 @@ function PartyDetail({
         </div>
       )}
 
-      {tab === "siparisler" ? (
+      {defterButonu && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 }}>
+          {!defterSoru ? (
+            <button
+              onClick={() => setDefterSoru(true)}
+              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
+            >
+              {baglantiModu ? t("Müşteri yap") : t("Bağlantılara ekle")}
+            </button>
+          ) : (
+            <>
+              <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>
+                {baglantiModu
+                  ? t("Kart Müşteriler listesinde de görünecek. İlişki notu satış ekibine açılmaz.")
+                  : t("Kart Bağlantı ve İlişkiler listesinde de görünecek.")}
+              </span>
+              <button
+                onClick={deftereEkle}
+                disabled={busy}
+                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+              >
+                {t("Onayla")}
+              </button>
+              <button
+                onClick={() => setDefterSoru(false)}
+                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
+              >
+                {t("Vazgeç")}
+              </button>
+            </>
+          )}
+          {defterHata && <span style={{ color: c.danger, flexBasis: "100%" }}>{defterHata}</span>}
+        </div>
+      )}
+
+      {tab === "iliski" ? (
+        <IliskiOzeti baglanti={party.baglanti} />
+      ) : tab === "gorevler" ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {canWrite && departmentId && (
+            <button
+              onClick={() => setGorevAcik(true)}
+              style={{ alignSelf: "flex-start", fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+            >
+              {t("+ Takip görevi aç")}
+            </button>
+          )}
+          {gorevler.length === 0 ? (
+            <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
+              {departmentId
+                ? t("Bu bağlantı için açılmış görev yok.")
+                : t("Takip görevi departman içinden açılır.")}
+            </p>
+          ) : (
+            gorevler.map((g) => (
+              <div key={g.id} style={{ display: "flex", gap: 6, fontSize: 12, alignItems: "baseline" }}>
+                <span style={{ color: g.status === "completed" ? c.success : c.textSecondary }}>
+                  {g.status === "completed" ? "✓" : "○"}
+                </span>
+                <span
+                  style={{
+                    flex: 1,
+                    color: c.textPrimary,
+                    textDecoration: g.status === "completed" ? "line-through" : undefined,
+                  }}
+                >
+                  {g.title}
+                  {g.assignedToName && <span style={{ color: c.textSecondary }}> · {g.assignedToName}</span>}
+                </span>
+                {g.deadline && (
+                  <span style={{ color: c.textSecondary }}>{g.deadline.slice(0, 10).split("-").reverse().join(".")}</span>
+                )}
+              </div>
+            ))
+          )}
+          {gorevAcik && departmentId && (
+            <TaskFromRecordModal
+              departmentId={departmentId}
+              moduleKey={BAGLANTI_MODUL_KEY}
+              moduleTitle={t("Bağlantı ve İlişkiler")}
+              recordId={party.id}
+              defaultTitle={t("{ad} ile görüş", { ad: party.displayName })}
+              defaultDeadline={party.baglanti?.sonrakiTemas}
+              existingCount={gorevler.length}
+              onClose={() => setGorevAcik(false)}
+              onCreated={load}
+            />
+          )}
+        </div>
+      ) : tab === "siparisler" ? (
         <MusteriSiparisleri party={party} yazabilir={siparisYazar} onSayi={setSiparisSayisi} />
       ) : tab === "alacakBorc" && alacakBorc.kayitlar && organizationId ? (
         <MusteriAlacakBorcu
@@ -885,6 +1269,36 @@ function PartyDetail({
             </div>
           ))}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** Bağlantı kartının "İlişki" sekmesi: tanışma bilgisi ve ilişki notu (düzenleme formdan). */
+function IliskiOzeti({ baglanti }: { baglanti?: PartyBaglanti }) {
+  const c = useThemeColors();
+  const t = useT();
+  const gun = (v?: string) => (v ? v.split("-").reverse().join(".") : undefined);
+  const satirlar: [string, string | undefined][] = [
+    [t("Önem"), baglanti ? t(ONEM_LABELS[baglanti.onem]) : undefined],
+    [t("Nerede tanışıldı"), baglanti?.tanismaYeri],
+    [t("Tanışma tarihi"), gun(baglanti?.tanismaTarihi)],
+    [t("Sonraki temas"), gun(baglanti?.sonrakiTemas)],
+  ];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+      {satirlar
+        .filter(([, v]) => v)
+        .map(([k, v]) => (
+          <div key={k}>
+            <span style={{ color: c.textSecondary }}>{k}: </span>
+            <span style={{ color: c.textPrimary }}>{v}</span>
+          </div>
+        ))}
+      {baglanti?.iliskiNotu ? (
+        <p style={{ margin: "4px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap" }}>{baglanti.iliskiNotu}</p>
+      ) : (
+        <p style={{ margin: "4px 0 0", color: c.textSecondary }}>{t("İlişki notu yok. Düzenle ile ekleyebilirsin.")}</p>
       )}
     </div>
   );

@@ -631,7 +631,75 @@ export interface ModuleAccess {
 
 // Rol bir alandır, tablo değil: aynı firma hem müşteri hem tedarikçi olabilir.
 // Rol EKLENİR, silinmez — ilk fatura kesilince lead üzerine customer eklenir.
-export type PartyRole = "lead" | "customer" | "supplier" | "candidate" | "distributor" | "other";
+//
+// competitor / collaborator / contact Bağlantı ve İlişkiler modülünden geldi
+// (migration 153). `partner` adı bilerek kullanılmadı: o ad hisse ortaklarına
+// ait (Partner, aşağıda).
+export type PartyRole =
+  | "lead"
+  | "customer"
+  | "supplier"
+  | "candidate"
+  | "distributor"
+  | "other"
+  | "competitor"
+  | "collaborator"
+  | "contact";
+
+/**
+ * Geçerli roller. Sunucu bunun dışındaki değeri REDDEDER — eskiden roles
+ * istemciden geldiği gibi yazılıyordu ve arayüzün tanımadığı bir rol kartta
+ * etiketsiz bir rozet olarak kalıyordu.
+ */
+export const PARTY_ROLES: readonly PartyRole[] = [
+  "lead",
+  "customer",
+  "supplier",
+  "candidate",
+  "distributor",
+  "other",
+  "competitor",
+  "collaborator",
+  "contact",
+];
+
+export function isPartyRole(value: unknown): value is PartyRole {
+  return typeof value === "string" && (PARTY_ROLES as readonly string[]).includes(value);
+}
+
+/**
+ * party kaydına bakan modüller. Kaydın hangi defterde durduğu
+ * `Party.modules`'ta yazılı (migration 153): Bağlantılar'da açılan kart
+ * Müşteriler'de görünmez, müşteriye dönüşünce ikisinde birden görünür.
+ */
+export const MUSTERI_MODUL_KEY = "crm_musteri";
+export const BAGLANTI_MODUL_KEY = "baglantilar";
+export type PartyModulKey = typeof MUSTERI_MODUL_KEY | typeof BAGLANTI_MODUL_KEY;
+export const PARTY_MODUL_KEYS: readonly PartyModulKey[] = [MUSTERI_MODUL_KEY, BAGLANTI_MODUL_KEY];
+
+export function isPartyModulKey(value: unknown): value is PartyModulKey {
+  return typeof value === "string" && (PARTY_MODUL_KEYS as readonly string[]).includes(value);
+}
+
+export type BaglantiOnem = "yuksek" | "orta" | "dusuk";
+export const BAGLANTI_ONEMLERI: readonly BaglantiOnem[] = ["yuksek", "orta", "dusuk"];
+
+/**
+ * Bağlantılar'ın karta eklediği alanlar (party_baglanti). Ayrı tabloda
+ * duruyor çünkü kart müşteriye dönüşünce satış ekibi `notes`'u okur; ilişki
+ * notu ("rakip, fiyatları bizden düşük") ona açılmamalı. Sunucu bu alanı
+ * yalnızca Bağlantılar'da okuma yetkisi olana döner.
+ */
+export interface PartyBaglanti {
+  onem: BaglantiOnem;
+  tanismaYeri?: string;
+  /** YYYY-MM-DD */
+  tanismaTarihi?: string;
+  /** YYYY-MM-DD — listede geçmişse ve bugünse vurgulanır. */
+  sonrakiTemas?: string;
+  iliskiNotu?: string;
+}
+
 export type PartyType = "person" | "company";
 export type PartyStatus = "active" | "passive" | "blocked";
 
@@ -690,6 +758,10 @@ export interface Party {
   roles: PartyRole[];
   status: PartyStatus;
   source?: string;
+  /** Kaydın görüldüğü modüller (crm_musteri, baglantilar). */
+  modules: PartyModulKey[];
+  /** Yalnızca Bağlantılar'da okuma yetkisi olana döner. */
+  baglanti?: PartyBaglanti;
 
   ownerUserId?: string;
   parentPartyId?: string;
@@ -757,6 +829,32 @@ export interface MusteriListesi {
   /** Kart bilgisini (ad, iletişim) değiştirebilir mi. */
   kartYazar: boolean;
   musteriler: Party[];
+}
+
+/**
+ * Karttan açılmış takip görevi (tasks.source_record_id = party.id). Görev
+ * departmanın görev listesinde yaşar; kartta yalnızca özeti görünür.
+ */
+export interface PartyGorevi {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  deadline?: string;
+  departmentId?: string;
+  projectId?: string;
+  assignedToName?: string;
+}
+
+/**
+ * Bağlantı ve İlişkiler ekranının listesi. Müşteriler'den farkı: sahiplik
+ * süzmesi yok, modülü okuyabilen herkes hepsini görür (bir yönetim defteri).
+ * Kartlar `baglanti` alanlarıyla gelir.
+ */
+export interface BaglantiListesi {
+  /** Sorumluyu başkasına verebilir. */
+  yonetici: boolean;
+  kartYazar: boolean;
+  baglantilar: Party[];
 }
 
 export interface PartyDuplicate {

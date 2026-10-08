@@ -2,6 +2,7 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  BAGLANTI_SUTUNLARI,
   MUSTERI_SUTUNLARI,
   mevcutlariAyikla,
   musteriSablonuOlustur,
@@ -10,6 +11,7 @@ import {
   planMusteriImport,
   SABLON_SAYFA_ADI,
   tabloyuOku,
+  tarihiCoz,
   Workbook,
 } from "./musteri-sablonu";
 
@@ -228,5 +230,63 @@ describe("İngilizce şablon", () => {
     await wb.xlsx.load((await musteriSablonuOlustur()) as any);
     assert.deepEqual(wb.worksheets.map((w) => w.name), ["Müşteriler", "Nasıl doldurulur"]);
     assert.equal(String(wb.worksheets[0].getCell("A1").value), "Ad");
+  });
+});
+
+describe("Bağlantı ve İlişkiler şablonu", () => {
+  const BAGLANTI_BASLIKLARI = BAGLANTI_SUTUNLARI.map((s) => s.baslik);
+
+  test("iki dilde de üretilen şablonun her sütunu bağlantı okuyucusunca tanınır", async () => {
+    for (const dil of ["tr", "en"] as const) {
+      const wb = new Workbook();
+      await wb.xlsx.load((await musteriSablonuOlustur(dil, "baglanti")) as any);
+      const ilk = wb.worksheets[0];
+      assert.equal(ilk.name, dil === "tr" ? "Bağlantılar" : "Contacts");
+      const basliklar = (ilk.getRow(1).values as unknown[]).slice(1).map(String);
+      assert.equal(musteriSutunlariniBul(basliklar, {}, "baglanti").size, BAGLANTI_SUTUNLARI.length);
+    }
+  });
+
+  test("önem, tanışma yeri, sonraki temas ve ilişki notu karta yazılır; varsayılan rol Bağlantı", () => {
+    const satir = BAGLANTI_SUTUNLARI.map((s) =>
+      ({ displayName: "Ayşe Yılmaz", onem: "Yüksek", tanismaYeri: "İstanbul Fuarı 2026", sonrakiTemas: "15.10.2026", iliskiNotu: "rakip" })[
+        s.alan as string
+      ] ?? ""
+    );
+    const p = planMusteriImport(sayfa([BAGLANTI_BASLIKLARI, satir]), { tur: "baglanti" }).planlanan[0];
+    assert.equal(p.party.roles, undefined); // sunucu varsayılanı (contact) uygular
+    assert.deepEqual(p.party.baglanti, {
+      onem: "yuksek",
+      tanismaYeri: "İstanbul Fuarı 2026",
+      sonrakiTemas: "2026-10-15",
+      iliskiNotu: "rakip",
+    });
+  });
+
+  test("rakip ve işbirliği rolleri tanınır", () => {
+    const plan = planMusteriImport(sayfa([["Ad", "Rol"], ["X", "Rakip, İşbirliği"]]), { tur: "baglanti" });
+    assert.deepEqual(plan.planlanan[0].party.roles, ["competitor", "collaborator"]);
+  });
+
+  test("tanınmayan önem ve tarih kartı düşürmez, uyarı olur", () => {
+    const plan = planMusteriImport(sayfa([["Ad", "Önem", "Sonraki temas"], ["X", "çok önemli", "yarın"]]), { tur: "baglanti" });
+    assert.equal(plan.planlanan.length, 1);
+    assert.equal(plan.planlanan[0].party.baglanti?.onem, "orta");
+    assert.equal(plan.planlanan[0].party.baglanti?.sonrakiTemas, undefined);
+    assert.equal(plan.uyarilar.length, 2);
+  });
+
+  test("müşteri içe aktarmasında Önem sütunu tanınmaz — kullanılmayan sütun olarak görünür", () => {
+    const plan = planMusteriImport(sayfa([["Ad", "Önem"], ["X", "Yüksek"]]));
+    assert.deepEqual(plan.kullanilmayanSutunlar, ["Önem"]);
+    assert.equal(plan.planlanan[0].party.baglanti, undefined);
+  });
+
+  test("tarihiCoz: iki biçim, takvimde olmayan gün reddedilir", () => {
+    assert.equal(tarihiCoz("2026-10-15"), "2026-10-15");
+    assert.equal(tarihiCoz("5.3.2026"), "2026-03-05");
+    assert.equal(tarihiCoz("05/03/2026"), "2026-03-05");
+    assert.equal(tarihiCoz("31.02.2026"), undefined);
+    assert.equal(tarihiCoz("yarın"), undefined);
   });
 });

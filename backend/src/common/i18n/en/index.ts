@@ -13,6 +13,7 @@ import { ekipHesaplari } from "./ekip-hesaplari";
 import { iseAlim } from "./ise-alim";
 import { googleTakvim } from "./google-takvim";
 import { projeTakvimi } from "./proje-takvimi";
+import { baglantilar } from "./baglantilar";
 
 /**
  * Sunucu metinlerinin Türkçe → İngilizce sözlüğü.
@@ -45,4 +46,5 @@ export const en: TranslationDict = {
   ...genel,
   ...googleTakvim,
   ...projeTakvimi,
+  ...baglantilar,
 };

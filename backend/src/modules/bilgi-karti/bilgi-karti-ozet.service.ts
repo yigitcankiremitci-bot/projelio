@@ -1,7 +1,7 @@
 // dil:anahtar-dosya — bölüm başlıkları ve satır etiketleri ozet() içinde kullanıcının diline çevriliyor.
 import { Injectable, Logger } from "@nestjs/common";
 import type { BilgiKartiKapsami, BilgiKartiOzetBolumu, BilgiKartiOzeti, BilgiKartiOzetSatiri } from "@projelio/shared";
-import { paraBirimiBazinda } from "@projelio/shared";
+import { MUSTERI_MODUL_KEY, paraBirimiBazinda } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ButceHiyerarsiService } from "../budget/butce-hiyerarsi.service";
 import { cevirmen } from "../../common/i18n";
@@ -92,7 +92,8 @@ export class BilgiKartiOzetService {
       this.kadroSayisi(departmanIds, ["manager", "employee"]),
       this.kadroSayisi(departmanIds, ["subcontractor"]),
       this.sayi("products", (q) => q.eq("organization_id", organizationId).is("archived_at", null)),
-      this.sayi("party", (q) => q.eq("organization_id", organizationId).is("archived_at", null)),
+      // Cari sayısı müşteri defterinden: Bağlantılar'daki tanışıklıklar cari değil.
+      this.sayi("party", (q) => q.eq("organization_id", organizationId).is("archived_at", null).contains("modules", [MUSTERI_MODUL_KEY])),
       this.sayi("organization_modules", (q) => q.eq("organization_id", organizationId)),
       this.dosyaSayisi({ organizationId, departmanIds }),
       this.sayi("service_accounts", (q) => q.eq("organization_id", organizationId)),
@@ -170,7 +171,7 @@ export class BilgiKartiOzetService {
 
     const [ekip, cari, modul, dosya, hesap, gorev] = await Promise.all([
       this.sayi("job_members", (q) => q.eq("job_id", jobId).eq("status", "approved")),
-      this.sayi("party", (q) => q.eq("job_id", jobId).is("archived_at", null)),
+      this.sayi("party", (q) => q.eq("job_id", jobId).is("archived_at", null).contains("modules", [MUSTERI_MODUL_KEY])),
       this.sayi("job_modules", (q) => q.eq("job_id", jobId)),
       this.sayi("files", (q) => q.eq("job_id", jobId)),
       this.sayi("service_accounts", (q) => q.eq("job_id", jobId)),

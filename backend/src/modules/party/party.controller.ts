@@ -22,7 +22,7 @@ import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
 import { PartyService } from "./party.service";
 import { musteriSablonuOlustur, musteriSayfasiniSec, sablonDosyaAdi, tabloyuOku } from "./musteri-sablonu";
-import { isLocale } from "@projelio/shared";
+import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, type PartyModulKey } from "@projelio/shared";
 import { istemciDili, tarayiciDili } from "../../common/i18n/index";
 import type { PartyScope } from "./party.service";
 import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./siparis.service";
@@ -30,6 +30,11 @@ import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./sip
 /** Şablon dosyası: 1000 satırlık dolu bir xlsx bile 1 MB'ı bulmuyor, 5 MB bol. */
 const SABLON_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 import { AccessService } from "../../common/access/access.service";
+
+/** Kartın açıldığı defter; gelmezse ya da tanınmazsa Müşteriler (eski istemciler). */
+function defter(modul: unknown): PartyModulKey {
+  return isPartyModulKey(modul) ? modul : MUSTERI_MODUL_KEY;
+}
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
@@ -48,15 +53,22 @@ export class PartyController {
    * yolu onu kimlik sanıp yakalardı.
    */
   @Get("party-template")
-  async sablon(@Query("dil") dilParam: string | undefined, @Req() req: any, @Res() res: Response) {
+  async sablon(
+    @Query("dil") dilParam: string | undefined,
+    @Query("modul") modul: string | undefined,
+    @Req() req: any,
+    @Res() res: Response
+  ) {
     // Şablon arayüzün dilinde. İndirme `fetch` + blob ile yapıldığı için
     // istemci dili açıkça ?dil= ile gönderiyor; gelmezse başlıklara bakılır.
     const dil = isLocale(dilParam) ? dilParam : (istemciDili(req) ?? tarayiciDili(req) ?? "tr");
-    const icerik = await musteriSablonuOlustur(dil);
+    // ?modul=baglantilar: Bağlantı ve İlişkiler şablonu (önem, tanışma yeri…).
+    const tur = defter(modul) === BAGLANTI_MODUL_KEY ? "baglanti" : "musteri";
+    const icerik = await musteriSablonuOlustur(dil, tur);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Length", String(icerik.length));
     res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(sablonDosyaAdi(dil))}`);
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(sablonDosyaAdi(dil, tur))}`);
     res.end(icerik);
   }
 
@@ -74,12 +86,13 @@ export class PartyController {
     @Param("organizationId") organizationId: string,
     @Query("onizleme") onizleme: string | undefined,
     @Query("departmentId") departmentId: string | undefined,
+    @Query("modul") modul: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, file);
+    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, defter(modul), file);
   }
 
   @Post("jobs/:jobId/party/import")
@@ -88,20 +101,27 @@ export class PartyController {
   async importJob(
     @Param("jobId") jobId: string,
     @Query("onizleme") onizleme: string | undefined,
+    @Query("modul") modul: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ jobId }, onizleme, req.user.userId, file);
+    return this.iceAktar({ jobId }, onizleme, req.user.userId, defter(modul), file);
   }
 
-  private async iceAktar(scope: PartyScope, onizleme: string | undefined, userId: string, file?: Express.Multer.File) {
+  private async iceAktar(
+    scope: PartyScope,
+    onizleme: string | undefined,
+    userId: string,
+    modul: PartyModulKey,
+    file?: Express.Multer.File
+  ) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
     // multer dosya adını latin1 okuyor; "Müşteriler.xlsx" bozuk gelmesin.
     const ad = Buffer.from(file.originalname, "latin1").toString("utf8");
     const sayfa = musteriSayfasiniSec(await tabloyuOku(file.buffer, ad));
-    return this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: onizleme !== "0" });
+    return this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: onizleme !== "0", modul });
   }
 
   // ============================================================ Organizasyon
@@ -136,6 +156,18 @@ export class PartyController {
     return this.partyService.musterilerim({ organizationId, departmentId }, req.user.userId);
   }
 
+  /** Bağlantı ve İlişkiler ekranının listesi (bağlantı alanlarıyla). */
+  @Get("organizations/:organizationId/baglantilar")
+  async baglantilarOrg(
+    @Param("organizationId") organizationId: string,
+    @Req() req: any,
+    @Query("departmentId") departmentId?: string
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.baglantilarim({ organizationId, departmentId }, req.user.userId);
+  }
+
   /** Tahsilat görünümü ve yönetici raporu: kapsamdaki siparişler. */
   @Get("organizations/:organizationId/siparisler")
   async siparislerOrg(
@@ -151,20 +183,25 @@ export class PartyController {
   @Post("organizations/:organizationId/party")
   create(
     @Param("organizationId") organizationId: string,
-    @Body() body: Partial<Party> & { departmentId?: string },
+    @Body() body: Partial<Party> & { departmentId?: string; modul?: string },
     @Req() req: any
   ) {
-    const { departmentId, ...payload } = body;
-    return this.partyService.create({ organizationId, departmentId }, payload, req.user.userId);
+    const { departmentId, modul, modules: _yokSayilir, ...payload } = body;
+    return this.partyService.create({ organizationId, departmentId }, payload, req.user.userId, defter(modul));
   }
 
   /** Kaydetmeden önce "bu kaydı daha önce girmiş olabilirsiniz" kontrolü. */
   @Post("organizations/:organizationId/party/check-duplicates")
   checkOrgDuplicates(
     @Param("organizationId") organizationId: string,
-    @Body() body: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string }
+    @Body() body: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string; departmentId?: string },
+    @Req() req: any
   ) {
-    return this.partyService.checkDuplicates({ organizationId }, body);
+    // Kullanıcı kimliği şart: yalnızca okuyabildiği defterlerle karşılaştırılır.
+    // Eskiden bu uç kimlik almıyordu; oturumu olan herkes başka bir şirketin
+    // kart adlarını yoklayabiliyordu.
+    const { departmentId, ...girdi } = body;
+    return this.partyService.checkDuplicates({ organizationId, departmentId }, girdi, req.user.userId);
   }
 
   // ============================================================ Serbest çalışan
@@ -183,6 +220,13 @@ export class PartyController {
     return this.partyService.musterilerim({ jobId }, req.user.userId);
   }
 
+  @Get("jobs/:jobId/baglantilar")
+  async baglantilarJob(@Param("jobId") jobId: string, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.baglantilarim({ jobId }, req.user.userId);
+  }
+
   @Get("jobs/:jobId/siparisler")
   async siparislerJob(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
@@ -191,16 +235,18 @@ export class PartyController {
   }
 
   @Post("jobs/:jobId/party")
-  createForJob(@Param("jobId") jobId: string, @Body() body: Partial<Party>, @Req() req: any) {
-    return this.partyService.create({ jobId }, body, req.user.userId);
+  createForJob(@Param("jobId") jobId: string, @Body() body: Partial<Party> & { modul?: string }, @Req() req: any) {
+    const { modul, modules: _yokSayilir, ...payload } = body;
+    return this.partyService.create({ jobId }, payload, req.user.userId, defter(modul));
   }
 
   @Post("jobs/:jobId/party/check-duplicates")
   checkJobDuplicates(
     @Param("jobId") jobId: string,
-    @Body() body: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string }
+    @Body() body: { displayName?: string; taxNumber?: string; email?: string; excludeId?: string },
+    @Req() req: any
   ) {
-    return this.partyService.checkDuplicates({ jobId }, body);
+    return this.partyService.checkDuplicates({ jobId }, body, req.user.userId);
   }
 
   // ============================================================ Tekil kayıt
@@ -229,6 +275,21 @@ export class PartyController {
   @Patch("party/:id/roles")
   addRole(@Param("id") id: string, @Body("role") role: PartyRole, @Req() req: any) {
     return this.partyService.addRoleTo(id, role, req.user.userId);
+  }
+
+  /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
+  @Post("party/:id/defter")
+  async deftereEkle(@Param("id") id: string, @Body("modul") modul: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    if (!isPartyModulKey(modul)) throw new BadRequestException("Geçersiz modül");
+    return this.partyService.deftereEkle(id, modul, req.user.userId);
+  }
+
+  /** Karttan açılmış takip görevleri (kullanıcının görebildikleri). */
+  @Get("party/:id/gorevler")
+  async gorevler(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.kartGorevleri(id, req.user.userId);
   }
 
   @Post("party/:id/merge")

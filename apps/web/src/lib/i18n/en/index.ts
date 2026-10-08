@@ -28,6 +28,7 @@ import { arkadaslar } from "./arkadaslar";
 import { bildirimTercihleri } from "./bildirimTercihleri";
 import { kartvizit } from "./kartvizit";
 import { projeTakvimi } from "./projeTakvimi";
+import { baglantilar } from "./baglantilar";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -88,4 +89,5 @@ export const en: TranslationDict = {
   ...googleTakvim,
   ...arkadaslar,
   ...projeTakvimi,
+  ...baglantilar,
 };

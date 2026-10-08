@@ -17,7 +17,8 @@ import { isSocialMediaModule } from "./socialMedia";
 import { isHesaplarModule } from "./hesaplar";
 import { isEkipHesaplariModule } from "./ekipHesaplari";
 
-export const ENTITY_MODULE_KEYS = ["crm_musteri"] as const;
+// baglantilar: aynı party tablosu, ayrı defter (migration 153).
+export const ENTITY_MODULE_KEYS = ["crm_musteri", "baglantilar"] as const;
 
 export type EntityModuleKey = (typeof ENTITY_MODULE_KEYS)[number];
 

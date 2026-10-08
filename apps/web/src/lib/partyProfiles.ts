@@ -1,5 +1,5 @@
 // dil:anahtar-dosya — etiketler; çeviri render anında (t(...)) yapılıyor.
-import type { Party, PartyRole } from "@projelio/shared";
+import { colors, type BaglantiOnem, type Party, type PartyRole } from "@projelio/shared";
 import { cevirmenSuAn } from "./i18n/anlik";
 
 /**
@@ -39,6 +39,9 @@ export const ROLE_LABELS: Record<PartyRole, string> = {
   distributor: "Bayi",
   candidate: "Aday",
   other: "Diğer",
+  competitor: "Rakip",
+  collaborator: "İşbirliği",
+  contact: "Bağlantı",
 };
 
 export const ROLE_COLORS: Record<PartyRole, string> = {
@@ -48,6 +51,17 @@ export const ROLE_COLORS: Record<PartyRole, string> = {
   distributor: "#7e22ce",
   candidate: "#475569",
   other: "#475569",
+  // Bağlantılar'ın rolleri paletten (theme.ts): rakip kırmızı, işbirliği
+  // yeşil, düz tanışıklık ana renk — listede bir bakışta ayrılsınlar.
+  competitor: colors.light.danger,
+  collaborator: colors.light.completed,
+  contact: colors.light.primary,
+};
+
+export const ONEM_LABELS: Record<BaglantiOnem, string> = {
+  yuksek: "Yüksek",
+  orta: "Orta",
+  dusuk: "Düşük",
 };
 
 export const STATUS_LABELS: Record<Party["status"], string> = {
@@ -120,4 +134,29 @@ export function profileFor(departmentKey?: string): PartyProfile {
   return (departmentKey && PROFILES[departmentKey]) || BASE_PROFILE;
 }
 
+// Müşteriler'in rol seçicisi eski altı rolle kalıyor: rakip/işbirliği
+// Bağlantılar'ın sorusu. İki defterde duran kartın rozetleri yine hepsini
+// gösterir (ROLE_LABELS tam).
 export const ALL_ROLES: PartyRole[] = ["lead", "customer", "supplier", "distributor", "candidate", "other"];
+
+// Bağlantılar'da "Müşteri" seçilemiyor: müşteriye dönüşmek kartı satış
+// defterine almak demek, o ayrı bir adım (bkz. docs/moduller/17).
+export const BAGLANTI_ROLES: PartyRole[] = ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"];
+
+/**
+ * Bağlantılar'ın görünümü. Departman profili değil, MODÜL profili: hangi
+ * departmandan açılırsa açılsın (Satış, Pazarlama, Yönetim) aynı defter.
+ */
+export const BAGLANTI_PROFILE: PartyProfile = {
+  key: "baglantilar",
+  label: "Bağlantı ve İlişkiler", // dil:anahtar
+  detail: (p) => {
+    const t = cevirmenSuAn();
+    return joinDetail(
+      p.roles.map((r) => t(ROLE_LABELS[r], { ctx: "rol" })).join(", "),
+      p.baglanti?.tanismaYeri,
+      p.phone ?? p.email
+    );
+  },
+  primaryActionLabel: "Temas ekle", // dil:anahtar
+};

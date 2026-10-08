@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { isThrottleError, WahaHttpClient } from "./waha.client";
@@ -27,7 +27,7 @@ const TIMEZONE = process.env.TZ?.trim() || "Europe/Istanbul";
  * bunu bilmek zorunda kalmamalı.
  */
 @Injectable()
-export class WhatsappSendProcessor {
+export class WhatsappSendProcessor implements OnApplicationBootstrap {
   private readonly logger = new Logger(WhatsappSendProcessor.name);
   private readonly config: RateLimitConfig = rateLimitFromEnv();
   private running = false;
@@ -38,6 +38,34 @@ export class WhatsappSendProcessor {
     private whatsapp: WhatsappService,
     private webhook: WhatsappWebhookService
   ) {}
+
+  /**
+   * Yarıda kalmış gönderimleri kuyruğa geri koyar.
+   *
+   * Satır gönderilmeden önce `sending` diye sahipleniliyor; süreç o arada
+   * ölürse (dağıtım konteyneri yeniliyor, çökme) satır sonsuza kadar
+   * `sending` kalıyordu — kuyruk yalnızca `queued` okuduğu için kimse onu bir
+   * daha almıyordu. 2026-10-08: Lio'nun taslak cevabı tam dağıtım anında
+   * sahiplenildi, kullanıcı "göster" dediği cevabı hiç alamadı.
+   *
+   * Açılışta yapmak güvenli çünkü backend TEK süreç: açılış anında başka bir
+   * gönderici yok, `sending` olan her satır ölmüş bir sürecin yetimidir.
+   * Bedeli: süreç tam sendText ile durum yazımı arasında öldüyse mesaj iki
+   * kez gidebilir — sessizce kaybolmasından iyidir. 6 saatten eski olan
+   * zaten kuyrukta "stale" diye düşer.
+   */
+  async onApplicationBootstrap(): Promise<void> {
+    const { data, error } = await this.supabase.client
+      .from("whatsapp_messages")
+      .update({ status: "queued" })
+      .eq("status", "sending")
+      .select("id");
+    if (error) {
+      this.logger.warn(`Yarıda kalan WhatsApp gönderimleri geri alınamadı: ${error.message}`);
+      return;
+    }
+    if (data?.length) this.logger.log(`Yarıda kalan ${data.length} WhatsApp gönderimi kuyruğa geri alındı`);
+  }
 
   /**
    * Kuyruğu HEMEN işlemeye çalışır (dakikalık cron'u beklemeden).

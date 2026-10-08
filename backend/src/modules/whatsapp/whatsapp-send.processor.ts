@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnApplicationBootstrap } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { isThrottleError, WahaHttpClient } from "./waha.client";
@@ -27,7 +27,7 @@ const TIMEZONE = process.env.TZ?.trim() || "Europe/Istanbul";
  * bunu bilmek zorunda kalmamalı.
  */
 @Injectable()
-export class WhatsappSendProcessor implements OnApplicationBootstrap {
+export class WhatsappSendProcessor {
   private readonly logger = new Logger(WhatsappSendProcessor.name);
   private readonly config: RateLimitConfig = rateLimitFromEnv();
   private running = false;
@@ -53,17 +53,26 @@ export class WhatsappSendProcessor implements OnApplicationBootstrap {
    * Bedeli: süreç tam sendText ile durum yazımı arasında öldüyse mesaj iki
    * kez gidebilir — sessizce kaybolmasından iyidir. 6 saatten eski olan
    * zaten kuyrukta "stale" diye düşer.
+   *
+   * Açılış anında DEĞİL, ilk kuyruk turunda yapılır ve başarana kadar her
+   * turda denenir: açılışın ilk saniyesinde veritabanı bağlantısı henüz hazır
+   * değildi ("fetch failed") ve kurtarma hiç çalışmadı (2026-10-08 ilk dağıtım).
+   * Tur `running` bayrağıyla korunduğu için o sırada gönderen başka tur yok.
    */
-  async onApplicationBootstrap(): Promise<void> {
+  private yetimlerAlindi = false;
+
+  private async yetimleriKuyrugaAl(): Promise<void> {
+    if (this.yetimlerAlindi) return;
     const { data, error } = await this.supabase.client
       .from("whatsapp_messages")
       .update({ status: "queued" })
       .eq("status", "sending")
       .select("id");
     if (error) {
-      this.logger.warn(`Yarıda kalan WhatsApp gönderimleri geri alınamadı: ${error.message}`);
+      this.logger.warn(`Yarıda kalan WhatsApp gönderimleri geri alınamadı, sonraki turda denenecek: ${error.message}`);
       return;
     }
+    this.yetimlerAlindi = true;
     if (data?.length) this.logger.log(`Yarıda kalan ${data.length} WhatsApp gönderimi kuyruğa geri alındı`);
   }
 
@@ -91,6 +100,7 @@ export class WhatsappSendProcessor implements OnApplicationBootstrap {
     if (this.running) return;
     this.running = true;
     try {
+      await this.yetimleriKuyrugaAl();
       await this.webhook.processPending();
       await this.processQueue();
     } catch (e) {

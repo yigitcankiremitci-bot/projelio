@@ -1035,16 +1035,26 @@ export default function CustomersPanel({
               {t("{n} / {toplam} kayıt", { n: visible.length, toplam: parties.length })}
             </span>
           )}
-          {visible.map((p) => (
-            <div key={p.id} style={{ display: "flex", flexDirection: "column" }}>
+          {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
+              sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
+              karışıyordu, göz satırı takip edemiyordu. Renkler paletten. */}
+          <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden" }}>
+          {visible.map((p, i) => (
+            <div
+              key={p.id}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                borderTop: i === 0 ? "none" : `1px solid ${c.border}`,
+                background: i % 2 === 0 ? c.surface : c.background,
+              }}
+            >
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
                   padding: "8px 10px",
-                  borderRadius: 8,
-                  background: c.background,
                 }}
               >
                 <button
@@ -1129,6 +1139,7 @@ export default function CustomersPanel({
                 />}
             </div>
           ))}
+          </div>
         </div>
       )}
       </>

@@ -25,4 +25,9 @@ export const projeTakvimi: TranslationDict = {
   "Proje takvimine eklendin: {baslik}": "You were added to a project calendar event: {baslik}",
   "Proje: {proje} · {zaman}": "Project: {proje} · {zaman}",
   Teslim: "Delivery",
+  // Lio'nun eylem etiketleri (bkz. ai-assistant.service.ts ACTION_LABELS ve etkinlik akışı).
+  "proje takvimine etkinlik eklendi": "event added to project calendar",
+  "proje etkinliği güncellendi": "project event updated",
+  "Proje takvimine etkinlik eklendi": "Event added to project calendar",
+  "Proje etkinliği güncellendi": "Project event updated",
 };

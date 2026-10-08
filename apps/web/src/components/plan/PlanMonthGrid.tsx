@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { GoogleTakvimEtkinligi, PlanTimeBlock } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
 import { etkinlikleriGunlereDagit } from "../../lib/googleTakvimGorunum";
+import GunEtkinlikleriPenceresi from "./GunEtkinlikleriPenceresi";
 
 interface Props {
   from: string;
@@ -55,6 +56,8 @@ export default function PlanMonthGrid({
   const c = useThemeColors();
   const gunluk = useMemo(() => etkinlikleriGunlereDagit(etkinlikler ?? []), [etkinlikler]);
   const today = todayStr();
+  /** "+n etkinlik"e basılan gün — o günün tüm etkinlikleri listelenir. */
+  const [listeGunu, setListeGunu] = useState<string | null>(null);
 
   // Ay, tam haftalar hâlinde çizilir: ilk satır ayın 1'inden önceki
   // pazartesiden, son satır ayın son gününü içeren haftanın pazarına kadar.
@@ -202,9 +205,26 @@ export default function PlanMonthGrid({
                         </button>
                       ))}
                       {liste.length > 2 && (
-                        <span style={{ fontSize: 11, color: c.textSecondary, paddingLeft: 4 }}>
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            // Hücrenin tıklaması günlük görünüme götürüyor; bu düğme listeyi açar.
+                            ev.stopPropagation();
+                            setListeGunu(day);
+                          }}
+                          style={{
+                            fontSize: 11,
+                            lineHeight: "16px",
+                            textAlign: "left",
+                            padding: "0 4px",
+                            border: "none",
+                            background: "transparent",
+                            color: c.accent,
+                            cursor: "pointer",
+                          }}
+                        >
                           {t("+{n} etkinlik", { n: liste.length - 2 })}
-                        </span>
+                        </button>
                       )}
                     </div>
                   );
@@ -238,6 +258,15 @@ export default function PlanMonthGrid({
           })}
         </div>
       ))}
+
+      {listeGunu && (
+        <GunEtkinlikleriPenceresi
+          gun={listeGunu}
+          etkinlikler={gunluk.get(listeGunu)}
+          onOpenEtkinlik={onOpenEtkinlik}
+          onClose={() => setListeGunu(null)}
+        />
+      )}
     </div>
   );
 }

@@ -21,6 +21,7 @@ import {
 } from "../../lib/planGrid";
 import { useT } from "../../lib/i18n";
 import { etkinlikleriGunlereDagit, type EtkinlikParcasi } from "../../lib/googleTakvimGorunum";
+import GunEtkinlikleriPenceresi from "./GunEtkinlikleriPenceresi";
 import { IconCheck } from "../icons";
 
 interface Props {
@@ -112,6 +113,8 @@ export default function PlanGrid({
   // yerin hangi saate denk geldiğini önceden görmezse her seferinde deneme
   // yanılma yapıyor.
   const [ghost, setGhost] = useState<{ day: string; startsAt: string; minutes: number } | null>(null);
+  /** Tüm gün şeridindeki "+n etkinlik"e basılan gün — o günün tüm etkinlikleri listelenir. */
+  const [listeGunu, setListeGunu] = useState<string | null>(null);
 
   const blocksByDay = useMemo(() => {
     const map = new Map<string, PlanTimeBlock[]>();
@@ -175,9 +178,19 @@ export default function PlanGrid({
             googleBloklari={googleBloklari}
             onSelectDay={onSelectDay}
             onayKutusuYok={onayKutusuYok}
+            onShowAll={() => setListeGunu(day)}
           />
         ))}
       </div>
+
+      {listeGunu && (
+        <GunEtkinlikleriPenceresi
+          gun={listeGunu}
+          etkinlikler={gunluk.get(listeGunu)}
+          onOpenEtkinlik={onOpenEtkinlik}
+          onClose={() => setListeGunu(null)}
+        />
+      )}
     </div>
   );
 }
@@ -211,6 +224,8 @@ interface ColumnProps {
   googleBloklari?: Set<string>;
   onSelectDay?: (day: string) => void;
   onayKutusuYok?: boolean;
+  /** Tüm gün şeridine sığmayanlar için "+n etkinlik" → günün tüm listesi. */
+  onShowAll: () => void;
 }
 
 function DayColumn({
@@ -237,6 +252,7 @@ function DayColumn({
   googleBloklari,
   onSelectDay,
   onayKutusuYok,
+  onShowAll,
 }: ColumnProps) {
   const t = useT();
   const c = useThemeColors();
@@ -389,9 +405,28 @@ function DayColumn({
             </button>
           ))}
           {tumGunler.length > TUM_GUN_SATIRI && (
-            <span style={{ fontSize: 11, color: c.textSecondary, paddingLeft: 5 }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onShowAll();
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              style={{
+                height: TUM_GUN_SATIR_YUKSEKLIGI - 2,
+                flexShrink: 0,
+                fontSize: 11,
+                textAlign: "left",
+                padding: "0 5px",
+                border: "none",
+                background: "transparent",
+                color: c.accent,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
               {t("+{n} etkinlik", { n: tumGunler.length - (TUM_GUN_SATIRI - 1) })}
-            </span>
+            </button>
           )}
         </div>
       )}

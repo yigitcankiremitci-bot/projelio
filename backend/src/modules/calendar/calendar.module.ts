@@ -14,5 +14,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
   imports: [TasksModule, PlanningModule, NotificationsModule],
   controllers: [CalendarController],
   providers: [CalendarService],
+  // Lio'nun proje takvimi araçları (list/create/update_project_event).
+  exports: [CalendarService],
 })
 export class CalendarModule {}

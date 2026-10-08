@@ -97,6 +97,9 @@ export const WRITE_TOOLS = new Set<string>([
   "create_calendar_event",
   "send_time_blocks_to_calendar",
   "mark_calendar_event",
+  // Proje takvimi: ekibin ortak takvimine yazar (katılımcılara bildirim gider).
+  "create_project_event",
+  "update_project_event",
   // Modül defteri
   "create_module_record",
   "update_module_record",
@@ -1417,6 +1420,82 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         taskId: { type: "string", description: "durum=gorev ise oluşturulan/bağlanan görevin id'si." },
       },
       required: ["eventId", "status"],
+    },
+  },
+
+  // --- Proje takvimi ----------------------------------------------------
+  //
+  // Projenin EKİPLE ortak takvimi (Süreç > Takvim, migration 152). Google
+  // Takvim'den ve kişisel zaman bloklarından ayrı: buraya yazılan etkinliği
+  // projeyi gören herkes görür, katılımcıların kişisel takvimine de düşer.
+  {
+    name: "list_project_events",
+    description:
+      "Bir projenin ortak takvimindeki etkinlikleri listeler (toplantı, kilometre taşı, teslim). \"Projede bu hafta " +
+      "toplantı var mı\", \"X projesinin teslim günleri\" gibi sorular için ve etkinlik eklemeden önce aynısı var mı diye " +
+      "bakmak için kullan. projectId vermezsen kullanıcının üyesi olduğu TÜM projelerin, onu ilgilendiren etkinlikleri gelir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string", description: "Proje id'si (opsiyonel)." },
+        from: { type: "string", description: "Başlangıç tarihi (YYYY-MM-DD)." },
+        to: { type: "string", description: "Bitiş tarihi (YYYY-MM-DD). En fazla 62 gün sonrası." },
+      },
+      required: ["from", "to"],
+    },
+  },
+  {
+    name: "create_project_event",
+    description:
+      "Bir projenin ORTAK takvimine etkinlik ekler (Süreç > Takvim). Kullanıcı \"projeye toplantı koy\", \"X projesinin " +
+      "takvimine teslim günü ekle\", \"ekiple perşembe 14:00'te toplantı\" dediğinde kullan. Projeyi gören herkes görür; " +
+      "katılımcı verirsen yalnızca onların kişisel takvimine düşer ve onlara bildirim gider, vermezsen tüm ekibin takvimine " +
+      "düşer. Kullanıcının kendi Google Takvim'i için create_calendar_event, kişisel planı için create_time_blocks kullan. " +
+      "Katılımcı id'lerini list_project_members ile bul; isimden emin değilsen sor.",
+    input_schema: {
+      type: "object",
+      properties: {
+        projectId: { type: "string" },
+        title: { type: "string" },
+        kind: {
+          type: "string",
+          enum: ["meeting", "milestone", "delivery", "other"],
+          description: "meeting=toplantı, milestone=kilometre taşı, delivery=teslim, other=diğer. Varsayılan meeting.",
+        },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        startsAt: { type: "string", description: "HH:MM (allDay değilse zorunlu)." },
+        endsAt: { type: "string", description: "HH:MM (allDay değilse zorunlu). Söylenmediyse toplantıya 1 saat ver." },
+        allDay: { type: "boolean", description: "Kilometre taşı ve teslim genelde tüm gündür." },
+        endDate: { type: "string", description: "Çok günlü tüm gün etkinlikte son gün (dahil), YYYY-MM-DD." },
+        location: { type: "string", description: "Yer ya da toplantı bağlantısı." },
+        note: { type: "string" },
+        participantIds: { type: "array", items: { type: "string" }, description: "Kullanıcı id'leri; boş = tüm ekip." },
+      },
+      required: ["projectId", "title", "date"],
+    },
+  },
+  {
+    name: "update_project_event",
+    description:
+      "Proje takvimindeki bir etkinliği değiştirir (saatini kaydırmak, adını, yerini, katılımcılarını düzenlemek). " +
+      "Yalnızca verdiğin alanlar değişir. Etkinliği yalnızca onu ekleyen kişi ya da proje sahibi değiştirebilir. " +
+      "Etkinlik id'sini list_project_events ile bul.",
+    input_schema: {
+      type: "object",
+      properties: {
+        eventId: { type: "string" },
+        title: { type: "string" },
+        kind: { type: "string", enum: ["meeting", "milestone", "delivery", "other"] },
+        date: { type: "string", description: "YYYY-MM-DD" },
+        startsAt: { type: "string", description: "HH:MM" },
+        endsAt: { type: "string", description: "HH:MM" },
+        allDay: { type: "boolean" },
+        endDate: { type: "string" },
+        location: { type: "string" },
+        note: { type: "string" },
+        participantIds: { type: "array", items: { type: "string" } },
+      },
+      required: ["eventId"],
     },
   },
 

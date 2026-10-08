@@ -27,4 +27,6 @@ export const projeTakvimi: TranslationDict = {
   "Katılımcılar: {liste}": "Participants: {liste}",
   "Ekleyen: {ad}": "Added by: {ad}",
   "Proje takviminde etkinliğe eklendiğimde": "When I'm added to a project calendar event",
+  // Izgaradaki "+n etkinlik" penceresi (plan/GunEtkinlikleriPenceresi.tsx).
+  "Bu günde etkinlik yok.": "No events on this day.",
 };

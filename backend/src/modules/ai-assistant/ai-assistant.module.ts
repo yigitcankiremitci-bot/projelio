@@ -46,6 +46,7 @@ import { SupportModule } from "../support/support.module";
 import { PartyModule } from "../party/party.module";
 import { WhatsappModule } from "../whatsapp/whatsapp.module";
 import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
+import { CalendarModule } from "../calendar/calendar.module";
 
 @Module({
   imports: [PayTRModule, IndirimModule, 
@@ -113,6 +114,8 @@ import { GoogleTakvimModule } from "../google-takvim/google-takvim.module";
     forwardRef(() => WhatsappModule),
     // Kullanıcının Google Takvim'i: etkinlikleri okuma, ekleme, göreve çevirme.
     GoogleTakvimModule,
+    // Projenin ortak takvimi (Süreç > Takvim): etkinlik okuma, ekleme, değiştirme.
+    CalendarModule,
   ],
   controllers: [AiAssistantController],
   providers: [

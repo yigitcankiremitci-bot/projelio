@@ -101,10 +101,12 @@ import { IzinliSaglayiciYokHatasi, LlmProviderRegistry, type ProviderChoice } fr
 import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 import type { Locale } from "@projelio/shared";
+import type { ProjeEtkinligi, ProjeEtkinlikGirdisi } from "@projelio/shared";
 import { DIL_KURALLARI } from "./lio-dil-kurallari";
 import { cevir, cevirmen, hataMetni } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
+import { CalendarService } from "../calendar/calendar.service";
 import { GOOGLE_VERISI_SAGLAYICILARI, takvimVerisiIceriyor } from "./google-veri-siniri";
 import { tumGunGunleri, takvimGunEkle, type GoogleTakvimEtkinligi } from "@projelio/shared";
 
@@ -415,6 +417,46 @@ function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
+/**
+ * Lio'nun proje takvimi girdisi → servis girdisi. Yalnızca verilen alanlar
+ * geçer: update_project_event'te "verilmedi" ile "boşalt" ayrımı servisin
+ * eksik alanları mevcut kayıttan tamamlamasına dayanıyor.
+ */
+function projeEtkinlikGirdisi(input: Record<string, any>): ProjeEtkinlikGirdisi {
+  const g: ProjeEtkinlikGirdisi = {};
+  if (input.title !== undefined) g.title = String(input.title);
+  if (input.kind !== undefined) g.kind = input.kind;
+  if (input.date !== undefined) g.eventDate = String(input.date);
+  if (input.allDay !== undefined) g.allDay = Boolean(input.allDay);
+  if (input.endDate !== undefined) g.endDate = input.endDate ? String(input.endDate) : null;
+  if (input.startsAt !== undefined) g.startsAt = String(input.startsAt);
+  if (input.endsAt !== undefined) g.endsAt = String(input.endsAt);
+  if (input.location !== undefined) g.location = input.location ? String(input.location) : null;
+  if (input.note !== undefined) g.note = input.note ? String(input.note) : null;
+  if (Array.isArray(input.participantIds)) g.participantIds = input.participantIds.map(String);
+  return g;
+}
+
+/** Modele dönen proje etkinliği — yalnızca işine yarayan alanlar. */
+function projeEtkinligiOzeti(e: ProjeEtkinligi) {
+  return pruneEmpty({
+    id: e.id,
+    projeId: e.projectId,
+    proje: e.projectTitle,
+    baslik: e.title,
+    tur: e.kind,
+    tarih: e.eventDate,
+    sonGun: e.endDate,
+    tumGun: e.allDay || undefined,
+    saat: e.startsAt ? `${e.startsAt}-${e.endsAt}` : undefined,
+    yer: e.location,
+    not: e.note,
+    katilimcilar: e.participantIds.length ? e.participantIds : "tüm ekip",
+    ekleyen: e.createdByName,
+    duzenleyebilirsin: e.duzenlenebilir,
+  });
+}
+
 // Müşteri modülü ortak `party` varlığına yazar, module_records'a değil
 // (bkz. packages/shared/src/moduleConfigs/index.ts).
 const CUSTOMER_MODULE_KEY = "crm_musteri";
@@ -646,6 +688,8 @@ const ACTION_LABELS: Record<string, string> = {
   add_task_comment: "yorum eklendi",
   set_period_plan: "dönem planı kaydedildi",
   create_time_blocks: "zaman bloğu eklendi",
+  create_project_event: "proje takvimine etkinlik eklendi",
+  update_project_event: "proje etkinliği güncellendi",
   update_time_block_status: "zaman bloğu güncellendi",
   set_time_block_labels: "zaman bloğu etiketlendi",
   complete_ritual: "planlama oturumu kapatıldı",
@@ -849,6 +893,10 @@ export class AiAssistantService {
     // Kullanıcının kendi Google Takvim'i: etkinlikleri okumak, etkinlik eklemek,
     // etkinliği göreve çevirince kararı işaretlemek.
     private googleTakvim: GoogleTakvimService,
+    // Projenin ekiple ortak takvimi (migration 152). Yetki kontrolü servisin
+    // içinde: görmek için projeyi görebilmek, değiştirmek için yazan ya da
+    // proje sahibi olmak gerekiyor — Lio aynı kapıdan geçer.
+    private projeTakvimi: CalendarService,
     // Sosyal medya araçları çağrı anında çözülür: SocialMediaModule zaten
     // AiAssistantModule'ü içe aktarıyor (öneri için kredi defteri), statik
     // bağımlılık modül döngüsü kurardı — WhatsappLioService ile aynı desen.
@@ -1532,6 +1580,15 @@ export class AiAssistantService {
         "Tahminini liste olarak ÖNER, kullanıcı onaylayınca create_task/create_tasks ile oluştur ve her etkinliği " +
         "mark_calendar_event ile işaretle (görev olmayanları yoksay). Emin olmadığın projeyi uydurma, sor.",
       "- Kullanıcı açıkça \"hepsini işle\" demedikçe onay almadan toplu görev açma.",
+      "",
+      "## Proje takvimi",
+      "Her projenin ekiple ORTAK bir takvimi var (Süreç > Takvim). Google Takvim kullanıcının kendi takvimidir, " +
+        "zaman blokları kişisel plandır; proje takvimi ise ekibe verilen sözdür (toplantı, kilometre taşı, teslim).",
+      "- \"Projeye/ekiple toplantı koy\", \"teslim gününü takvime ekle\" gibi isteklerde create_project_event kullan. " +
+        "Hangi proje olduğu belli değilse sor; uydurma.",
+      "- Eklemeden önce list_project_events ile aynı gün aynı adda etkinlik var mı bak; varsa yenisini açma, söyle.",
+      "- Katılımcı adı verildiyse id'yi list_project_members ile bul. Katılımcı vermezsen etkinlik tüm ekibin " +
+        "takvimine düşer — kullanıcı belirli kişiler dediyse mutlaka ver.",
       "",
       "Aşağıda sana kullanıcının bugünkü bağlamı verilecek. Oradaki id'leri doğrudan kullanabilirsin;",
       "listede olmayan bir şey için list_* araçlarına başvur.",
@@ -3194,6 +3251,21 @@ export class AiAssistantService {
       case "send_time_blocks_to_calendar":
         return make(t("Google Takvim'e eklendi"), "/calendar");
 
+      case "create_project_event":
+      case "update_project_event": {
+        const projectId = result?.projeId;
+        if (!projectId) return null;
+        const label =
+          (toolName === "create_project_event" ? t("Proje takvimine etkinlik eklendi") : t("Proje etkinliği güncellendi")) +
+          (result?.baslik ? `: ${result.baslik}` : "");
+        return make(
+          label,
+          `/projects/${projectId}?tab=process&gorunum=takvim${result?.tarih ? `&tarih=${result.tarih}` : ""}`,
+          `project:${projectId}`,
+          result?.id
+        );
+      }
+
       default:
         return null;
     }
@@ -4561,6 +4633,27 @@ export class AiAssistantService {
           }
         }
         return pruneEmpty(sonuc);
+      }
+
+      case "list_project_events": {
+        const from = String(input.from ?? "");
+        const to = String(input.to ?? "");
+        const liste = input.projectId
+          ? (await this.projeTakvimi.projeTakvimi(String(input.projectId), userId, from, to)).events
+          : await this.projeTakvimi.kisiselTakvim(userId, from, to);
+        return {
+          etkinlikler: liste.map((e) => projeEtkinligiOzeti(e)),
+        };
+      }
+
+      case "create_project_event": {
+        const e = await this.projeTakvimi.etkinlikEkle(String(input.projectId ?? ""), userId, projeEtkinlikGirdisi(input));
+        return projeEtkinligiOzeti(e);
+      }
+
+      case "update_project_event": {
+        const e = await this.projeTakvimi.etkinlikGuncelle(String(input.eventId ?? ""), userId, projeEtkinlikGirdisi(input));
+        return projeEtkinligiOzeti(e);
       }
 
       case "mark_calendar_event": {

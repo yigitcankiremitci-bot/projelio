@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { icerikTuruSec, medyaEtiketi, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
+import { cevaptaTaslakVar, icerikTuruSec, medyaEtiketi, taslakGosterimi, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
 
 test("ofsetsiz duvar saati İstanbul saatine göre UTC'ye çevrilir", () => {
   const d = zamaniCoz("2026-10-01T19:00", "Europe/Istanbul");
@@ -52,4 +52,32 @@ test("saat dilimsiz veritabanı damgası UTC okunur", () => {
   assert.equal(utcAn("2026-10-01T16:00:00").toISOString(), "2026-10-01T16:00:00.000Z");
   assert.equal(utcAn("2026-10-01T16:00:00+00:00").toISOString(), "2026-10-01T16:00:00.000Z");
   assert.equal(utcAn("2026-10-01T19:00:00+03:00").toISOString(), "2026-10-01T16:00:00.000Z");
+});
+
+test("taslak gösterimi: açıklamayı aktarmayan cevap gösterilmemiş sayılır", () => {
+  const aciklama = "Satış Öğreniyorum - Bölüm 3\n\nFuarlarda networking yapmanın gücünü keşfettik.";
+  // 2026-10-08: Lio düzeltmeden sonra yalnızca bunu dedi.
+  assert.equal(cevaptaTaslakVar("Yeni hâli hazır. Böyle planlayayım mı?", aciklama), false);
+  // Biçim işaretleri ve satır sonları farkı engel değil.
+  assert.equal(
+    cevaptaTaslakVar("Açıklama:\n*Satış Öğreniyorum - Bölüm 3*\nFuarlarda networking yapmanın gücünü keşfettik.", aciklama),
+    true
+  );
+  assert.equal(cevaptaTaslakVar("Tamam.", null), true);
+});
+
+test("taslak gösterimi: sunucu bloğu hesap, tür, zaman, açıklama ve etiketleri taşır", () => {
+  const metin = taslakGosterimi({
+    hesaplar: ["@yigitcankiremitci"],
+    icerikTuru: "reel",
+    yayinZamani: "8 Ekim 2026 Perşembe 19:00",
+    aciklama: "Bölüm 3",
+    etiketler: "#projelio",
+  });
+  assert.match(metin, /Hesap: @yigitcankiremitci/);
+  assert.match(metin, /Tür: Reel/);
+  assert.match(metin, /19:00/);
+  assert.match(metin, /Bölüm 3/);
+  assert.match(metin, /Etiketler: #projelio/);
+  assert.ok(cevaptaTaslakVar(metin, "Bölüm 3"));
 });

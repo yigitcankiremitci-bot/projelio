@@ -8,7 +8,7 @@ import { yedektenYukle, yedekSil } from "./medya-yedegi";
 import { LioOneriService } from "./lio-oneri.service";
 import { denemeReelsHatasi } from "./publish-format";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
-import { icerikTuruSec, KARUSEL_TAVANI, medyaEtiketi, utcAn, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
+import { icerikTuruSec, KARUSEL_TAVANI, medyaEtiketi, taslakGosterimi, utcAn, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
 
 /**
  * Lio'nun sosyal medya araçlarının arkasındaki servis: WhatsApp'tan (ya da
@@ -402,6 +402,12 @@ export class SosyalLioService {
     const { data } = await this.supabase.client.from("files").select("id, name, mime_type, size_bytes").in("id", fileIds);
     const byId = new Map((data ?? []).map((f: any) => [f.id, f]));
     return fileIds.map((id) => medyaEtiketi(byId.get(id) ?? {}));
+  }
+
+  /** WhatsApp cevabına sunucunun eklediği taslak bloğu (bkz. cevaptaTaslakVar). */
+  async taslakGosterimi(postId: string, userId: string): Promise<{ aciklama: string | null; metin: string }> {
+    const o = await this.ozet(postId, userId);
+    return { aciklama: o.aciklama, metin: taslakGosterimi(o) };
   }
 
   private async ozet(postId: string, userId: string): Promise<TaslakOzeti> {

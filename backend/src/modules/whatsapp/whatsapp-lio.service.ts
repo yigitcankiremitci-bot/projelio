@@ -11,7 +11,7 @@ import type { WahaClient } from "./waha.client";
 import { decideLioKomut, devamCevabi, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
 import { yedekle, yedekSil, yedektenYukle } from "../social-media/medya-yedegi";
-import { medyaEtiketi, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
+import { cevaptaTaslakVar, medyaEtiketi, utcAn, WHATSAPP_ADSIZ_DOSYA_ONEKI } from "../social-media/sosyal-lio";
 import { formatForWhatsapp } from "./whatsapp-lio-format";
 import { maskPhone, normalizePhoneE164 } from "./whatsapp-phone";
 import { mapMessage, mapThread, WhatsappService, type ConnectionRow, type ContactRow, type ThreadRow } from "./whatsapp.service";
@@ -71,6 +71,33 @@ export class WhatsappLioService {
   private async ai(): Promise<AiAssistantService> {
     const { AiAssistantService: cls } = await import("../ai-assistant/ai-assistant.service");
     return this.moduleRef.get(cls, { strict: false });
+  }
+
+  /**
+   * Bu turda değişen taslak cevapta görünmüyorsa sunucu onu cevaba ekler.
+   *
+   * Onay koruması (gelen-medya.ts) bir sonraki mesajı "taslak gösterildi"
+   * sayıyor; gösterimi modele bırakınca kullanıcı görmediği açıklamaya "evet"
+   * diyebiliyordu (bkz. cevaptaTaslakVar). Hata cevabı engellemez: taslak
+   * okunamazsa Lio'nun kendi cevabı gider.
+   */
+  private async taslaklariGoster(userId: string, cevap: string | null | undefined): Promise<string | null | undefined> {
+    const idler = gelenMedya.buTurTaslaklari(userId);
+    if (!idler.length) return cevap;
+    try {
+      const { SosyalLioService: cls } = await import("../social-media/sosyal-lio.service");
+      const sosyal = this.moduleRef.get(cls, { strict: false });
+      const eklenecek: string[] = [];
+      for (const id of idler) {
+        const t = await sosyal.taslakGosterimi(id, userId);
+        if (!cevaptaTaslakVar(cevap ?? "", t.aciklama)) eklenecek.push(t.metin);
+      }
+      if (!eklenecek.length) return cevap;
+      return [cevap?.trim(), ...eklenecek].filter(Boolean).join("\n\n");
+    } catch (e) {
+      this.logger.warn(`Taslak gösterimi eklenemedi: ${e instanceof Error ? e.message : e}`);
+      return cevap;
+    }
   }
 
   /** Aynı gerekçeyle (bkz. ai()) ek servisi de çağrı anında çözülür. */
@@ -359,7 +386,8 @@ export class WhatsappLioService {
     // Taslak gösterilen turda cevap KESİLMEZ: kullanıcı onaylayacağı açıklamanın
     // tamamını görmeli. 800'de kesilince "…Tamamı için" eki açıklamanın parçası
     // sanıldı ve kullanıcı olmayan cümleleri sildirmeye çalıştı (2026-09-30).
-    const reply = this.komutCevabi(result, gelenMedya.buTurTaslakVar(userId) ? TASLAK_CEVAP_SINIRI : undefined);
+    const cevap = this.komutCevabi(result, gelenMedya.buTurTaslakVar(userId) ? TASLAK_CEVAP_SINIRI : undefined);
+    const reply = await this.taslaklariGoster(userId, cevap);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
   }

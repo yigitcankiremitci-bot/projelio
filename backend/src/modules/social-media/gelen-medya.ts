@@ -221,6 +221,11 @@ export class GelenMedyaDeposu {
     return (this.buTur.get(userId)?.size ?? 0) > 0;
   }
 
+  /** Bu turda açılan/değişen taslaklar — cevapta gerçekten gösterildiler mi diye bakılır. */
+  buTurTaslaklari(userId: string): string[] {
+    return [...(this.buTur.get(userId) ?? [])];
+  }
+
   planlanabilir(userId: string, postId: string): boolean {
     return this.sunulan.get(userId)?.has(postId) === true;
   }

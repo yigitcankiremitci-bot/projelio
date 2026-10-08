@@ -116,3 +116,53 @@ export function medyaEtiketi(f: { name?: string | null; mime_type?: string | nul
 export function utcAn(damga: string): Date {
   return new Date(/([zZ]|[+-]\d{2}:?\d{2})$/.test(damga) ? damga : `${damga}Z`);
 }
+
+const ICERIK_TURU_ADI: Record<string, string> = {
+  image: "Görsel",
+  video: "Video",
+  carousel: "Karusel",
+  reel: "Reel",
+  story: "Hikâye",
+};
+
+/** Karşılaştırma için: biçim işaretleri ve boşluk farkı "gösterilmedi" sayılmasın. */
+function sadelestir(metin: string): string {
+  return metin.replace(/[*_~`]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase("tr");
+}
+
+/**
+ * Lio'nun cevabı taslağın GÜNCEL açıklamasını içeriyor mu.
+ *
+ * NEDEN: onay koruması (gelen-medya.ts) taslağa dokunulan turdan sonraki her
+ * mesajı "taslak gösterildi" sayıyor. 2026-10-08'de Lio düzeltmeden sonra
+ * yalnızca "Yeni hâli hazır. Böyle planlayayım mı?" dedi; kullanıcı "evet"
+ * deseydi görmediği açıklama planlanacaktı. Gösterimi modele bırakmıyoruz.
+ *
+ * Açıklamanın başı (ilk 60 karakter) aranır: model metni olduğu gibi aktarır,
+ * ama sonuna "…" koyabilir ya da etiketleri ayrı satıra alabilir.
+ */
+export function cevaptaTaslakVar(cevap: string, aciklama: string | null | undefined): boolean {
+  const govde = sadelestir(aciklama ?? "");
+  if (!govde) return true;
+  return sadelestir(cevap).includes(govde.slice(0, 60));
+}
+
+/** Sunucunun cevaba eklediği taslak bloğu — Lio'nun kendi gösterim biçimiyle aynı alanlar. */
+export function taslakGosterimi(o: {
+  hesaplar: string[];
+  icerikTuru: string;
+  yayinZamani: string | null;
+  aciklama: string | null;
+  etiketler: string | null;
+}): string {
+  const satirlar = [
+    `Hesap: ${o.hesaplar.length ? o.hesaplar.join(", ") : "seçilmedi"}`,
+    `Tür: ${ICERIK_TURU_ADI[o.icerikTuru] ?? o.icerikTuru}`,
+    `Yayın zamanı: ${o.yayinZamani ?? "belirlenmedi"}`,
+    "",
+    "Açıklama:",
+    o.aciklama?.trim() || "(boş)",
+  ];
+  if (o.etiketler?.trim()) satirlar.push("", `Etiketler: ${o.etiketler.trim()}`);
+  return satirlar.join("\n");
+}

@@ -1,16 +1,6 @@
 {
 	# ACME bildirimleri (sertifika yenilenemezse uyarı buraya gider).
 	email info@projelio.app
-
-	# Kullanıcı kartvizitleri (*.projelio.app, aşağıda): sertifika, adres ilk
-	# açıldığında alınır. Almadan önce backend'e "bu adres gerçekten bir kart
-	# mı" diye sorulur; yalnızca aktif kartlara evet denir. Sormadan alınsaydı
-	# rastgele alt alan adlarıyla Let's Encrypt kotası (alan adı başına haftada
-	# 50) tüketilebilirdi. Joker sertifika yerine bu yol seçildi çünkü joker
-	# DNS-01 doğrulaması ister (GoDaddy API anahtarı + Caddy eklentisi).
-	on_demand_tls {
-		ask http://backend:3000/public/kartvizit/izin
-	}
 }
 
 # -------------------------------------------------------------- Tanıtım sitesi
@@ -66,45 +56,6 @@ firdevs.projelio.app, selin.projelio.app {
 		X-Robots-Tag "noindex"
 		Cache-Control "no-cache"
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-	}
-}
-
-# ---------------------------------------------- Kullanıcı kartvizitleri
-# Projelio'da kişi kartından oluşturulan ücretsiz kartvizitler (bkz. backend
-# modules/kartvizit, migration 151). DNS'te tek bir joker kayıt var
-# (*.projelio.app → bu sunucu); yukarıdaki açık bloklar (app, api, brand,
-# firdevs, selin...) her zaman bundan ÖNCE eşleşir.
-#
-# Sayfa, vCard ve QR backend'den gelir: istek /public/kartvizit/<adres><yol>
-# olarak çevrilir. style.css ve app.js tüm kartlarda aynı, doğrudan buradan.
-# Başlıklar bu blokta (backend vermiyor) — tek kaynak.
-*.projelio.app {
-	tls {
-		on_demand
-	}
-	encode zstd gzip
-
-	@ortak path /style.css /app.js
-	handle @ortak {
-		root * /srv/kartvizit/_ortak
-		file_server
-		header Cache-Control "no-cache"
-	}
-
-	handle {
-		rewrite * /public/kartvizit/{labels.2}{uri}
-		reverse_proxy backend:3000
-	}
-
-	header {
-		X-Content-Type-Options "nosniff"
-		Referrer-Policy "strict-origin-when-cross-origin"
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Frame-Options "DENY"
-		X-Robots-Tag "noindex"
-		# Profil fotoğrafı api.projelio.app'teki açık kovadan geliyor.
-		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://api.projelio.app; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
-		-Server
 	}
 }
 

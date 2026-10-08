@@ -23,6 +23,7 @@ export const baglantilar: TranslationDict = {
   "Kartı bu deftere eklemek için orada da yazma yetkin olmalı": "You need write access there too to add the card to that list",
 
   "Geçersiz sosyal hesap": "Invalid social media account",
+  "Geçersiz kart türü": "Invalid card type",
   "Departman bu kartın şirketinde değil": "That department isn't in this card's company",
   "Dosya eklemek için kartı modülün açık olduğu bir departmandan aç":
     "To add a file, open the card from a department where the module is enabled",

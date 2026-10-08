@@ -88,4 +88,12 @@ export const baglantilar: TranslationDict = {
   "Kart kaydedildi ama kartvizit yüklenemedi: {sebep}": "The card was saved but the business card couldn't be uploaded: {sebep}",
   "Kartvizit ({n} dosya)": { one: "Business card ({n} file)", other: "Business card ({n} files)" },
   "Dosya açılamadı": "Couldn't open the file",
+
+  // ─────────────────────────────────────────────── Şirket/kurum kişileri, açılır bölüm
+  "Kurum ##kartTuru": "Organization",
+  "Şirket adı *": "Company name *",
+  "Kurum adı *": "Organization name *",
+  "+ Kişi ekle": "+ Add person",
+  "Web sitesi ve sosyal medya": "Website and social media",
+  "dolu": "filled in",
 };

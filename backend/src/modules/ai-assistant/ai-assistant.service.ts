@@ -65,6 +65,7 @@ import { AccessService } from "../../common/access/access.service";
 import {
   BAGLANTI_MODUL_KEY,
   isPartyRole,
+  isPartyType,
   isReferenceValue,
   MUSTERI_MODUL_KEY,
   type BaglantiOnem,
@@ -491,7 +492,7 @@ function customerSummary(p: Party) {
 function customerFields(input: Record<string, any>): Partial<Party> {
   const str = (v: unknown) => (v === undefined || v === null ? undefined : String(v).trim());
   return {
-    partyType: input.partyType === "person" || input.partyType === "company" ? input.partyType : undefined,
+    partyType: isPartyType(input.partyType) ? input.partyType : undefined,
     roles: Array.isArray(input.roles) && input.roles.length ? (input.roles as PartyRole[]) : undefined,
     legalName: str(input.legalName),
     taxNumber: str(input.taxNumber),
@@ -537,7 +538,7 @@ function connectionFields(input: Record<string, any>): Partial<Party> {
     iliskiNotu: str(input.iliskiNotu),
   });
   return {
-    partyType: input.partyType === "person" || input.partyType === "company" ? input.partyType : undefined,
+    partyType: isPartyType(input.partyType) ? input.partyType : undefined,
     // Tanınmayan rol sessizce düşer (sunucu zaten reddederdi; tek yanlış rol
     // bütün kartı düşürmesin).
     roles: Array.isArray(input.roles) && input.roles.some(isPartyRole) ? input.roles.filter(isPartyRole) : undefined,
@@ -1571,6 +1572,8 @@ export class AiAssistantService {
         "create_customer ile AÇMA, rakip satış listesine düşer. Kullanıcı kartvizit fotoğrafı verip \"bağlantılara " +
         "ekle\" dediğinde: her kartvizitten ad, şirket (kurum), unvan, telefon, e-posta, web, LinkedIn/Instagram'ı oku; " +
         "okuyamadığını UYDURMA, boş bırak. Nerede tanışıldığını kullanıcı söylemediyse bir kez sor; bilmiyorsa boş geç. " +
+        "Kartvizitler bir şirket ya da kurumdaki birden fazla kişiye aitse ve kullanıcı şirket kartı istiyorsa " +
+        "partyType company/institution ile tek kart aç, kişileri yetkililer'e yaz; aksi hâlde her kişi ayrı kart. " +
         "Sonra TEK create_connections çağrısıyla hepsini gönder, her kişiye kartvizitinin görüldüğü dosyaKimligi'ni " +
         "kartvizitDosyasi olarak ver. Kullanıcı listeyi onay penceresinde görür — ayrıca sohbette onay isteme.",
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
@@ -6295,6 +6298,20 @@ export class AiAssistantService {
         );
       }
       acilan.push({ partyId: party.id, ad });
+
+      // Şirket/kurum kartının yetkilileri; ilki birincil.
+      const yetkililer: Record<string, any>[] =
+        party.partyType !== "person" && Array.isArray(k.yetkililer) ? k.yetkililer.slice(0, 20) : [];
+      for (const [i, y] of yetkililer.entries()) {
+        if (!String(y?.name ?? "").trim()) continue;
+        await this.partyService
+          .addContact(
+            party.id,
+            { name: String(y.name), title: y.title, phone: y.phone, email: y.email, isPrimary: i === 0 },
+            userId
+          )
+          .catch((err) => uyarilar.push(`${ad}: ${y.name} eklenemedi (${(err as Error).message})`));
+      }
 
       const dosyaKimligi = k.kartvizitDosyasi ? String(k.kartvizitDosyasi) : "";
       if (!dosyaKimligi) continue;

@@ -341,6 +341,11 @@ export class PartyController {
     return this.partyService.addContact(id, body, req.user.userId);
   }
 
+  @Patch("party-contacts/:contactId")
+  updateContact(@Param("contactId") contactId: string, @Body() body: Partial<PartyContact>, @Req() req: any) {
+    return this.partyService.updateContact(contactId, body, req.user.userId);
+  }
+
   @Delete("party-contacts/:contactId")
   removeContact(@Param("contactId") contactId: string, @Req() req: any) {
     return this.partyService.removeContact(contactId, req.user.userId);

@@ -701,7 +701,13 @@ export interface PartyBaglanti {
   iliskiNotu?: string;
 }
 
-export type PartyType = "person" | "company";
+// institution: dernek, üniversite, kamu kurumu (migration 156). Şirket ve
+// kurum kartlarının altında birden fazla kişi olur (PartyContact).
+export type PartyType = "person" | "company" | "institution";
+export const PARTY_TYPES: readonly PartyType[] = ["person", "company", "institution"];
+export function isPartyType(value: unknown): value is PartyType {
+  return typeof value === "string" && (PARTY_TYPES as readonly string[]).includes(value);
+}
 export type PartyStatus = "active" | "passive" | "blocked";
 
 /**

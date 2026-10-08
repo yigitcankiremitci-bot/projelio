@@ -71,6 +71,8 @@ function emptyForm() {
     // Yalnızca kişi kartında: çalıştığı şirket ve görevi.
     kurum: "",
     unvan: "",
+    // Şirket/kurum kartında: kurumdaki kişiler (party_contact). id'li olanlar kayıtlı.
+    yetkililer: [] as YetkiliSatiri[],
     role: "lead" as PartyRole,
     email: "",
     phone: "",
@@ -91,6 +93,15 @@ function emptyForm() {
 }
 
 const ONEM_SIRASI: Record<BaglantiOnem, number> = { yuksek: 0, orta: 1, dusuk: 2 };
+
+interface YetkiliSatiri {
+  id?: string;
+  name: string;
+  title: string;
+  phone: string;
+  email: string;
+}
+const bosYetkili = (): YetkiliSatiri => ({ name: "", title: "", phone: "", email: "" });
 
 /** Yerel takvimde bugün, YYYY-MM-DD (toISOString UTC'ye kayar, gece yarısı yanlış gün verir). */
 function bugunYmd(): string {
@@ -159,6 +170,11 @@ export default function CustomersPanel({
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Formdan çıkarılan kayıtlı kişiler: kaydedince arşivlenir.
+  const [silinenYetkililer, setSilinenYetkililer] = useState<string[]>([]);
+  // Web sitesi ve sosyal hesaplar herkese gerekmiyor: kapalı bir bölüm,
+  // dolu alan varsa açık gelir.
+  const [sosyalAcik, setSosyalAcik] = useState(false);
   // Formda seçilen kartvizit: kart kaydedildikten sonra karta yüklenir.
   const [kartvizit, setKartvizit] = useState<File | null>(null);
   // Form kapandıktan sonra görünmesi gereken uyarı (kart açıldı, kartvizit yüklenemedi).
@@ -269,7 +285,7 @@ export default function CustomersPanel({
       Array.from(
         new Set(
           parties
-            .flatMap((p) => [p.kurum, p.partyType === "company" ? p.displayName : undefined])
+            .flatMap((p) => [p.kurum, p.partyType !== "person" ? p.displayName : undefined])
             .filter((x): x is string => !!x?.trim())
         )
       ).sort((a, b) => a.localeCompare(b, "tr")),
@@ -344,6 +360,8 @@ export default function CustomersPanel({
     });
     setEkSosyal([]);
     setKartvizit(null);
+    setSilinenYetkililer([]);
+    setSosyalAcik(false);
     setDuplicates([]);
     setError("");
     setFormMode({ kind: "create" });
@@ -368,11 +386,32 @@ export default function CustomersPanel({
       tanismaTarihi: p.baglanti?.tanismaTarihi ?? "",
       sonrakiTemas: p.baglanti?.sonrakiTemas ?? "",
       iliskiNotu: p.baglanti?.iliskiNotu ?? "",
+      yetkililer: [],
     });
     setDuplicates([]);
     setError("");
     setKartvizit(null);
+    setSilinenYetkililer([]);
+    setSosyalAcik(!!p.website || Object.values(p.sosyal ?? {}).some(Boolean));
     setFormMode({ kind: "edit", party: p });
+    // Kayıtlı kişiler formda düzenlenebilsin (unvan, iletişim).
+    if (p.partyType !== "person") {
+      api
+        .get<PartyContact[]>(`/party/${p.id}/contacts`)
+        .then((kisiler) =>
+          setForm((f) => ({
+            ...f,
+            yetkililer: kisiler.map((k) => ({
+              id: k.id,
+              name: k.name,
+              title: k.title ?? "",
+              phone: k.phone ?? "",
+              email: k.email ?? "",
+            })),
+          }))
+        )
+        .catch(() => {});
+    }
   };
 
   const closeForm = () => {
@@ -472,6 +511,17 @@ export default function CustomersPanel({
       } else {
         const yeni = await api.post<Party>(scopePath, payload);
         partyId = yeni.id;
+      }
+      // Şirket/kurum kişileri: yeniler eklenir, kayıtlılar güncellenir,
+      // formdan çıkarılanlar arşivlenir. İlk kişi yeni kartta birincil olur.
+      if (partyId && form.partyType !== "person") {
+        const doluSatirlar = form.yetkililer.filter((y) => y.name.trim());
+        for (const [i, y] of doluSatirlar.entries()) {
+          const govde = { name: y.name, title: y.title, phone: y.phone, email: y.email };
+          if (y.id) await api.patch(`/party-contacts/${y.id}`, govde);
+          else await api.post(`/party/${partyId}/contacts`, { ...govde, isPrimary: formMode?.kind !== "edit" && i === 0 });
+        }
+        for (const id of silinenYetkililer) await api.delete(`/party-contacts/${id}`).catch(() => {});
       }
       if (kartvizit && partyId) {
         await partyApi.dosyaEkle(partyId, kartvizit, jobId ? undefined : departmentId).catch((err) =>
@@ -703,7 +753,15 @@ export default function CustomersPanel({
             <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kaydı düzenliyorsun")}</span>
           )}
 
-          <Field label={form.partyType === "person" ? t("Ad soyad *") : t("Ad / Unvan *")}>
+          <Field
+            label={
+              form.partyType === "person"
+                ? t("Ad soyad *")
+                : form.partyType === "institution"
+                  ? t("Kurum adı *")
+                  : t("Şirket adı *")
+            }
+          >
             <input
               value={form.displayName}
               onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
@@ -717,11 +775,20 @@ export default function CustomersPanel({
             <Field label={t("Tür")} style={{ flex: 1 }}>
               <select
                 value={form.partyType}
-                onChange={(e) => setForm((f) => ({ ...f, partyType: e.target.value }))}
+                onChange={(e) => {
+                  const tur = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    partyType: tur,
+                    // Şirket/kurum seçilince ilk kişi satırı hazır gelsin.
+                    yetkililer: tur !== "person" && !f.yetkililer.length ? [bosYetkili()] : f.yetkililer,
+                  }));
+                }}
                 style={{ width: "100%" }}
               >
-                <option value="company">{t("Kurum")}</option>
                 <option value="person">{t("Kişi")}</option>
+                <option value="company">{t("Şirket")}</option>
+                <option value="institution">{t("Kurum", { ctx: "kartTuru" })}</option>
               </select>
             </Field>
             <Field label={t("Rol")} style={{ flex: 1 }}>
@@ -780,6 +847,49 @@ export default function CustomersPanel({
                   style={{ width: "100%" }}
                 />
               </Field>
+            </div>
+          )}
+
+          {form.partyType !== "person" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kişiler")}</span>
+              {form.yetkililer.map((y, i) => {
+                const degistir = (alan: keyof YetkiliSatiri, deger: string) =>
+                  setForm((f) => ({
+                    ...f,
+                    yetkililer: f.yetkililer.map((x, j) => (j === i ? { ...x, [alan]: deger } : x)),
+                  }));
+                return (
+                  <div
+                    key={y.id ?? `yeni-${i}`}
+                    style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", paddingBottom: 6, borderBottom: `1px solid ${c.border}` }}
+                  >
+                    <input value={y.name} onChange={(e) => degistir("name", e.target.value)} placeholder={t("Ad soyad")} style={{ flex: "2 1 140px" }} />
+                    <input value={y.title} onChange={(e) => degistir("title", e.target.value)} placeholder={t("Unvan")} style={{ flex: "1 1 110px" }} />
+                    <input value={y.phone} onChange={(e) => degistir("phone", e.target.value)} placeholder={t("Telefon")} style={{ flex: "1 1 110px" }} />
+                    <input value={y.email} onChange={(e) => degistir("email", e.target.value)} placeholder={t("E-posta")} style={{ flex: "2 1 150px" }} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (y.id) setSilinenYetkililer((l) => [...l, y.id!]);
+                        setForm((f) => ({ ...f, yetkililer: f.yetkililer.filter((_, j) => j !== i) }));
+                      }}
+                      aria-label={t("Kişiyi çıkar")}
+                      title={t("Kişiyi çıkar")}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", padding: 2 }}
+                    >
+                      <IconX size={14} color={c.textSecondary} />
+                    </button>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, yetkililer: [...f.yetkililer, bosYetkili()] }))}
+                style={{ alignSelf: "flex-start", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+              >
+                {t("+ Kişi ekle")}
+              </button>
             </div>
           )}
 
@@ -868,6 +978,17 @@ export default function CustomersPanel({
             </Field>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setSosyalAcik((a) => !a)}
+            aria-expanded={sosyalAcik}
+            style={{ alignSelf: "flex-start", fontSize: 12, color: c.textSecondary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {sosyalAcik ? "▾" : "▸"} {t("Web sitesi ve sosyal medya")}
+            {!sosyalAcik && (form.website || Object.values(form.sosyal).some(Boolean)) ? ` · ${t("dolu")}` : ""}
+          </button>
+          {sosyalAcik && (
+          <>
           <Field label={t("Web sitesi")}>
             <input
               value={form.website}
@@ -906,6 +1027,8 @@ export default function CustomersPanel({
                 </option>
               ))}
             </select>
+          )}
+          </>
           )}
 
           {/* Bağlantılar'da fatura kesilmiyor; hızlı girişte fazladan alan olmasın. */}
@@ -1505,6 +1628,21 @@ function PartyDetail({
                 {ct.name}
                 {ct.title && <span style={{ color: c.textSecondary }}> · {ct.title}</span>}
                 {ct.isPrimary && <span style={{ color: c.primary }}> {t("· birincil")}</span>}
+                {(ct.phone || ct.email) && (
+                  <span style={{ display: "block", color: c.textSecondary }}>
+                    {ct.phone && (
+                      <a href={`tel:${ct.phone.replace(/[^\d+]/g, "")}`} style={{ color: c.primary, textDecoration: "none" }}>
+                        {ct.phone}
+                      </a>
+                    )}
+                    {ct.phone && ct.email && " · "}
+                    {ct.email && (
+                      <a href={`mailto:${ct.email}`} style={{ color: c.primary, textDecoration: "none" }}>
+                        {ct.email}
+                      </a>
+                    )}
+                  </span>
+                )}
               </span>
               {canWrite && (
                 <button

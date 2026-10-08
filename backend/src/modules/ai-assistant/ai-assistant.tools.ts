@@ -1685,7 +1685,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
         departmentId: { type: "string", description: "Kullanıcı departman belirttiyse (opsiyonel)." },
         displayName: { type: "string", description: "Kartta görünecek ad (firma ya da kişi adı)." },
-        partyType: { type: "string", enum: ["company", "person"], description: "Firma mı kişi mi. Varsayılan company." },
+        partyType: {
+          type: "string",
+          enum: ["company", "institution", "person"],
+          description: "Firma, kurum (dernek, üniversite, kamu) ya da kişi. Varsayılan company.",
+        },
         roles: {
           type: "array",
           items: { type: "string", enum: ["lead", "customer", "supplier", "candidate", "distributor", "other"] },
@@ -1716,7 +1720,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       properties: {
         partyId: { type: "string", description: "Kart kimliği." },
         displayName: { type: "string" },
-        partyType: { type: "string", enum: ["company", "person"] },
+        partyType: { type: "string", enum: ["company", "institution", "person"] },
         roles: {
           type: "array",
           items: { type: "string", enum: ["lead", "customer", "supplier", "candidate", "distributor", "other"] },
@@ -1809,7 +1813,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
             type: "object",
             properties: {
               displayName: { type: "string", description: "Kişinin adı soyadı (yalnızca kurumsa kurum adı)." },
-              partyType: { type: "string", enum: ["person", "company"], description: "Varsayılan person." },
+              partyType: {
+                type: "string",
+                enum: ["person", "company", "institution"],
+                description: "Varsayılan person. Kartvizit bir kişiye aitse person; yalnızca firma bilgisi varsa company.",
+              },
               roles: {
                 type: "array",
                 items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
@@ -1827,6 +1835,21 @@ export const AI_TOOLS: Anthropic.Tool[] = [
               tanismaTarihi: { type: "string", description: "YYYY-AA-GG." },
               sonrakiTemas: { type: "string", description: "Ne zaman dönülecek, YYYY-AA-GG." },
               iliskiNotu: { type: "string", description: "Yalnızca bu modülde görünen not (rakip, ortak iş fikri…)." },
+              yetkililer: {
+                type: "array",
+                maxItems: 20,
+                description: "Yalnızca company/institution kartında: kurumdaki kişiler (ad, unvan, iletişim).",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    title: { type: "string", description: "Unvan." },
+                    phone: { type: "string" },
+                    email: { type: "string" },
+                  },
+                  required: ["name"],
+                },
+              },
               kartvizitDosyasi: {
                 type: "string",
                 description: "Bu kişinin kartvizitinin göründüğü görselin dosyaKimligi (\"Şu an açık dosyalar\" listesinden).",

@@ -113,7 +113,13 @@ const ONEMLER: { etiket: string; en: string; onem: BaglantiOnem; esAdlar: string
 ];
 
 const TURLER: { etiket: string; en: string; tur: PartyType; esAdlar: string[] }[] = [
-  { etiket: "Firma", en: "Company", tur: "company", esAdlar: ["firma", "şirket", "sirket", "kurum", "tüzel", "company", "business"] },
+  { etiket: "Firma", en: "Company", tur: "company", esAdlar: ["firma", "şirket", "sirket", "tüzel", "company", "business"] },
+  {
+    etiket: "Kurum",
+    en: "Organization",
+    tur: "institution",
+    esAdlar: ["kurum", "kuruluş", "kurulus", "dernek", "vakıf", "vakif", "kamu", "üniversite", "organization", "institution", "ngo"],
+  },
   { etiket: "Kişi", en: "Person", tur: "person", esAdlar: ["kişi", "kisi", "şahıs", "sahis", "bireysel", "gerçek", "person", "individual"] },
 ];
 
@@ -132,7 +138,7 @@ export const MUSTERI_SUTUNLARI: Sutun[] = [
     baslik: "Tür",
     esAdlar: ["tür", "tip", "type"],
     genislik: 10,
-    aciklama: "Firma ya da Kişi. Boşsa Firma sayılır.",
+    aciklama: "Firma, Kurum ya da Kişi. Boşsa Firma sayılır.",
     ornek: "Firma",
     secenekler: TURLER.map((t) => t.etiket),
   },
@@ -350,7 +356,7 @@ export function sablonSutunlari(tur: SablonTuru): Sutun[] {
  */
 const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string }> = {
   displayName: { baslik: "Name", aciklama: "Required. The name shown in the list: company name or the person's full name.", ornek: "Harbor Logistics" },
-  partyType: { baslik: "Type", aciklama: "Company or Person. Empty means Company.", ornek: "Company" },
+  partyType: { baslik: "Type", aciklama: "Company, Organization or Person. Empty means Company.", ornek: "Company" },
   roles: {
     baslik: "Role",
     aciklama: "Customer, Lead, Supplier, Distributor or Other. Separate several with commas. Empty means Lead.",

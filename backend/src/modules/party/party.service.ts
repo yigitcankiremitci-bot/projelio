@@ -7,6 +7,7 @@ import {
   MUSTERI_MODUL_KEY,
   PARTY_MODUL_KEYS,
   isPartyRole,
+  isPartyType,
   type BaglantiListesi,
   type KartvizitSosyal,
   type KartvizitSosyalAnahtar,
@@ -273,6 +274,10 @@ export class PartyService {
     return sonuc;
   }
 
+  private turuDogrula(tur: unknown): void {
+    if (tur !== undefined && !isPartyType(tur)) throw new BadRequestException("Geçersiz kart türü");
+  }
+
   /** Bilinmeyen rolü reddeder (eskiden istemciden geldiği gibi yazılıyordu). */
   private rolleriDogrula(roles: unknown): void {
     if (roles === undefined) return;
@@ -473,6 +478,7 @@ export class PartyService {
   ): Promise<Party> {
     if (!payload.displayName?.trim()) throw new BadRequestException("Ad gerekli");
     this.rolleriDogrula(payload.roles);
+    this.turuDogrula(payload.partyType);
     const sosyal = this.sosyalDogrula(payload.sosyal);
     await this.assertCanWrite(scope, userId, modul);
     const baglantiDefteri = modul === BAGLANTI_MODUL_KEY;
@@ -745,6 +751,7 @@ export class PartyService {
   async update(id: string, payload: Partial<Party>, userId?: string): Promise<Party> {
     const existing = await this.findOne(id, { baglanti: true });
     this.rolleriDogrula(payload.roles);
+    this.turuDogrula(payload.partyType);
     const sosyal = this.sosyalDogrula(payload.sosyal);
     let e: Erisimler | null = null;
     if (userId) {
@@ -1181,6 +1188,48 @@ export class PartyService {
         is_primary: payload.isPrimary ?? false,
         notes: payload.notes ?? null,
       })
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapContact(row);
+  }
+
+  /**
+   * Kişiyi günceller (unvan, telefon, e-posta). Şirket/kurum kartının altındaki
+   * kişiler formdan topluca düzenleniyor; eskiden yalnızca ekle/çıkar vardı
+   * ve unvan değişince kişiyi silip yeniden eklemek gerekiyordu.
+   */
+  async updateContact(contactId: string, payload: Partial<PartyContact>, userId?: string): Promise<PartyContact> {
+    const { data: contact } = await this.supabase.client
+      .from("party_contact")
+      .select("party_id")
+      .eq("id", contactId)
+      .is("archived_at", null)
+      .maybeSingle();
+    if (!contact) throw new NotFoundException("Kişi bulunamadı");
+    await this.assertKayitYazilir(await this.findOne(contact.party_id), userId);
+    if (payload.name !== undefined && !payload.name.trim()) throw new BadRequestException("Kişi adı gerekli");
+
+    if (payload.isPrimary) {
+      await this.supabase.client
+        .from("party_contact")
+        .update({ is_primary: false })
+        .eq("party_id", contact.party_id)
+        .neq("id", contactId)
+        .is("archived_at", null);
+    }
+    const patch: Record<string, unknown> = {};
+    const metin = (v: string | undefined) => (v === undefined ? undefined : v.trim() || null);
+    if (payload.name !== undefined) patch.name = payload.name.trim();
+    if (payload.title !== undefined) patch.title = metin(payload.title);
+    if (payload.email !== undefined) patch.email = metin(payload.email);
+    if (payload.phone !== undefined) patch.phone = metin(payload.phone);
+    if (payload.notes !== undefined) patch.notes = metin(payload.notes);
+    if (payload.isPrimary !== undefined) patch.is_primary = payload.isPrimary;
+    const { data: row, error } = await this.supabase.client
+      .from("party_contact")
+      .update(patch)
+      .eq("id", contactId)
       .select("*")
       .single();
     if (error) throw error;

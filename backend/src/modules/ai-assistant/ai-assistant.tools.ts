@@ -115,6 +115,7 @@ export const WRITE_TOOLS = new Set<string>([
   // taslak kuralı zorluyor (bkz. baglanti-taslaklari.ts). prepare yazmadığı
   // için listede yok.
   "confirm_connections",
+  "set_connection_event",
   // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
@@ -1785,6 +1786,29 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         organizationId: { type: "string" },
         jobId: { type: "string" },
         query: { type: "string", description: "Ada, kuruma, e-postaya, telefona ya da tanışma yerine göre süzgeç." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "set_connection_event",
+    description:
+      "Kullanıcının şu an bulunduğu etkinliği (fuar, kongre) kaydeder: bitişine kadar her kartvizite tanışma yeri " +
+      "ve o günün tarihi KENDİLİĞİNDEN yazılır, tanışma yeri bir daha SORULMAZ. Kullanıcı \"İTS'deyim, 10 Ekim'e " +
+      "kadar\" gibi bir şey söyleyince çağır. varsayilanRol: kullanıcı \"hepsi bağlantı\" dediyse — o zaman rol de " +
+      "sorulmaz. sormadanKaydet: kullanıcı \"rolleri/notları sonra eklerim, direkt kaydet\" dediyse — o zaman " +
+      "kartvizitler okunur okunmaz kaydedilir, hiçbir şey sorulmaz. kapat:true etkinliği bitirir.",
+    input_schema: {
+      type: "object",
+      properties: {
+        tanismaYeri: { type: "string", description: "Etkinliğin adı (İTS 2026). Bilinmiyorsa verme." },
+        bitisTarihi: {
+          type: "string",
+          description: "Son gün, YYYY-AA-GG (bugünden önce olamaz). Kullanıcı söylemediyse ve kayıtlı etkinlik yoksa bugün.",
+        },
+        varsayilanRol: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
+        sormadanKaydet: { type: "boolean", description: "Yalnızca kullanıcı açıkça \"sormadan kaydet / sonra eklerim\" dediyse true." },
+        kapat: { type: "boolean" },
       },
       required: [],
     },

@@ -66,6 +66,15 @@ export class BaglantiTaslaklari<T> {
   }
 
   /**
+   * Taslağı gösterilmiş say — YALNIZCA kullanıcının açıkça istediği "sormadan
+   * kaydet" modunda (migration 158 sormadan_kaydet). Başka yerden çağırma.
+   */
+  sunulmusSay(id: string): void {
+    const t = this.taslaklar.get(id);
+    if (t) t.sunuldu = true;
+  }
+
+  /**
    * Kullanıcıya gösterilmiş EN SON taslak. Sohbet geçmişine araç sonuçları
    * yazılmadığı için Lio cevap turunda taslakId'yi bilmiyor; 2026-10-09'da
    * kimlik uydurdu ve "taslak bulunamadı" alıp kullanıcıdan bilgileri yeniden

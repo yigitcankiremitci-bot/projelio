@@ -1597,6 +1597,11 @@ export class AiAssistantService {
         "çağır: rol söylenmediyse contact, tanışma yeri söylenmediyse boş, not yoksa boş (uydurma); notu kullanıcının " +
         "sözleriyle iliskiNotu'na yaz. Kaydettikten sonra kısa bir özetle bitir. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
         "update_connection ile düzelt.",
+      "- FUAR/ETKİNLİK: Kullanıcı bulunduğu etkinliği ve ne zamana kadar orada olacağını söylerse (\"İTS'deyim, " +
+        "10 Ekim'e kadar\") set_connection_event ile kaydet; o tarihe kadar tanışma yerini bir daha SORMA. \"Hepsi " +
+        "bağlantı\" derse varsayilanRol ver — rolü de sorma. \"Rolleri/notları sonra eklerim, direkt kaydet\" derse " +
+        "sormadanKaydet:true — sonra kartvizit gelince prepare_connections kaydı kendisi yapar, sen yalnızca kısaca " +
+        "\"Kaydettim: …\" de, soru sorma. \"Fuar bitti\" ya da \"artık sor\" derse kapat:true / sormadanKaydet:false.",
       "- QR'LI KARTVİZİT: Kâğıt kartvizitin üstünde QR varsa KARTTA YAZANLAR önceliklidir — önce onları oku. Ad + telefon " +
         "ya da e-posta okunabildiyse QR'a dokunma. Eksikse read_contact_card çağır: QR'da kişi kartı varsa yalnızca EKSİK " +
         "alanları tamamla; QR bir bağlantıysa adresi göster ve açmak için kullanıcıya SOR, onay gelirse baglantiyaGit:true. " +
@@ -5526,6 +5531,9 @@ export class AiAssistantService {
           .map((p) => connectionSummary(p));
       }
 
+      case "set_connection_event":
+        return this.setConnectionEvent(userId, input);
+
       case "read_contact_card":
         return this.readContactCard(userId, String(input.dosya ?? ""), input.baglantiyaGit === true);
 
@@ -6339,6 +6347,72 @@ export class AiAssistantService {
     return this.attachmentsService.getFile(userId, dosya);
   }
 
+  /** Bugünün tarihi İstanbul saatiyle, YYYY-AA-GG (gece yarısı UTC'ye kaymasın). */
+  private bugunTr(): string {
+    return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Istanbul" });
+  }
+
+  /** Kullanıcının süresi geçmemiş etkinliği (bkz. migration 158). Okunamazsa yok sayılır. */
+  private async aktifEtkinlik(
+    userId: string
+  ): Promise<{ yer?: string; bitis: string; varsayilanRol?: PartyRole; sormadanKaydet: boolean } | null> {
+    const { data, error } = await this.supabase.client
+      .from("baglanti_etkinlikleri")
+      .select("tanisma_yeri, bitis, varsayilan_rol, sormadan_kaydet")
+      .eq("user_id", userId)
+      .gte("bitis", this.bugunTr())
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      yer: data.tanisma_yeri ?? undefined,
+      bitis: data.bitis,
+      varsayilanRol: data.varsayilan_rol ?? undefined,
+      sormadanKaydet: data.sormadan_kaydet === true,
+    };
+  }
+
+  private async setConnectionEvent(userId: string, input: Record<string, any>) {
+    if (input.kapat === true) {
+      const { error } = await this.supabase.client.from("baglanti_etkinlikleri").delete().eq("user_id", userId);
+      if (error) throw error;
+      return { kapatildi: true };
+    }
+    // Verilmeyen alan kayıtlı etkinlikten korunur: "sormadan kaydet" demek
+    // daha önce söylenen fuarı silmesin.
+    const onceki = await this.aktifEtkinlik(userId);
+    const bugun = this.bugunTr();
+    const yer = String(input.tanismaYeri ?? "").trim().slice(0, 200) || onceki?.yer || null;
+    const bitis = String(input.bitisTarihi ?? "").trim() || onceki?.bitis || bugun;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bitis) || bitis < bugun) {
+      throw new BadRequestException(`bitisTarihi YYYY-AA-GG olmalı ve bugünden (${bugun}) önce olamaz`);
+    }
+    const rol = isPartyRole(input.varsayilanRol) ? input.varsayilanRol : (onceki?.varsayilanRol ?? null);
+    const sormadan = typeof input.sormadanKaydet === "boolean" ? input.sormadanKaydet : (onceki?.sormadanKaydet ?? false);
+    const { error } = await this.supabase.client.from("baglanti_etkinlikleri").upsert(
+      {
+        user_id: userId,
+        tanisma_yeri: yer,
+        baslangic: bugun,
+        bitis,
+        varsayilan_rol: rol,
+        sormadan_kaydet: sormadan,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+    if (error) throw error;
+    return {
+      kaydedildi: true,
+      tanismaYeri: yer ?? undefined,
+      bitis,
+      varsayilanRol: rol ?? undefined,
+      sormadanKaydet: sormadan,
+      not: sormadan
+        ? "Bu tarihe kadar kartvizitler okunur okunmaz KAYDEDİLİR, hiçbir şey sorma; yalnızca kısaca 'Kaydettim: …' de."
+        : "Bu tarihe kadar kartvizitlerde " + (yer ? "tanışma yerini SORMA" : "") + (rol ? (yer ? ", " : "") + "rolü SORMA" : "") + ".",
+    };
+  }
+
   /**
    * Dijital kartvizit: .vcf eki, görseldeki QR (vCard/MECARD) ya da QR'daki
    * dijital kartvizit bağlantısı. Veri alan alan gelir; Lio onu
@@ -6450,9 +6524,10 @@ export class AiAssistantService {
       }
     }
 
-    const [mevcut, sonYerler] = await Promise.all([
+    const [mevcut, sonYerler, etkinlik] = await Promise.all([
       this.partyService.kartvizitAdaylari(scope, userId),
       this.partyService.sonTanismaYerleri(scope, userId).catch(() => []),
+      this.aktifEtkinlik(userId),
     ]);
     const plan = kartvizitPlani(kisiler, mevcut);
     const gorseller: BaglantiTaslakVerisi["gorseller"] = {};
@@ -6493,15 +6568,37 @@ export class AiAssistantService {
       else if (a.tur === "mevcutKurum") ozet.push(`• Kayıtlı "${a.ad}" kartına eklenecek: ${a.kisiler.map(satir).join("; ") || "kartvizit"}`);
       else ozet.push(`• Atlanacak: ${a.ad} — zaten kayıtlı ("${a.mevcutKart}", aynı ${a.sebep})`);
     }
+    // Sorulacaklar etkinliğe göre azalır: her soru bir tur, her tur bakiye.
+    const sorular = [
+      ...(etkinlik?.varsayilanRol ? [] : ["rol (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / Tedarikçi)"]),
+      ...(etkinlik?.yer
+        ? []
+        : ["nerede tanışıldı — ve \"bu fuarda kaç gün daha olacaksın? söylersen sonraki kartvizitlerde sormam\""]),
+      "\"Not olarak eklemek istediğin bir şey var mı?\"",
+    ];
+    if (etkinlik?.yer) ozet.push(`• Tanışma yeri: ${etkinlik.yer} (bugün) — kayıtlı etkinlikten`);
+
+    // "Sormadan kaydet" modu (kullanıcının açık isteği, migration 158): taslak
+    // gösterilmiş sayılır ve hemen uygulanır — kartvizit başına tek tur.
+    if (etkinlik?.sormadanKaydet) {
+      baglantiTaslaklari.sunulmusSay(taslak.id);
+      const sonuc = await this.confirmConnections(userId, { taslakId: taslak.id });
+      return {
+        ...sonuc,
+        sormadanKaydedildi: true,
+        yapilacak:
+          "Kaydedildi. Kullanıcıya SORU SORMA; tek kısa cümleyle 'Kaydettim: <adlar>' de" +
+          (sonuc.atlanan.length ? " ve atlananları (zaten kayıtlı) belirt." : "."),
+      };
+    }
     return {
       taslakId: taslak.id,
       ozet,
-      sonTanismaYerleri: sonYerler,
+      ...(etkinlik?.yer ? { aktifEtkinlik: etkinlik } : { sonTanismaYerleri: sonYerler }),
       ...(gorselEksik.length ? { uyari: `Şu görseller bulunamadı, karta eklenemeyecek: ${gorselEksik.join(", ")}` } : {}),
       yapilacak:
-        "Özeti kullanıcıya göster ve TEK mesajda sor: (1) rol (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / " +
-        "Tedarikçi), (2) nerede tanışıldı (bilmiyorsan; sonTanismaYerleri'nden öner), (3) \"Not olarak eklemek istediğin " +
-        "bir şey var mı?\" — başka soru yok. Kullanıcının cevabı gelince eksik olsa bile TEKRAR SORMADAN " +
+        `Özeti kullanıcıya göster ve TEK mesajda YALNIZCA şunları sor: ${sorular.join("; ")} — başka soru yok. ` +
+        "Kullanıcı etkinliği ve bitiş gününü söylerse aynı turda set_connection_event çağır. Kullanıcının cevabı gelince eksik olsa bile TEKRAR SORMADAN " +
         "confirm_connections'ı bu taslakId ile çağır (rol yoksa contact); not verdiyse iliskiNotu'na AYNEN yaz, " +
         "vermediyse boş bırak — not uydurma.",
     };
@@ -6534,7 +6631,17 @@ export class AiAssistantService {
     baglantiTaslaklari.sil(taslak.id);
     const { scope, departmentId, plan, gorseller } = taslak.veri;
     const ortak = connectionFields(input);
-    const bugun = new Date().toISOString().slice(0, 10);
+    const bugun = this.bugunTr();
+    // Kayıtlı etkinlik: söylenmeyen tanışma yeri ve rol ondan.
+    const etkinlik = await this.aktifEtkinlik(userId);
+    if (etkinlik) {
+      ortak.baglanti = { ...(ortak.baglanti ?? {}) } as PartyBaglanti;
+      if (etkinlik.yer) {
+        ortak.baglanti.tanismaYeri ??= etkinlik.yer;
+        ortak.baglanti.tanismaTarihi ??= bugun;
+      }
+      if (!ortak.roles && etkinlik.varsayilanRol) ortak.roles = [etkinlik.varsayilanRol];
+    }
     // Rol ve tanışma bilgisi kullanıcının cevabından; kartvizitte olmaz.
     const ust = (k: OkunanKisi): Partial<Party> => {
       const okunan = connectionFields(k as Record<string, any>);

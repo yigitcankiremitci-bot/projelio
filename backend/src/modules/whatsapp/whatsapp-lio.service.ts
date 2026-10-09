@@ -331,8 +331,9 @@ export class WhatsappLioService {
         // Lio videoyu social_suggest_caption ile kendisi izler. Fotoğrafı ise
         // model doğrudan görebilsin diye normal ek olarak da veriyoruz.
         if (turu !== "video") {
-          const ek = await (await this.attachments()).prepareFromBuffer(userId, buffer, ad, mime, convId);
+          const ek = await (await this.attachments()).prepareFromBuffer(userId, buffer, gorselAdi(ad, buMedyaId), mime, convId);
           attachmentIds = [ek.id];
+          if (buMedyaId) this.gorulduIsaretle(userId, buMedyaId);
         }
       } catch (e) {
         // Desteklenmeyen tür / çok büyük dosya: sebebi kullanıcıya söylenir,
@@ -374,9 +375,10 @@ export class WhatsappLioService {
           continue;
         }
         try {
-          const ek = await ekler.prepareFromBuffer(userId, m.buffer, m.ad, m.mimeType, convId);
+          const ek = await ekler.prepareFromBuffer(userId, m.buffer, gorselAdi(m.ad, m.id), m.mimeType, convId);
           attachmentIds = [...(attachmentIds ?? []), ek.id];
           gorselKotasi--;
+          this.gorulduIsaretle(userId, m.id);
         } catch (e) {
           this.logger.warn(`Fotoğraf Lio'ya görsel olarak verilemedi (${m.id}): ${e instanceof Error ? e.message : e}`);
         }
@@ -394,6 +396,21 @@ export class WhatsappLioService {
     // 2026-09-30'da Lio hiç araç çağırmadan sohbet geçmişindeki eski bağlamı
     // ("elimde yalnızca ses kayıtları var") tekrarladı, video depoda dururken.
     const bekleyen = gelenMedya.liste(userId).filter((m) => !yeni.has(m.id));
+    // Bu süreçte modele HİÇ gösterilmemiş bekleyen fotoğraf (dağıtımdan sonra
+    // yedekten döndü, "bildirildi" sayılıyor): bir kez görsel olarak verilir.
+    // 2026-10-09'da "tekrar dene" diyen kullanıcıya Lio görmediği kartvizit
+    // için "görsel bulanık" dedi. Her turda değil — görsel yeniden ücretlenmesin.
+    for (const m of bekleyen) {
+      if (gorselKotasi <= 0 || medyaTuru(m.mimeType) !== "gorsel" || this.gorulduMu(userId, m.id)) continue;
+      try {
+        const ek = await ekler.prepareFromBuffer(userId, m.buffer, gorselAdi(m.ad, m.id), m.mimeType, convId);
+        attachmentIds = [...(attachmentIds ?? []), ek.id];
+        gorselKotasi--;
+        this.gorulduIsaretle(userId, m.id);
+      } catch (e) {
+        this.logger.warn(`Bekleyen fotoğraf Lio'ya verilemedi (${m.id}): ${e instanceof Error ? e.message : e}`);
+      }
+    }
     if (bekleyen.length) {
       karar.text +=
         "\n\n[Sistem notu: Kullanıcının WhatsApp'tan gönderdiği, henüz taslağa bağlanmamış medya ŞU AN SENDE: " +
@@ -524,6 +541,23 @@ export class WhatsappLioService {
     const k = this.bekleyenKosular.get(threadId);
     this.bekleyenKosular.delete(threadId);
     return k && Date.now() - k.at < BEKLEYEN_KOSU_OMRU_MS ? k : null;
+  }
+
+  // ------------------------------------------- modele gösterilen görseller
+
+  /** Kullanıcı başına, bu süreçte modele görsel olarak verilmiş medya kimlikleri. */
+  private readonly gorulenGorseller = new Map<string, Set<string>>();
+
+  private gorulduIsaretle(userId: string, mediaId: string): void {
+    const s = this.gorulenGorseller.get(userId) ?? new Set<string>();
+    s.add(mediaId);
+    // Sınırsız büyümesin: medya zaten 3 saatte düşüyor, son 50 kimlik yeter.
+    if (s.size > 50) s.delete(s.values().next().value as string);
+    this.gorulenGorseller.set(userId, s);
+  }
+
+  private gorulduMu(userId: string, mediaId: string): boolean {
+    return this.gorulenGorseller.get(userId)?.has(mediaId) === true;
   }
 
   // ------------------------------------------------ medya turu zamanlaması
@@ -827,4 +861,19 @@ function dosyaAdi(url: string): string {
   const son = new URL(url, "http://waha").pathname.split("/").pop() ?? "";
   const ext = son.includes(".") ? son.slice(son.lastIndexOf(".")) : "";
   return `${WHATSAPP_ADSIZ_DOSYA_ONEKI}${ext}`;
+}
+
+/**
+ * Modele verilen görselin adı. WhatsApp fotoğrafa ad vermiyor, hepsi
+ * "whatsapp-dosyasi.jpeg" oluyordu: içeriği kaybolmuş eski bir dosyanın
+ * "tekrar gönder" notu yenisiyle aynı adı taşıyınca Lio yeni fotoğraf için
+ * "görsel açılmıyor" dedi (2026-10-09). Kimliğin bir parçası adı ayırt eder;
+ * uzantı sonda kalır (görsel türü uzantıdan okunuyor).
+ */
+function gorselAdi(ad: string, mediaId?: string): string {
+  if (!mediaId) return ad;
+  const nokta = ad.lastIndexOf(".");
+  const govde = nokta > 0 ? ad.slice(0, nokta) : ad;
+  const uzanti = nokta > 0 ? ad.slice(nokta) : "";
+  return `${govde}-${mediaId.replace(/^med_/, "").slice(0, 6)}${uzanti}`;
 }

@@ -1921,7 +1921,16 @@ export class AiAssistantService {
     // Eskiden ek yalnızca gönderildiği mesajda duruyordu ve geçmiş penceresi
     // dolunca kayboluyordu — Lio "dosyayı bu turda göremiyorum" deyip aynı soruları
     // tekrarlıyor, kullanıcı hem sonuç alamıyor hem yüzlerce kredi ödüyordu.
-    const stored = await this.conversationsService.getActiveFiles(convId);
+    // Yeni dosya geldiyse içeriği kaybolmuş (sunucu yeniden başladı, süre
+    // doldu) eski görsel/PDF sohbetten düşer. Kalsaydı modele "içeriği elimde
+    // değil, tekrar göndermesini iste" notuyla gidiyordu ve yeni dosya aynı
+    // adı taşıyınca Lio yeni dosya için "açılmıyor, tekrar gönder" dedi.
+    const stored = (await this.conversationsService.getActiveFiles(convId)).filter(
+      (f) =>
+        !attachments.length ||
+        (f.kind !== "image" && f.kind !== "pdf") ||
+        this.attachmentsService.getBinary(userId, f.id) !== undefined
+    );
     // Bir önceki koşunun ORTASINDA açılmış dosya (open_file) önbellek önekini
     // değiştirdi ama bedelini bu istek ödeyecek: önek burada yeniden yazılıyor.
     // İşaret okunup temizlenmezse pahalı ilk tur, ucuz sanılıp uyarısız geçerdi.
@@ -6335,8 +6344,9 @@ export class AiAssistantService {
       return {
         qrBulunamadi: true,
         not:
-          "Görselde okunabilir QR kod bulunamadı. Kartvizit yazıları görünüyorsa görselden oku (prepare_connections + kirpma). " +
-          "QR bulanık/küçükse kullanıcıdan QR'ı yakından ya da ekran görüntüsü olarak göndermesini iste.",
+          "Görselde QR kod YOK ya da çözülemedi — bu görselin bulanık olduğu anlamına GELMEZ. Kartvizit yazılarını " +
+          "görebiliyorsan normal akışa devam et: yazıları oku, prepare_connections + kirpma. Yalnızca görselde gerçekten " +
+          "bir QR varsa ve kartta yeterli bilgi yoksa kullanıcıdan QR'ı yakından göndermesini iste.",
       };
     }
     if (kartvizitMetniMi(qr)) return { kaynak: "qr-vcard", kisiler: kartvizitMetniCoz(qr), dosya, yapilacak };

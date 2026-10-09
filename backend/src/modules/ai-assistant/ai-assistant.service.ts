@@ -60,7 +60,7 @@ import { SupportService } from "../support/support.service";
 import { PartyService } from "../party/party.service";
 import { musteriSayfasiniSec } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
-import { addRole } from "../party/party-dedup";
+import { addRole, normalizeName } from "../party/party-dedup";
 import { kartvizitPlani, type OkunanKisi, type PlanKisisi } from "../party/kartvizit-plani";
 import { kartviziKirp } from "../party/kartvizit-kirp";
 import { qrCoz } from "../party/qr-coz";
@@ -1954,7 +1954,7 @@ export class AiAssistantService {
         role: m.role,
         content: this.storedMessageContent(m),
       })),
-      { role: "user" as const, content: trimmed },
+      { role: "user" as const, content: trimmed + this.bekleyenTaslakNotu(userId) },
     ];
 
     // Bakiye bu isteğin en pahalı hâlini karşılamıyorsa HİÇ BAŞLAMA. Kontrol
@@ -6278,6 +6278,28 @@ export class AiAssistantService {
    * (bkz. PartyController). Yazma yetkisi ayrıca PartyService içinde.
    */
   /**
+   * Kullanıcıya gösterilmiş, onay bekleyen kartvizit taslağı — modele giden
+   * mesajın sonuna eklenir, SAKLANMAZ. Geçmişte araç sonuçları yok: Lio cevap
+   * turunda taslağı bilmiyor, prepare_connections'ı yeniden çağırıp kullanıcının
+   * az önce verdiği cevabı yeniden soruyordu (canlı deneme, 2026-10-09).
+   */
+  // dil:atla-baslangic — modele giden not
+  private bekleyenTaslakNotu(userId: string): string {
+    const t = baglantiTaslaklari.sonSunulan(userId);
+    if (!t) return "";
+    const adlar = t.veri.plan
+      .map((a) => (a.tur === "yeniKisi" ? a.kisi.displayName : a.tur === "atla" ? "" : `${a.ad} (${a.kisiler.map((k) => k.name).join(", ")})`))
+      .filter(Boolean)
+      .join("; ");
+    return (
+      `\n\n[Sistem notu: Kullanıcıya GÖSTERİLMİŞ, onay bekleyen kartvizit taslağı var (taslakId=${t.id}: ${adlar}). ` +
+      "Bu mesaj rol / tanışma yeri / not cevabıysa prepare_connections'ı YENİDEN ÇAĞIRMA ve SORU SORMA: " +
+      "doğrudan confirm_connections'ı çağır, söylenmeyeni boş bırak (rol yoksa contact).]"
+    );
+  }
+  // dil:atla-bitis
+
+  /**
    * Bağlantı araçlarının kapsamı. organizationId/jobId verilmediyse ve
    * kullanıcının Bağlantı ve İlişkiler modülü açık TEK bir şirketi varsa o
    * seçilir: WhatsApp'tan kartvizit atan kullanıcıya "hangi şirket?" diye
@@ -6405,6 +6427,28 @@ export class AiAssistantService {
             : [],
       }));
     if (!kisiler.length) throw new BadRequestException("Eklenecek kişi yok");
+
+    // Aynı kişiler için gösterilmiş bir taslak zaten varsa yenisi AÇILMAZ:
+    // kullanıcı cevabını verdi, yeniden sormak bakiye yakar.
+    const gosterilen = baglantiTaslaklari.sonSunulan(userId);
+    if (gosterilen) {
+      const anahtar = (adlar: string[]) => adlar.map((a) => normalizeName(a)).sort().join("|");
+      const eskiAdlar = gosterilen.veri.plan.flatMap((a) =>
+        a.tur === "yeniKisi" ? [a.kisi.displayName] : a.tur === "atla" ? [a.ad] : a.kisiler.length ? a.kisiler.map((k) => k.name) : [a.ad]
+      );
+      const yeniAdlar = kisiler.flatMap((k) =>
+        k.partyType && k.partyType !== "person" && k.yetkililer?.length ? k.yetkililer.map((y) => y.name) : [k.displayName]
+      );
+      if (anahtar(eskiAdlar) === anahtar(yeniAdlar)) {
+        return {
+          taslakId: gosterilen.id,
+          zatenGosterildi: true,
+          yapilacak:
+            "Bu kişilerin taslağı kullanıcıya ZATEN gösterildi ve kullanıcı cevap verdi. SORU SORMA: hemen " +
+            "confirm_connections'ı çağır (kullanıcının söylediği rol, tanışma yeri ve notla; söylenmeyeni boş bırak).",
+        };
+      }
+    }
 
     const [mevcut, sonYerler] = await Promise.all([
       this.partyService.kartvizitAdaylari(scope, userId),

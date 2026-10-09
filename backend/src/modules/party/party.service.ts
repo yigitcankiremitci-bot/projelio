@@ -1059,6 +1059,28 @@ export class PartyService {
         return r.department_id;
       }
     }
+    // Modül şirket geneline açılmış (department_id boş — kurulum sihirbazı ya da
+    // eski kayıt): katalogdaki departmanlardan ilki, önce birincil (Satış).
+    // Eskiden burada hata veriliyordu ve Lio'nun okuduğu kartvizit karta eklenemiyordu.
+    const { data: katalog } = await this.supabase.client
+      .from("module_catalog_departments")
+      .select("department_key, is_primary, sort_order")
+      .eq("module_key", modul)
+      .order("is_primary", { ascending: false })
+      .order("sort_order", { ascending: true });
+    const anahtarlar = ((katalog ?? []) as any[]).map((k) => k.department_key as string);
+    if (anahtarlar.length) {
+      const { data: deps } = await this.supabase.client
+        .from("departments")
+        .select("id, catalog_key")
+        .eq("organization_id", orgId)
+        .in("catalog_key", anahtarlar)
+        .is("archived_at", null);
+      const sirali = ((deps ?? []) as any[]).sort((a, b) => anahtarlar.indexOf(a.catalog_key) - anahtarlar.indexOf(b.catalog_key));
+      for (const d of sirali) {
+        if ((await this.accessService.departmentAccess(d.id, userId).catch(() => null))?.canView) return d.id;
+      }
+    }
     throw new BadRequestException("Dosya eklemek için kartı modülün açık olduğu bir departmandan aç");
   }
 

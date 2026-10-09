@@ -1819,7 +1819,10 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği (list_organizations)." },
+        organizationId: {
+          type: "string",
+          description: "Genelde VERME: sunucu Bağlantılar'ın açık olduğu şirketi seçer. Birden çok şirket varsa hata adlarıyla döner.",
+        },
         jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
         departmentId: { type: "string", description: "Kartvizit dosyasının ineceği departman (opsiyonel)." },
         kisiler: {

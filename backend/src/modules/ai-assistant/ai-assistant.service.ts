@@ -1578,7 +1578,9 @@ export class AiAssistantService {
         "olası işbirlikçiler. Araçları list_connections / prepare_connections / confirm_connections / update_connection — " +
         "bunları create_customer ile AÇMA, rakip satış listesine düşer.",
       "- KARTVİZİT: Kullanıcı bir ya da birden çok KARTVİZİT fotoğrafı gönderirse (ne yapacağını yazmasa da) amaç " +
-        "onları Bağlantı ve İlişkiler'e eklemektir — sosyal medya gönderisi DEĞİL. Kartvizit = üzerinde ad, unvan, " +
+        "onları Bağlantı ve İlişkiler'e eklemektir — sosyal medya gönderisi DEĞİL. \"Ekleyeyim mi?\", \"ayrı mı aynı " +
+        "şirkete mi?\" diye SORMA: doğrudan prepare_connections'ı çağır (şirket birleştirmesini sunucu yapar), " +
+        "organizationId VERME (sunucu seçer), sonra özetle birlikte yalnızca rolü ve tanışma yerini sor. Kartvizit = üzerinde ad, unvan, " +
         "şirket/logo ve telefon/e-posta/web yazan küçük dikdörtgen kart. Fotoğrafta kart yoksa (manzara, ürün, kişi " +
         "fotoğrafı) kartvizit akışına GİRME, ne yapılacağını sor. Akış: (1) her kartvizitten ad soyad, şirket/marka " +
         "(kurum), unvan, cep telefonu, e-posta, web, LinkedIn/Instagram, şehir/adres oku — okuyamadığını UYDURMA; " +
@@ -6264,7 +6266,7 @@ export class AiAssistantService {
    * sormak, "kartviziti at, gerisini Lio yapsın" vaadini bozuyordu.
    */
   private async baglantiKapsami(userId: string, input: Record<string, any>): Promise<{ organizationId?: string; jobId?: string }> {
-    if (input.organizationId || input.jobId) return this.customerScope(userId, input);
+    if (input.jobId) return this.customerScope(userId, input);
     const orgs = await this.organizationsService.findAllForUser(userId);
     const { data } = await this.supabase.client
       .from("organization_modules")
@@ -6272,6 +6274,12 @@ export class AiAssistantService {
       .eq("module_key", BAGLANTI_MODUL_KEY)
       .in("organization_id", orgs.map((o) => o.id).slice(0, 200));
     const acik = [...new Set(((data ?? []) as any[]).map((r) => r.organization_id as string))];
+    // Modelin verdiği kimliğe ancak adaylardan biriyse güvenilir: 2026-10-09'da
+    // Lio WhatsApp'ta erişimi olmayan bir organizasyon kimliği uydurdu ve
+    // kartvizit "erişimin yok" hatasıyla kaydedilemedi.
+    if (input.organizationId && acik.includes(String(input.organizationId))) {
+      return this.customerScope(userId, { organizationId: String(input.organizationId) });
+    }
     if (acik.length === 1) return this.customerScope(userId, { organizationId: acik[0] });
     if (!acik.length) {
       throw new BadRequestException(

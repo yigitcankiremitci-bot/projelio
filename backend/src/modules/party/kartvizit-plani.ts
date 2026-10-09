@@ -85,6 +85,9 @@ export type PlanAdimi =
       ad: string;
       partyType: "company" | "institution";
       website?: string;
+      /** Şirketin ortak e-postası/telefonu (info@…, kartvizitteki ortak santral). */
+      email?: string;
+      phone?: string;
       sehir?: string;
       adres?: string;
       kisiler: PlanKisisi[];
@@ -94,6 +97,46 @@ export type PlanAdimi =
     }
   | { tur: "mevcutKurum"; partyId: string; ad: string; kisiler: PlanKisisi[]; kartvizitler: KartvizitKaynagi[] }
   | { tur: "atla"; ad: string; mevcutKart: string; sebep: "ad" | "e-posta" | "telefon" };
+
+/** info@, iletisim@ gibi kişiye değil kuruma ait adres önekleri. */
+const GENEL_EPOSTA = /^(info|bilgi|iletisim|contact|hello|merhaba|sales|satis|destek|support|office|ofis|mail|admin)@/i;
+
+/**
+ * Kişiler arasında ORTAK iletişim bilgisi şirketindir: kartvizitte iki kişi
+ * var, tek e-posta (info@…) — o adres ikisinin de kişisel adresi değil. Kişiye
+ * yazılsaydı aynı adres iki kişide görünür, şirket kartı e-postasız kalırdı
+ * (canlı deneme, Sinyal kartviziti, 2026-10-09). Genel önekli e-posta tek
+ * kişide bile şirketindir.
+ */
+export function ortakIletisimiAyir(kisiler: PlanKisisi[]): { email?: string; phone?: string; kisiler: PlanKisisi[] } {
+  const say = (anahtar: (k: PlanKisisi) => string) => {
+    const m = new Map<string, number>();
+    for (const k of kisiler) {
+      const a = anahtar(k);
+      if (a) m.set(a, (m.get(a) ?? 0) + 1);
+    }
+    return m;
+  };
+  const epostaAnahtari = (k: PlanKisisi) => (k.email ? normalizeEmail(k.email) : "");
+  const telAnahtari = (k: PlanKisisi) => telefonAnahtari(k.phone);
+  const epostalar = say(epostaAnahtari);
+  const telefonlar = say(telAnahtari);
+  const ortakEposta = (k: PlanKisisi) =>
+    !!k.email && ((epostalar.get(epostaAnahtari(k)) ?? 0) > 1 || GENEL_EPOSTA.test(k.email.trim()));
+  const ortakTel = (k: PlanKisisi) => kisiler.length > 1 && (telefonlar.get(telAnahtari(k)) ?? 0) > 1;
+
+  const email = kisiler.find(ortakEposta)?.email;
+  const phone = kisiler.find(ortakTel)?.phone;
+  return {
+    email,
+    phone,
+    kisiler: kisiler.map((k) => ({
+      ...k,
+      email: ortakEposta(k) ? undefined : k.email,
+      phone: ortakTel(k) ? undefined : k.phone,
+    })),
+  };
+}
 
 /** Telefonun karşılaştırma anahtarı: son 10 hane (ülke kodu/0 farkı eşleşsin). */
 export function telefonAnahtari(tel?: string): string {
@@ -149,14 +192,18 @@ export function kartvizitPlani(kisiler: OkunanKisi[], mevcut: MevcutKart[]): Pla
         }
         continue;
       }
+      const ayrik = ortakIletisimiAyir((k.yetkililer ?? []).filter((y) => y.name?.trim()));
       adimlar.push({
         tur: "yeniKurum",
         ad,
         partyType: k.partyType,
         website: k.website,
+        // Kurum satırının kendi e-postası/telefonu kurumundur.
+        email: k.email ?? ayrik.email,
+        phone: k.phone ?? ayrik.phone,
         sehir: k.sehir,
         adres: k.adres,
-        kisiler: (k.yetkililer ?? []).filter((y) => y.name?.trim()),
+        kisiler: ayrik.kisiler,
         kartvizitler: k.kartvizitler ?? [],
         kaynak: k,
       });
@@ -206,14 +253,17 @@ export function kartvizitPlani(kisiler: OkunanKisi[], mevcut: MevcutKart[]): Pla
     // Aynı markadan iki ve daha fazla kartvizit: şirket kartı + kişiler.
     const ilk = grup[0];
     const ilkDolu = <K extends keyof OkunanKisi>(alan: K) => grup.find((g) => g[alan])?.[alan];
+    const ayrik = ortakIletisimiAyir(grup.map(kisiyeCevir));
     adimlar.push({
       tur: "yeniKurum",
       ad: ilk.kurum!.trim(),
       partyType: "company",
       website: ilkDolu("website") as string | undefined,
+      email: ayrik.email,
+      phone: ayrik.phone,
       sehir: ilkDolu("sehir") as string | undefined,
       adres: ilkDolu("adres") as string | undefined,
-      kisiler: grup.map(kisiyeCevir),
+      kisiler: ayrik.kisiler,
       kartvizitler: grup.flatMap((g) => g.kartvizitler ?? []),
       kaynak: ilk,
     });

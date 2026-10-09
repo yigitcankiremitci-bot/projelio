@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { kartvizitPlani, kirpmaHesabi, telefonAnahtari, type Koseler } from "./kartvizit-plani";
+import { kartvizitPlani, kirpmaHesabi, ortakIletisimiAyir, telefonAnahtari, type Koseler } from "./kartvizit-plani";
 
 // Fuar dönüşü 20 kartvizit tek mesajla geliyor. Buradaki bir gerileme ya aynı
 // şirketin iki çalışanını iki ayrı şirket gibi açar ya da kayıtlı kişiyi ikinci
@@ -104,5 +104,46 @@ describe("kirpmaHesabi", () => {
     assert.equal(kirpmaHesabi({ ...kart, sagUst: [1.5, 0.2] }, 1000, 1000), null);
     const minik: Koseler = { solUst: [0.5, 0.5], sagUst: [0.52, 0.5], sagAlt: [0.52, 0.52], solAlt: [0.5, 0.52] };
     assert.equal(kirpmaHesabi(minik, 1000, 1000), null);
+  });
+});
+
+describe("ortak iletişim şirketindir", () => {
+  test("canlı deneme: Sinyal kartviziti — iki kişi, tek info@ e-postası şirket kartına gider", () => {
+    const plan = kartvizitPlani(
+      [
+        { displayName: "Mustafa Özkan", kurum: "Sinyal", phone: "0551 507 42 70", email: "info@sinyalsoft.com", website: "www.sinyalsoft.com" },
+        { displayName: "Yusuf Baştuğu", kurum: "Sinyal", phone: "0 507 519 39 91", email: "info@sinyalsoft.com", website: "www.sinyalsoft.com" },
+      ],
+      []
+    );
+    assert.equal(plan.length, 1);
+    const a = plan[0];
+    if (a.tur !== "yeniKurum") throw new Error("şirket kartı bekleniyordu");
+    assert.equal(a.email, "info@sinyalsoft.com");
+    assert.equal(a.website, "www.sinyalsoft.com");
+    assert.equal(a.phone, undefined);
+    assert.deepEqual(
+      a.kisiler.map((k) => [k.name, k.phone, k.email]),
+      [
+        ["Mustafa Özkan", "0551 507 42 70", undefined],
+        ["Yusuf Baştuğu", "0 507 519 39 91", undefined],
+      ]
+    );
+  });
+
+  test("kişisel e-postalar kişide kalır; ortak santral numarası şirkete gider", () => {
+    const r = ortakIletisimiAyir([
+      { name: "A", email: "a@x.com", phone: "0212 000 00 00" },
+      { name: "B", email: "b@x.com", phone: "+90 212 000 00 00" },
+    ]);
+    assert.equal(r.email, undefined);
+    assert.equal(r.phone, "0212 000 00 00");
+    assert.deepEqual(r.kisiler.map((k) => [k.email, k.phone]), [["a@x.com", undefined], ["b@x.com", undefined]]);
+  });
+
+  test("tek kişide genel önekli e-posta (info@) da şirketindir", () => {
+    const r = ortakIletisimiAyir([{ name: "A", email: "Info@abc.com" }]);
+    assert.equal(r.email, "Info@abc.com");
+    assert.equal(r.kisiler[0].email, undefined);
   });
 });

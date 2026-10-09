@@ -1588,10 +1588,10 @@ export class AiAssistantService {
         "dört köşesini 0–1 oranıyla kirpma'ya yaz (kâğıdın kenarları). Bir fotoğrafta birden fazla kart varsa her " +
         "birine kendi köşeleri; ön/arka yüz ayrı fotoğrafsa ikisini aynı kişinin kartvizitler'ine koy ve bilgileri " +
         "birleştir. (3) Hepsini TEK prepare_connections çağrısıyla gönder; şirket birleştirmesini sunucu yapar. " +
-        "(4) Dönen özeti kullanıcıya göster ve ROLÜ sor: Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, Tedarikçi " +
-        "(birden çok kişi varsa hepsi için tek rol mü, farklı mı). Nerede tanışıldığı bilinmiyorsa onu da sor; " +
-        "sonTanismaYerleri'nden öner. (5) Kullanıcı cevap verince confirm_connections'ı taslakId ve söylenen rolle " +
-        "çağır. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
+        "(4) Dönen özeti kullanıcıya göster ve TEK mesajda sor: ROL (Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, " +
+        "Tedarikçi), nerede tanışıldığı (bilinmiyorsa; sonTanismaYerleri'nden öner) ve \"Not olarak eklemek istediğin bir " +
+        "şey var mı?\". (5) Kullanıcı cevap verince confirm_connections'ı taslakId, rol ve verdiyse notla (iliskiNotu, " +
+        "kullanıcının sözleriyle) çağır; not vermediyse uydurma. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
         "update_connection ile düzelt.",
       "- QR'LI KARTVİZİT: Kâğıt kartvizitin üstünde QR varsa KARTTA YAZANLAR önceliklidir — önce onları oku. Ad + telefon " +
         "ya da e-posta okunabildiyse QR'a dokunma. Eksikse read_contact_card çağır: QR'da kişi kartı varsa yalnızca EKSİK " +
@@ -6407,8 +6407,13 @@ export class AiAssistantService {
     const ozet: string[] = [];
     for (const a of plan) {
       if (a.tur === "yeniKisi") ozet.push(`• Yeni kişi: ${satir(a.kisi)}${a.kisi.kurum ? `, ${a.kisi.kurum}` : ""}`);
-      else if (a.tur === "yeniKurum")
-        ozet.push(`• Yeni şirket kartı: ${a.ad}${a.kisiler.length ? ` — kişiler: ${a.kisiler.map(satir).join("; ")}` : ""}`);
+      else if (a.tur === "yeniKurum") {
+        const ortak = [a.phone, a.email, a.website].filter(Boolean).join(" · ");
+        ozet.push(
+          `• Yeni şirket kartı: ${a.ad}${ortak ? ` (${ortak})` : ""}` +
+            (a.kisiler.length ? ` — kişiler: ${a.kisiler.map(satir).join("; ")}` : "")
+        );
+      }
       else if (a.tur === "mevcutKurum") ozet.push(`• Kayıtlı "${a.ad}" kartına eklenecek: ${a.kisiler.map(satir).join("; ") || "kartvizit"}`);
       else ozet.push(`• Atlanacak: ${a.ad} — zaten kayıtlı ("${a.mevcutKart}", aynı ${a.sebep})`);
     }
@@ -6418,8 +6423,10 @@ export class AiAssistantService {
       sonTanismaYerleri: sonYerler,
       ...(gorselEksik.length ? { uyari: `Şu görseller bulunamadı, karta eklenemeyecek: ${gorselEksik.join(", ")}` } : {}),
       yapilacak:
-        "Özeti kullanıcıya göster, rolü sor (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / Tedarikçi) ve nerede " +
-        "tanışıldığını bilmiyorsan sor. Kullanıcının CEVABINDAN sonra confirm_connections'ı bu taslakId ile çağır.",
+        "Özeti kullanıcıya göster ve TEK mesajda sor: (1) rol (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / " +
+        "Tedarikçi), (2) nerede tanışıldı (bilmiyorsan; sonTanismaYerleri'nden öner), (3) \"Not olarak eklemek istediğin " +
+        "bir şey var mı?\". Kullanıcının CEVABINDAN sonra confirm_connections'ı bu taslakId ile çağır; not verdiyse " +
+        "iliskiNotu'na AYNEN yaz, vermediyse boş bırak — not uydurma.",
     };
   }
 
@@ -6529,11 +6536,12 @@ export class AiAssistantService {
           const alanlar = ust(a.kaynak);
           const party = await kartAc({
             ...alanlar,
-            // Şirket kartında kişisel alanlar (ad, unvan, cep) kişilere gider.
+            // Şirket kartında kişisel alanlar (ad, unvan, cep) kişilere gider;
+            // yalnızca ORTAK e-posta/telefon (info@…) şirketin kendisine yazılır.
             kurum: undefined,
             unvan: undefined,
-            phone: undefined,
-            email: undefined,
+            phone: a.phone,
+            email: a.email,
             sosyal: undefined,
             displayName: a.ad,
             partyType: a.partyType,
@@ -6546,6 +6554,13 @@ export class AiAssistantService {
         } else {
           await kisileriEkle(a.partyId, a.kisiler, a.ad, false);
           await kartvizitEkle(a.partyId, a.kartvizitler, a.ad);
+          // Kayıtlı karta ilişki notu YAZILMAZ (onun notu başka bir bağlamda
+          // yazıldı); kullanıcının notu temas geçmişine düşer, kaybolmaz.
+          if (ortak.baglanti?.iliskiNotu) {
+            await this.partyService
+              .addActivity(a.partyId, { type: "not", summary: ortak.baglanti.iliskiNotu }, userId)
+              .catch(() => undefined);
+          }
         }
       } catch (err) {
         uyarilar.push(`${a.tur === "yeniKisi" ? a.kisi.displayName : a.ad}: ${(err as Error).message}`);

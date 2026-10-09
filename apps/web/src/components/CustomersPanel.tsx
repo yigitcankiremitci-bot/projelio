@@ -42,7 +42,7 @@ import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/proje
 import { IconEdit, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
-import { onLioActivity } from "../lib/liveRoom";
+import { useCanliTazele } from "../lib/liveRoom";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { partyApi } from "../api/party";
 import { filesApi } from "../api/files";
@@ -96,6 +96,59 @@ function emptyForm() {
 }
 
 const ONEM_SIRASI: Record<BaglantiOnem, number> = { yuksek: 0, orta: 1, dusuk: 2 };
+
+type Siralama = "onem" | "ad" | "yeni" | "temas" | "kurum";
+// dil:anahtar-baslangic
+const SIRALAMA_ETIKETI: Record<Siralama, string> = {
+  onem: "Önem",
+  ad: "Ad (A–Z)",
+  yeni: "Son eklenen",
+  temas: "Sonraki temas",
+  kurum: "Şirket / kurum",
+};
+// dil:anahtar-bitis
+
+/** Kullanıcının seçtiği sıralama, modül başına bu tarayıcıda hatırlanır (kaybolsa da olur). */
+function siralamaOku(anahtar: string, varsayilan: Siralama, gecerli: Siralama[]): Siralama {
+  try {
+    const v = localStorage.getItem(anahtar) as Siralama | null;
+    return v && gecerli.includes(v) ? v : varsayilan;
+  } catch {
+    return varsayilan;
+  }
+}
+
+function sirala(liste: Party[], s: Siralama): Party[] {
+  const ad = (a: Party, b: Party) => a.displayName.localeCompare(b.displayName, "tr");
+  return [...liste].sort((a, b) => {
+    switch (s) {
+      case "ad":
+        return ad(a, b);
+      case "yeni":
+        return b.createdAt.localeCompare(a.createdAt) || ad(a, b);
+      case "temas": {
+        // Tarihsizler sona.
+        const ta = a.baglanti?.sonrakiTemas ?? "9999";
+        const tb = b.baglanti?.sonrakiTemas ?? "9999";
+        return ta !== tb ? (ta < tb ? -1 : 1) : ad(a, b);
+      }
+      case "kurum": {
+        // Şirket kartında kurum kendi adı; kurumsuzlar sona.
+        const ka = (a.partyType !== "person" ? a.displayName : a.kurum) ?? "\uffff";
+        const kb = (b.partyType !== "person" ? b.displayName : b.kurum) ?? "\uffff";
+        return ka.localeCompare(kb, "tr") || ad(a, b);
+      }
+      default: {
+        // Önem, sonra en yakın temas, sonra ad: "kime önce dönmeliyim".
+        const o = ONEM_SIRASI[a.baglanti?.onem ?? "orta"] - ONEM_SIRASI[b.baglanti?.onem ?? "orta"];
+        if (o) return o;
+        const ta = a.baglanti?.sonrakiTemas ?? "9999";
+        const tb = b.baglanti?.sonrakiTemas ?? "9999";
+        return ta !== tb ? (ta < tb ? -1 : 1) : ad(a, b);
+      }
+    }
+  });
+}
 
 interface YetkiliSatiri {
   id?: string;
@@ -274,7 +327,10 @@ export default function CustomersPanel({
 
   // Excel şablonu Lio'ya verilince kartlar Lio'nun tarafında açılıyor; kullanıcı
   // bu ekrandaysa listeyi kendisi tazelemek zorunda kalmasın.
-  useEffect(() => onLioActivity(() => load()), [scopePath]);
+  // Canlı: Lio'nun eklediği kart (WhatsApp'tan da), aynı sayfadaki başkasının
+  // değişikliği, soket yeniden bağlanması ve uygulamaya geri dönüş listeyi
+  // tazeler — sayfayı yenilemek gerekmesin (bkz. useCanliTazele).
+  useCanliTazele(() => load(), [scopePath, departmentId, baglantiModu]);
 
   // Şablon indirme ve doldurulmuş dosyayı yükleme aynı pencerede (bkz. MusteriExcelModal).
   const [excelAcik, setExcelAcik] = useState(false);
@@ -283,6 +339,19 @@ export default function CustomersPanel({
   useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
 
   const bugun = bugunYmd();
+  const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum"];
+  const siralamaAnahtari = `projelio_party_siralama_${baglantiModu ? "baglantilar" : "musteri"}`;
+  const [siralama, setSiralama] = useState<Siralama>(() =>
+    siralamaOku(siralamaAnahtari, baglantiModu ? "onem" : "ad", siralamaSecenekleri)
+  );
+  const siralamaSec = (s: Siralama) => {
+    setSiralama(s);
+    try {
+      localStorage.setItem(siralamaAnahtari, s);
+    } catch {
+      /* gizli pencere: hatırlamasa da olur */
+    }
+  };
   const oneriler = useMemo(() => (baglantiModu ? tanismaOnerileri(parties) : []), [parties, baglantiModu]);
   const yerOnerileri = useMemo(() => Array.from(new Set(oneriler.map((o) => o.yer))), [oneriler]);
   // Kurum önerileri: daha önce yazılmış kurumlar + listedeki kurum kartlarının adları.
@@ -316,18 +385,8 @@ export default function CustomersPanel({
         .toLocaleLowerCase("tr")
         .includes(q);
     });
-    if (!baglantiModu) return suzulen;
-    // Önce önem, sonra en yakın temas tarihi (tarihsizler sona), sonra ad:
-    // fuar dönüşü "kime önce dönmeliyim" sorusunun cevabı listenin başı olsun.
-    return [...suzulen].sort((a, b) => {
-      const o = ONEM_SIRASI[a.baglanti?.onem ?? "orta"] - ONEM_SIRASI[b.baglanti?.onem ?? "orta"];
-      if (o) return o;
-      const ta = a.baglanti?.sonrakiTemas ?? "9999";
-      const tb = b.baglanti?.sonrakiTemas ?? "9999";
-      if (ta !== tb) return ta < tb ? -1 : 1;
-      return a.displayName.localeCompare(b.displayName, "tr");
-    });
-  }, [parties, search, roleFilter, onemFiltre, sorumluFiltre, baglantiModu]);
+    return sirala(suzulen, siralama);
+  }, [parties, search, roleFilter, onemFiltre, sorumluFiltre, siralama]);
 
   const hasActiveFilter =
     search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "") || sorumluFiltre !== "" || onemFiltre !== "";
@@ -1178,11 +1237,29 @@ export default function CustomersPanel({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {hasActiveFilter && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {t("{n} / {toplam} kayıt", { n: visible.length, toplam: parties.length })}
-            </span>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {hasActiveFilter && (
+              <span style={{ fontSize: 12, color: c.textSecondary }}>
+                {t("{n} / {toplam} kayıt", { n: visible.length, toplam: parties.length })}
+              </span>
+            )}
+            {visible.length > 1 && (
+              <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary }}>
+                {t("Sırala:")}
+                <select
+                  value={siralama}
+                  onChange={(e) => siralamaSec(e.target.value as Siralama)}
+                  style={{ fontSize: 12, padding: "3px 6px" }}
+                >
+                  {siralamaSecenekleri.map((s) => (
+                    <option key={s} value={s}>
+                      {t(SIRALAMA_ETIKETI[s])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
           {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
               sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
               karışıyordu, göz satırı takip edemiyordu. Renkler paletten. */}

@@ -49,6 +49,9 @@ const changeListeners = new Set<(payload: RoomChangedPayload) => void>();
  */
 const lioActivityListeners = new Set<(payload: LioActivityPayload) => void>();
 const worklogListeners = new Set<() => void>();
+const yenidenBaglantiListeners = new Set<() => void>();
+/** İlk bağlantı mı: yeniden bağlanmayı (kaçırılmış olaylar) ilkinden ayırmak için. */
+let birKezBaglandi = false;
 
 function token(): string | null {
   return localStorage.getItem("projelio_token");
@@ -86,6 +89,11 @@ export function getSocket(): Socket | null {
     socket?.emit("register", auth);
     // Yeniden bağlanmada oda üyeliği sunucuda kayboldu; geri katıl.
     if (joinedRoom) socket?.emit("join-room", { token: auth, room: joinedRoom });
+    // Kopukken gelen olaylar kayıp: dinleyen ekranlar kendini tazelesin.
+    // Ana ekrana eklenmiş Safari uygulaması arka planda soketi kapatıyor;
+    // geri dönünce Lio'nun WhatsApp'tan eklediği kart listede yoktu (2026-10-09).
+    if (birKezBaglandi) yenidenBaglantiListeners.forEach((fn) => fn());
+    birKezBaglandi = true;
   });
   socket.on("disconnect", () => setSocketId(undefined));
   socket.on("presence", (payload: RoomPresencePayload) => {
@@ -127,6 +135,53 @@ export function onWorklogChanged(fn: () => void): () => void {
   return () => {
     worklogListeners.delete(fn);
   };
+}
+
+/**
+ * Soket kopup yeniden bağlandığında çağrılır — arada kaçan olaylar için
+ * ekran verisini yeniden çeker. İlk bağlantıda ÇAĞRILMAZ.
+ */
+export function onYenidenBaglanti(fn: () => void): () => void {
+  getSocket();
+  yenidenBaglantiListeners.add(fn);
+  return () => {
+    yenidenBaglantiListeners.delete(fn);
+  };
+}
+
+/**
+ * Ekranın verisini canlı tutar: Lio'nun işleri, aynı sayfadaki başkalarının
+ * değişiklikleri, soket yeniden bağlanması ve uygulamaya geri dönüş (sekme ya
+ * da ana ekran uygulaması öne gelince). Arka arkaya gelen sinyaller tek
+ * yüklemeye iner.
+ */
+export function useCanliTazele(yukle: () => void, bagimliliklar: unknown[]): void {
+  useEffect(() => {
+    let son = 0;
+    let bekleyen: ReturnType<typeof setTimeout> | undefined;
+    const tazele = () => {
+      const gecen = Date.now() - son;
+      if (bekleyen) return;
+      // Bir saniye içinde gelen ikinci sinyal (ör. Lio etkinliği + oda değişikliği) bekletilir.
+      bekleyen = setTimeout(() => {
+        bekleyen = undefined;
+        son = Date.now();
+        yukle();
+      }, gecen < 1000 ? 1000 - gecen : 0);
+    };
+    const gorunur = () => {
+      if (document.visibilityState === "visible") tazele();
+    };
+    const birak = [onLioActivity(tazele), onRoomChanged(tazele), onYenidenBaglanti(tazele)];
+    document.addEventListener("visibilitychange", gorunur);
+    window.addEventListener("pageshow", tazele);
+    return () => {
+      birak.forEach((b) => b());
+      document.removeEventListener("visibilitychange", gorunur);
+      window.removeEventListener("pageshow", tazele);
+      if (bekleyen) clearTimeout(bekleyen);
+    };
+  }, bagimliliklar);
 }
 
 /** Lio'nun yaptığı işleri dinler. Dönen fonksiyon aboneliği bırakır. */

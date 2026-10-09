@@ -143,10 +143,36 @@ export const WRITE_TOOLS = new Set<string>([
  * whatsapp_* araçları da dışarıda: WhatsApp'tan WhatsApp mesajı göndertmek,
  * tek mesajla zincir kurmanın en kolay yolu.
  */
+/**
+ * Kartvizit turunda modele verilen DAR araç seti.
+ *
+ * Her model çağrısında araç tanımlarının tamamı (~25 bin token) gidiyor;
+ * kartvizit turu en az iki çağrı yapıyor. Fuarda 40 kartvizit atan kullanıcı
+ * için bu, kartvizit başına yüzlerce birim demekti (canlı ölçüm 2026-10-09:
+ * çağrı başına ~70 bin token girdi). Kartvizit araçları ~2,4 bin token.
+ * Fotoğraf sosyal medya için de olabileceğinden taslak açan iki sosyal araç da
+ * sette; gerisi bir sonraki turda zaten geri gelir.
+ */
+export const KARTVIZIT_KIPI_ARACLARI: readonly string[] = [
+  "prepare_connections",
+  "confirm_connections",
+  "read_contact_card",
+  "set_connection_event",
+  "update_connection",
+  "list_connections",
+  "release_files",
+  "social_create_draft",
+  "social_list_accounts",
+];
+
 export function toolsForChannel(
   channel: "web" | "whatsapp",
-  opts: { allowWrites?: boolean } = {}
+  opts: { allowWrites?: boolean; yalnizAraclar?: readonly string[] } = {}
 ): Anthropic.Tool[] {
+  if (opts.yalnizAraclar) {
+    const izinli = new Set(opts.yalnizAraclar);
+    return toolsForChannel(channel, { allowWrites: opts.allowWrites }).filter((t) => izinli.has(t.name));
+  }
   if (channel === "web") return AI_TOOLS;
   const allowWrites = opts.allowWrites ?? true;
   return AI_TOOLS.filter(

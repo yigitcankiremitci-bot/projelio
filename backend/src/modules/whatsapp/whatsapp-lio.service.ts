@@ -9,6 +9,7 @@ import type { AiAssistantService, ChatResult } from "../ai-assistant/ai-assistan
 import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.service";
 import { MAX_ATTACHMENT_UPLOAD_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "../ai-assistant/ai-attachments.service";
 import { baglantiTaslaklari } from "../ai-assistant/baglanti-taslaklari";
+import { KARTVIZIT_KIPI_ARACLARI } from "../ai-assistant/ai-assistant.tools";
 import type { WahaClient } from "./waha.client";
 import { decideLioKomut, devamCevabi, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
@@ -451,7 +452,15 @@ export class WhatsappLioService {
         convId,
         "fast",
         attachmentIds,
-        { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false, otomatik }
+        {
+          channel: "whatsapp",
+          allowWrites: contact.lio_allow_writes !== false,
+          otomatik,
+          // Kartvizit turu (fotoğraf geldi ya da kullanıcı az önce gösterilen
+          // taslağı cevaplıyor): dar araç seti — çağrı başına ~25 bin token
+          // araç tanımı yerine ~3 bin (bkz. KARTVIZIT_KIPI_ARACLARI).
+          yalnizAraclar: this.kartvizitTuruMu(userId, attachmentIds?.length ?? 0) ? KARTVIZIT_KIPI_ARACLARI : undefined,
+        }
       );
     }
     // Yine duraklatıldıysa koşu saklanır: sıradaki "devam" onu sürdürür.
@@ -541,6 +550,18 @@ export class WhatsappLioService {
     const k = this.bekleyenKosular.get(threadId);
     this.bekleyenKosular.delete(threadId);
     return k && Date.now() - k.at < BEKLEYEN_KOSU_OMRU_MS ? k : null;
+  }
+
+  /**
+   * Bu tur bir kartvizit turu mu: bu mesajla görsel geldi ya da son 20
+   * dakikada kullanıcıya gösterilmiş, onay bekleyen bir kartvizit taslağı var.
+   * Taslak daha eskiyse kullanıcı büyük ihtimalle başka bir şey soruyor; tam
+   * araç seti döner.
+   */
+  private kartvizitTuruMu(userId: string, gorselSayisi: number): boolean {
+    if (gorselSayisi > 0) return true;
+    const t = baglantiTaslaklari.sonSunulan(userId);
+    return !!t && Date.now() - t.olusma < 20 * 60 * 1000;
   }
 
   // ------------------------------------------- modele gösterilen görseller

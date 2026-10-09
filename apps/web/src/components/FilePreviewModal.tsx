@@ -178,7 +178,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         </div>
 
         {/* --- içerik --- */}
-        <div style={{ flex: 1, background: c.background, position: "relative" }}>
+        <div style={{ flex: 1, minHeight: 0, background: c.background, position: "relative" }}>
           {file.status === "missing" ? (
             <EmptyState
               title={t("Dosya {p1}'da bulunamadı", { p1: driveProviderLabel(file) })}
@@ -189,19 +189,26 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
           ) : renderLocally ? (
             localUrl ? (
               file.mimeType.startsWith("image/") ? (
+                // Kutu içeriğe MUTLAK yerleşir: yüksekliği kesin olsun diye. Esnek
+                // kutunun içinde "height: 100%" belirsiz kalıyordu, tarayıcı
+                // görselin maxHeight sınırını yok sayıyor ve fotoğraf taşıp
+                // kesik görünüyordu — telefonda kartvizitler yanlış yerinden
+                // kesilmiş sanıldı (2026-10-09; dosyanın kendisi bütündü).
                 <div
                   style={{
-                    height: "100%",
+                    position: "absolute",
+                    inset: 0,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     padding: 20,
+                    boxSizing: "border-box",
                   }}
                 >
                   <img
                     src={localUrl}
                     alt={file.name}
-                    style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+                    style={{ maxWidth: "100%", maxHeight: "100%", width: "auto", height: "auto", objectFit: "contain", display: "block" }}
                   />
                 </div>
               ) : (

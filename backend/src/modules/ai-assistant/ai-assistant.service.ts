@@ -413,6 +413,8 @@ interface PendingRun {
   channel: "web" | "whatsapp";
   /** WhatsApp'ta kullanıcı veri değiştirmeyi kapatmış olabilir (§3.8). */
   allowWrites: boolean;
+  /** Verilirse modele yalnızca bu araçlar gider (kartvizit turu, bkz. KARTVIZIT_KIPI_ARACLARI). */
+  yalnizAraclar?: readonly string[];
   createdAt: number;
 }
 
@@ -1871,6 +1873,8 @@ export class AiAssistantService {
        * SAYMAZ (bkz. baglanti-taslaklari.ts).
        */
       otomatik?: boolean;
+      /** Modele yalnızca bu araçlar verilir (bkz. KARTVIZIT_KIPI_ARACLARI). */
+      yalnizAraclar?: readonly string[];
     }
   ): Promise<ChatResult> {
     // Kullanıcı yeni bir şey yazdı: önceki turlarda hazırlanan kartvizit
@@ -2005,6 +2009,7 @@ export class AiAssistantService {
       holds: [],
       channel: options?.channel ?? "web",
       allowWrites: options?.allowWrites ?? true,
+      yalnizAraclar: options?.yalnizAraclar,
       createdAt: Date.now(),
     };
 
@@ -2469,7 +2474,7 @@ export class AiAssistantService {
               (run.channel === "whatsapp" ? `\n\n${WHATSAPP_CHANNEL_PROMPT}` : ""),
           },
         ] as any,
-        tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites }),
+        tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites, yalnizAraclar: run.yalnizAraclar }),
         messages: run.messages,
       }), run.preferredModel, await this.googleVerisiSiniri(run));
       // Yedeğe geçilmiş olabilir; sonraki kredi hesapları gerçek modeli kullansın.
@@ -6512,7 +6517,11 @@ export class AiAssistantService {
       const yeniAdlar = kisiler.flatMap((k) =>
         k.partyType && k.partyType !== "person" && k.yetkililer?.length ? k.yetkililer.map((y) => y.name) : [k.displayName]
       );
-      if (anahtar(eskiAdlar) === anahtar(yeniAdlar)) {
+      // En az bir ortak kişi yeter: Lio cevap turunda taslağı yeniden hazırlarken
+      // kişiyi şirketten ayırıp/birleştirip farklı bir liste verebiliyor
+      // (canlıda 2026-10-09: bir tur + kullanıcıya ikinci onay sorusu).
+      const eski = new Set(eskiAdlar.map((a) => normalizeName(a)));
+      if (yeniAdlar.some((a) => eski.has(normalizeName(a))) || anahtar(eskiAdlar) === anahtar(yeniAdlar)) {
         return {
           taslakId: gosterilen.id,
           zatenGosterildi: true,
@@ -6611,9 +6620,12 @@ export class AiAssistantService {
   private async confirmConnections(userId: string, input: Record<string, any>) {
     // Kimlik yoksa ya da tutmuyorsa kullanıcının gösterilmiş son taslağı
     // (bkz. BaglantiTaslaklari.sonSunulan — geçmişte araç sonucu yok).
-    const taslak =
-      (input.taslakId ? baglantiTaslaklari.al(userId, String(input.taslakId)) : undefined) ??
-      baglantiTaslaklari.sonSunulan(userId);
+    // Verilen kimlik bu turda açılmış (gösterilmemiş) bir taslağa çıkıyorsa
+    // ama kullanıcının gördüğü ve cevapladığı bir taslak varsa o geçerlidir:
+    // kullanıcı onu onayladı. Canlıda Lio cevap turunda taslağı yeniden açıp
+    // yenisini onaylamaya çalıştı ve kullanıcıdan ikinci kez onay istedi.
+    const verilen = input.taslakId ? baglantiTaslaklari.al(userId, String(input.taslakId)) : undefined;
+    const taslak = verilen?.sunuldu ? verilen : (baglantiTaslaklari.sonSunulan(userId) ?? verilen);
     if (!taslak) {
       const bekleyen = baglantiTaslaklari.kullanicininVerileri(userId).length > 0;
       throw new BadRequestException(

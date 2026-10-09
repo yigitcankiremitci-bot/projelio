@@ -106,4 +106,9 @@ export const baglantilar: TranslationDict = {
   "Kart kaydedildi ama şu dosyalar yüklenemedi: {liste}": "The card was saved but these files couldn't be uploaded: {liste}",
   "{n} kişi kayıtlı": { one: "{n} person registered", other: "{n} people registered" },
   "E-posta gönder": "Send email",
+
+  // ─────────────────────────────────────────────── Sıralama
+  "Sırala:": "Sort:",
+  "Ad (A–Z)": "Name (A–Z)",
+  "Son eklenen": "Recently added",
 };

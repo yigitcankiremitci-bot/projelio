@@ -65,6 +65,12 @@ export class BaglantiTaslaklari<T> {
     this.taslaklar.delete(id);
   }
 
+  /** Kullanıcının taslaklarındaki her veri (yeniden hazırlıkta önceki taslağın görseli için). */
+  kullanicininVerileri(userId: string): T[] {
+    this.temizle();
+    return [...this.taslaklar.values()].filter((t) => t.userId === userId).map((t) => t.veri);
+  }
+
   /**
    * Kullanıcının henüz gösterilmemiş (bu turda hazırlanmış) taslağı var mı.
    * WhatsApp köprüsü cevabı bu durumda KESMEZ: kullanıcı onaylayacağı listenin
@@ -86,6 +92,13 @@ export interface BaglantiTaslakVerisi {
   scope: { organizationId?: string; jobId?: string };
   departmentId?: string;
   plan: PlanAdimi[];
+  /**
+   * Kartvizit görsellerinin KOPYASI (dosya kimliği → baytlar). Taslak
+   * hazırlanınca sohbetteki dosyalar bırakılıyor — yoksa görsel kullanıcının
+   * cevap turunda modele yeniden gönderilip yeniden ücretleniyordu. Onayda
+   * kırpma ve karta ekleme bu kopyadan yapılır.
+   */
+  gorseller: Record<string, { name: string; mimeType: string; buffer: Buffer }>;
 }
 
 /** Süreç genelinde tek depo: Lio yazar, WhatsApp köprüsü cevabı keserken sorar. */

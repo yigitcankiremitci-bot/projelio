@@ -66,7 +66,7 @@ import { kartviziKirp } from "../party/kartvizit-kirp";
 import { qrCoz } from "../party/qr-coz";
 import { kartvizitBaglantisiniCoz } from "../party/qr-baglanti";
 import { kartvizitMetniCoz, kartvizitMetniMi } from "../party/vcard";
-import { baglantiTaslaklari } from "./baglanti-taslaklari";
+import { baglantiTaslaklari, type BaglantiTaslakVerisi } from "./baglanti-taslaklari";
 import { AccessService } from "../../common/access/access.service";
 import {
   BAGLANTI_MODUL_KEY,
@@ -1590,8 +1590,10 @@ export class AiAssistantService {
         "birleştir. (3) Hepsini TEK prepare_connections çağrısıyla gönder; şirket birleştirmesini sunucu yapar. " +
         "(4) Dönen özeti kullanıcıya göster ve TEK mesajda sor: ROL (Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, " +
         "Tedarikçi), nerede tanışıldığı (bilinmiyorsa; sonTanismaYerleri'nden öner) ve \"Not olarak eklemek istediğin bir " +
-        "şey var mı?\". (5) Kullanıcı cevap verince confirm_connections'ı taslakId, rol ve verdiyse notla (iliskiNotu, " +
-        "kullanıcının sözleriyle) çağır; not vermediyse uydurma. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
+        "şey var mı?\" — bunlardan başka HİÇBİR soru sorma, soruları ikinci bir mesaja bölme (her mesaj kullanıcıya " +
+        "bakiye harcatır). (5) Kullanıcının cevabı gelince — eksik olsa bile — TEKRAR SORMADAN hemen confirm_connections " +
+        "çağır: rol söylenmediyse contact, tanışma yeri söylenmediyse boş, not yoksa boş (uydurma); notu kullanıcının " +
+        "sözleriyle iliskiNotu'na yaz. Kaydettikten sonra kısa bir özetle bitir. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
         "update_connection ile düzelt.",
       "- QR'LI KARTVİZİT: Kâğıt kartvizitin üstünde QR varsa KARTTA YAZANLAR önceliklidir — önce onları oku. Ad + telefon " +
         "ya da e-posta okunabildiyse QR'a dokunma. Eksikse read_contact_card çağır: QR'da kişi kartı varsa yalnızca EKSİK " +
@@ -2670,6 +2672,11 @@ export class AiAssistantService {
           );
           // Yalnızca BAŞARILI çağrılar özete girer; hata alan bir araç iş yapmadı.
           run.executed.push(use.name);
+          // Kartvizit görselleri taslağa kopyalandı: sohbetten bırakılır ki
+          // kullanıcının cevap turunda yeniden gönderilip ücretlenmesin.
+          if (use.name === "prepare_connections" || use.name === "confirm_connections") {
+            await this.releaseActiveFiles(run).catch(() => undefined);
+          }
           await this.emitActivity(run.userId, use.name, (use.input as Record<string, any>) ?? {}, result, run.locale);
           toolResults.push({
             type: "tool_result",
@@ -6392,11 +6399,24 @@ export class AiAssistantService {
       this.partyService.sonTanismaYerleri(scope, userId).catch(() => []),
     ]);
     const plan = kartvizitPlani(kisiler, mevcut);
-    const gorselEksik = kisiler
-      .flatMap((k) => k.kartvizitler ?? [])
-      .filter((v) => !this.kartvizitGorseli(userId, v.dosya))
-      .map((v) => v.dosya);
-    const taslak = baglantiTaslaklari.olustur(userId, { scope, departmentId: input.departmentId ? String(input.departmentId) : undefined, plan });
+    const gorseller: BaglantiTaslakVerisi["gorseller"] = {};
+    const gorselEksik: string[] = [];
+    for (const v of kisiler.flatMap((k) => k.kartvizitler ?? [])) {
+      if (gorseller[v.dosya]) continue;
+      // Kullanıcı özeti düzelttirince taslak yeniden hazırlanır; sohbetteki
+      // dosya o arada bırakıldığı için görsel önceki taslaktan alınır.
+      const g =
+        this.kartvizitGorseli(userId, v.dosya) ??
+        baglantiTaslaklari.kullanicininVerileri(userId).find((t) => t.gorseller[v.dosya])?.gorseller[v.dosya];
+      if (g) gorseller[v.dosya] = g;
+      else gorselEksik.push(v.dosya);
+    }
+    const taslak = baglantiTaslaklari.olustur(userId, {
+      scope,
+      departmentId: input.departmentId ? String(input.departmentId) : undefined,
+      plan,
+      gorseller,
+    });
 
     const satir = (k: { name?: string; displayName?: string; title?: string; unvan?: string; phone?: string; email?: string }) => {
       const ad = k.name ?? k.displayName ?? "";
@@ -6425,8 +6445,9 @@ export class AiAssistantService {
       yapilacak:
         "Özeti kullanıcıya göster ve TEK mesajda sor: (1) rol (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / " +
         "Tedarikçi), (2) nerede tanışıldı (bilmiyorsan; sonTanismaYerleri'nden öner), (3) \"Not olarak eklemek istediğin " +
-        "bir şey var mı?\". Kullanıcının CEVABINDAN sonra confirm_connections'ı bu taslakId ile çağır; not verdiyse " +
-        "iliskiNotu'na AYNEN yaz, vermediyse boş bırak — not uydurma.",
+        "bir şey var mı?\" — başka soru yok. Kullanıcının cevabı gelince eksik olsa bile TEKRAR SORMADAN " +
+        "confirm_connections'ı bu taslakId ile çağır (rol yoksa contact); not verdiyse iliskiNotu'na AYNEN yaz, " +
+        "vermediyse boş bırak — not uydurma.",
     };
   }
 
@@ -6446,7 +6467,7 @@ export class AiAssistantService {
       );
     }
     baglantiTaslaklari.sil(taslak.id);
-    const { scope, departmentId, plan } = taslak.veri;
+    const { scope, departmentId, plan, gorseller } = taslak.veri;
     const ortak = connectionFields(input);
     const bugun = new Date().toISOString().slice(0, 10);
     // Rol ve tanışma bilgisi kullanıcının cevabından; kartvizitte olmaz.
@@ -6471,7 +6492,8 @@ export class AiAssistantService {
 
     const kartvizitEkle = async (partyId: string, kaynaklar: { dosya: string; kirpma?: any }[], ad: string) => {
       for (const v of kaynaklar) {
-        const g = this.kartvizitGorseli(userId, v.dosya);
+        // Taslaktaki kopya: sohbetteki dosya taslak hazırlanınca bırakıldı.
+        const g = gorseller[v.dosya] ?? this.kartvizitGorseli(userId, v.dosya);
         if (!g) {
           uyarilar.push(`${ad}: kartvizit görseli artık açık değil, dosya eklenmedi`);
           continue;

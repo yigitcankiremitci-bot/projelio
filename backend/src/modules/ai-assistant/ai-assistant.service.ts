@@ -61,6 +61,12 @@ import { PartyService } from "../party/party.service";
 import { musteriSayfasiniSec } from "../party/musteri-sablonu";
 import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole } from "../party/party-dedup";
+import { kartvizitPlani, type OkunanKisi, type PlanKisisi } from "../party/kartvizit-plani";
+import { kartviziKirp } from "../party/kartvizit-kirp";
+import { qrCoz } from "../party/qr-coz";
+import { kartvizitBaglantisiniCoz } from "../party/qr-baglanti";
+import { kartvizitMetniCoz, kartvizitMetniMi } from "../party/vcard";
+import { baglantiTaslaklari } from "./baglanti-taslaklari";
 import { AccessService } from "../../common/access/access.service";
 import {
   BAGLANTI_MODUL_KEY,
@@ -419,6 +425,7 @@ function shortDate(value?: string | null): string | undefined {
   return value ? String(value).slice(0, 10) : undefined;
 }
 
+
 /** Boş/undefined alanları atarak nesneyi küçültür. */
 function pruneEmpty<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const out: Record<string, unknown> = {};
@@ -522,7 +529,7 @@ function connectionSummary(p: Party) {
 }
 
 /**
- * create_connections / update_connection'ın alanları. Verilmeyenler undefined
+ * prepare/confirm_connections ve update_connection'ın alanları. Verilmeyenler undefined
  * kalır. Sosyal hesap ve bağlantı alanları YALNIZCA verildiyse nesne olur:
  * update'te boş nesne mevcut değerleri silerdi.
  */
@@ -1568,14 +1575,28 @@ export class AiAssistantService {
       "- MÜŞTERİLER (crm_musteri) de kendi araçlarıyla çalışır: list_customers / create_customer / update_customer. " +
         "Yeni kart açmadan önce list_customers ile aynı adda kart var mı bak.",
       "- BAĞLANTI VE İLİŞKİLER ayrı bir defterdir: fuarda/toplantıda tanışılan, müşteri OLMAYAN kişiler, rakipler, " +
-        "olası işbirlikçiler. Araçları list_connections / create_connections / update_connection — bunları " +
-        "create_customer ile AÇMA, rakip satış listesine düşer. Kullanıcı kartvizit fotoğrafı verip \"bağlantılara " +
-        "ekle\" dediğinde: her kartvizitten ad, şirket (kurum), unvan, telefon, e-posta, web, LinkedIn/Instagram'ı oku; " +
-        "okuyamadığını UYDURMA, boş bırak. Nerede tanışıldığını kullanıcı söylemediyse bir kez sor; bilmiyorsa boş geç. " +
-        "Kartvizitler bir şirket ya da kurumdaki birden fazla kişiye aitse ve kullanıcı şirket kartı istiyorsa " +
-        "partyType company/institution ile tek kart aç, kişileri yetkililer'e yaz; aksi hâlde her kişi ayrı kart. " +
-        "Sonra TEK create_connections çağrısıyla hepsini gönder, her kişiye kartvizitinin görüldüğü dosyaKimligi'ni " +
-        "kartvizitDosyasi olarak ver. Kullanıcı listeyi onay penceresinde görür — ayrıca sohbette onay isteme.",
+        "olası işbirlikçiler. Araçları list_connections / prepare_connections / confirm_connections / update_connection — " +
+        "bunları create_customer ile AÇMA, rakip satış listesine düşer.",
+      "- KARTVİZİT: Kullanıcı bir ya da birden çok KARTVİZİT fotoğrafı gönderirse (ne yapacağını yazmasa da) amaç " +
+        "onları Bağlantı ve İlişkiler'e eklemektir — sosyal medya gönderisi DEĞİL. Kartvizit = üzerinde ad, unvan, " +
+        "şirket/logo ve telefon/e-posta/web yazan küçük dikdörtgen kart. Fotoğrafta kart yoksa (manzara, ürün, kişi " +
+        "fotoğrafı) kartvizit akışına GİRME, ne yapılacağını sor. Akış: (1) her kartvizitten ad soyad, şirket/marka " +
+        "(kurum), unvan, cep telefonu, e-posta, web, LinkedIn/Instagram, şehir/adres oku — okuyamadığını UYDURMA; " +
+        "harf harf emin olmadığın e-posta ve telefonu boş bırakmak yanlış yazmaktan iyidir. (2) Her kartın fotoğraftaki " +
+        "dört köşesini 0–1 oranıyla kirpma'ya yaz (kâğıdın kenarları). Bir fotoğrafta birden fazla kart varsa her " +
+        "birine kendi köşeleri; ön/arka yüz ayrı fotoğrafsa ikisini aynı kişinin kartvizitler'ine koy ve bilgileri " +
+        "birleştir. (3) Hepsini TEK prepare_connections çağrısıyla gönder; şirket birleştirmesini sunucu yapar. " +
+        "(4) Dönen özeti kullanıcıya göster ve ROLÜ sor: Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, Tedarikçi " +
+        "(birden çok kişi varsa hepsi için tek rol mü, farklı mı). Nerede tanışıldığı bilinmiyorsa onu da sor; " +
+        "sonTanismaYerleri'nden öner. (5) Kullanıcı cevap verince confirm_connections'ı taslakId ve söylenen rolle " +
+        "çağır. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
+        "update_connection ile düzelt.",
+      "- QR'LI KARTVİZİT: Kâğıt kartvizitin üstünde QR varsa KARTTA YAZANLAR önceliklidir — önce onları oku. Ad + telefon " +
+        "ya da e-posta okunabildiyse QR'a dokunma. Eksikse read_contact_card çağır: QR'da kişi kartı varsa yalnızca EKSİK " +
+        "alanları tamamla; QR bir bağlantıysa adresi göster ve açmak için kullanıcıya SOR, onay gelirse baglantiyaGit:true. " +
+        "Yalnızca QR kodu ya da dijital kartvizit EKRAN GÖRÜNTÜSÜ geldiyse: yazıları oku ve read_contact_card çağır " +
+        "(bağlantı yine sorulur). Kullanıcı .vcf ya da paylaşılan kişi gönderdiyse veriler hatasızdır, doğrudan kullan. " +
+        "QR'ı kendin çözmeye çalışma.",
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
         "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
@@ -1834,8 +1855,17 @@ export class AiAssistantService {
        * cevap veriyordu (bkz. common/i18n `istemciDili`).
        */
       locale?: Locale;
+      /**
+       * Kullanıcının yazmadığı, sistemin başlattığı tur (WhatsApp'ta "fotoğraf
+       * geldi" turu). Kartvizit taslağının onay kuralı bunu kullanıcı cevabı
+       * SAYMAZ (bkz. baglanti-taslaklari.ts).
+       */
+      otomatik?: boolean;
     }
   ): Promise<ChatResult> {
+    // Kullanıcı yeni bir şey yazdı: önceki turlarda hazırlanan kartvizit
+    // taslakları artık gösterilmiş sayılır ve onaylanabilir.
+    if (!options?.otomatik) baglantiTaslaklari.yeniMesaj(userId);
     // Ekler mesajdan önce çözülür: süresi dolmuş bir ek varsa hiç API çağrısı yapmadan hata verilir.
     const attachments = this.attachmentsService.take(userId, attachmentIds ?? []);
 
@@ -3211,9 +3241,9 @@ export class AiAssistantService {
         return make(label);
       }
 
-      case "create_connections": {
-        const count = Array.isArray(result?.acilan) ? result.acilan.length : 0;
-        return count ? make(t("{n} bağlantı kartı açıldı", { n: count })) : null;
+      case "confirm_connections": {
+        const count = Number(result?.acilanKart ?? 0) + Number(result?.eklenenKisi ?? 0);
+        return count ? make(t("{n} bağlantı eklendi", { n: count })) : null;
       }
 
       case "import_customers_from_sheet": {
@@ -3753,36 +3783,6 @@ export class AiAssistantService {
           "{ad} için Projelio hesabı açılacak ve {eposta} adresine giriş bağlantısı gönderilecek.\nDepartman: {departmanlar}\nŞifreyi kişi ilk girişte kendisi belirler.",
           { ad: String(input.fullName ?? ""), eposta: String(input.email ?? ""), departmanlar: departmanlar || "-" }
         );
-      }
-
-      case "create_connections": {
-        // Onay penceresinde KİŞİLER görünmeli: kartvizit okuması yanlış bir ad
-        // ya da telefon üretebilir ve kullanıcı bunu kayıttan önce görmeli.
-        const kisiler: Record<string, any>[] = Array.isArray(input.kisiler) ? input.kisiler.slice(0, 30) : [];
-        const scope = await this.customerScope(userId, input).catch(() => null);
-        const satirlar: string[] = [];
-        const atlanacak: string[] = [];
-        for (const k of kisiler) {
-          const ad = String(k.displayName ?? "").trim();
-          if (!ad) continue;
-          const kopya = scope
-            ? await this.partyService.checkDuplicates(scope, { displayName: ad, email: k.email }, userId).catch(() => [])
-            : [];
-          if (kopya.length) {
-            atlanacak.push(ad);
-            continue;
-          }
-          const kim = [k.unvan, k.kurum].filter(Boolean).join(", ");
-          const iletisim = [k.phone, k.email].filter(Boolean).join(" · ");
-          satirlar.push(`• ${ad}${kim ? ` — ${kim}` : ""}${iletisim ? ` (${iletisim})` : ""}`);
-        }
-        const yer = kisiler.find((k) => k.tanismaYeri)?.tanismaYeri;
-        return [
-          t("Bağlantı ve İlişkiler'e {n} kişi eklenecek:", { n: satirlar.length }),
-          ...satirlar,
-          ...(yer ? [t("Nerede tanışıldı: {yer}", { yer })] : []),
-          ...(atlanacak.length ? [t("Zaten kayıtlı, atlanacak: {liste}", { liste: atlanacak.join(", ") })] : []),
-        ].join("\n");
       }
 
       case "create_support_request": {
@@ -5506,8 +5506,14 @@ export class AiAssistantService {
           .map((p) => connectionSummary(p));
       }
 
-      case "create_connections":
-        return this.createConnections(userId, input);
+      case "read_contact_card":
+        return this.readContactCard(userId, String(input.dosya ?? ""), input.baglantiyaGit === true);
+
+      case "prepare_connections":
+        return this.prepareConnections(userId, input);
+
+      case "confirm_connections":
+        return this.confirmConnections(userId, input);
 
       case "update_connection": {
         const existing = await this.partyService.findOne(String(input.partyId ?? ""));
@@ -6252,97 +6258,295 @@ export class AiAssistantService {
    * (bkz. PartyController). Yazma yetkisi ayrıca PartyService içinde.
    */
   /**
-   * Kartvizitlerden toplu bağlantı. Onay penceresinden (CRITICAL_TOOLS) geçmiş
-   * olarak gelir; burada yine de yinelenen kontrolü yapılır — onayla çalıştırma
-   * arasında başka biri aynı kişiyi eklemiş olabilir.
-   *
-   * Bir kişinin hatası diğerlerini düşürmez: kartvizit okumasında tek bir
-   * bozuk LinkedIn adresi yüzünden 20 kartın açılmaması kabul edilemezdi.
+   * Bağlantı araçlarının kapsamı. organizationId/jobId verilmediyse ve
+   * kullanıcının Bağlantı ve İlişkiler modülü açık TEK bir şirketi varsa o
+   * seçilir: WhatsApp'tan kartvizit atan kullanıcıya "hangi şirket?" diye
+   * sormak, "kartviziti at, gerisini Lio yapsın" vaadini bozuyordu.
    */
-  private async createConnections(userId: string, input: Record<string, any>) {
-    const scope = await this.customerScope(userId, input);
-    const kisiler: Record<string, any>[] = Array.isArray(input.kisiler) ? input.kisiler.slice(0, 30) : [];
-    if (!kisiler.length) throw new BadRequestException("Eklenecek kişi yok");
-    const departmentId = input.departmentId ? String(input.departmentId) : undefined;
+  private async baglantiKapsami(userId: string, input: Record<string, any>): Promise<{ organizationId?: string; jobId?: string }> {
+    if (input.organizationId || input.jobId) return this.customerScope(userId, input);
+    const orgs = await this.organizationsService.findAllForUser(userId);
+    const { data } = await this.supabase.client
+      .from("organization_modules")
+      .select("organization_id")
+      .eq("module_key", BAGLANTI_MODUL_KEY)
+      .in("organization_id", orgs.map((o) => o.id).slice(0, 200));
+    const acik = [...new Set(((data ?? []) as any[]).map((r) => r.organization_id as string))];
+    if (acik.length === 1) return this.customerScope(userId, { organizationId: acik[0] });
+    if (!acik.length) {
+      throw new BadRequestException(
+        "Bağlantı ve İlişkiler modülü hiçbir şirketinde açık değil. Kullanıcıdan modülü bir departmana eklemesini iste."
+      );
+    }
+    const adlar = orgs.filter((o) => acik.includes(o.id)).map((o) => `${o.name} (${o.id})`);
+    throw new BadRequestException(`Hangi şirkete eklenecek? organizationId ver: ${adlar.join(", ")}`);
+  }
 
-    const acilan: { partyId: string; ad: string }[] = [];
-    const atlanan: { ad: string; mevcutKart: string }[] = [];
-    const uyarilar: string[] = [];
-    // Aynı fotoğrafta birden fazla kartvizit olabilir: dosya bir kez yüklenir.
-    const yuklenen = new Map<string, string>();
+  /** Kartvizit görselinin baytları: sohbet eki (dosyaKimligi) ya da WhatsApp medyası (med_…). */
+  private kartvizitGorseli(userId: string, dosya: string): { name: string; mimeType: string; buffer: Buffer } | undefined {
+    if (dosya.startsWith("med_")) {
+      const m = gelenMedya.coz(userId, [dosya]).medya[0];
+      return m ? { name: m.ad, mimeType: m.mimeType, buffer: m.buffer } : undefined;
+    }
+    return this.attachmentsService.getFile(userId, dosya);
+  }
 
-    for (const k of kisiler) {
-      const ad = String(k.displayName ?? "").trim();
-      if (!ad) continue;
-      const alanlar = connectionFields(k);
-      const kopya = await this.partyService
-        .checkDuplicates(scope, { displayName: ad, email: alanlar.email }, userId)
-        .catch(() => []);
-      if (kopya.length) {
-        atlanan.push({ ad, mevcutKart: kopya[0].party.displayName });
-        continue;
+  /**
+   * Dijital kartvizit: .vcf eki, görseldeki QR (vCard/MECARD) ya da QR'daki
+   * dijital kartvizit bağlantısı. Veri alan alan gelir; Lio onu
+   * prepare_connections'a verir. Görsel kartvizit olarak karta eklenir
+   * (kırpılmadan: QR görseli ya da ekran görüntüsü düzleştirilecek bir kart değil).
+   */
+  private async readContactCard(userId: string, dosya: string, baglantiyaGit: boolean) {
+    // Kâğıt kartvizitte yazanlar önceliklidir (kullanıcı kararı, 2026-10-09):
+    // QR yalnızca EKSİK alanları tamamlar. QR'ın yalnız başına geldiği
+    // durumda (ekran görüntüsü) kartta yazan bir şey yok, QR'dakiler esas.
+    const yapilacak =
+      "KÂĞIT kartvizitse kartta yazanlar ÖNCELİKLİ: bu alanları yalnızca kartta OLMAYANLARI tamamlamak için kullan. " +
+      "Yalnız QR/ekran görüntüsüyse bunlar esas. Sonra prepare_connections; görsel kâğıt kartsa kirpma ver, QR ekran görüntüsüyse verme.";
+    const metin = this.attachmentsService.getText(userId, dosya);
+    if (metin && kartvizitMetniMi(metin)) {
+      return {
+        kaynak: "kisi-karti",
+        kisiler: kartvizitMetniCoz(metin).slice(0, 30),
+        yapilacak: "Bu kişileri prepare_connections'a ver (kartvizitler boş). Alanlar kişi kartından geldi, hatasız.",
+      };
+    }
+    const g = this.kartvizitGorseli(userId, dosya);
+    if (!g) throw new BadRequestException("Dosya bulunamadı ya da süresi doldu. Kullanıcıdan yeniden göndermesini iste.");
+    if (!g.mimeType.startsWith("image/")) throw new BadRequestException("Bu dosya görsel ya da kişi kartı (.vcf) değil.");
+    const qr = await qrCoz(g.buffer);
+    if (!qr) {
+      return {
+        qrBulunamadi: true,
+        not:
+          "Görselde okunabilir QR kod bulunamadı. Kartvizit yazıları görünüyorsa görselden oku (prepare_connections + kirpma). " +
+          "QR bulanık/küçükse kullanıcıdan QR'ı yakından ya da ekran görüntüsü olarak göndermesini iste.",
+      };
+    }
+    if (kartvizitMetniMi(qr)) return { kaynak: "qr-vcard", kisiler: kartvizitMetniCoz(qr), dosya, yapilacak };
+    if (/^https?:\/\//i.test(qr)) {
+      // Bağlantı kullanıcı sormadan AÇILMAZ: kartta yazanlar çoğu zaman yeter,
+      // yabancı bir adrese gitmek kullanıcının kararı.
+      if (!baglantiyaGit) {
+        return {
+          kaynak: "qr-baglanti-acilmadi",
+          url: qr,
+          dosya,
+          yapilacak:
+            "QR bir bağlantı ve AÇILMADI. Kartta yeterli bilgi varsa (ad + telefon ya da e-posta) bağlantıyı yok say. " +
+            "Eksikse kullanıcıya adresi göster ve \"Bu bağlantıyı açıp eksik bilgileri tamamlayayım mı?\" diye sor; " +
+            "evet derse read_contact_card'ı baglantiyaGit:true ile yeniden çağır.",
+        };
       }
-      const payload = { ...alanlar, displayName: ad, partyType: alanlar.partyType ?? "person", source: "lio" };
-      let party: Party;
+      const s = await kartvizitBaglantisiniCoz(qr);
+      // Dijital kartvizit sayfası kişinin web varlığı: kartın web sitesi olarak da kalır.
+      const kisiler = s.kisiler.map((k) => ({ ...k, website: k.website ?? s.url }));
+      if (s.kaynak === "vcard" || s.kaynak === "sayfa-vcard") return { kaynak: "qr-baglanti", url: s.url, kisiler, dosya, yapilacak };
+      if (s.kaynak === "sayfa-metni") {
+        return {
+          kaynak: "qr-sayfa",
+          url: s.url,
+          sayfaMetni: s.sayfaMetni,
+          dosya,
+          yapilacak:
+            "Sayfada hazır kişi kartı yok; kişiyi sayfaMetni'nden OKU (ad, şirket, unvan, telefon, e-posta), website = url. " +
+            "Emin olmadığını boş bırak. Sonra prepare_connections; kartvizitler: [{ dosya }], kirpma verme.",
+        };
+      }
+      return { kaynak: "qr-baglanti-acilamadi", url: qr, hata: s.hata, dosya, yapilacak: "Bağlantı açılamadı; kullanıcıya söyle, adresi website olarak kullanabilirsin." };
+    }
+    return { kaynak: "qr-metin", icerik: qr.slice(0, 2000), dosya, yapilacak: "QR düz metin; içinde kişi bilgisi varsa oku." };
+  }
+
+  /**
+   * Kartvizitten bağlantı — 1. adım: planı çıkarır, SAKLAR, gösterilecek özeti
+   * döner. Hiçbir şey yazmaz (bkz. baglanti-taslaklari.ts onay kuralı).
+   */
+  private async prepareConnections(userId: string, input: Record<string, any>) {
+    const scope = await this.baglantiKapsami(userId, input);
+    const kisiler: OkunanKisi[] = (Array.isArray(input.kisiler) ? input.kisiler : [])
+      .slice(0, 30)
+      .filter((k: any) => String(k?.displayName ?? "").trim())
+      .map((k: any) => ({
+        ...k,
+        displayName: String(k.displayName).trim(),
+        kartvizitler: Array.isArray(k.kartvizitler)
+          ? k.kartvizitler.filter((v: any) => v?.dosya).slice(0, 2)
+          : k.kartvizitDosyasi
+            ? [{ dosya: String(k.kartvizitDosyasi) }]
+            : [],
+      }));
+    if (!kisiler.length) throw new BadRequestException("Eklenecek kişi yok");
+
+    const [mevcut, sonYerler] = await Promise.all([
+      this.partyService.kartvizitAdaylari(scope, userId),
+      this.partyService.sonTanismaYerleri(scope, userId).catch(() => []),
+    ]);
+    const plan = kartvizitPlani(kisiler, mevcut);
+    const gorselEksik = kisiler
+      .flatMap((k) => k.kartvizitler ?? [])
+      .filter((v) => !this.kartvizitGorseli(userId, v.dosya))
+      .map((v) => v.dosya);
+    const taslak = baglantiTaslaklari.olustur(userId, { scope, departmentId: input.departmentId ? String(input.departmentId) : undefined, plan });
+
+    const satir = (k: { name?: string; displayName?: string; title?: string; unvan?: string; phone?: string; email?: string }) => {
+      const ad = k.name ?? k.displayName ?? "";
+      const unvan = k.title ?? k.unvan;
+      const iletisim = [k.phone, k.email].filter(Boolean).join(" · ");
+      return `${ad}${unvan ? ` (${unvan})` : ""}${iletisim ? ` — ${iletisim}` : ""}`;
+    };
+    const ozet: string[] = [];
+    for (const a of plan) {
+      if (a.tur === "yeniKisi") ozet.push(`• Yeni kişi: ${satir(a.kisi)}${a.kisi.kurum ? `, ${a.kisi.kurum}` : ""}`);
+      else if (a.tur === "yeniKurum")
+        ozet.push(`• Yeni şirket kartı: ${a.ad}${a.kisiler.length ? ` — kişiler: ${a.kisiler.map(satir).join("; ")}` : ""}`);
+      else if (a.tur === "mevcutKurum") ozet.push(`• Kayıtlı "${a.ad}" kartına eklenecek: ${a.kisiler.map(satir).join("; ") || "kartvizit"}`);
+      else ozet.push(`• Atlanacak: ${a.ad} — zaten kayıtlı ("${a.mevcutKart}", aynı ${a.sebep})`);
+    }
+    return {
+      taslakId: taslak.id,
+      ozet,
+      sonTanismaYerleri: sonYerler,
+      ...(gorselEksik.length ? { uyari: `Şu görseller bulunamadı, karta eklenemeyecek: ${gorselEksik.join(", ")}` } : {}),
+      yapilacak:
+        "Özeti kullanıcıya göster, rolü sor (Bağlantı / Rakip / İşbirliği / Potansiyel müşteri / Tedarikçi) ve nerede " +
+        "tanışıldığını bilmiyorsan sor. Kullanıcının CEVABINDAN sonra confirm_connections'ı bu taslakId ile çağır.",
+    };
+  }
+
+  /**
+   * Kartvizitten bağlantı — 2. adım: kullanıcının cevabından sonra planı uygular.
+   * Bir adımın hatası diğerlerini düşürmez: tek bozuk LinkedIn adresi yüzünden
+   * 20 kartın açılmaması kabul edilemezdi.
+   */
+  private async confirmConnections(userId: string, input: Record<string, any>) {
+    const taslak = baglantiTaslaklari.al(userId, String(input.taslakId ?? ""));
+    if (!taslak) {
+      throw new BadRequestException("Taslak bulunamadı ya da süresi doldu. prepare_connections'ı yeniden çağır.");
+    }
+    if (!taslak.sunuldu) {
+      throw new BadRequestException(
+        "Taslak kullanıcıya henüz gösterilmedi. Özeti göster, rolü sor ve kullanıcının cevabını bekle; onay aynı turda verilemez."
+      );
+    }
+    baglantiTaslaklari.sil(taslak.id);
+    const { scope, departmentId, plan } = taslak.veri;
+    const ortak = connectionFields(input);
+    const bugun = new Date().toISOString().slice(0, 10);
+    // Rol ve tanışma bilgisi kullanıcının cevabından; kartvizitte olmaz.
+    const ust = (k: OkunanKisi): Partial<Party> => {
+      const okunan = connectionFields(k as Record<string, any>);
+      const baglanti = { ...(okunan.baglanti ?? {}), ...(ortak.baglanti ?? {}) } as PartyBaglanti;
+      if (baglanti.tanismaYeri && !baglanti.tanismaTarihi) baglanti.tanismaTarihi = bugun;
+      return {
+        ...okunan,
+        roles: ortak.roles ?? okunan.roles,
+        baglanti: Object.keys(baglanti).length ? baglanti : undefined,
+        address: k.sehir || k.adres ? pruneEmpty({ city: k.sehir, line: k.adres }) : undefined,
+        source: "lio",
+      };
+    };
+
+    const acilan: string[] = [];
+    const eklenen: string[] = [];
+    const atlanan: string[] = [];
+    const uyarilar: string[] = [];
+    const kullanilanMedya = new Set<string>();
+
+    const kartvizitEkle = async (partyId: string, kaynaklar: { dosya: string; kirpma?: any }[], ad: string) => {
+      for (const v of kaynaklar) {
+        const g = this.kartvizitGorseli(userId, v.dosya);
+        if (!g) {
+          uyarilar.push(`${ad}: kartvizit görseli artık açık değil, dosya eklenmedi`);
+          continue;
+        }
+        try {
+          const kirpik = await kartviziKirp(g.buffer, g.mimeType, v.kirpma);
+          await this.partyService.dosyaEkle(
+            partyId,
+            {
+              originalname: kirpik.kirpildi ? "kartvizit.jpg" : g.name,
+              mimetype: kirpik.mimeType,
+              buffer: kirpik.buffer,
+              size: kirpik.buffer.length,
+            } as Express.Multer.File,
+            userId,
+            { departmentId, rol: "kartvizit" }
+          );
+          if (v.dosya.startsWith("med_")) kullanilanMedya.add(v.dosya);
+        } catch (err) {
+          uyarilar.push(`${ad}: kartvizit dosyası eklenemedi (${(err as Error).message})`);
+        }
+      }
+    };
+    const kisileriEkle = async (partyId: string, kisiler: PlanKisisi[], kartAdi: string, ilkBirincil: boolean) => {
+      const mevcutKisiler = await this.partyService.findContacts(partyId, userId).catch(() => []);
+      for (const [i, k] of kisiler.entries()) {
+        const ayni = mevcutKisiler.some(
+          (m) =>
+            m.name.toLocaleLowerCase("tr") === k.name.toLocaleLowerCase("tr") ||
+            (!!k.email && m.email?.toLowerCase() === k.email.toLowerCase())
+        );
+        if (ayni) {
+          atlanan.push(`${k.name} (${kartAdi} kartında zaten var)`);
+          continue;
+        }
+        await this.partyService
+          .addContact(partyId, { ...k, isPrimary: ilkBirincil && i === 0 }, userId)
+          .then(() => eklenen.push(`${k.name} → ${kartAdi}`))
+          .catch((err) => uyarilar.push(`${k.name}: eklenemedi (${(err as Error).message})`));
+      }
+    };
+    const kartAc = async (payload: Partial<Party> & { displayName: string }): Promise<Party> => {
       try {
-        party = await this.partyService.create({ ...scope, departmentId }, payload, userId, BAGLANTI_MODUL_KEY);
+        return await this.partyService.create({ ...scope, departmentId }, payload, userId, BAGLANTI_MODUL_KEY);
       } catch (err) {
         // Okunan sosyal hesap tanınmadıysa kart onsuz açılır.
         if (!payload.sosyal) throw err;
-        uyarilar.push(`${ad}: ${(err as Error).message} — hesap eklenmeden açıldı`);
-        party = await this.partyService.create(
-          { ...scope, departmentId },
-          { ...payload, sosyal: undefined },
-          userId,
-          BAGLANTI_MODUL_KEY
-        );
+        uyarilar.push(`${payload.displayName}: ${(err as Error).message} — hesap eklenmeden açıldı`);
+        return this.partyService.create({ ...scope, departmentId }, { ...payload, sosyal: undefined }, userId, BAGLANTI_MODUL_KEY);
       }
-      acilan.push({ partyId: party.id, ad });
+    };
 
-      // Şirket/kurum kartının yetkilileri; ilki birincil.
-      const yetkililer: Record<string, any>[] =
-        party.partyType !== "person" && Array.isArray(k.yetkililer) ? k.yetkililer.slice(0, 20) : [];
-      for (const [i, y] of yetkililer.entries()) {
-        if (!String(y?.name ?? "").trim()) continue;
-        await this.partyService
-          .addContact(
-            party.id,
-            { name: String(y.name), title: y.title, phone: y.phone, email: y.email, isPrimary: i === 0 },
-            userId
-          )
-          .catch((err) => uyarilar.push(`${ad}: ${y.name} eklenemedi (${(err as Error).message})`));
-      }
-
-      const dosyaKimligi = k.kartvizitDosyasi ? String(k.kartvizitDosyasi) : "";
-      if (!dosyaKimligi) continue;
+    for (const a of plan) {
       try {
-        const mevcut = yuklenen.get(dosyaKimligi);
-        if (mevcut) {
-          await this.partyService.dosyaBagla(party.id, mevcut, userId);
+        if (a.tur === "atla") {
+          atlanan.push(`${a.ad} (kayıtlı: ${a.mevcutKart})`);
+        } else if (a.tur === "yeniKisi") {
+          const party = await kartAc({ ...ust(a.kisi), displayName: a.kisi.displayName, partyType: "person" });
+          acilan.push(a.kisi.displayName);
+          await kartvizitEkle(party.id, a.kisi.kartvizitler ?? [], a.kisi.displayName);
+        } else if (a.tur === "yeniKurum") {
+          const alanlar = ust(a.kaynak);
+          const party = await kartAc({
+            ...alanlar,
+            // Şirket kartında kişisel alanlar (ad, unvan, cep) kişilere gider.
+            kurum: undefined,
+            unvan: undefined,
+            phone: undefined,
+            email: undefined,
+            sosyal: undefined,
+            displayName: a.ad,
+            partyType: a.partyType,
+            website: a.website,
+            address: a.sehir || a.adres ? pruneEmpty({ city: a.sehir, line: a.adres }) : undefined,
+          });
+          acilan.push(a.ad);
+          await kisileriEkle(party.id, a.kisiler, a.ad, true);
+          await kartvizitEkle(party.id, a.kartvizitler, a.ad);
         } else {
-          const dosya = this.attachmentsService.getFile(userId, dosyaKimligi);
-          if (!dosya) {
-            uyarilar.push(`${ad}: kartvizit görseli artık açık değil, dosya eklenmedi`);
-            continue;
-          }
-          const yuklenenDosya = await this.partyService.dosyaEkle(
-            party.id,
-            {
-              originalname: dosya.name,
-              mimetype: dosya.mimeType,
-              buffer: dosya.buffer,
-              size: dosya.buffer.length,
-            } as Express.Multer.File,
-            userId,
-            { departmentId }
-          );
-          yuklenen.set(dosyaKimligi, yuklenenDosya.id);
+          await kisileriEkle(a.partyId, a.kisiler, a.ad, false);
+          await kartvizitEkle(a.partyId, a.kartvizitler, a.ad);
         }
       } catch (err) {
-        uyarilar.push(`${ad}: kartvizit dosyası eklenemedi (${(err as Error).message})`);
+        uyarilar.push(`${a.tur === "yeniKisi" ? a.kisi.displayName : a.ad}: ${(err as Error).message}`);
       }
     }
-    return { acilan, atlanan, uyarilar };
+    // Kartvizit olarak kullanılan WhatsApp fotoğrafları sosyal medya deposundan
+    // çıkar: yoksa Lio her turda "gönderilmemiş fotoğrafın var" diye hatırlatırdı.
+    if (kullanilanMedya.size) gelenMedya.birak(userId, [...kullanilanMedya]);
+    return { acilanKart: acilan.length, eklenenKisi: eklenen.length, acilan, eklenen, atlanan, uyarilar };
   }
 
   private async customerScope(

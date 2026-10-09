@@ -32,6 +32,7 @@ import { FilesService, type ProjectFile } from "../files/files.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
+import type { MevcutKart } from "./kartvizit-plani";
 import {
   baglantiAlaniOkunur,
   baglantiAlaniYazilir,
@@ -432,6 +433,33 @@ export class PartyService {
         if (p) p.contactCount = (p.contactCount ?? 0) + 1;
       }
     }
+  }
+
+  /**
+   * Kartvizit planı için karşılaştırma havuzu: kullanıcının OKUYABİLDİĞİ
+   * defterlerdeki kartlar (bkz. checkDuplicates — görülemeyen defterin kartı
+   * "zaten kayıtlı" diye adıyla sızmasın).
+   */
+  async kartvizitAdaylari(scope: PartyScope, userId: string): Promise<MevcutKart[]> {
+    const moduller = await this.okunanModuller(scope, userId);
+    if (!moduller.includes(BAGLANTI_MODUL_KEY)) throw new ForbiddenException("Bağlantı ve İlişkiler'i görme yetkin yok");
+    const kartlar = await this.findAll(scope, { moduller });
+    return kartlar.map((p) => ({ id: p.id, displayName: p.displayName, partyType: p.partyType, email: p.email, phone: p.phone }));
+  }
+
+  /** Bağlantılar'daki en son tanışma yerleri (yer + tarih), Lio'nun önerisi için. */
+  async sonTanismaYerleri(scope: PartyScope, userId: string): Promise<{ yer: string; tarih?: string }[]> {
+    const { baglantilar } = await this.baglantilarim(scope, userId);
+    const gorulen = new Set<string>();
+    const sonuc: { yer: string; tarih?: string }[] = [];
+    for (const p of [...baglantilar].sort((a, b) => b.createdAt.localeCompare(a.createdAt))) {
+      const yer = p.baglanti?.tanismaYeri?.trim();
+      if (!yer || gorulen.has(yer.toLocaleLowerCase("tr"))) continue;
+      gorulen.add(yer.toLocaleLowerCase("tr"));
+      sonuc.push({ yer, tarih: p.baglanti?.tanismaTarihi });
+      if (sonuc.length >= 3) break;
+    }
+    return sonuc;
   }
 
   /** GET /party/:id için: yükler VE okuma yetkisini doğrular. */

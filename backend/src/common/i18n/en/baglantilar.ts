@@ -30,14 +30,17 @@ export const baglantilar: TranslationDict = {
     "To add a file, open the card from a department where the module is enabled",
   "Kartvizit fotoğraf ya da PDF olmalı": "The business card must be a photo or a PDF",
 
-  // Lio: kartvizitten toplu bağlantı (onay penceresi ve etkinlik kartı)
-  "Bağlantı ve İlişkiler'e {n} kişi eklenecek:": {
-    one: "{n} person will be added to Contacts & Relationships:",
-    other: "{n} people will be added to Contacts & Relationships:",
-  },
-  "Nerede tanışıldı: {yer}": "Where you met: {yer}",
-  "Zaten kayıtlı, atlanacak: {liste}": "Already registered, will be skipped: {liste}",
-  "{n} bağlantı kartı açıldı": { one: "{n} contact card created", other: "{n} contact cards created" },
+  // Lio: kartvizitten bağlantı (taslak → onay)
   "Eklenecek kişi yok": "No one to add",
+  "Bu dosya görsel ya da kişi kartı (.vcf) değil.": "This file isn't an image or a contact card (.vcf).",
+  "Dosya bulunamadı ya da süresi doldu. Kullanıcıdan yeniden göndermesini iste.": "File not found or expired. Ask the user to send it again.",
+  "{n} bağlantı eklendi": { one: "{n} contact added", other: "{n} contacts added" },
+  "Bağlantı ve İlişkiler'i görme yetkin yok": "You don't have access to Contacts & Relationships",
+  "Bağlantı ve İlişkiler modülü hiçbir şirketinde açık değil. Kullanıcıdan modülü bir departmana eklemesini iste.":
+    "Contacts & Relationships isn't enabled in any of your companies. Ask the user to add the module to a department.",
+  "Taslak bulunamadı ya da süresi doldu. prepare_connections'ı yeniden çağır.":
+    "Draft not found or expired. Call prepare_connections again.",
+  "Taslak kullanıcıya henüz gösterilmedi. Özeti göster, rolü sor ve kullanıcının cevabını bekle; onay aynı turda verilemez.":
+    "The draft hasn't been shown to the user yet. Show the summary, ask for the role and wait for the user's reply; it can't be confirmed in the same turn.",
   "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
 };

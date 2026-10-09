@@ -1,4 +1,5 @@
 import { belgeOlarakMi } from "../social-media/gelen-medya";
+import { kartvizitMetniCoz, vcardlariAl } from "../party/vcard";
 import { forwardRef, Inject, Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -283,7 +284,17 @@ export class WhatsappWebhookService {
           .medyaAlinamadi(thread.id, contact.user_id, payload.media?.filename, payload.media?.error ?? "adres yok")
           .catch(() => undefined);
       }
-      if (!body.trim() && !media) return;
+      // Paylaşılan kişi (telefonla kartvizit QR'ı okutup "kişiyi paylaş"):
+      // gövde boş gelir, eskiden sessizce düşüyordu. Ham vCard modele
+      // VERİLMEZ — içinde fotoğraf (base64) olabiliyor ve mesaj sınırını aşar;
+      // ayrıştırılmış hâli kısa bir not olarak gider.
+      const kisiler = vcardlariAl(payload).flatMap((v) => kartvizitMetniCoz(v)).slice(0, 10);
+      const metin = kisiler.length
+        ? `${body}\n\n[Sistem notu: Kullanıcı WhatsApp'tan ${kisiler.length} kişi kartı (vCard) paylaştı; veriler alan alan geldi, ` +
+          `HATASIZ. Amaç Bağlantı ve İlişkiler'e eklemek: bunları prepare_connections'a AYNEN ver (kartvizitler boş), ` +
+          `sonra rolü sor. Kişiler: ${JSON.stringify(kisiler)}]`.trim()
+        : body;
+      if (!metin.trim() && !media) return;
       await this.waha.sendSeen(conn.session_name, contact.wa_jid, payload.id ? [payload.id] : undefined).catch(() => {});
       // "Yazıyor…" göstergesi: araçlı tur 15 saniye sürebiliyor ve o süre
       // boyunca kullanıcı hiçbir şey görmüyordu — mesajı aldık mı belli
@@ -299,7 +310,7 @@ export class WhatsappWebhookService {
       // Beklenmeyen hata kuyruğu tıkamasın: olay işlenmiş sayılır, kullanıcı
       // cevapsız kalır ama sonraki mesajları çalışır.
       await this.lio
-        .handleUserCommand(thread, contact, conn, contact.user_id, body, media)
+        .handleUserCommand(thread, contact, conn, contact.user_id, metin, media)
         .catch((e) => this.logger.warn(`Lio komutu başarısız (${thread.id}): ${e instanceof Error ? e.message : e}`))
         // Gösterge her hâlükârda kapanmalı: hata durumunda açık kalırsa
         // kullanıcı gelmeyecek bir cevabı bekler.
@@ -578,3 +589,4 @@ export class WhatsappWebhookService {
     await this.supabase.client.from("whatsapp_messages").update(patch).eq("id", (existing as any).id);
   }
 }
+

@@ -127,6 +127,9 @@ const EXTENSION_MIMES: Record<string, string> = {
   txt: "text/plain",
   md: "text/markdown",
   json: "application/json",
+  // Kişi kartı (telefondan paylaşılan, QR'dan indirilen): metin olarak okunur,
+  // read_contact_card alan alan ayrıştırır.
+  vcf: "text/vcard",
   mp3: "audio/mpeg",
   m4a: "audio/mp4",
   wav: "audio/wav",
@@ -391,13 +394,21 @@ export class AiAttachmentsService {
   /**
    * Sabitlenmiş bir görselin/PDF'in kendisi — adı ve türüyle. Lio'nun okuduğu
    * kartvizit fotoğrafı, açtığı bağlantı kartına dosya olarak bağlansın diye
-   * (create_connections). Sahiplik getBinary'deki gibi doğrulanır.
+   * (confirm_connections). Sahiplik getBinary'deki gibi doğrulanır.
    */
   getFile(userId: string, id: string): { name: string; mimeType: string; buffer: Buffer } | undefined {
     this.sweep();
     const record = this.prepared.get(id);
     if (!record || record.userId !== userId || !record.base64) return undefined;
     return { name: record.name, mimeType: record.mimeType, buffer: Buffer.from(record.base64, "base64") };
+  }
+
+  /** Sabitlenmiş bir metin ekinin içeriği (.vcf, .txt) — read_contact_card için. */
+  getText(userId: string, id: string): string | undefined {
+    this.sweep();
+    const record = this.prepared.get(id);
+    if (!record || record.userId !== userId) return undefined;
+    return record.text;
   }
 
   /**

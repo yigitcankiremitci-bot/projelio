@@ -48,11 +48,6 @@ export const CRITICAL_TOOLS = new Set<string>([
   // geri alınamaz ve karşı tarafta bir insan okur. Kullanıcı ne yazdığını
   // görmeden gitmemeli.
   "create_support_request",
-  // Bağlantı kartları: Lio kartvizit fotoğrafını OKUYARAK açıyor. Okuma hatası
-  // (yanlış ad, kayan telefon) sessizce deftere girmesin; kullanıcı açılacak
-  // kişileri onay penceresinde görüp onaylar. Toplu araç olduğu için 30 kart
-  // tek tıkla açılır — tek tek onay istemek kartvizit kolaylığını yok ederdi.
-  "create_connections",
 ]);
 
 // Veri DEĞİŞTİREN ama kritik olmayan araçlar. Kritik olanlar yukarıda;
@@ -116,6 +111,10 @@ export const WRITE_TOOLS = new Set<string>([
   // Toplu kart açma; önizleme varsayılan (bkz. import_tasks_from_sheet).
   "import_customers_from_sheet",
   "update_connection",
+  // Kartvizit kaydı kritik DEĞİL (WhatsApp'ta da çalışmalı): onayı sunucudaki
+  // taslak kuralı zorluyor (bkz. baglanti-taslaklari.ts). prepare yazmadığı
+  // için listede yok.
+  "confirm_connections",
   // Bilgi kartı: künye düzenlemek geri alınabilir bir değişiklik (silme değil),
   // o yüzden kritik değil — ama yazmadır, "hiçbir şeyi değiştirme" denmişse kapanır.
   "update_info_card",
@@ -1791,68 +1790,87 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "create_connections",
+    name: "read_contact_card",
     description:
-      "Bağlantı ve İlişkiler modülüne bir ya da birden çok kişi kartı açar — kartvizit fotoğraflarından okunan " +
-      "kişiler için TEK çağrı yap (en çok 30). Kullanıcı açılacak listeyi onay penceresinde görür; aynı ad ya da " +
-      "e-postayla zaten kayıtlı olanlar atlanır. Kartvizitte olmayan bilgiyi UYDURMA, okunamayan alanı boş bırak. " +
-      "kartvizitDosyasi verilirse fotoğraf kişinin kartına dosya olarak eklenir.",
+      "Dijital kartvizit okur: QR kod (yalnız QR ya da dijital kartvizit ekran görüntüsü) veya kişi kartı (.vcf). " +
+      "QR'ı sen çözemezsin, sunucu çözer. KAĞIT kartvizitin üstündeki QR için yalnızca kartta yazanlar YETERSİZSE " +
+      "çağır (ad + telefon ya da e-posta yoksa). QR bir BAĞLANTIYSA sunucu onu açmaz, adresi döner: kullanıcıya " +
+      "\"Bu bağlantıyı açıp bilgileri tamamlayayım mı?\" diye sor; evet derse baglantiyaGit:true ile yeniden çağır.",
     input_schema: {
       type: "object",
       properties: {
-        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği." },
-        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
-        departmentId: {
-          type: "string",
-          description: "Kartvizit dosyasının ineceği departman (modülün açık olduğu). Verilmezse uygun olanı seçilir.",
+        dosya: { type: "string", description: "Görselin ya da .vcf'nin dosyaKimligi, veya WhatsApp mediaId'si (med_…)." },
+        baglantiyaGit: {
+          type: "boolean",
+          description: "QR'daki bağlantı açılsın mı. YALNIZCA kullanıcı açmayı onayladıktan sonra true.",
         },
+      },
+      required: ["dosya"],
+    },
+  },
+  {
+    name: "prepare_connections",
+    description:
+      "KARTVİZİTTEN BAĞLANTI — 1. adım. Kullanıcı kartvizit fotoğrafı gönderdiğinde (ne yapacağını söylemese de) " +
+      "her kartviziti oku ve TEK çağrıda buraya ver. Hiçbir şey KAYDETMEZ: sunucu planı çıkarır (aynı markadan " +
+      "birden çok kartvizit şirket kartı altında birleşir, kurumu kayıtlı şirkete kişi eklenir, kayıtlılar atlanır) " +
+      "ve taslakId döner. Dönen özeti kullanıcıya AYNEN göster, rolü (ve bilinmiyorsa nerede tanışıldığını) sor. " +
+      "Kartvizitte olmayan bilgiyi UYDURMA; okuyamadığını boş bırak.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Şirket tarafı: organizasyon kimliği (list_organizations)." },
+        jobId: { type: "string", description: "Serbest çalışan tarafı: iş kimliği." },
+        departmentId: { type: "string", description: "Kartvizit dosyasının ineceği departman (opsiyonel)." },
         kisiler: {
           type: "array",
           maxItems: 30,
+          description: "Her kartvizit bir kişi. Şirket kartı birleştirmesini sunucu yapar; sen kişileri ayrı ver.",
           items: {
             type: "object",
             properties: {
-              displayName: { type: "string", description: "Kişinin adı soyadı (yalnızca kurumsa kurum adı)." },
+              displayName: { type: "string", description: "Kişinin adı soyadı (kartta kişi yoksa kurumun adı + partyType company)." },
               partyType: {
                 type: "string",
                 enum: ["person", "company", "institution"],
-                description: "Varsayılan person. Kartvizit bir kişiye aitse person; yalnızca firma bilgisi varsa company.",
+                description: "Varsayılan person. Kartta kişi adı yoksa company (dernek/üniversite/kamu ise institution).",
               },
-              roles: {
-                type: "array",
-                items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
-                description: "Kullanıcı söylemediyse verme (contact).",
-              },
-              kurum: { type: "string", description: "Kişinin çalıştığı şirket/kurum (kartvizitteki firma adı)." },
-              unvan: { type: "string", description: "Kişinin görevi (Pazarlama Müdürü)." },
+              kurum: { type: "string", description: "Kartvizitteki şirket/marka adı — logo yazısı dahil, olduğu gibi." },
+              unvan: { type: "string", description: "Görevi (Satış Müdürü)." },
+              phone: { type: "string", description: "Cep telefonu; yoksa sabit hat. Kartta yazdığı gibi." },
               email: { type: "string" },
-              phone: { type: "string", description: "Kartvizitte birden fazla numara varsa cep telefonu." },
               website: { type: "string" },
-              linkedin: { type: "string", description: "LinkedIn profil adresi ya da in/ad-soyad." },
-              instagram: { type: "string", description: "@kullaniciadi ya da profil adresi." },
-              onem: { type: "string", enum: ["yuksek", "orta", "dusuk"], description: "Kullanıcı söylemediyse verme (orta)." },
-              tanismaYeri: { type: "string", description: "Nerede tanışıldı (fuar/etkinlik adı). Kullanıcı söylemediyse sor." },
-              tanismaTarihi: { type: "string", description: "YYYY-AA-GG." },
-              sonrakiTemas: { type: "string", description: "Ne zaman dönülecek, YYYY-AA-GG." },
-              iliskiNotu: { type: "string", description: "Yalnızca bu modülde görünen not (rakip, ortak iş fikri…)." },
-              yetkililer: {
+              linkedin: { type: "string" },
+              instagram: { type: "string" },
+              sehir: { type: "string" },
+              adres: { type: "string", description: "Açık adres satırı." },
+              kartvizitler: {
                 type: "array",
-                maxItems: 20,
-                description: "Yalnızca company/institution kartında: kurumdaki kişiler (ad, unvan, iletişim).",
+                maxItems: 2,
+                description: "Bu kişinin kartvizit görseli (ön; varsa arka yüz).",
                 items: {
                   type: "object",
                   properties: {
-                    name: { type: "string" },
-                    title: { type: "string", description: "Unvan." },
-                    phone: { type: "string" },
-                    email: { type: "string" },
+                    dosya: {
+                      type: "string",
+                      description: "Görselin dosyaKimligi (\"Şu an açık dosyalar\") ya da WhatsApp mediaId'si (med_…).",
+                    },
+                    kirpma: {
+                      type: "object",
+                      description:
+                        "Kartvizitin fotoğraftaki DÖRT KÖŞESİ, 0–1 arası oran [x, y] (sol üst 0,0 · sağ alt 1,1). " +
+                        "Kartın kâğıt kenarlarını ver, yazıların değil. Bir fotoğrafta birden çok kart varsa her kişiye kendi köşeleri.",
+                      properties: {
+                        solUst: { type: "array", items: { type: "number" } },
+                        sagUst: { type: "array", items: { type: "number" } },
+                        sagAlt: { type: "array", items: { type: "number" } },
+                        solAlt: { type: "array", items: { type: "number" } },
+                      },
+                      required: ["solUst", "sagUst", "sagAlt", "solAlt"],
+                    },
                   },
-                  required: ["name"],
+                  required: ["dosya"],
                 },
-              },
-              kartvizitDosyasi: {
-                type: "string",
-                description: "Bu kişinin kartvizitinin göründüğü görselin dosyaKimligi (\"Şu an açık dosyalar\" listesinden).",
               },
             },
             required: ["displayName"],
@@ -1860,6 +1878,30 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["kisiler"],
+    },
+  },
+  {
+    name: "confirm_connections",
+    description:
+      "KARTVİZİTTEN BAĞLANTI — 2. adım. prepare_connections'ın taslağını kaydeder. YALNIZCA kullanıcı taslağı " +
+      "gördükten sonra yazdığı mesajla onay ya da rol verdiyse çağır; sunucu aynı turda onayı reddeder. Kullanıcının " +
+      "söylediği rol, tanışma yeri ve diğerleri TÜM yeni kartlara uygulanır.",
+    input_schema: {
+      type: "object",
+      properties: {
+        taslakId: { type: "string" },
+        roles: {
+          type: "array",
+          items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
+          description: "Bağlantı=contact, Rakip=competitor, İşbirliği=collaborator, Potansiyel müşteri=lead, Tedarikçi=supplier.",
+        },
+        tanismaYeri: { type: "string" },
+        tanismaTarihi: { type: "string", description: "YYYY-AA-GG; söylenmediyse bugün yazılır." },
+        onem: { type: "string", enum: ["yuksek", "orta", "dusuk"] },
+        sonrakiTemas: { type: "string", description: "YYYY-AA-GG." },
+        iliskiNotu: { type: "string" },
+      },
+      required: ["taslakId"],
     },
   },
   {

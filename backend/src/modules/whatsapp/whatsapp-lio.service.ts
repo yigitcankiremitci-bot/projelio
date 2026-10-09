@@ -7,7 +7,8 @@ import { AccessService } from "../../common/access/access.service";
 import { SupabaseService } from "../../database/supabase.service";
 import type { AiAssistantService, ChatResult } from "../ai-assistant/ai-assistant.service";
 import type { AiAttachmentsService } from "../ai-assistant/ai-attachments.service";
-import { MAX_ATTACHMENT_UPLOAD_BYTES } from "../ai-assistant/ai-attachments.service";
+import { MAX_ATTACHMENT_UPLOAD_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "../ai-assistant/ai-attachments.service";
+import { baglantiTaslaklari } from "../ai-assistant/baglanti-taslaklari";
 import type { WahaClient } from "./waha.client";
 import { decideLioKomut, devamCevabi, lioKomutConfigFromEnv } from "./lio-komut-sinir";
 import { gelenMedya, medyaTuru, MEDYA_INDIRME_ZAMAN_ASIMI_MS, MEDYA_TEK_DOSYA_TAVANI, type GelenMedya } from "../social-media/gelen-medya";
@@ -242,7 +243,9 @@ export class WhatsappLioService {
     // WhatsApp'tan gelen dosya (Excel, PDF, görsel, sesli not). Eskiden hiç
     // iletilmiyordu: açıklamasız dosya "boş mesaj" sayılıp atlanıyor,
     // açıklamalısında Lio yalnızca metni görüyordu.
-    media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean }
+    media?: { waha: WahaClient; url: string; mimetype?: string | null; filename?: string | null; belge?: boolean },
+    /** Sistemin başlattığı "fotoğraf geldi" turu — kullanıcı yazmadı (bkz. medyaTuruPlanla). */
+    otomatik = false
   ): Promise<void> {
     const config = lioKomutConfigFromEnv();
     // Açıklamasız video/fotoğraf: depolanır, HER BİRİNE cevap verilmez. Karusel
@@ -258,7 +261,12 @@ export class WhatsappLioService {
         await this.gonder(thread.id, userId, this.medyaHatasi(e, userId), false);
         return;
       }
-      if (this.komutSohbeti(thread)) this.medyaTuruPlanla(thread.id, contact, conn, userId);
+      // Fotoğrafta, süren bir konuşma olmasa da tur çalışır: tek başına atılan
+      // kartvizit "doğrudan bağlantılara eklensin" isteniyor ve Lio ancak
+      // fotoğrafa bakınca kartvizit mi, paylaşılacak bir görsel mi anlar.
+      // Video eski kuralda: kullanıcı ne yapılacağını yazınca.
+      const gorsel = medyaTuru(media.mimetype ?? "") === "gorsel";
+      if (gorsel || this.komutSohbeti(thread)) this.medyaTuruPlanla(thread.id, contact, conn, userId);
       return;
     }
     // Açıklamasız dosya: modele ne yapacağını söyleyen kısa bir istek.
@@ -300,6 +308,8 @@ export class WhatsappLioService {
     }
 
     let attachmentIds: string[] | undefined;
+    // Bu mesajla gelen fotoğrafın depodaki kimliği: aşağıda ikinci kez ek yapılmasın.
+    let buMedyaId: string | undefined;
     if (media) {
       try {
         const turu = medyaTuru(media.mimetype ?? "");
@@ -311,7 +321,9 @@ export class WhatsappLioService {
         let buffer: Buffer;
         if (turu) {
           // Not aşağıda, bildirilmemiş medyayla birlikte eklenir.
-          buffer = (await this.indirmeyiIzle(userId, this.sosyalMedyaAl(userId, media))).buffer;
+          const kayit = await this.indirmeyiIzle(userId, this.sosyalMedyaAl(userId, media));
+          buffer = kayit.buffer;
+          buMedyaId = kayit.id;
         } else {
           buffer = await media.waha.downloadMedia(media.url, MAX_ATTACHMENT_UPLOAD_BYTES);
         }
@@ -345,11 +357,37 @@ export class WhatsappLioService {
     // Önce yedekten geri yükle: dağıtımdan sonra bellek boştur.
     await yedektenYukle(this.supabase, userId).catch(() => undefined);
     const yeni = new Set<string>();
+    // Sessizce gelen fotoğraflar modele GÖRSEL olarak da verilir. Eskiden
+    // yalnızca "mediaId=… fotoğraf" notu gidiyordu: Lio kartviziti göremiyor,
+    // her fotoğrafı sosyal medya içeriği sanıyordu (2026-10-09).
+    const ekler = await this.attachments();
+    let gorselKotasi = MAX_ATTACHMENTS_PER_MESSAGE - (attachmentIds?.length ?? 0);
+    let bekletilen = 0;
     for (const m of gelenMedya.bildirilmemisleriAl(userId)) {
       const tur = medyaTuru(m.mimeType);
       if (!tur) continue;
+      if (tur === "gorsel" && m.id !== buMedyaId) {
+        if (gorselKotasi <= 0) {
+          // Bir mesaja en çok 5 görsel girer; kalanlar sonraki turda gösterilir.
+          m.bildirildi = false;
+          bekletilen++;
+          continue;
+        }
+        try {
+          const ek = await ekler.prepareFromBuffer(userId, m.buffer, m.ad, m.mimeType, convId);
+          attachmentIds = [...(attachmentIds ?? []), ek.id];
+          gorselKotasi--;
+        } catch (e) {
+          this.logger.warn(`Fotoğraf Lio'ya görsel olarak verilemedi (${m.id}): ${e instanceof Error ? e.message : e}`);
+        }
+      }
       yeni.add(m.id);
       karar.text += "\n\n" + medyaNotu(m, tur);
+    }
+    if (bekletilen) {
+      karar.text +=
+        `\n\n[Sistem notu: Kullanıcının ${bekletilen} fotoğrafı daha var; bir mesaja en çok ${MAX_ATTACHMENTS_PER_MESSAGE} görsel ` +
+        `sığdığı için bu turda göremiyorsun. Bu turdakileri bitirince kullanıcıya kalan fotoğraflar için "devam" yazmasını söyle.]`;
     }
     // Daha önce bildirilmiş ama hâlâ taslağa bağlanmamış medya da HER turda
     // hatırlatılır. Modelin social_list_accounts'u çağırıp bakmasına güvenilmiyor:
@@ -396,7 +434,7 @@ export class WhatsappLioService {
         convId,
         "fast",
         attachmentIds,
-        { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false }
+        { channel: "whatsapp", allowWrites: contact.lio_allow_writes !== false, otomatik }
       );
     }
     // Yine duraklatıldıysa koşu saklanır: sıradaki "devam" onu sürdürür.
@@ -409,7 +447,9 @@ export class WhatsappLioService {
     // Taslak gösterilen turda cevap KESİLMEZ: kullanıcı onaylayacağı açıklamanın
     // tamamını görmeli. 800'de kesilince "…Tamamı için" eki açıklamanın parçası
     // sanıldı ve kullanıcı olmayan cümleleri sildirmeye çalıştı (2026-09-30).
-    const cevap = this.komutCevabi(result, gelenMedya.buTurTaslakVar(userId) ? TASLAK_CEVAP_SINIRI : undefined);
+    // Taslak (sosyal medya ya da kartvizit) gösterilen turda cevap kesilmez.
+    const taslakVar = gelenMedya.buTurTaslakVar(userId) || baglantiTaslaklari.sunulmamisVar(userId);
+    const cevap = this.komutCevabi(result, taslakVar ? TASLAK_CEVAP_SINIRI : undefined);
     const reply = await this.taslaklariGoster(userId, text, cevap);
     if (reply) await this.gonder(thread.id, userId, reply);
     this.logger.log(`Lio komutu yanıtlandı (${conn.session_name}, ${maskPhone(contact.phone_e164)})`);
@@ -523,7 +563,7 @@ export class WhatsappLioService {
       void (async () => {
         const { data } = await this.supabase.client.from("whatsapp_threads").select("*").eq("id", threadId).maybeSingle();
         if (!data) return;
-        await this.handleUserCommand(data as ThreadRow, contact, conn, userId, "Dosyayı gönderdim.");
+        await this.handleUserCommand(data as ThreadRow, contact, conn, userId, "Fotoğraf gönderdim.", undefined, true);
       })().catch((e) => this.logger.warn(`Medya turu çalışmadı (${threadId}): ${e instanceof Error ? e.message : e}`));
     }, MEDYA_TURU_BEKLEME_MS);
     this.medyaTurlari.set(userId, t);
@@ -774,7 +814,11 @@ function medyaNotu(kayit: GelenMedya, turu: "video" | "gorsel"): string {
     : "";
   return (
     `[Ekli medya: mediaId=${kayit.id} · ${turu === "video" ? "video" : "fotoğraf"} · ${kayit.ad} · ` +
-    `${(kayit.boyut / 1048576).toFixed(1)} MB · ${kalite}.${yerine} Sosyal medya için social_create_draft'ta bu mediaId'yi kullan.]`
+    `${(kayit.boyut / 1048576).toFixed(1)} MB · ${kalite}.${yerine} ` +
+    (turu === "gorsel"
+      ? `Fotoğraf sana görsel olarak da verildi — önce BAK: KARTVİZİTSE bağlantı akışına gir (prepare_connections, ` +
+        `kartvizitler.dosya = bu mediaId). Değilse ve kullanıcı paylaşmak istiyorsa social_create_draft'ta bu mediaId'yi kullan.]`
+      : `Sosyal medya için social_create_draft'ta bu mediaId'yi kullan.]`)
   );
 }
 

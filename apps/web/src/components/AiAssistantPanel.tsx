@@ -1651,7 +1651,7 @@ export default function AiAssistantPanel({
             type="file"
             multiple
             hidden
-            accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,image/*,audio/*"
+            accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.vcf,image/*,audio/*"
             onChange={(e) => void handleFileInput(e)}
           />
 

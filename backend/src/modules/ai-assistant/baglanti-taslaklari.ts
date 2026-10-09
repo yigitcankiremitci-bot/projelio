@@ -65,6 +65,21 @@ export class BaglantiTaslaklari<T> {
     this.taslaklar.delete(id);
   }
 
+  /**
+   * Kullanıcıya gösterilmiş EN SON taslak. Sohbet geçmişine araç sonuçları
+   * yazılmadığı için Lio cevap turunda taslakId'yi bilmiyor; 2026-10-09'da
+   * kimlik uydurdu ve "taslak bulunamadı" alıp kullanıcıdan bilgileri yeniden
+   * yazmasını istedi. Kimlik yoksa ya da tutmuyorsa bu kullanılır.
+   */
+  sonSunulan(userId: string): BaglantiTaslagi<T> | undefined {
+    this.temizle();
+    let son: BaglantiTaslagi<T> | undefined;
+    for (const t of this.taslaklar.values()) {
+      if (t.userId === userId && t.sunuldu && (!son || t.olusma >= son.olusma)) son = t;
+    }
+    return son;
+  }
+
   /** Kullanıcının taslaklarındaki her veri (yeniden hazırlıkta önceki taslağın görseli için). */
   kullanicininVerileri(userId: string): T[] {
     this.temizle();

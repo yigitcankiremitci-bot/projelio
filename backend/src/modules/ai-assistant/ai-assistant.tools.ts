@@ -1892,7 +1892,10 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        taslakId: { type: "string" },
+        taslakId: {
+          type: "string",
+          description: "Verilmezse kullanıcıya gösterilmiş son taslak kullanılır — kimliği hatırlamıyorsan VERME, uydurma.",
+        },
         roles: {
           type: "array",
           items: { type: "string", enum: ["contact", "competitor", "collaborator", "lead", "supplier", "distributor", "other"] },
@@ -1904,7 +1907,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         sonrakiTemas: { type: "string", description: "YYYY-AA-GG." },
         iliskiNotu: { type: "string" },
       },
-      required: ["taslakId"],
+      required: [],
     },
   },
   {

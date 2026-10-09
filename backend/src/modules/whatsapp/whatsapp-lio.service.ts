@@ -850,8 +850,9 @@ function medyaNotu(kayit: GelenMedya, turu: "video" | "gorsel"): string {
     `[Ekli medya: mediaId=${kayit.id} · ${turu === "video" ? "video" : "fotoğraf"} · ${kayit.ad} · ` +
     `${(kayit.boyut / 1048576).toFixed(1)} MB · ${kalite}.${yerine} ` +
     (turu === "gorsel"
-      ? `Fotoğraf sana görsel olarak da verildi — önce BAK: KARTVİZİTSE bağlantı akışına gir (prepare_connections, ` +
-        `kartvizitler.dosya = bu mediaId). Değilse ve kullanıcı paylaşmak istiyorsa social_create_draft'ta bu mediaId'yi kullan.]`
+      ? `Fotoğraf sana görsel olarak da verildi — önce BAK: KARTVİZİTSE kullanıcıya "ekleyeyim mi?" diye SORMADAN hemen ` +
+        `prepare_connections çağır (kartvizitler.dosya = bu mediaId), sonra özetle rol/yer/notu tek mesajda sor. ` +
+        `Değilse ve kullanıcı paylaşmak istiyorsa social_create_draft'ta bu mediaId'yi kullan.]`
       : `Sosyal medya için social_create_draft'ta bu mediaId'yi kullan.]`)
   );
 }

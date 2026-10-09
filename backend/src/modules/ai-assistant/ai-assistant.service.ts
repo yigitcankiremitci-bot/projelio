@@ -1591,7 +1591,9 @@ export class AiAssistantService {
         "(4) Dönen özeti kullanıcıya göster ve TEK mesajda sor: ROL (Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, " +
         "Tedarikçi), nerede tanışıldığı (bilinmiyorsa; sonTanismaYerleri'nden öner) ve \"Not olarak eklemek istediğin bir " +
         "şey var mı?\" — bunlardan başka HİÇBİR soru sorma, soruları ikinci bir mesaja bölme (her mesaj kullanıcıya " +
-        "bakiye harcatır). (5) Kullanıcının cevabı gelince — eksik olsa bile — TEKRAR SORMADAN hemen confirm_connections " +
+        "bakiye harcatır). Okuyabildiğin bilgiyi göstermeden \"bulanık\", \"okunmuyor\" DEME; emin olmadığın alanı boş " +
+        "bırak, gerisini taslağa koy. Bir araç hata verirse kullanıcıdan bilgileri yeniden yazmasını İSTEME — " +
+        "prepare_connections'ı yeniden çağır. (5) Kullanıcının cevabı gelince — eksik olsa bile — TEKRAR SORMADAN hemen confirm_connections " +
         "çağır: rol söylenmediyse contact, tanışma yeri söylenmediyse boş, not yoksa boş (uydurma); notu kullanıcının " +
         "sözleriyle iliskiNotu'na yaz. Kaydettikten sonra kısa bir özetle bitir. Aynı turda confirm ÇAĞIRMA — sunucu reddeder. Kullanıcı farklı roller verdiyse bir kısmını sonra " +
         "update_connection ile düzelt.",
@@ -6467,9 +6469,18 @@ export class AiAssistantService {
    * 20 kartın açılmaması kabul edilemezdi.
    */
   private async confirmConnections(userId: string, input: Record<string, any>) {
-    const taslak = baglantiTaslaklari.al(userId, String(input.taslakId ?? ""));
+    // Kimlik yoksa ya da tutmuyorsa kullanıcının gösterilmiş son taslağı
+    // (bkz. BaglantiTaslaklari.sonSunulan — geçmişte araç sonucu yok).
+    const taslak =
+      (input.taslakId ? baglantiTaslaklari.al(userId, String(input.taslakId)) : undefined) ??
+      baglantiTaslaklari.sonSunulan(userId);
     if (!taslak) {
-      throw new BadRequestException("Taslak bulunamadı ya da süresi doldu. prepare_connections'ı yeniden çağır.");
+      const bekleyen = baglantiTaslaklari.kullanicininVerileri(userId).length > 0;
+      throw new BadRequestException(
+        bekleyen
+          ? "Taslak kullanıcıya henüz gösterilmedi. Özeti göster, rolü sor ve kullanıcının cevabını bekle; onay aynı turda verilemez."
+          : "Taslak bulunamadı ya da süresi doldu. prepare_connections'ı yeniden çağır."
+      );
     }
     if (!taslak.sunuldu) {
       throw new BadRequestException(

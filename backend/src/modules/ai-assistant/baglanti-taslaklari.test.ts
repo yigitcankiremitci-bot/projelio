@@ -37,3 +37,17 @@ describe("BaglantiTaslaklari", () => {
     assert.equal(d.al("u1", t.id), undefined);
   });
 });
+
+describe("sonSunulan — kimliği bilinmeyen onay", () => {
+  test("cevap turunda Lio kimliği bilmese de gösterilmiş son taslak bulunur; gösterilmemiş olan bulunmaz", () => {
+    let simdi = 1000;
+    const d = new BaglantiTaslaklari<string>(() => simdi);
+    d.olustur("u1", "eski");
+    simdi = 2000;
+    d.olustur("u1", "yeni");
+    assert.equal(d.sonSunulan("u1"), undefined);
+    d.yeniMesaj("u1");
+    assert.equal(d.sonSunulan("u1")?.veri, "yeni");
+    assert.equal(d.sonSunulan("u2"), undefined);
+  });
+});

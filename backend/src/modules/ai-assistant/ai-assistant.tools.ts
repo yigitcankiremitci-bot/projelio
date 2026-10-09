@@ -1884,9 +1884,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
                     },
                     kirpma: {
                       type: "object",
-                      description:
-                        "Kartvizitin fotoğraftaki DÖRT KÖŞESİ, 0–1 arası oran [x, y] (sol üst 0,0 · sağ alt 1,1). " +
-                        "Kartın kâğıt kenarlarını ver, yazıların değil. Bir fotoğrafta birden çok kart varsa her kişiye kendi köşeleri.",
+                      description: "VERME — kırpma şimdilik kapalı (özgün fotoğraf eklenir).",
                       properties: {
                         solUst: { type: "array", items: { type: "number" } },
                         sagUst: { type: "array", items: { type: "number" } },

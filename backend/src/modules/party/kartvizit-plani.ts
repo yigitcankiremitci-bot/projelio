@@ -96,7 +96,15 @@ export type PlanAdimi =
       kaynak: OkunanKisi;
     }
   | { tur: "mevcutKurum"; partyId: string; ad: string; kisiler: PlanKisisi[]; kartvizitler: KartvizitKaynagi[] }
-  | { tur: "atla"; ad: string; mevcutKart: string; sebep: "ad" | "e-posta" | "telefon" };
+  | {
+      tur: "atla";
+      ad: string;
+      mevcutKart: string;
+      sebep: "ad" | "e-posta" | "telefon";
+      /** Kayıtlı kartın kimliği ve yeni gelen kartvizit görseli: kişi atlanır ama görsel o karta eklenir. */
+      partyId: string;
+      kartvizitler: KartvizitKaynagi[];
+    };
 
 /** info@, iletisim@ gibi kişiye değil kuruma ait adres önekleri. */
 const GENEL_EPOSTA = /^(info|bilgi|iletisim|contact|hello|merhaba|sales|satis|destek|support|office|ofis|mail|admin)@/i;
@@ -186,7 +194,7 @@ export function kartvizitPlani(kisiler: OkunanKisi[], mevcut: MevcutKart[]): Pla
       if (var_) {
         const kisilerI = (k.yetkililer ?? []).filter((y) => y.name?.trim());
         if (!kisilerI.length && !(k.kartvizitler ?? []).length) {
-          adimlar.push({ tur: "atla", ad, mevcutKart: var_.displayName, sebep: "ad" });
+          adimlar.push({ tur: "atla", ad, mevcutKart: var_.displayName, sebep: "ad", partyId: var_.id, kartvizitler: [] });
         } else {
           adimlar.push({ tur: "mevcutKurum", partyId: var_.id, ad: var_.displayName, kisiler: kisilerI, kartvizitler: k.kartvizitler ?? [] });
         }
@@ -218,7 +226,16 @@ export function kartvizitPlani(kisiler: OkunanKisi[], mevcut: MevcutKart[]): Pla
       }) ||
       (kisiAd.get(normalizeName(ad)) && { kart: kisiAd.get(normalizeName(ad))!, sebep: "ad" as const });
     if (kopya) {
-      adimlar.push({ tur: "atla", ad, mevcutKart: kopya.kart.displayName, sebep: kopya.sebep });
+      // Kayıtlı kişinin kartviziti yeniden geldiyse (ör. önceki fotoğraf kötüydü)
+      // görsel mevcut karta eklenir; kişi ikinci kez açılmaz.
+      adimlar.push({
+        tur: "atla",
+        ad,
+        mevcutKart: kopya.kart.displayName,
+        sebep: kopya.sebep,
+        partyId: kopya.kart.id,
+        kartvizitler: k.kartvizitler ?? [],
+      });
       continue;
     }
 

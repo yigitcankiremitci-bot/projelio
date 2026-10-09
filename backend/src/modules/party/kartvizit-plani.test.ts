@@ -147,3 +147,16 @@ describe("ortak iletişim şirketindir", () => {
     assert.equal(r.kisiler[0].email, undefined);
   });
 });
+
+describe("kayıtlı kişinin kartviziti yeniden gelirse", () => {
+  test("kişi atlanır ama yeni görsel o kayıtlı karta eklenecek şekilde taşınır", () => {
+    const plan = kartvizitPlani(
+      [{ displayName: "Ayşe Yılmaz", kartvizitler: [{ dosya: "yeni" }] }],
+      [{ id: "p1", displayName: "Ayşe Yılmaz", partyType: "person" }]
+    );
+    assert.equal(plan[0].tur, "atla");
+    if (plan[0].tur !== "atla") return;
+    assert.equal(plan[0].partyId, "p1");
+    assert.deepEqual(plan[0].kartvizitler.map((k) => k.dosya), ["yeni"]);
+  });
+});

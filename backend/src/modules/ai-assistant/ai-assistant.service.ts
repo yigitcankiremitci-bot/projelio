@@ -1584,10 +1584,9 @@ export class AiAssistantService {
         "şirket/logo ve telefon/e-posta/web yazan küçük dikdörtgen kart. Fotoğrafta kart yoksa (manzara, ürün, kişi " +
         "fotoğrafı) kartvizit akışına GİRME, ne yapılacağını sor. Akış: (1) her kartvizitten ad soyad, şirket/marka " +
         "(kurum), unvan, cep telefonu, e-posta, web, LinkedIn/Instagram, şehir/adres oku — okuyamadığını UYDURMA; " +
-        "harf harf emin olmadığın e-posta ve telefonu boş bırakmak yanlış yazmaktan iyidir. (2) Her kartın fotoğraftaki " +
-        "dört köşesini 0–1 oranıyla kirpma'ya yaz (kâğıdın kenarları). Bir fotoğrafta birden fazla kart varsa her " +
-        "birine kendi köşeleri; ön/arka yüz ayrı fotoğrafsa ikisini aynı kişinin kartvizitler'ine koy ve bilgileri " +
-        "birleştir. (3) Hepsini TEK prepare_connections çağrısıyla gönder; şirket birleştirmesini sunucu yapar. " +
+        "harf harf emin olmadığın e-posta ve telefonu boş bırakmak yanlış yazmaktan iyidir. (2) kirpma VERME. " +
+        "Ön/arka yüz ayrı fotoğrafsa ikisini aynı kişinin kartvizitler'ine koy ve bilgileri birleştir. Kayıtlı kişinin " +
+        "kartviziti yeniden geldiyse yine prepare_connections'a ver: kişi atlanır, görsel karta eklenir. (3) Hepsini TEK prepare_connections çağrısıyla gönder; şirket birleştirmesini sunucu yapar. " +
         "(4) Dönen özeti kullanıcıya göster ve TEK mesajda sor: ROL (Bağlantı, Rakip, İşbirliği, Potansiyel müşteri, " +
         "Tedarikçi), nerede tanışıldığı (bilinmiyorsa; sonTanismaYerleri'nden öner) ve \"Not olarak eklemek istediğin bir " +
         "şey var mı?\" — bunlardan başka HİÇBİR soru sorma, soruları ikinci bir mesaja bölme (her mesaj kullanıcıya " +
@@ -6425,7 +6424,7 @@ export class AiAssistantService {
     // durumda (ekran görüntüsü) kartta yazan bir şey yok, QR'dakiler esas.
     const yapilacak =
       "KÂĞIT kartvizitse kartta yazanlar ÖNCELİKLİ: bu alanları yalnızca kartta OLMAYANLARI tamamlamak için kullan. " +
-      "Yalnız QR/ekran görüntüsüyse bunlar esas. Sonra prepare_connections; görsel kâğıt kartsa kirpma ver, QR ekran görüntüsüyse verme.";
+      "Yalnız QR/ekran görüntüsüyse bunlar esas. Sonra prepare_connections; kirpma verme.";
     const metin = this.attachmentsService.getText(userId, dosya);
     if (metin && kartvizitMetniMi(metin)) {
       return {
@@ -6443,7 +6442,7 @@ export class AiAssistantService {
         qrBulunamadi: true,
         not:
           "Görselde QR kod YOK ya da çözülemedi — bu görselin bulanık olduğu anlamına GELMEZ. Kartvizit yazılarını " +
-          "görebiliyorsan normal akışa devam et: yazıları oku, prepare_connections + kirpma. Yalnızca görselde gerçekten " +
+          "görebiliyorsan normal akışa devam et: yazıları oku, prepare_connections. Yalnızca görselde gerçekten " +
           "bir QR varsa ve kartta yeterli bilgi yoksa kullanıcıdan QR'ı yakından göndermesini iste.",
       };
     }
@@ -6671,7 +6670,11 @@ export class AiAssistantService {
           continue;
         }
         try {
-          const kirpik = await kartviziKirp(g.buffer, g.mimeType, v.kirpma);
+          // Kırpma KAPALI (KARTVIZIT_KIRPMA=1 ile açılır): köşeleri model
+          // tahmin ediyor ve hızlı model (Haiku) yer belirlemede zayıf — canlıda
+          // iki kartvizit de yanlış yerinden kesildi (2026-10-09). Özgün fotoğraf
+          // eklenir; köşeleri güvenilir bulan bir yöntem gelince açılır.
+          const kirpik = await kartviziKirp(g.buffer, g.mimeType, process.env.KARTVIZIT_KIRPMA === "1" ? v.kirpma : undefined);
           await this.partyService.dosyaEkle(
             partyId,
             {
@@ -6721,7 +6724,8 @@ export class AiAssistantService {
     for (const a of plan) {
       try {
         if (a.tur === "atla") {
-          atlanan.push(`${a.ad} (kayıtlı: ${a.mevcutKart})`);
+          atlanan.push(`${a.ad} (kayıtlı: ${a.mevcutKart}${a.kartvizitler.length ? " — kartvizit görseli karta eklendi" : ""})`);
+          await kartvizitEkle(a.partyId, a.kartvizitler, a.mevcutKart);
         } else if (a.tur === "yeniKisi") {
           const party = await kartAc({ ...ust(a.kisi), displayName: a.kisi.displayName, partyType: "person" });
           acilan.push(a.kisi.displayName);

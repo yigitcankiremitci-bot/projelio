@@ -230,7 +230,9 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
                       {u.fullName}
                       {u.title && <span style={{ color: c.textSecondary }}> · {u.title}</span>}
                     </div>
-                    <div style={{ fontSize: 12, color: c.textSecondary }}>{departmanEtiketleri(u.departmanlar)}</div>
+                    <div style={{ fontSize: 12, color: c.textSecondary }}>
+                      {[u.kurucu ? t("Kurucu") : "", departmanEtiketleri(u.departmanlar)].filter(Boolean).join(" · ")}
+                    </div>
                   </div>
                   {u.username && <span style={{ fontSize: 12, color: c.textSecondary }}>@{u.username}</span>}
                 </div>

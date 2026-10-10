@@ -64,12 +64,16 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [me, setMe] = useState<User | null>(null);
   const [responding, setResponding] = useState(false);
 
   useEffect(() => {
     api
-      .get<{ id: string } | null>("/auth/me")
-      .then((me) => setCurrentUserId(me?.id ?? null))
+      .get<User | null>("/auth/me")
+      .then((u) => {
+        setCurrentUserId(u?.id ?? null);
+        setMe(u ?? null);
+      })
       .catch(() => setCurrentUserId(null));
   }, []);
 
@@ -426,6 +430,32 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               </div>
             ) : (
               <>
+                {/* Kurucu/yönetici kendini de kadroya alabilsin: aramada kendi
+                    adını bulmak gerekmesin. Sunucu kendine eklemeyi davet değil
+                    doğrudan onaylı kayıt olarak açıyor. */}
+                {me && !members.some((m) => m.userId === me.id) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedUser(me);
+                      setRole("manager");
+                      setQuery("");
+                      setResults([]);
+                    }}
+                    style={{
+                      alignSelf: "flex-start",
+                      padding: "6px 12px",
+                      fontSize: 13,
+                      borderRadius: 8,
+                      border: `1px solid ${c.border}`,
+                      background: "transparent",
+                      color: c.primary,
+                      cursor: "pointer",
+                    }}
+                  >
+                    {t("Kendimi ekle")}
+                  </button>
+                )}
                 <input
                   type="text"
                   placeholder={t("Kullanıcı adı (@) veya e-posta ile ara…")}
@@ -485,7 +515,7 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
               onClick={handleInvite}
               style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
-              {t("Davet gönder")}
+              {mode === "user" && selectedUser && selectedUser.id === currentUserId ? t("Kadroya ekle") : t("Davet gönder")}
             </button>
             {/* Vazgeçme formun içinde: başlıktaki düğme "+"a taşındı. */}
             <button

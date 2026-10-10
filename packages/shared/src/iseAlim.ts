@@ -49,6 +49,11 @@ export interface SirketEkibiUyesi {
   avatarUrl?: string;
   /** Kadro kayıtlarından ilk dolu pozisyon. */
   title?: string;
+  /**
+   * Şirketin sahibi. Kadro kaydı olmasa da ekipte görünür: kurucu kendi
+   * şirketinin ekibinde yokmuş gibi duruyordu. Departmanı yoksa `departmanlar` boş.
+   */
+  kurucu?: boolean;
   departmanlar: { id: string; name: string; role: DepartmentMemberRole }[];
 }
 

@@ -137,6 +137,11 @@ export class DepartmentMembersService {
     if (!data.userId && !data.inviteEmail) {
       throw new BadRequestException("Kadroya bir kullanıcı ya da davet e-postası gerekli");
     }
+    // Kurucu ya da yönetici kendini ekliyorsa davet anlamsız: kendi daveti
+    // kendisi onaylayacaktı. Yetki zaten assertOrgOwner'dan geçti, kayıt
+    // doğrudan onaylı açılır ve bildirim gitmez — kurucu böylece kendini bir
+    // departmana yönetici (sorumlu) olarak atayabiliyor.
+    const kendisi = !!data.userId && data.userId === requestingUserId;
 
     const { data: row, error } = await this.supabase.client
       .from("department_members")
@@ -146,7 +151,7 @@ export class DepartmentMembersService {
         invite_email: data.userId ? null : data.inviteEmail?.trim().toLowerCase(),
         role: data.role ?? "employee",
         title: data.title?.trim() || null,
-        status: data.userId ? "pending" : "invited",
+        status: kendisi ? "approved" : data.userId ? "pending" : "invited",
         invited_by: requestingUserId ?? null,
       })
       // department_members'ın users'a iki ayrı FK'sı var (user_id, invited_by) —
@@ -160,7 +165,7 @@ export class DepartmentMembersService {
       throw error;
     }
 
-    if (data.userId) {
+    if (data.userId && !kendisi) {
       // link: bildirime tıklayınca doğrudan departman sayfasına gider — orada
       // DepartmentMembersList kendi bekleyen davetini algılayıp Onayla/Reddet
       // düğmelerini gösterir (bkz. respond()).

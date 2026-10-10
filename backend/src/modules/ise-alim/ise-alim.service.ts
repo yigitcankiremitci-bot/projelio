@@ -138,7 +138,30 @@ export class IseAlimService {
       uye.departmanlar.push({ id: k.department_id, name: departmanAdi.get(k.department_id) ?? "", role: k.role });
       byUser.set(k.user_id, uye);
     }
-    const uyeler = [...byUser.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "tr"));
+    // Kurucu, departman kadrosunda olmasa da ekibin parçası. Önceden yalnızca
+    // department_members'tan okunduğu için şirketi kuran kişi kendi şirketinin
+    // Ekip listesinde görünmüyordu.
+    if (org.owner_id) {
+      const kurucu = byUser.get(org.owner_id);
+      if (kurucu) kurucu.kurucu = true;
+      else {
+        const sahip = await this.usersService.findById(org.owner_id);
+        if (sahip && !sahip.deletedAt) {
+          byUser.set(org.owner_id, {
+            userId: sahip.id,
+            fullName: sahip.fullName ?? "",
+            username: sahip.username ?? undefined,
+            avatarUrl: sahip.avatarUrl ?? undefined,
+            kurucu: true,
+            departmanlar: [],
+          });
+        }
+      }
+    }
+    // Kurucu başta, kalanlar ada göre.
+    const uyeler = [...byUser.values()].sort(
+      (a, b) => Number(!!b.kurucu) - Number(!!a.kurucu) || a.fullName.localeCompare(b.fullName, "tr")
+    );
 
     const secenekler = await this.secenekleriBul(organizationId, userId);
     let bekleyenDavetler: IseAlimDaveti[] = [];

@@ -401,7 +401,10 @@ export default function CustomersPanel({
   const visible = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
     const suzulen = sekmeKartlari.filter((p) => {
-      if (roleFilter && !p.roles.includes(roleFilter)) return false;
+      // Potansiyel sekmesinde rol filtresi YOK: Müşteri İlişkileri'nin
+      // varsayılan "Müşteri" filtresi oradaki herkesi gizliyordu, seçici de o
+      // sekmede saklı olduğu için kullanıcı filtreyi kaldıramıyordu.
+      if (roleFilter && gorunum !== "potansiyel" && !p.roles.includes(roleFilter)) return false;
       if (onemFiltre && p.baglanti?.onem !== onemFiltre) return false;
       if (sorumluFiltre && (sorumluFiltre === "-" ? !!p.ownerUserId : p.ownerUserId !== sorumluFiltre)) return false;
       if (!q) return true;
@@ -412,11 +415,14 @@ export default function CustomersPanel({
         .includes(q);
     });
     return sirala(suzulen, siralama);
-  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama]);
+  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama, gorunum]);
 
   const hasActiveFilter =
     search.trim() !== "" || roleFilter !== varsayilanRol || sorumluFiltre !== "" || onemFiltre !== "";
-  const showToolbar = sekmeKartlari.length > TOOLBAR_THRESHOLD || hasActiveFilter;
+  // Varsayılan filtre her şeyi gizlediyse de araç çubuğu çıkar; yoksa "eşleşen
+  // kayıt yok" yazar ve filtreyi değiştirecek bir yer kalmazdı.
+  const showToolbar =
+    sekmeKartlari.length > TOOLBAR_THRESHOLD || hasActiveFilter || (sekmeKartlari.length > 0 && visible.length === 0);
 
   const stats = useMemo(
     () =>
@@ -1317,8 +1323,18 @@ export default function CustomersPanel({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {gorunum === "potansiyel"
             ? t("Henüz potansiyel müşteri yok. Anlaşması yapılmamış ama yakın olan kişi ve firmaları buraya ekle; anlaşma olunca tek tıkla müşteriye dönüştür.")
-            : t("Henüz müşteri yok. Potansiyel müşteriler kendi sekmesinde; anlaşma olunca müşteriye dönüştürülür.")}
+            : potansiyelSayisi
+              ? t("Bu sekmede müşteri yok; {n} kart Potansiyel sekmesinde. Anlaşması yapılmış olanları oradan müşteriye dönüştürebilirsin.", { n: potansiyelSayisi })
+              : t("Henüz müşteri yok. Potansiyel müşteriler kendi sekmesinde; anlaşma olunca müşteriye dönüştürülür.")}
           {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
+          {gorunum !== "potansiyel" && potansiyelSayisi > 0 && (
+            <button
+              onClick={() => setGorunum("potansiyel")}
+              style={{ marginLeft: 6, fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            >
+              {t("Potansiyel sekmesine geç")}
+            </button>
+          )}
         </p>
       ) : visible.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>

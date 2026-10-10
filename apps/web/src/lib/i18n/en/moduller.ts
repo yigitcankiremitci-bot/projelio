@@ -1149,4 +1149,7 @@ export const moduller: TranslationDict = {
     "No prospects yet. Add people and companies you haven't closed a deal with but are close to; once the deal is done, convert them to a customer in one click.",
   "Henüz müşteri yok. Potansiyel müşteriler kendi sekmesinde; anlaşma olunca müşteriye dönüştürülür.":
     "No customers yet. Prospects have their own tab; they're converted to customers once a deal is closed.",
+  "Bu sekmede müşteri yok; {n} kart Potansiyel sekmesinde. Anlaşması yapılmış olanları oradan müşteriye dönüştürebilirsin.":
+    "No customers in this tab; {n} cards are in the Prospects tab. You can convert the ones you've closed a deal with from there.",
+  "Potansiyel sekmesine geç": "Go to Prospects",
 };

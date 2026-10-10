@@ -279,6 +279,12 @@ export class PartyController {
     return this.partyService.addRoleTo(id, role, req.user.userId);
   }
 
+  /** Potansiyel müşteri → müşteri (anlaşma yapıldı). */
+  @Post("party/:id/musteriye-donustur")
+  musteriyeDonustur(@Param("id") id: string, @Req() req: any) {
+    return this.partyService.musteriyeDonustur(id, req.user.userId);
+  }
+
   /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
   @Post("party/:id/defter")
   async deftereEkle(@Param("id") id: string, @Body("modul") modul: string, @Req() req: any) {
@@ -321,6 +327,19 @@ export class PartyController {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
     await this.partyService.dosyaKaldir(id, fileId, req.user.userId);
     return { success: true };
+  }
+
+  /** Rol aktarımı seçenekleri ("Aktar" menüsü) ve aktarım. */
+  @Get("party/:id/aktarim")
+  async aktarimSecenekleri(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.aktarimSecenekleri(id, req.user.userId);
+  }
+
+  @Post("party/:id/aktar")
+  async aktar(@Param("id") id: string, @Body("hedef") hedef: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.aktar(id, hedef, req.user.userId);
   }
 
   /** Karttan açılmış takip görevleri (kullanıcının görebildikleri). */

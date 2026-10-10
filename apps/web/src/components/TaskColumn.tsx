@@ -18,6 +18,7 @@ import {
 } from "./icons";
 import AskLioButton from "./AskLioButton";
 import TaskAttachmentBadges from "./TaskAttachmentBadges";
+import KartEtiketi from "./KartEtiketi";
 import Modal from "./Modal";
 import AutoGrowTextarea from "./AutoGrowTextarea";
 import { useSortableList, SORTABLE_BASE_OPTIONS } from "../lib/useSortableList";
@@ -1481,6 +1482,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                           onOpenDetail={() => onEditTask(gorev)}
                           size={13}
                         />
+                        {/* Kişi kartından doğan görev: "Bağlantı: Ad" — tıklayınca kart açılır. */}
+                        <KartEtiketi task={gorev} />
                         {/* "Bekliyor" rozeti: görevin beklediği görevlerden en az
                             biri hâlâ açık (bkz. migration 094). Sunucu zaten
                             başlatmayı reddediyor; rozet bunu DENEMEDEN ÖNCE
@@ -1873,6 +1876,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                                 onOpenDetail={() => onEditTask(sub)}
                                 size={11}
                               />
+                              <KartEtiketi task={sub} size={11} />
                               {/* Üst görev satırındaki kuralın aynısı: eylemler
                                   sağa dayalı, böylece alt görevlerin düğmeleri
                                   de üsttekilerle aynı dikey çizgide durur. */}

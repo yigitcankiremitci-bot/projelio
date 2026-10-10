@@ -2,7 +2,7 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import type { Party, PartyRole } from "@projelio/shared";
+import { musteriyeDonusenRoller, potansiyelMusteriMi, type Party, type PartyRole } from "@projelio/shared";
 import { addRole, findDuplicates, normalizeEmail, normalizeName, normalizeTaxNumber, removeRole } from "./party-dedup";
 
 // Ortak varlığın değeri tekilliğine bağlı: "ABC Ltd", "ABC Ltd." ve "abc ltd"
@@ -196,5 +196,24 @@ describe("rol kuralları", () => {
 
   test("olmayan rolü kaldırmak bir şeyi değiştirmez", () => {
     assert.deepEqual(removeRole(["customer"], "supplier"), ["customer"]);
+  });
+});
+
+describe("potansiyel müşteri", () => {
+  test("yalnızca lead taşıyan kart potansiyeldir", () => {
+    assert.equal(potansiyelMusteriMi({ roles: ["lead"] }), true);
+    assert.equal(potansiyelMusteriMi({ roles: ["lead", "supplier"] }), true);
+  });
+
+  test("customer da taşıyorsa müşteridir (anlaşma olmuş)", () => {
+    assert.equal(potansiyelMusteriMi({ roles: ["lead", "customer"] }), false);
+    assert.equal(potansiyelMusteriMi({ roles: ["supplier"] }), false);
+  });
+
+  test("dönüştürme customer'ı başa alır, lead ve diğer rolleri korur", () => {
+    // Form roles[0]'ı gösterir: customer başta değilse kaydetmek kartı geri potansiyele çevirir.
+    assert.deepEqual(musteriyeDonusenRoller(["lead", "supplier"]), ["customer", "lead", "supplier"]);
+    assert.deepEqual(musteriyeDonusenRoller(["lead", "customer"]), ["customer", "lead"]);
+    assert.equal(potansiyelMusteriMi({ roles: musteriyeDonusenRoller(["lead"]) }), false);
   });
 });

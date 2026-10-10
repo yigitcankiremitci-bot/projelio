@@ -1063,4 +1063,7 @@ export const hatalar: TranslationDict = {
   // Lio arka plan turları (ai-chat-jobs.ts)
   "Lio şu an önceki isteklerin üzerinde çalışıyor. Bitince tekrar dene.": "Lio is still working on your previous requests. Try again when they finish.",
   "Lio'nun bu cevabı artık bulunamıyor. Sohbeti yeniden açıp son mesaja bak; tekrar göndermeden önce yapılanları kontrol et.": "This Lio reply can no longer be found. Reopen the conversation and check the last message; review what was done before sending again.",
+  "Arşivdeki kart dönüştürülemez": "An archived card can't be converted",
+  "Kart Müşteriler listesinde değil": "This card isn't in the Customers list",
+  "Kart zaten müşteri": "This card is already a customer",
 };

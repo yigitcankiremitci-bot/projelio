@@ -20,6 +20,8 @@ import ModuleFieldInput from "./ModuleFieldInput";
 import { IconEdit, IconListCheck, IconTrash } from "./icons";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import { useCanliTazele } from "../lib/liveRoom";
+import { listeCercevesi, listeSatiri } from "../lib/listeStili";
 
 // Kayıtların sahibi iki türlü olabilir (bkz. 037_freelancer_modules.sql):
 // bir organizasyon (şirket/işletme departman modülleri) ya da bir iş (serbest
@@ -83,7 +85,23 @@ export default function ModuleRecordsPanel({
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<Record<string, string>>({});
-  const [sortKey, setSortKey] = useState("");
+  // Seçilen sıralama modül başına bu tarayıcıda hatırlanır (kaybolsa da olur).
+  const siralamaAnahtari = `projelio_kayit_siralama_${moduleKey}`;
+  const [sortKey, setSortKeyState] = useState(() => {
+    try {
+      return localStorage.getItem(siralamaAnahtari) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const setSortKey = (v: string) => {
+    setSortKeyState(v);
+    try {
+      localStorage.setItem(siralamaAnahtari, v);
+    } catch {
+      /* gizli pencere: hatırlamasa da olur */
+    }
+  };
   // Liste mi pano mı. Pano, kayıtları bir select alanına göre sütunlara böler
   // (görev kanbanıyla aynı okuma biçimi) ve geniş ekranda satırların ekranı
   // baştan sona kat etmesini engeller.
@@ -121,6 +139,12 @@ export default function ModuleRecordsPanel({
   };
 
   useEffect(() => load(true), [basePath, moduleKey]);
+  // Canlı: Lio'nun eklediği kayıt, aynı sayfadaki başkasının değişikliği,
+  // soket yeniden bağlanması ve uygulamaya geri dönüş listeyi tazeler.
+  useCanliTazele(() => {
+    load();
+    loadTaskCounts();
+  }, [basePath, moduleKey, departmentId]);
 
   /**
    * Bu modül kayıtlarından doğmuş görevler.
@@ -207,9 +231,18 @@ export default function ModuleRecordsPanel({
       const [field, dir] = sortKey.split(":");
       const cfg = config.fields.find((f) => f.key === field);
       const numeric = cfg?.type === "number";
+      // Alan dışı sıralamalar: ad (kaydın özeti), eklenme ve güncellenme zamanı.
+      const deger = (r: ModuleRecord): unknown =>
+        field === "__ad"
+          ? config.summary(displayOf(r.data))
+          : field === "__eklenme"
+            ? r.createdAt
+            : field === "__guncelleme"
+              ? (r.updatedAt ?? r.createdAt)
+              : r.data[field];
       rows = [...rows].sort((a, b) => {
-        const av = a.data[field];
-        const bv = b.data[field];
+        const av = deger(a);
+        const bv = deger(b);
         // Değeri olmayan kayıtlar her zaman sona düşer — sıralama yönünden
         // bağımsız olarak "bilgi yok" en az ilgi çeken gruptur.
         if (av === undefined || av === "" || av === null) return 1;
@@ -343,7 +376,8 @@ export default function ModuleRecordsPanel({
   };
 
   /** Bir kaydın satır/kart gövdesi: özet, detay ve düzenle/arşivle düğmeleri. */
-  const renderRecord = (r: ModuleRecord) => {
+  /** sira verilirse liste satırı (çizgi + sıra sıra renk), verilmezse pano kartı. */
+  const renderRecord = (r: ModuleRecord, sira?: number) => {
     const shown = displayOf(r.data);
     const detail = config.detail?.(shown);
     const taskCount = taskCounts[r.id] ?? 0;
@@ -357,8 +391,9 @@ export default function ModuleRecordsPanel({
           alignItems: "flex-start",
           gap: 8,
           padding: "8px 10px",
-          borderRadius: 8,
-          background: c.background,
+          ...(sira === undefined
+            ? { borderRadius: 8, background: c.background }
+            : listeSatiri(c, sira)),
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -529,23 +564,6 @@ export default function ModuleRecordsPanel({
               ))}
             </select>
           ))}
-          {sortableFields.length > 0 && (
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value)}
-              style={{ fontSize: 13, padding: "5px 6px" }}
-            >
-              <option value="">{t("Sıralama: eklenme")}</option>
-              {sortableFields.map((field) => [
-                <option key={`${field.key}:desc`} value={`${field.key}:desc`}>
-                  {t(field.label)} ↓
-                </option>,
-                <option key={`${field.key}:asc`} value={`${field.key}:asc`}>
-                  {t(field.label)} ↑
-                </option>,
-              ])}
-            </select>
-          )}
           {hasActiveFilter && (
             <button
               onClick={() => {
@@ -677,13 +695,43 @@ export default function ModuleRecordsPanel({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {hasActiveFilter && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {t("{n} / {toplam} kayıt", { n: visible.length, toplam: records.length })}
-            </span>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            {hasActiveFilter && (
+              <span style={{ fontSize: 12, color: c.textSecondary }}>
+                {t("{n} / {toplam} kayıt", { n: visible.length, toplam: records.length })}
+              </span>
+            )}
+            {/* Sıralama her zaman görünür (eskiden yalnızca 8+ kayıtta açılan
+                araç çubuğundaydı); Bağlantı ve İlişkiler'deki düzenle aynı. */}
+            {view === "list" && visible.length > 1 && (
+              <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary }}>
+                {t("Sırala:")}
+                <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} style={{ fontSize: 12, padding: "3px 6px" }}>
+                  <option value="">{t("Eklenme sırası")}</option>
+                  <option value="__ad:asc">{t("Ad (A–Z)")}</option>
+                  <option value="__eklenme:desc">{t("Son eklenen")}</option>
+                  <option value="__guncelleme:desc">{t("Son güncellenen")}</option>
+                  {sortableFields.map((field) => [
+                    <option key={`${field.key}:desc`} value={`${field.key}:desc`}>
+                      {t(field.label)} ↓
+                    </option>,
+                    <option key={`${field.key}:asc`} value={`${field.key}:asc`}>
+                      {t(field.label)} ↑
+                    </option>,
+                  ])}
+                </select>
+              </label>
+            )}
+          </div>
 
-          {view === "list" && visible.map(renderRecord)}
+          {/* Liste tek çerçevede: satırlar arasında ince çizgi, arka plan sıra
+              sıra değişir (Bağlantı ve İlişkiler'deki düzen; ayrı kutular
+              uzun listede birbirine karışıyordu). Pano kartları olduğu gibi. */}
+          {view === "list" && (
+            <div style={listeCercevesi(c)}>
+              {visible.map((r, i) => renderRecord(r, i))}
+            </div>
+          )}
 
           {view === "board" && boardField && (
             <div
@@ -719,7 +767,7 @@ export default function ModuleRecordsPanel({
                     canDrag={canWrite}
                     onDrop={moveRecord}
                   >
-                    {rows.map(renderRecord)}
+                    {rows.map((r) => renderRecord(r))}
                   </BoardColumn>
                 ))}
             </div>

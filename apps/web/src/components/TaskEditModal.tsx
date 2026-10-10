@@ -19,6 +19,7 @@ import { IconIndent, IconOutdent } from "./icons";
 import { useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
+import KartEtiketi from "./KartEtiketi";
 
 interface Props {
   task: Task;
@@ -336,6 +337,10 @@ export default function TaskEditModal({
             required
             minHeight={42}
           />
+          {/* Görev bir kişi kartından doğduysa (Bağlantılar/Müşteriler): kartı açar. */}
+          <div>
+            <KartEtiketi task={task} size={13} />
+          </div>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

@@ -17,6 +17,11 @@ export const colors = {
     accentDark: "#8C5A28",
     background: "#F7F8FA",
     surface: "#FFFFFF",
+    // Liste görünümünde sıra sıra değişen satırın ikinci rengi. Eskiden
+    // `background` kullanılıyordu ve sayfa zemininin ta kendisiydi: koyu
+    // satırlar sayfaya karışıyor, liste sayfadan ayrışmıyordu (kullanıcı
+    // geri bildirimi 2026-10-10). Yüzeyle zemin arasında, zemine göre açık.
+    listeSatirAlt: "#FBFCFD",
     textPrimary: "#1A1F29",
     textSecondary: "#66707F",
     border: "#E3E6EB",
@@ -45,6 +50,9 @@ export const colors = {
     accentDark: "#C0813F",
     background: "#12151B",
     surface: "#1B2028",
+    // bkz. light.listeSatirAlt — koyu temada yüzeyden biraz AÇIK: zemine
+    // (#12151B) karışmasın.
+    listeSatirAlt: "#20262F",
     textPrimary: "#F1F3F5",
     textSecondary: "#9AA2B0",
     border: "#2A3140",

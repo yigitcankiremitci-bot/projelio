@@ -669,6 +669,25 @@ export function isPartyRole(value: unknown): value is PartyRole {
 }
 
 /**
+ * Potansiyel müşteri: anlaşma henüz yapılmamış kart. Müşteriler panelinde
+ * "Potansiyel" sekmesinde durur. Hem `lead` hem `customer` taşıyan kart
+ * (ör. ilk faturası kesilmiş, `lead` silinmemiş) MÜŞTERİDİR — anlaşma olmuş.
+ */
+export function potansiyelMusteriMi(p: Pick<Party, "roles">): boolean {
+  return p.roles.includes("lead") && !p.roles.includes("customer");
+}
+
+/**
+ * "Müşteriye dönüştür"ün rol sonucu: `customer` BAŞA gelir — düzenleme formu
+ * `roles[0]`'ı gösteriyor; sonda kalsaydı form "Potansiyel" açar, kaydetmek
+ * kartı geri potansiyele çevirirdi. `lead` silinmez (kaydın potansiyel olarak
+ * başladığı bilgisi kalsın, bkz. party-dedup addRole), diğer roller de kalır.
+ */
+export function musteriyeDonusenRoller(roles: readonly PartyRole[]): PartyRole[] {
+  return ["customer", ...roles.filter((r) => r !== "customer")];
+}
+
+/**
  * party kaydına bakan modüller. Kaydın hangi defterde durduğu
  * `Party.modules`'ta yazılı (migration 153): Bağlantılar'da açılan kart
  * Müşteriler'de görünmez, müşteriye dönüşünce ikisinde birden görünür.
@@ -854,6 +873,19 @@ export interface MusteriListesi {
   /** Kart bilgisini (ad, iletişim) değiştirebilir mi. */
   kartYazar: boolean;
   musteriler: Party[];
+}
+
+/** Bağlantı kartının aktarılabileceği hedefler (bkz. backend party/aktarim.ts). */
+export type PartyAktarimHedefi = "musteri" | "potansiyel" | "tedarikci" | "rakip" | "ortaklik";
+
+/**
+ * Kart için bir aktarım seçeneğinin durumu: uygun (yapılabilir), yapildi
+ * (zaten aktarıldı), kapali (hedef modül şirkette açık değil), yetkisiz
+ * (hedefte yazma yetkisi yok).
+ */
+export interface PartyAktarimSecenegi {
+  hedef: PartyAktarimHedefi;
+  durum: "uygun" | "yapildi" | "kapali" | "yetkisiz";
 }
 
 /** Kartın dosyasının rolü (file_links.party_rol, migration 157). */

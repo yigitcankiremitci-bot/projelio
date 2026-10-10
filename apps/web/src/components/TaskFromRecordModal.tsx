@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { Task } from "@projelio/shared";
+import { useEffect, useState } from "react";
+import type { Department, Task } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { todayISO } from "../lib/moduleConfigs";
@@ -8,7 +8,14 @@ import Modal from "./Modal";
 import { useT } from "../lib/i18n";
 
 interface Props {
-  departmentId: string;
+  /** Varsayılan departman. organizationId verilmezse görev YALNIZCA buraya açılır. */
+  departmentId?: string;
+  /**
+   * Verilirse görev şirketin istenen departmanına ve istenirse bir görevin
+   * ALTINA (alt görev) açılabilir — kartvizitten doğan iş çoğu zaman başka bir
+   * ekibin işi (ör. teklifi satış hazırlar, bağlantıyı yönetim kurar).
+   */
+  organizationId?: string;
   moduleKey: string;
   moduleTitle: string;
   recordId: string;
@@ -34,7 +41,8 @@ interface Props {
  * böylece modül panelinde "bu kayıttan görev üretildi" görünür.
  */
 export default function TaskFromRecordModal({
-  departmentId,
+  departmentId: varsayilanDepartman,
+  organizationId,
   moduleKey,
   moduleTitle,
   recordId,
@@ -55,10 +63,41 @@ export default function TaskFromRecordModal({
   const [deadline, setDeadline] = useState(defaultDeadline || todayISO());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [departmanlar, setDepartmanlar] = useState<Department[]>([]);
+  const [departmentId, setDepartmentId] = useState(varsayilanDepartman ?? "");
+  const [ustGorevler, setUstGorevler] = useState<Task[]>([]);
+  const [ustGorevId, setUstGorevId] = useState("");
+
+  useEffect(() => {
+    if (!organizationId) return;
+    api
+      .get<Department[]>(`/organizations/${organizationId}/departments`)
+      .then((d) => {
+        setDepartmanlar(d);
+        setDepartmentId((mevcut) => mevcut || d[0]?.id || "");
+      })
+      .catch(() => setDepartmanlar([]));
+  }, [organizationId]);
+
+  // Alt görev seçenekleri: seçilen departmanın tamamlanmamış ana görevleri.
+  useEffect(() => {
+    setUstGorevId("");
+    // Başka ekibin kişisi yeni departmanın görevine atanamaz.
+    setAssigneeIds([]);
+    if (!departmentId) return setUstGorevler([]);
+    api
+      .get<Task[]>(`/departments/${departmentId}/tasks`)
+      .then((g) => setUstGorevler(g.filter((x) => !x.parentTaskId && x.status !== "completed").slice(0, 200)))
+      .catch(() => setUstGorevler([]));
+  }, [departmentId]);
 
   const save = async () => {
     if (!title.trim()) {
       setError(t("Görev başlığı gerekli"));
+      return;
+    }
+    if (!departmentId) {
+      setError(t("Departman seç"));
       return;
     }
     setSaving(true);
@@ -72,6 +111,7 @@ export default function TaskFromRecordModal({
         assignedToIds: assigneeIds,
         sourceModuleKey: moduleKey,
         sourceRecordId: recordId,
+        ...(ustGorevId ? { parentTaskId: ustGorevId } : {}),
       });
       onCreated();
       onClose();
@@ -98,6 +138,33 @@ export default function TaskFromRecordModal({
           <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%" }} />
         </label>
 
+        {departmanlar.length > 1 && (
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Departman")}</span>
+            <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
+              {departmanlar.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {ustGorevler.length > 0 && (
+          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Alt görev olarak ekle (isteğe bağlı)")}</span>
+            <select value={ustGorevId} onChange={(e) => setUstGorevId(e.target.value)} style={{ width: "100%" }}>
+              <option value="">{t("Hayır — ayrı görev")}</option>
+              {ustGorevler.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Açıklama")}</span>
           <textarea
@@ -112,6 +179,8 @@ export default function TaskFromRecordModal({
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kime")}</span>
           <AssigneePicker
+            // Departman değişince kişi listesi o ekibe göre yenilenir.
+            key={departmentId}
             departmentId={departmentId}
             multiple
             values={assigneeIds}

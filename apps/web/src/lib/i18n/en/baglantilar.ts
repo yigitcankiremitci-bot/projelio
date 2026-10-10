@@ -111,4 +111,24 @@ export const baglantilar: TranslationDict = {
   "Sırala:": "Sort:",
   "Ad (A–Z)": "Name (A–Z)",
   "Son eklenen": "Recently added",
+  "Son güncellenen": "Recently updated",
+  "Eklenme sırası": "Order added",
+  "Düzenle: {ad}": "Edit: {ad}",
+
+  // ─────────────────────────────────────────────── Aktarım (rol → modül)
+  "Aktar:": "Move to:",
+  "Potansiyel müşteri yap": "Make lead",
+  "Tedarikçi yap": "Make supplier",
+  "Rakip analizine ekle": "Add to competitor analysis",
+  "Ortaklığa ekle": "Add to partnerships",
+  "Potansiyel müşteri": "Lead",
+  "Rakip analizinde": "In competitor analysis",
+  "Ortaklıkta": "In partnerships",
+  "Kart Müşteriler listesinde potansiyel müşteri olarak görünecek.": "The card will appear in Customers as a lead.",
+  "Kart Müşteriler'de tedarikçi olarak görünecek; ürün, fatura ve tedarik ekranlarında seçilebilir.":
+    "The card will appear in Customers as a supplier and can be picked on product, invoice and procurement screens.",
+  "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.":
+    "A record will be created for this card in Competitor & Industry Analysis. The relationship note isn't copied.",
+  "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.":
+    "A record will be created for this card in Partnerships & Distribution. The relationship note isn't copied.",
 };

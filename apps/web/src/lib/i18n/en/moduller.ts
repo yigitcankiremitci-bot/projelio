@@ -1136,4 +1136,17 @@ export const moduller: TranslationDict = {
   "Kısmi tahsil": "Partially collected",
   "Gecikti": "Overdue",
   "Tahsilat, siparişin kalan tutarını aşamaz": "A collection can't exceed the order's remaining amount",
+  // Müşteriler > Potansiyel sekmesi
+  "Potansiyel ({n})": "Prospects ({n})",
+  "Potansiyel müşteri ekle": "Add prospect",
+  "+ Potansiyel müşteri ekle": "+ Add prospect",
+  "Müşteriye dönüştür": "Convert to customer",
+  "Müşteriye dönüştürme": "Customer conversion",
+  "Anlaşma yapıldı: kartı müşteriye dönüştür": "Deal closed: convert this card to a customer",
+  "Dönüştürülemedi": "Couldn't convert",
+  "{ad} müşteriye dönüştürüldü; artık Müşteriler sekmesinde.": "{ad} was converted to a customer and is now in the Customers tab.",
+  "Henüz potansiyel müşteri yok. Anlaşması yapılmamış ama yakın olan kişi ve firmaları buraya ekle; anlaşma olunca tek tıkla müşteriye dönüştür.":
+    "No prospects yet. Add people and companies you haven't closed a deal with but are close to; once the deal is done, convert them to a customer in one click.",
+  "Henüz müşteri yok. Potansiyel müşteriler kendi sekmesinde; anlaşma olunca müşteriye dönüştürülür.":
+    "No customers yet. Prospects have their own tab; they're converted to customers once a deal is closed.",
 };

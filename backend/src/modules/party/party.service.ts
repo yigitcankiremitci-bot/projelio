@@ -20,6 +20,9 @@ import {
   type PartyBaglanti,
   type PartyContact,
   type PartyDuplicate,
+  type PartyAktarimSecenegi,
+  musteriyeDonusenRoller,
+  potansiyelMusteriMi,
   type PartyDosyaRolu,
   type PartyGorevi,
   type PartyModulKey,
@@ -29,6 +32,8 @@ import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { AccessService } from "../../common/access/access.service";
 import { FilesService, type ProjectFile } from "../files/files.service";
+import { ModuleRecordsService } from "../module-records/module-records.service";
+import { AKTARIM_TANIMLARI, aktarimKaydiVerisi, aktarimTanimi, defterAktarimiYapildi } from "./aktarim";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
@@ -153,7 +158,8 @@ export class PartyService {
     private supabase: SupabaseService,
     private moduleMembers: ModuleMembersService,
     private accessService: AccessService,
-    private files: FilesService
+    private files: FilesService,
+    private moduleRecords: ModuleRecordsService
   ) {}
 
   private readonly OWNER_JOIN = "*, owner:users!party_owner_user_id_fkey(full_name)";
@@ -914,6 +920,30 @@ export class PartyService {
   }
 
   /**
+   * Potansiyel müşteriyi müşteriye dönüştürür (anlaşma yapıldı). Yalnızca
+   * Müşteriler defterindeki potansiyel kart dönüşür; kart aynı kalır — bilgi,
+   * kişiler, geçmiş, dosyalar taşınmaz, yalnızca rol değişir.
+   */
+  async musteriyeDonustur(id: string, userId?: string): Promise<Party> {
+    const existing = await this.findOne(id);
+    await this.assertKayitYazilir(existing, userId);
+    if (existing.archivedAt) throw new BadRequestException("Arşivdeki kart dönüştürülemez");
+    if (!existing.modules.includes(MUSTERI_MODUL_KEY)) throw new BadRequestException("Kart Müşteriler listesinde değil");
+    if (!potansiyelMusteriMi(existing)) throw new BadRequestException("Kart zaten müşteri");
+
+    const { data: row, error } = await this.supabase.client
+      .from("party")
+      .update({ roles: musteriyeDonusenRoller(existing.roles), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select(this.OWNER_JOIN)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Kayıt bulunamadı");
+    await this.logActivity(id, "sistem", "Potansiyel müşteriden müşteriye dönüştürüldü", userId);
+    return mapParty(row);
+  }
+
+  /**
    * Yinelenen kayıtları birleştirir: alt kayıtlar hedefe taşınır, kaynak
    * silinmez, merged_into_id ile işaretlenir (geri alınabilsin diye).
    */
@@ -992,11 +1022,13 @@ export class PartyService {
    * satırı açılır ki önem sıralamasına girsin. İlişki notu müşteri tarafına
    * HİÇBİR ŞEKİLDE geçmez; ayrı tabloda kalır.
    */
-  async deftereEkle(id: string, hedef: PartyModulKey, userId: string): Promise<Party> {
+  async deftereEkle(id: string, hedef: PartyModulKey, userId: string, rol: PartyRole = "customer"): Promise<Party> {
     const existing = await this.findOne(id, { baglanti: true });
     if (existing.archivedAt) throw new BadRequestException("Arşivdeki kart başka bir deftere eklenemez");
     if (existing.modules.includes(hedef)) {
-      return this.gorunur(existing, await this.erisimler(existing, userId));
+      // Kart zaten o defterde (ör. müşteri), yeni rol (tedarikçi) eklenir.
+      if (hedef === MUSTERI_MODUL_KEY && !existing.roles.includes(rol)) await this.addRoleTo(id, rol, userId);
+      return this.gorunur(await this.findOne(id, { baglanti: true }), await this.erisimler(existing, userId));
     }
     const scope = this.scopeOf(existing);
     const [e, hedefErisim, acik] = await Promise.all([
@@ -1011,7 +1043,7 @@ export class PartyService {
       modules: [...existing.modules, hedef],
       updated_at: new Date().toISOString(),
     };
-    if (hedef === MUSTERI_MODUL_KEY) patch.roles = addRole(existing.roles, "customer");
+    if (hedef === MUSTERI_MODUL_KEY) patch.roles = addRole(existing.roles, rol);
     const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
     if (error) throw error;
     if (hedef === BAGLANTI_MODUL_KEY) await this.baglantiYaz(id, {});
@@ -1024,6 +1056,111 @@ export class PartyService {
     );
     const guncel = await this.findOne(id, { baglanti: true });
     return this.gorunur(guncel, { ...e, [hedef]: hedefErisim });
+  }
+
+  // ============================================================ Aktarım (rol → modül)
+
+  /** Bir modülün kapsamdaki yetkisi (party defteri olmayan modüller için de). */
+  private modulErisimi(scope: PartyScope, modul: string, userId: string): Promise<ModuleAccess> {
+    return scope.jobId
+      ? this.moduleMembers.resolveJobAccess(scope.jobId, modul, userId)
+      : this.moduleMembers.resolveOrganizationAccess(scope.organizationId!, modul, userId);
+  }
+
+  /** Modül şirkette/işte açık mı (party defteri olmayan modüller için de). */
+  private async modulAcikMi(scope: PartyScope, modul: string): Promise<boolean> {
+    return this.modulAcik(scope, modul as PartyModulKey);
+  }
+
+  /** Bu karttan o modüle daha önce kayıt aktarılmış mı (kaynakKart). */
+  private async kaynakKaydiVar(party: Party, modul: string): Promise<boolean> {
+    let q = this.supabase.client
+      .from("module_records")
+      .select("id", { count: "exact", head: true })
+      .eq("module_key", modul)
+      .is("archived_at", null)
+      .eq("data->>kaynakKart", party.id);
+    q = party.jobId ? q.eq("job_id", party.jobId) : q.eq("organization_id", party.organizationId!);
+    const { count, error } = await q;
+    if (error) throw error;
+    return (count ?? 0) > 0;
+  }
+
+  /**
+   * Kartın aktarım seçenekleri ve her birinin durumu — arayüz "Aktar"
+   * menüsünü bundan kurar. Karar yine aktarımda verilir; bu yalnızca gösterim.
+   */
+  async aktarimSecenekleri(partyId: string, userId: string): Promise<PartyAktarimSecenegi[]> {
+    const party = await this.findOne(partyId);
+    await this.assertKayitOkunur(party, userId);
+    const scope = this.scopeOf(party);
+    const kartYazilir = kayitYazilir(party.modules, await this.erisimler(party, userId));
+    return Promise.all(
+      AKTARIM_TANIMLARI.map(async (t): Promise<PartyAktarimSecenegi> => {
+        const yapildi =
+          t.tur === "defter" ? defterAktarimiYapildi(party, t) : await this.kaynakKaydiVar(party, t.modul).catch(() => false);
+        if (yapildi) return { hedef: t.hedef, durum: "yapildi" };
+        if (!(await this.modulAcikMi(scope, t.modul))) return { hedef: t.hedef, durum: "kapali" };
+        const erisim = await this.modulErisimi(scope, t.modul, userId).catch(() => null);
+        if (!kartYazilir || !erisim?.canWrite) return { hedef: t.hedef, durum: "yetkisiz" };
+        return { hedef: t.hedef, durum: "uygun" };
+      })
+    );
+  }
+
+  /** Kayıt aktarımında modülün ineceği departman: modülün açık olduğu ve kullanıcının gördüğü ilki. */
+  private async kayitDepartmani(orgId: string, modul: string, userId: string): Promise<string | undefined> {
+    const { data } = await this.supabase.client
+      .from("organization_modules")
+      .select("department_id")
+      .eq("organization_id", orgId)
+      .eq("module_key", modul)
+      .not("department_id", "is", null);
+    for (const r of (data ?? []) as any[]) {
+      if ((await this.accessService.departmentAccess(r.department_id, userId).catch(() => null))?.canView) {
+        return r.department_id;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Kartı bir role göre ilgili modüle aktarır (bkz. aktarim.ts). Kartı
+   * değiştirme yetkisi + hedef modülde yazma yetkisi gerekir; ikincisini
+   * modül kaydı servisi de ayrıca denetler. Aynı kart aynı modüle iki kez
+   * aktarılmaz.
+   */
+  async aktar(partyId: string, hedef: string, userId: string): Promise<{ party: Party; kayitId?: string }> {
+    const t = aktarimTanimi(hedef);
+    if (!t) throw new BadRequestException("Geçersiz aktarım hedefi");
+    if (t.tur === "defter") {
+      return { party: await this.deftereEkle(partyId, MUSTERI_MODUL_KEY, userId, t.rol) };
+    }
+    const party = await this.findOne(partyId, { baglanti: true });
+    if (party.archivedAt) throw new BadRequestException("Arşivdeki kart aktarılamaz");
+    await this.assertKayitYazilir(party, userId);
+    if (await this.kaynakKaydiVar(party, t.modul)) throw new BadRequestException("Bu kart o modüle zaten aktarılmış");
+    const scope = this.scopeOf(party);
+    if (!(await this.modulAcikMi(scope, t.modul))) throw new BadRequestException("Hedef modül burada açık değil");
+
+    const veri = aktarimKaydiVerisi(party, t.hedef);
+    const kayit = party.jobId
+      ? await this.moduleRecords.createForJob(party.jobId, { moduleKey: t.modul, data: veri }, userId)
+      : await this.moduleRecords.create(
+          party.organizationId!,
+          { departmentId: await this.kayitDepartmani(party.organizationId!, t.modul, userId), moduleKey: t.modul, data: veri },
+          userId
+        );
+    if (!party.roles.includes(t.rol)) await this.addRoleTo(partyId, t.rol, userId);
+    await this.logActivity(
+      partyId,
+      "sistem",
+      t.hedef === "rakip" ? "Rakip ve Sektör Analizi'ne aktarıldı" : "Ortaklık ve Dağıtım'a aktarıldı",
+      userId,
+      undefined,
+      { type: "module_record", id: kayit.id }
+    );
+    return { party: await this.findOne(partyId, { baglanti: true }), kayitId: kayit.id };
   }
 
   // ============================================================ Dosyalar (kartvizit)

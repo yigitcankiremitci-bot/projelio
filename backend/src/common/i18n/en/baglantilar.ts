@@ -25,6 +25,10 @@ export const baglantilar: TranslationDict = {
   "Geçersiz sosyal hesap": "Invalid social media account",
   "Geçersiz kart türü": "Invalid card type",
   "Geçersiz dosya rolü": "Invalid file role",
+  "Geçersiz aktarım hedefi": "Invalid transfer target",
+  "Arşivdeki kart aktarılamaz": "An archived card can't be transferred",
+  "Bu kart o modüle zaten aktarılmış": "This card has already been transferred to that module",
+  "Hedef modül burada açık değil": "The target module isn't enabled here",
   "Departman bu kartın şirketinde değil": "That department isn't in this card's company",
   "Dosya eklemek için kartı modülün açık olduğu bir departmandan aç":
     "To add a file, open the card from a department where the module is enabled",

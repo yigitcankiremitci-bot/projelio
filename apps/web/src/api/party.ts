@@ -5,6 +5,8 @@ import type {
   MusteriSiparisListesi,
   OdemeYontemi,
   Party,
+  PartyAktarimHedefi,
+  PartyAktarimSecenegi,
   PartyDosyaRolu,
   PartyGorevi,
   ProjectFile,
@@ -60,6 +62,14 @@ export const partyApi = {
     return api.uploadFile<ProjectFile>(`/party/${partyId}/dosyalar?${q}`, fd);
   },
   dosyaKaldir: (partyId: string, fileId: string) => api.delete(`/party/${partyId}/dosyalar/${fileId}`),
+
+  /** Rol aktarımı: seçenekler ve aktarım (müşteri, tedarikçi, rakip analizi, ortaklık). */
+  aktarimSecenekleri: (partyId: string) => api.get<PartyAktarimSecenegi[]>(`/party/${partyId}/aktarim`),
+  aktar: (partyId: string, hedef: PartyAktarimHedefi) =>
+    api.post<{ party: Party; kayitId?: string }>(`/party/${partyId}/aktar`, { hedef }),
+
+  /** Potansiyel müşteri → müşteri (anlaşma yapıldı). */
+  musteriyeDonustur: (partyId: string) => api.post<Party>(`/party/${partyId}/musteriye-donustur`, {}),
 
   /** Karttan açılmış takip görevleri. */
   gorevler: (partyId: string) => api.get<PartyGorevi[]>(`/party/${partyId}/gorevler`),

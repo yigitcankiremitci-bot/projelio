@@ -9,6 +9,7 @@ import {
   kartvizitSosyalNormallestir,
   WEB_SITESI_IKON,
   MUSTERI_MODUL_KEY,
+  potansiyelMusteriMi,
   safeExternalUrl,
   type KartvizitSosyal,
   type KartvizitSosyalAnahtar,
@@ -21,6 +22,8 @@ import {
   type PartyBaglanti,
   type PartyContact,
   type PartyDuplicate,
+  type PartyAktarimHedefi,
+  type PartyAktarimSecenegi,
   type PartyDosyaRolu,
   type PartyGorevi,
   type ProjectFile,
@@ -43,6 +46,7 @@ import { IconEdit, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, I
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
+import { listeCercevesi, listeSatiri } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { partyApi } from "../api/party";
 import { filesApi } from "../api/files";
@@ -51,6 +55,7 @@ import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
+import Modal from "./Modal";
 
 interface Props {
   organizationId?: string;
@@ -249,7 +254,11 @@ export default function CustomersPanel({
   };
   const [duplicates, setDuplicates] = useState<PartyDuplicate[]>([]);
   const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<PartyRole | "">(profile.defaultRole ?? "");
+  // Potansiyel müşterilerin kendi sekmesi var: Satış profilinin "lead"
+  // varsayılanı artık bir filtre değil, panelin Potansiyel sekmesinde açılması.
+  const varsayilanRol: PartyRole | "" = !baglantiModu && profile.defaultRole === "lead" ? "" : profile.defaultRole ?? "";
+  const ilkGorunum = !baglantiModu && profile.defaultRole === "lead" ? "potansiyel" : "musteriler";
+  const [roleFilter, setRoleFilter] = useState<PartyRole | "">(varsayilanRol);
   const [onemFiltre, setOnemFiltre] = useState<BaglantiOnem | "">("");
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
   const { pushUndo } = useUndo();
@@ -258,7 +267,9 @@ export default function CustomersPanel({
   // Yönetici hepsini görür, müşteriyi çalışana atar ve raporu görür; çalışan
   // yalnızca kendisine atananları görür. Karar sunucunun (musterilerim ucu).
   const [yonetici, setYonetici] = useState(false);
-  const [gorunum, setGorunum] = useState<"musteriler" | "tahsilat">("musteriler");
+  // Potansiyel: anlaşma yapılmamış kartlar (bkz. potansiyelMusteriMi). Aynı
+  // tablo, aynı kart; "Müşteriye dönüştür" yalnızca rolü değiştirir.
+  const [gorunum, setGorunum] = useState<"musteriler" | "potansiyel" | "tahsilat">(ilkGorunum);
   const [sorumluFiltre, setSorumluFiltre] = useState("");
   const [ekip, setEkip] = useState<{ id: string; ad: string }[]>([]);
 
@@ -336,7 +347,10 @@ export default function CustomersPanel({
   const [excelAcik, setExcelAcik] = useState(false);
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
-  useEffect(() => setRoleFilter(profile.defaultRole ?? ""), [profile.defaultRole]);
+  useEffect(() => {
+    setRoleFilter(varsayilanRol);
+    setGorunum(ilkGorunum);
+  }, [profile.defaultRole]);
 
   const bugun = bugunYmd();
   const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum"];
@@ -372,9 +386,21 @@ export default function CustomersPanel({
     (k) => VARSAYILAN_SOSYAL.includes(k) || ekSosyal.includes(k) || !!form.sosyal[k]
   );
 
+  // Açık sekmenin kartları. Bağlantılar'da sekme yok, hepsi.
+  const sekmeKartlari = useMemo(
+    () =>
+      baglantiModu
+        ? parties
+        : parties.filter((p) => (gorunum === "potansiyel") === potansiyelMusteriMi(p)),
+    [parties, baglantiModu, gorunum]
+  );
+  const potansiyelSayisi = useMemo(() => parties.filter(potansiyelMusteriMi).length, [parties]);
+  // Müşteriler sekmesinin rol seçicisinde "Potansiyel" yok: o kartlar kendi sekmesinde.
+  const filtreRolleri = baglantiModu ? rolSecenekleri : rolSecenekleri.filter((r) => r !== "lead");
+
   const visible = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr");
-    const suzulen = parties.filter((p) => {
+    const suzulen = sekmeKartlari.filter((p) => {
       if (roleFilter && !p.roles.includes(roleFilter)) return false;
       if (onemFiltre && p.baglanti?.onem !== onemFiltre) return false;
       if (sorumluFiltre && (sorumluFiltre === "-" ? !!p.ownerUserId : p.ownerUserId !== sorumluFiltre)) return false;
@@ -386,11 +412,11 @@ export default function CustomersPanel({
         .includes(q);
     });
     return sirala(suzulen, siralama);
-  }, [parties, search, roleFilter, onemFiltre, sorumluFiltre, siralama]);
+  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama]);
 
   const hasActiveFilter =
-    search.trim() !== "" || roleFilter !== (profile.defaultRole ?? "") || sorumluFiltre !== "" || onemFiltre !== "";
-  const showToolbar = parties.length > TOOLBAR_THRESHOLD || hasActiveFilter;
+    search.trim() !== "" || roleFilter !== varsayilanRol || sorumluFiltre !== "" || onemFiltre !== "";
+  const showToolbar = sekmeKartlari.length > TOOLBAR_THRESHOLD || hasActiveFilter;
 
   const stats = useMemo(
     () =>
@@ -418,7 +444,8 @@ export default function CustomersPanel({
       ...emptyForm(),
       // Fuarda tanışılan çoğu zaman bir KİŞİ; şirketi Kurum alanına yazılır.
       partyType: baglantiModu ? "person" : "company",
-      role: profile.defaultRole ?? (baglantiModu ? "contact" : "lead"),
+      // Müşteriler'de açık sekme belirler: Potansiyel'den eklenen kart potansiyel.
+      role: baglantiModu ? profile.defaultRole ?? "contact" : gorunum === "potansiyel" ? "lead" : "customer",
       // En son girilen yer ve tarih hazır gelir; değiştirmek tek tık.
       tanismaYeri: oneriler[0]?.yer ?? "",
       tanismaTarihi: oneriler[0]?.tarih ?? "",
@@ -490,9 +517,14 @@ export default function CustomersPanel({
   // Ekleme sayfanın "+" düğmesinden. Panelin başlığındaki ikinci düğme kalktı;
   // modal içinde (bkz. Modal.tsx) "+" ulaşılamadığı için orada geri gelir.
   const fabAvailable = useFabAvailable();
+  const ekleEtiketi = baglantiModu
+    ? t("Bağlantı ekle")
+    : gorunum === "potansiyel"
+      ? t("Potansiyel müşteri ekle")
+      : t("Müşteri ekle");
   useProjectFabAction(
-    canWrite && fabAvailable ? { label: baglantiModu ? t("Bağlantı ekle") : t("Müşteri ekle"), onClick: openCreate } : null,
-    [canWrite, fabAvailable, organizationId, departmentId, jobId, baglantiModu],
+    canWrite && fabAvailable ? { label: ekleEtiketi, onClick: openCreate } : null,
+    [canWrite, fabAvailable, organizationId, departmentId, jobId, baglantiModu, gorunum],
     FAB_PRIORITY.panel
   );
 
@@ -569,11 +601,13 @@ export default function CustomersPanel({
         ...(departmentId && !jobId ? { departmentId } : {}),
       };
       let partyId: string | undefined;
+      let sonRoller: PartyRole[] = [form.role];
       if (formMode?.kind === "edit") {
         // Düzenlemede roller korunur: mevcut rollerin üzerine seçilen eklenir,
         // hiçbiri silinmez (bkz. party-dedup.ts addRole).
         const merged = Array.from(new Set([...formMode.party.roles, form.role]));
         await api.patch(`/party/${formMode.party.id}`, { ...payload, roles: merged });
+        sonRoller = merged;
         partyId = formMode.party.id;
       } else {
         const yeni = await api.post<Party>(scopePath, payload);
@@ -610,6 +644,9 @@ export default function CustomersPanel({
       }
       closeForm();
       load();
+      // Kart açık sekmeden düştüyse (potansiyel kaydedildi, rol müşteriye
+      // çevrildi) kaybolmuş gibi görünmesin: onun sekmesine geçilir.
+      if (!baglantiModu) setGorunum(potansiyelMusteriMi({ roles: sonRoller }) ? "potansiyel" : "musteriler");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Kaydedilemedi"));
     } finally {
@@ -634,20 +671,38 @@ export default function CustomersPanel({
     });
   };
 
-  // Form açılınca görünür alana kaydırılır: üstte de açılsa altta da, kullanıcı
-  // açıldığını görmeli.
-  const formRef = useRef<HTMLDivElement>(null);
-  const formAnahtari = formMode ? (formMode.kind === "edit" ? formMode.party.id : "yeni") : null;
-  useEffect(() => {
-    if (formAnahtari) formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [formAnahtari]);
+  /** Anlaşma yapıldı: kart aynı kalır, Müşteriler sekmesine geçer. Geri alınabilir. */
+  const [donusturulen, setDonusturulen] = useState<string | null>(null);
+  const musteriyeDonustur = async (p: Party) => {
+    setDonusturulen(p.id);
+    setBildirim("");
+    try {
+      await partyApi.musteriyeDonustur(p.id);
+      setBildirim(t("{ad} müşteriye dönüştürüldü; artık Müşteriler sekmesinde.", { ad: p.displayName }));
+      if (openPartyId === p.id) setOpenPartyId(null);
+      load();
+      pushUndo({
+        label: t("Müşteriye dönüştürme"),
+        // Geri almak eski rolleri olduğu gibi yazar (müşteri rolü düşer).
+        run: async () => {
+          await api.patch(`/party/${p.id}`, { roles: p.roles });
+          load();
+        },
+        redo: async () => {
+          await partyApi.musteriyeDonustur(p.id);
+          load();
+        },
+      });
+    } catch (err) {
+      setBildirim(err instanceof Error ? err.message : t("Dönüştürülemedi"));
+    } finally {
+      setDonusturulen(null);
+    }
+  };
 
-  // Form tek blok: yeni kayıtta listenin üstünde, düzenlemede DÜZENLENEN SATIRIN
-  // ALTINDA açılır. Eskiden hep üstte açılıyordu; uzun listenin sonundaki kişiye
-  // "Düzenle" deyince form ekranın dışında kalıyor, açıldığı bile anlaşılmıyordu.
+  // Form tek blok; ekleme ve düzenlemede modal pencerenin içinde açılır.
   const formAlani = formMode ? (
         <div
-          ref={formRef}
           style={{
             display: "flex",
             flexDirection: "column",
@@ -655,16 +710,10 @@ export default function CustomersPanel({
             background: c.background,
             borderRadius: 10,
             padding: 10,
-            // Satırın içinde açıldığında listeden ayrılsın.
-            border: formMode.kind === "edit" ? `1px solid ${c.primary}` : "none",
-            scrollMarginTop: 12,
+
           }}
         >
-          {formMode.kind === "edit" && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {t("Düzenleniyor: {ad}", { ad: formMode.party.displayName })}
-            </span>
-          )}
+
 
           <Field
             label={
@@ -1081,7 +1130,13 @@ export default function CustomersPanel({
               onClick={() => (formMode ? closeForm() : openCreate())}
               style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
             >
-              {formMode ? t("Vazgeç") : baglantiModu ? t("+ Bağlantı ekle") : t("+ Müşteri ekle")}
+              {formMode
+                ? t("Vazgeç")
+                : baglantiModu
+                  ? t("+ Bağlantı ekle")
+                  : gorunum === "potansiyel"
+                    ? t("+ Potansiyel müşteri ekle")
+                    : t("+ Müşteri ekle")}
             </button>
           )
         )}
@@ -1094,7 +1149,7 @@ export default function CustomersPanel({
           Bağlantılar'da sipariş yok; sekme de yok. */}
       {!baglantiModu && (
       <div style={{ display: "flex", gap: 6 }}>
-        {(["musteriler", "tahsilat"] as const).map((g) => (
+        {(["musteriler", "potansiyel", "tahsilat"] as const).map((g) => (
           <button
             key={g}
             onClick={() => setGorunum(g)}
@@ -1108,7 +1163,13 @@ export default function CustomersPanel({
               cursor: "pointer",
             }}
           >
-            {g === "musteriler" ? t("Müşteriler") : t("Tahsilat takibi")}
+            {g === "musteriler"
+              ? t("Müşteriler")
+              : g === "potansiyel"
+                ? potansiyelSayisi
+                  ? t("Potansiyel ({n})", { n: potansiyelSayisi })
+                  : t("Potansiyel")
+                : t("Tahsilat takibi")}
           </button>
         ))}
       </div>
@@ -1163,18 +1224,20 @@ export default function CustomersPanel({
             placeholder={t("Ara…")}
             style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
           />
+          {gorunum !== "potansiyel" && (
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value as PartyRole | "")}
             style={{ fontSize: 13, padding: "5px 6px" }}
           >
             <option value="">{t("Rol: tümü")}</option>
-            {rolSecenekleri.map((r) => (
+            {filtreRolleri.map((r) => (
               <option key={r} value={r}>
                 {t(ROLE_LABELS[r], { ctx: "rol" })}
               </option>
             ))}
           </select>
+          )}
           {baglantiModu && (
             <select
               value={onemFiltre}
@@ -1210,7 +1273,7 @@ export default function CustomersPanel({
             <button
               onClick={() => {
                 setSearch("");
-                setRoleFilter(profile.defaultRole ?? "");
+                setRoleFilter(varsayilanRol);
                 setSorumluFiltre("");
                 setOnemFiltre("");
               }}
@@ -1222,7 +1285,24 @@ export default function CustomersPanel({
         </div>
       )}
 
-      {formMode?.kind === "create" && formAlani}
+      {/* Ekleme ve düzenleme modal pencerede: listenin içinde açılan form uzun
+          listede kayboluyor, satırları itip kaydırıyordu (kullanıcı isteği). */}
+      {formMode && (
+        <Modal
+          title={
+            formMode.kind === "edit"
+              ? t("Düzenle: {ad}", { ad: formMode.party.displayName })
+              : form.role === "lead" && !baglantiModu
+                ? t("Potansiyel müşteri ekle")
+                : ekleEtiketi
+          }
+          onClose={closeForm}
+          maxWidth={640}
+          mobileFullScreen
+        >
+          {formAlani}
+        </Modal>
+      )}
 
       {loading ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
@@ -1233,6 +1313,13 @@ export default function CustomersPanel({
             : t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
           {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
         </p>
+      ) : sekmeKartlari.length === 0 ? (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+          {gorunum === "potansiyel"
+            ? t("Henüz potansiyel müşteri yok. Anlaşması yapılmamış ama yakın olan kişi ve firmaları buraya ekle; anlaşma olunca tek tıkla müşteriye dönüştür.")
+            : t("Henüz müşteri yok. Potansiyel müşteriler kendi sekmesinde; anlaşma olunca müşteriye dönüştürülür.")}
+          {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
+        </p>
       ) : visible.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
@@ -1240,7 +1327,7 @@ export default function CustomersPanel({
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {hasActiveFilter && (
               <span style={{ fontSize: 12, color: c.textSecondary }}>
-                {t("{n} / {toplam} kayıt", { n: visible.length, toplam: parties.length })}
+                {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
               </span>
             )}
             {visible.length > 1 && (
@@ -1263,17 +1350,9 @@ export default function CustomersPanel({
           {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
               sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
               karışıyordu, göz satırı takip edemiyordu. Renkler paletten. */}
-          <div style={{ display: "flex", flexDirection: "column", border: `1px solid ${c.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={listeCercevesi(c)}>
           {visible.map((p, i) => (
-            <div
-              key={p.id}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                borderTop: i === 0 ? "none" : `1px solid ${c.border}`,
-                background: i % 2 === 0 ? c.surface : c.background,
-              }}
-            >
+            <div key={p.id} style={{ display: "flex", flexDirection: "column", ...listeSatiri(c, i) }}>
               <div
                 style={{
                   display: "flex",
@@ -1338,6 +1417,26 @@ export default function CustomersPanel({
                     setOpenPartyId(p.id);
                   }}
                 />
+                {canWrite && !baglantiModu && potansiyelMusteriMi(p) && (
+                  <button
+                    onClick={() => musteriyeDonustur(p)}
+                    disabled={donusturulen === p.id}
+                    title={t("Anlaşma yapıldı: kartı müşteriye dönüştür")}
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 12,
+                      padding: "3px 8px",
+                      borderRadius: 6,
+                      border: `1px solid ${ROLE_COLORS.customer}60`,
+                      background: "transparent",
+                      color: ROLE_COLORS.customer,
+                      cursor: donusturulen === p.id ? "default" : "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {donusturulen === p.id ? t("Dönüştürülüyor…") : t("Müşteriye dönüştür")}
+                  </button>
+                )}
                 {canWrite && (
                   <>
                     <button
@@ -1364,11 +1463,8 @@ export default function CustomersPanel({
                 )}
               </div>
 
-              {formMode?.kind === "edit" && formMode.party.id === p.id && (
-                <div style={{ padding: "0 10px 10px" }}>{formAlani}</div>
-              )}
 
-              {openPartyId === p.id && !(formMode?.kind === "edit" && formMode.party.id === p.id) && <PartyDetail
+              {openPartyId === p.id && <PartyDetail
                   key={`${p.id}-${detaySekmesi ?? ""}`}
                   ilkSekme={detaySekmesi}
                   party={p}
@@ -1384,6 +1480,7 @@ export default function CustomersPanel({
                   profile={profile.primaryActionLabel}
                   // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
                   organizationId={baglantiModu ? undefined : organizationId}
+                  sirketId={jobId ? undefined : organizationId}
                 />}
             </div>
           ))}
@@ -1479,8 +1576,11 @@ function PartyDetail({
   siparisYazar,
   profile,
   organizationId,
+  sirketId,
 }: {
   party: Party;
+  /** Takip görevinin açılabileceği şirket (departman seçimi görev penceresinde). */
+  sirketId?: string;
   ilkSekme?: "contacts";
   baglantiModu: boolean;
   /** Müşteriler'de: kullanıcı Bağlantılar'a da yazabiliyor mu ("Bağlantılara ekle"). */
@@ -1505,8 +1605,10 @@ function PartyDetail({
   const [defterSoru, setDefterSoru] = useState(false);
   const [defterHata, setDefterHata] = useState("");
   const hedefDefter = baglantiModu ? MUSTERI_MODUL_KEY : BAGLANTI_MODUL_KEY;
-  const defterButonu =
-    canWrite && !party.modules.includes(hedefDefter) && (baglantiModu || baglantiYazar);
+  // Bağlantılar'da defter düğmesinin yerini "Aktar" alır (müşteri, tedarikçi,
+  // rakip analizi, ortaklık — bkz. AktarimSecenekleri); Müşteriler'de
+  // "Bağlantılara ekle" kalır.
+  const defterButonu = canWrite && !baglantiModu && !party.modules.includes(hedefDefter) && baglantiYazar;
 
   const deftereEkle = async () => {
     setBusy(true);
@@ -1659,6 +1761,8 @@ function PartyDetail({
 
       <KartBaglantilari party={party} />
 
+      {baglantiModu && canWrite && <AktarimSecenekleri party={party} onDegisti={onDegisti} />}
+
       {defterButonu && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 }}>
           {!defterSoru ? (
@@ -1701,7 +1805,7 @@ function PartyDetail({
         </>
       ) : tab === "gorevler" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {canWrite && departmentId && (
+          {canWrite && (departmentId || sirketId) && (
             <button
               onClick={() => setGorevAcik(true)}
               style={{ alignSelf: "flex-start", fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
@@ -1711,7 +1815,7 @@ function PartyDetail({
           )}
           {gorevler.length === 0 ? (
             <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
-              {departmentId
+              {departmentId || sirketId
                 ? t("Bu bağlantı için açılmış görev yok.")
                 : t("Takip görevi departman içinden açılır.")}
             </p>
@@ -1737,9 +1841,10 @@ function PartyDetail({
               </div>
             ))
           )}
-          {gorevAcik && departmentId && (
+          {gorevAcik && (departmentId || sirketId) && (
             <TaskFromRecordModal
               departmentId={departmentId}
+              organizationId={sirketId}
               moduleKey={BAGLANTI_MODUL_KEY}
               moduleTitle={t("Bağlantı ve İlişkiler")}
               recordId={party.id}
@@ -1894,6 +1999,7 @@ function KartDosyalari({
   /** Listedeki simgeler tazelensin. */
   onDegisti: () => void;
 }) {
+  const c = useThemeColors();
   const t = useT();
   const [dosyalar, setDosyalar] = useState<{ rol: PartyDosyaRolu; dosya: ProjectFile }[]>([]);
   const [acik, setAcik] = useState<ProjectFile | null>(null);
@@ -1925,6 +2031,11 @@ function KartDosyalari({
         ekleMetni={t("+ Dosya ekle")}
         dosyalar={dosyalar.filter((d) => d.rol === "ek").map((d) => d.dosya)}
       />
+      {/* Yeni kullanıcı dosyaların nereye gittiğini buradan öğrenir. Drive
+          bağlı değilse kart yine kaydedilir; yalnızca dosya saklanmaz. */}
+      <span style={{ fontSize: 11, color: c.textSecondary }}>
+        {t("Kartvizit ve dosyalar bağlı Google Drive ya da OneDrive hesabına kaydedilir (Ayarlar > Bağlı hesaplar). Bağlı değilse kartın bilgileri yine kaydedilir.")}
+      </span>
       {acik && <FilePreviewModal file={acik} onClose={() => setAcik(null)} />}
     </div>
   );
@@ -2177,5 +2288,172 @@ function SatirSimgeleri({
         );
       })}
     </div>
+  );
+}
+
+// dil:anahtar-baslangic
+const AKTARIM_ETIKETI: Record<PartyAktarimHedefi, string> = {
+  musteri: "Müşteri yap",
+  potansiyel: "Potansiyel müşteri yap",
+  tedarikci: "Tedarikçi yap",
+  rakip: "Rakip analizine ekle",
+  ortaklik: "Ortaklığa ekle",
+};
+const AKTARIM_YAPILDI: Record<PartyAktarimHedefi, string> = {
+  musteri: "Müşteri",
+  potansiyel: "Potansiyel müşteri",
+  tedarikci: "Tedarikçi",
+  rakip: "Rakip analizinde",
+  ortaklik: "Ortaklıkta",
+};
+const AKTARIM_ACIKLAMA: Record<PartyAktarimHedefi, string> = {
+  musteri: "Kart Müşteriler listesinde de görünecek. İlişki notu satış ekibine açılmaz.",
+  potansiyel: "Kart Müşteriler listesinde potansiyel müşteri olarak görünecek.",
+  tedarikci: "Kart Müşteriler'de tedarikçi olarak görünecek; ürün, fatura ve tedarik ekranlarında seçilebilir.",
+  rakip: "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.",
+  ortaklik: "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.",
+};
+// dil:anahtar-bitis
+
+/**
+ * Bağlantı kartını rolüne göre diğer modüllere aktarma (bkz. backend
+ * party/aktarim.ts). Hedef modül şirkette kapalıysa ya da kullanıcının orada
+ * yazma yetkisi yoksa seçenek görünmez; yapılmış olanlar onay işaretiyle.
+ * Aktarım geri alınamadığı için iki adımlı.
+ */
+function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () => void }) {
+  const c = useThemeColors();
+  const t = useT();
+  const [secenekler, setSecenekler] = useState<PartyAktarimSecenegi[]>([]);
+  const [soru, setSoru] = useState<PartyAktarimHedefi | null>(null);
+  const [mesgul, setMesgul] = useState(false);
+  const [hata, setHata] = useState("");
+
+  const yukle = () => {
+    partyApi.aktarimSecenekleri(party.id).then(setSecenekler).catch(() => setSecenekler([]));
+  };
+  useEffect(yukle, [party.id, party.updatedAt]);
+
+  const aktar = async (hedef: PartyAktarimHedefi) => {
+    setMesgul(true);
+    setHata("");
+    try {
+      await partyApi.aktar(party.id, hedef);
+      setSoru(null);
+      yukle();
+      onDegisti();
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
+    } finally {
+      setMesgul(false);
+    }
+  };
+
+  const uygun = secenekler.filter((s) => s.durum === "uygun");
+  const yapilan = secenekler.filter((s) => s.durum === "yapildi");
+  if (!uygun.length && !yapilan.length) return null;
+
+  const dugme = {
+    fontSize: 12,
+    padding: "4px 10px",
+    borderRadius: 6,
+    border: `1px solid ${c.primary}`,
+    background: "transparent",
+    color: c.primary,
+    cursor: "pointer",
+  } as const;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+        <span style={{ color: c.textSecondary }}>{t("Aktar:")}</span>
+        {uygun.map((s) => (
+          <button key={s.hedef} onClick={() => setSoru(s.hedef)} disabled={mesgul} style={dugme}>
+            {t(AKTARIM_ETIKETI[s.hedef])}
+          </button>
+        ))}
+        {yapilan.map((s) => (
+          <span key={s.hedef} style={{ color: c.success }}>
+            ✓ {t(AKTARIM_YAPILDI[s.hedef])}
+          </span>
+        ))}
+      </div>
+      {soru && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+          <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>{t(AKTARIM_ACIKLAMA[soru])}</span>
+          <button
+            onClick={() => aktar(soru)}
+            disabled={mesgul}
+            style={{ ...dugme, border: "none", background: c.primary, color: c.onPrimary }}
+          >
+            {t("Onayla")}
+          </button>
+          <button onClick={() => setSoru(null)} style={{ ...dugme, borderColor: c.border, color: c.textSecondary }}>
+            {t("Vazgeç")}
+          </button>
+        </div>
+      )}
+      {hata && <span style={{ color: c.danger }}>{hata}</span>}
+    </div>
+  );
+}
+
+/**
+ * Kişi kartını modal pencerede açar — panelin dışından (görevdeki "Bağlantı:
+ * …" etiketi). Kartın kendisi panelin detayıyla aynı (PartyDetail); yetkiyi
+ * sunucu denetler: kartı göremeyen kullanıcıda pencere hata metniyle açılır.
+ */
+export function BaglantiKartiModal({ partyId, onClose }: { partyId: string; onClose: () => void }) {
+  const c = useThemeColors();
+  const t = useT();
+  const [party, setParty] = useState<Party | null>(null);
+  const [hata, setHata] = useState("");
+
+  const yukle = () => {
+    api
+      .get<Party>(`/party/${partyId}`)
+      .then(setParty)
+      .catch((err) => setHata(err instanceof Error ? err.message : t("Kart açılamadı")));
+  };
+  useEffect(yukle, [partyId]);
+
+  const baglanti = !!party?.modules.includes(BAGLANTI_MODUL_KEY);
+  const altSatir = party
+    ? [[party.unvan, party.kurum].filter(Boolean).join(", "), party.baglanti?.tanismaYeri].filter(Boolean).join(" · ")
+    : "";
+
+  return (
+    <Modal title={party?.displayName ?? t("Yükleniyor…")} subtitle={altSatir || undefined} onClose={onClose} maxWidth={640} mobileFullScreen>
+      {hata ? (
+        <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>
+      ) : party ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {party.roles.map((r) => (
+              <span
+                key={r}
+                style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: ROLE_COLORS[r], border: `1px solid ${ROLE_COLORS[r]}40` }}
+              >
+                {t(ROLE_LABELS[r], { ctx: "rol" })}
+              </span>
+            ))}
+          </div>
+          <PartyDetail
+            party={party}
+            baglantiModu={baglanti}
+            baglantiYazar={false}
+            onDegisti={yukle}
+            // Yazma kararı sunucuda; yetkisi olmayan kullanıcı düğmeye basınca hata görür.
+            canWrite
+            siparisYazar={false}
+            profile={t("Temas ekle")}
+            organizationId={baglanti ? undefined : party.organizationId}
+            sirketId={party.organizationId}
+          />
+        </div>
+      ) : (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+      )}
+    </Modal>
   );
 }

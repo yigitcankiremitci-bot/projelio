@@ -1127,6 +1127,36 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
           </button>
         </div>
       )}
+
+      {/* Bir şirketin birden çok Instagram hesabı olabilir (ör. ajansın kendi
+          hesabı + ürün hesabı). Büyük davet bandı ilk bağlantıdan sonra
+          kayboluyordu ve ikinci hesabı bağlamanın hiçbir yolu kalmıyordu.
+          Arka uç zaten her bağlantıyı kendi satırına yazıyor (bkz.
+          InstagramService.linkAccount); force_reauth sayesinde Instagram,
+          oturumdaki hesabı sormadan onaylamıyor. */}
+      {igConfigured && canWrite && accounts.some((a) => a.connectionStatus === "connected") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <button
+            onClick={connectInstagram}
+            disabled={connecting}
+            style={{
+              fontSize: 12,
+              padding: "4px 10px",
+              background: "transparent",
+              color: c.primary,
+              border: `1px dashed ${c.border}`,
+              borderRadius: 8,
+              cursor: connecting ? "default" : "pointer",
+              opacity: connecting ? 0.6 : 1,
+            }}
+          >
+            {connecting ? t("Yönlendiriliyor…") : `+ ${t("Başka bir Instagram hesabı bağla")}`}
+          </button>
+          <span style={{ fontSize: 11, color: c.textSecondary }}>
+            {t("Instagram giriş ekranında bağlamak istediğiniz hesapla oturum açın.")}
+          </span>
+        </div>
+      )}
       {accounts.map((a) => (
         <div
           key={a.id}

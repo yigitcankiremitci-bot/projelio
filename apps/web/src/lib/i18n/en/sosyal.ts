@@ -229,6 +229,9 @@ export const sosyal: TranslationDict = {
   // ─────────────────────────────────────────────── Instagram bağlantısı
   "Instagram'a bağla": "Connect to Instagram",
   "Instagram'ı bağla": "Connect Instagram",
+  "Başka bir Instagram hesabı bağla": "Connect another Instagram account",
+  "Instagram giriş ekranında bağlamak istediğiniz hesapla oturum açın.":
+    "On the Instagram sign-in screen, log in with the account you want to connect.",
   "Instagram hesabınızı bağlayın — planladığınız içerikler saati gelince kendiliğinden yayımlansın.":
     "Connect your Instagram account so scheduled content publishes itself when the time comes.",
   "Instagram'ın profesyonel (işletme/içerik üretici) hesabı gerekiyor.":

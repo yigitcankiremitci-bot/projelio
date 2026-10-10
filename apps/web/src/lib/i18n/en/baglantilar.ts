@@ -115,6 +115,15 @@ export const baglantilar: TranslationDict = {
   "Eklenme sırası": "Order added",
   "Düzenle: {ad}": "Edit: {ad}",
 
+  // ─────────────────────────────────────────────── Görev ve kart penceresi
+  "Alt görev olarak ekle (isteğe bağlı)": "Add as a subtask (optional)",
+  "Departman seç": "Choose a department",
+  "Hayır — ayrı görev": "No — separate task",
+  "Kart açılamadı": "Couldn't open the card",
+  "Kartı aç": "Open card",
+  "Kartvizit ve dosyalar bağlı Google Drive ya da OneDrive hesabına kaydedilir (Ayarlar > Bağlı hesaplar). Bağlı değilse kartın bilgileri yine kaydedilir.":
+    "Business cards and files are saved to the connected Google Drive or OneDrive account (Settings > Connected accounts). If none is connected, the card's details are still saved.",
+
   // ─────────────────────────────────────────────── Aktarım (rol → modül)
   "Aktar:": "Move to:",
   "Potansiyel müşteri yap": "Make lead",

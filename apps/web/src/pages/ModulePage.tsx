@@ -9,6 +9,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import ModuleSurface from "../components/ModuleSurface";
 import ModuleTeamPanel from "../components/ModuleTeamPanel";
 import { CoverBackLink } from "../components/EntityCover";
+import AskLioButton from "../components/AskLioButton";
 import { useT } from "../lib/i18n";
 
 /**
@@ -105,18 +106,27 @@ export default function ModulePage() {
   }
 
   return (
-    <div style={{ padding: 28, display: "flex", flexDirection: "column", gap: 18 }}>
-      {/* Geri hapı ile başlık arası 14px: 6px'te ikisi yapışık görünüyordu. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    // Üst boşluk kısa: kabuk zaten sabit üst şerit kadar (HEADER_HEIGHT) yer
+    // bırakıyor ve modüllerde kapak yok. 28 px + tek başına satır kaplayan Lio
+    // simgesi + başlığın ÜSTÜNDEKİ geri hapı birlikte çalışma alanını ~150 px
+    // aşağı itiyordu (kullanıcı geri bildirimi, 2026-10-10).
+    <div style={{ padding: "4px 28px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary, flex: 1, minWidth: 0 }}>
+            {title}
+          </h1>
+          {/* Lio simgesi başlığın yanında; ModuleSurface'e kendi satırını
+              çizmemesi söyleniyor (lioBaslikta), yoksa sayfada iki tane olurdu. */}
+          <AskLioButton subject={{ kind: "modul", title }} size={24} />
+        </div>
         {/* Uygulamanın her yerindeki geri hapı (bkz. EntityCover CoverBackLink).
             Burada kapak olmadığı için sayfa zeminine uygun "floating" hâli.
-            Önceden düz bir yazı bağlantısıydı; tek bu sayfa farklı duruyordu. */}
+            Başlığın ALTINDA: sayfayı ilk okuyan göz modülün adına çarpsın, geri
+            yolu ikincil bilgi. */}
         <div style={{ alignSelf: "flex-start" }}>
           <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} floating />
         </div>
-        {/* Lio simgesi burada DEĞİL: modülün kendi yüzeyi (ModuleSurface) onu
-            zaten çiziyor, buraya da koyarsak sayfada iki tane olurdu. */}
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary }}>{title}</h1>
         {/* Katalog açıklaması BİLEREK gösterilmiyor.
             O cümle "bu modülü açarsam ne göreceğim" sorusunu yanıtlamak için
             yazıldı; yeri modül kartı ve "Modül ekle" seçim ekranı. Sayfanın
@@ -134,6 +144,7 @@ export default function ModulePage() {
         departmentKey={department?.catalogKey}
         jobId={jobId}
         access={access}
+        lioBaslikta
       />
 
       {/* Ekip modülün altında: önce iş, sonra kim çalışıyor. Departman

@@ -41,6 +41,11 @@ export interface ModuleSurfaceProps {
   departmentKey?: string;
   jobId?: string;
   access?: ModuleAccess | null;
+  /**
+   * Lio simgesini çağıran kendi başlık satırına koyuyor (modül sayfası).
+   * Simge tek başına bir satır kaplıyordu; sayfada başlığın yanında duruyor.
+   */
+  lioBaslikta?: boolean;
 }
 
 /**
@@ -51,15 +56,17 @@ export interface ModuleSurfaceProps {
  * hepsi bu bileşenden geçiyor. Simgeyi tek tek yüzeylere koymak beşe bölünmüş
  * bir kural demekti.
  */
-export default function ModuleSurface(props: ModuleSurfaceProps) {
+export default function ModuleSurface({ lioBaslikta, ...props }: ModuleSurfaceProps) {
   // Anasayfadaki Modüller listesi son kullanılanı en üste koyuyor; beş yüzeyin
   // hepsi buradan geçtiği için işaret tek yerde (bkz. lib/sonKullanilanModul).
   useEffect(() => modulKullanildi(props.moduleKey), [props.moduleKey]);
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <AskLioButton subject={{ kind: "modul", title: props.moduleName }} size={24} />
-      </div>
+      {!lioBaslikta && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <AskLioButton subject={{ kind: "modul", title: props.moduleName }} size={24} />
+        </div>
+      )}
       <ModuleSurfaceContent {...props} />
     </div>
   );

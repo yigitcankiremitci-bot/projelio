@@ -33,7 +33,7 @@ import { ModuleMembersService } from "../module-members/module-members.service";
 import { AccessService } from "../../common/access/access.service";
 import { FilesService, type ProjectFile } from "../files/files.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
-import { AKTARIM_TANIMLARI, aktarimKaydiVerisi, aktarimTanimi, defterAktarimiYapildi } from "./aktarim";
+import { AKTARIM_TANIMLARI, aktarimKaydiVerisi, aktarimTanimi, defterAktarimiYapildi, notaEkle } from "./aktarim";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { musteriYetkisi } from "./siparis-erisim";
 import { addRole, findDuplicates } from "./party-dedup";
@@ -1025,9 +1025,19 @@ export class PartyService {
   async deftereEkle(id: string, hedef: PartyModulKey, userId: string, rol: PartyRole = "customer"): Promise<Party> {
     const existing = await this.findOne(id, { baglanti: true });
     if (existing.archivedAt) throw new BadRequestException("Arşivdeki kart başka bir deftere eklenemez");
+    // Müşteriler'e geçerken ilişki notu kartın genel notuna eklenir — satış ekibi
+    // görsün diye (kullanıcı kararı, 2026-10-10; bkz. aktarim.ts notaEkle).
+    const yeniNot = hedef === MUSTERI_MODUL_KEY ? notaEkle(existing.notes, existing.baglanti?.iliskiNotu) : undefined;
     if (existing.modules.includes(hedef)) {
       // Kart zaten o defterde (ör. müşteri), yeni rol (tedarikçi) eklenir.
       if (hedef === MUSTERI_MODUL_KEY && !existing.roles.includes(rol)) await this.addRoleTo(id, rol, userId);
+      if (yeniNot) {
+        const { error } = await this.supabase.client
+          .from("party")
+          .update({ notes: yeniNot, updated_at: new Date().toISOString() })
+          .eq("id", id);
+        if (error) throw error;
+      }
       return this.gorunur(await this.findOne(id, { baglanti: true }), await this.erisimler(existing, userId));
     }
     const scope = this.scopeOf(existing);
@@ -1044,6 +1054,7 @@ export class PartyService {
       updated_at: new Date().toISOString(),
     };
     if (hedef === MUSTERI_MODUL_KEY) patch.roles = addRole(existing.roles, rol);
+    if (yeniNot) patch.notes = yeniNot;
     const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
     if (error) throw error;
     if (hedef === BAGLANTI_MODUL_KEY) await this.baglantiYaz(id, {});

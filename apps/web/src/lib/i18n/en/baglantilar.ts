@@ -44,8 +44,6 @@ export const baglantilar: TranslationDict = {
   // ─────────────────────────────────────────────── Müşteriye dönüşüm
   "Müşteri yap": "Make customer",
   "Bağlantılara ekle": "Add to contacts",
-  "Kart Müşteriler listesinde de görünecek. İlişki notu satış ekibine açılmaz.":
-    "The card will also appear in Customers. The relationship note stays hidden from the sales team.",
   "Kart Bağlantı ve İlişkiler listesinde de görünecek.": "The card will also appear in Contacts & Relationships.",
 
   // ─────────────────────────────────────────────── Takip görevleri
@@ -133,11 +131,14 @@ export const baglantilar: TranslationDict = {
   "Potansiyel müşteri": "Lead",
   "Rakip analizinde": "In competitor analysis",
   "Ortaklıkta": "In partnerships",
-  "Kart Müşteriler listesinde potansiyel müşteri olarak görünecek.": "The card will appear in Customers as a lead.",
-  "Kart Müşteriler'de tedarikçi olarak görünecek; ürün, fatura ve tedarik ekranlarında seçilebilir.":
-    "The card will appear in Customers as a supplier and can be picked on product, invoice and procurement screens.",
-  "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.":
-    "A record will be created for this card in Competitor & Industry Analysis. The relationship note isn't copied.",
-  "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.":
-    "A record will be created for this card in Partnerships & Distribution. The relationship note isn't copied.",
+  "Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.":
+    "The card will also appear in Customers; the relationship note is added to the card's note and the sales team will see it.",
+  "Kart Müşteriler'de potansiyel müşteri olarak görünecek; ilişki notu kartın notuna eklenir.":
+    "The card will appear in Customers as a lead; the relationship note is added to the card's note.",
+  "Kart Müşteriler'de tedarikçi olarak görünecek; ilişki notu kartın notuna eklenir.":
+    "The card will appear in Customers as a supplier; the relationship note is added to the card's note.",
+  "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.":
+    "A record will be created for this card in Competitor & Industry Analysis; the relationship note goes into its note.",
+  "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.":
+    "A record will be created for this card in Partnerships & Distribution; the relationship note goes into its note.",
 };

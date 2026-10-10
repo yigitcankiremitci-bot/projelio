@@ -183,6 +183,8 @@ export const competitorConfig: ModuleRecordConfig = {
     },
     { key: "threatLevel", label: "Tehdit seviyesi", type: "select", defaultValue: "medium", options: opts(THREAT_LEVEL) },
     { key: "lastReviewDate", label: "Son inceleme", type: "date" },
+    // Bağlantı ve İlişkiler'den aktarılan kartın ilişki notu buraya gelir.
+    NOTES_FIELD,
   ],
   summary: (d) => `${d.competitorName ?? ""}${d.segment ? ` · ${d.segment}` : ""}`,
   detail: (d) =>

@@ -11,8 +11,10 @@ import { MUSTERI_MODUL_KEY, type Party, type PartyAktarimHedefi, type PartyRole 
  *  - Rakip → Rakip ve Sektör Analizi'nde bir kayıt (module_records).
  *  - İşbirliği / bayi → Ortaklık ve Dağıtım'da bir kayıt.
  *
- * İlişki notu HİÇBİR hedefe kopyalanmaz: yalnızca Bağlantılar'ın yetkisiyle
- * görülür (party_baglanti) ve rakip analizi pazarlama ekibine açık.
+ * İlişki notu AKTARILIR (kullanıcı kararı, 2026-10-10): defter aktarımında
+ * kartın genel notuna eklenir, kayıt aktarımında kaydın "Not" alanına yazılır.
+ * Bilerek: not artık hedefin ekibine (satış, pazarlama) açıktır — aktarımın
+ * amacı bilgiyi o ekibe taşımak.
  */
 
 export interface AktarimTanimi {
@@ -48,6 +50,7 @@ export function aktarimKaydiVerisi(party: Party, hedef: PartyAktarimHedefi): Rec
       // Kişi kartıysa çalıştığı kurum segmentin en yakın ipucu.
       segment: party.partyType === "person" ? party.kurum : undefined,
       threatLevel: "medium",
+      notes: party.baglanti?.iliskiNotu,
       kaynakKart: party.id,
     });
   }
@@ -58,6 +61,7 @@ export function aktarimKaydiVerisi(party: Party, hedef: PartyAktarimHedefi): Rec
     contactInfo: iletisim,
     region: party.address?.city,
     status: "talking",
+    notes: party.baglanti?.iliskiNotu,
     kaynakKart: party.id,
   });
 }
@@ -69,4 +73,13 @@ function pruneBos(o: Record<string, unknown>): Record<string, unknown> {
 /** Defter aktarımı yapılmış mı: kart o defterde ve rolü taşıyor. */
 export function defterAktarimiYapildi(party: Pick<Party, "modules" | "roles">, t: AktarimTanimi): boolean {
   return party.modules.includes(t.modul as any) && party.roles.includes(t.rol);
+}
+
+/** Defter aktarımında kartın genel notu: ilişki notu, zaten yoksa sona eklenir. */
+export function notaEkle(mevcut: string | undefined, iliskiNotu: string | undefined): string | undefined {
+  const not = iliskiNotu?.trim();
+  if (!not) return undefined;
+  const eski = mevcut?.trim() ?? "";
+  if (eski.includes(not)) return undefined;
+  return eski ? `${eski}\n\n${not}` : not;
 }

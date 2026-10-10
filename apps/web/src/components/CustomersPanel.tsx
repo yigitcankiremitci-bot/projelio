@@ -1792,7 +1792,7 @@ function PartyDetail({
             <>
               <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>
                 {baglantiModu
-                  ? t("Kart Müşteriler listesinde de görünecek. İlişki notu satış ekibine açılmaz.")
+                  ? t("Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.")
                   : t("Kart Bağlantı ve İlişkiler listesinde de görünecek.")}
               </span>
               <button
@@ -2323,11 +2323,11 @@ const AKTARIM_YAPILDI: Record<PartyAktarimHedefi, string> = {
   ortaklik: "Ortaklıkta",
 };
 const AKTARIM_ACIKLAMA: Record<PartyAktarimHedefi, string> = {
-  musteri: "Kart Müşteriler listesinde de görünecek. İlişki notu satış ekibine açılmaz.",
-  potansiyel: "Kart Müşteriler listesinde potansiyel müşteri olarak görünecek.",
-  tedarikci: "Kart Müşteriler'de tedarikçi olarak görünecek; ürün, fatura ve tedarik ekranlarında seçilebilir.",
-  rakip: "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.",
-  ortaklik: "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak. İlişki notu kopyalanmaz.",
+  musteri: "Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.",
+  potansiyel: "Kart Müşteriler'de potansiyel müşteri olarak görünecek; ilişki notu kartın notuna eklenir.",
+  tedarikci: "Kart Müşteriler'de tedarikçi olarak görünecek; ilişki notu kartın notuna eklenir.",
+  rakip: "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.",
+  ortaklik: "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.",
 };
 // dil:anahtar-bitis
 

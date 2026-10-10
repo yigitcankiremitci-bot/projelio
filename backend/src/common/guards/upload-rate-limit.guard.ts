@@ -20,13 +20,23 @@ import { consumeRateLimit } from "./rate-limit.store";
  * IP değiştiren tek kullanıcıyı serbest bırakırdı. Kullanıcı yoksa (guard
  * yanlışlıkla kimliksiz bir uca takılırsa) IP'ye düşülür.
  *
- * SINIR NEDEN BU DEĞER. 30 yükleme / 5 dakika, elle çalışan bir insan için
- * fazlasıyla geniş (dosya modülünden toplu yükleme yapan kullanıcı bile bu
- * hızda gitmez), ama otomatik bir döngüyü anında durdurur.
+ * SINIR NEDEN BU DEĞER. İlk değer 30 yükleme / 5 dakikaydı ve "elle çalışan
+ * bir insan bu hıza çıkmaz" varsayımına dayanıyordu. Yanlış çıktı: ay sonunda
+ * 30 civarı fatura/fişi tek seferde sürükleyen kullanıcı sınıra takıldı
+ * (2026-10). Toplu seçimde her dosya AYRI bir istek ve sayaç tüm yükleme
+ * uçlarında ortak; tek seferde yüzlerce fiş de yüklenebiliyor. 1000 / 5 dakika
+ * gerçekçi hiçbir toplu yüklemeye takılmaz (sıralı yüklemede küçük bir fiş bile
+ * ~0,3 sn sürüyor, 5 dakikaya ancak bu kadarı sığar), ama sınırsız bir döngüyü
+ * yine keser. Sürükle-bırakta klasör ağacı zaten 500 dosyayla kesiliyor
+ * (bkz. lib/dropFiles.ts MAX_FILES).
+ *
+ * Bellek açısından bu yükseltme güvenli: istemcideki yükleme yolları
+ * (uploadQueue, KayitEkleri, LioYardimiKutusu) dosyaları SIRAYLA gönderiyor,
+ * yani istek sayısı artsa da aynı anda RAM'de tutulan dosya sayısı artmıyor.
  */
 @Injectable()
 export class UploadRateLimitGuard implements CanActivate {
-  private readonly limit = 30;
+  private readonly limit = 1000;
   private readonly windowMs = 5 * 60_000;
 
   canActivate(context: ExecutionContext): boolean {

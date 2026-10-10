@@ -231,6 +231,8 @@ export const sosyal: TranslationDict = {
   "Instagram'ı bağla": "Connect Instagram",
   "Başka bir Instagram hesabı bağla": "Connect another Instagram account",
   "Projelio'da {n} içerik": "{n} in Projelio",
+  "Instagram'a otomatik yayında karusel en fazla {max} medya alabilir (uygulamada 20 olsa da Instagram'ın yayın API'si {max} kabul ediyor). Bu içerikte {n} medya var: fazlasını çıkarın ya da ikinci bir gönderiye bölün.":
+    "Automatic Instagram publishing allows at most {max} items per carousel (the app allows 20, but Instagram's publishing API accepts {max}). This post has {n}: remove the extras or split it into a second post.",
   "Instagram giriş ekranında bağlamak istediğiniz hesapla oturum açın.":
     "On the Instagram sign-in screen, log in with the account you want to connect.",
   "Instagram hesabınızı bağlayın — planladığınız içerikler saati gelince kendiliğinden yayımlansın.":

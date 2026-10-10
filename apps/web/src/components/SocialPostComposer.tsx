@@ -10,7 +10,7 @@ import type {
   SocialPublishVia,
   SocialTrialReel,
 } from "@projelio/shared";
-import { normalizeSocialHandle } from "@projelio/shared";
+import { MAX_INSTAGRAM_CAROUSEL, normalizeSocialHandle } from "@projelio/shared";
 import type { ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import { openGooglePicker } from "../lib/googlePicker";
@@ -583,6 +583,16 @@ export default function SocialPostComposer({
   const denemeUyarisi =
     form.trialReel && media.length > 0 && (media.length !== 1 || !videoVar)
       ? t("Deneme reels tek bir video ister; bu içerikte {n} medya var.", { n: media.length })
+      : "";
+  // Instagram'ın yayın API'si karuselde 10 medya alıyor (uygulamada 20); sınır
+  // aşılırsa hata yayın saatinde çıkıyordu. Sunucu planlamayı da reddeder
+  // (social-media.service > karuselSiniriniDenetle); burada erken uyarı.
+  const karuselUyarisi =
+    instagramSecili && form.publishVia !== "external" && media.length > MAX_INSTAGRAM_CAROUSEL
+      ? t(
+          "Instagram'a otomatik yayında karusel en fazla {max} medya alabilir (uygulamada 20 olsa da Instagram'ın yayın API'si {max} kabul ediyor). Bu içerikte {n} medya var: fazlasını çıkarın ya da ikinci bir gönderiye bölün.",
+          { max: MAX_INSTAGRAM_CAROUSEL, n: media.length }
+        )
       : "";
   const ikincilDugme = {
     display: "flex",
@@ -1378,6 +1388,7 @@ export default function SocialPostComposer({
           </div>
         )}
 
+        {karuselUyarisi && <span style={{ fontSize: 12, color: c.danger }}>{karuselUyarisi}</span>}
         {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
         {notice && <span style={{ fontSize: 12, color: c.success }}>{notice}</span>}
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { normalizeSocialHandle } from "./sosyalHesap";
+import { instagramKaruselHatasi, normalizeSocialHandle } from "./sosyalHesap";
 
 describe("sosyal kullanıcı adı", () => {
   test("@, profil adresi ve büyük harf aynı hesaba çözülür", () => {
@@ -18,4 +18,10 @@ describe("sosyal kullanıcı adı", () => {
     assert.equal(normalizeSocialHandle("  @ "), "");
     assert.equal(normalizeSocialHandle(null), "");
   });
+});
+
+test("instagramKaruselHatasi: 10'a kadar sorun yok, 11'de uyarır", () => {
+  assert.equal(instagramKaruselHatasi(10), null);
+  assert.equal(instagramKaruselHatasi(0), null);
+  assert.match(instagramKaruselHatasi(20) ?? "", /en fazla 10 medya.*20 medya var/);
 });

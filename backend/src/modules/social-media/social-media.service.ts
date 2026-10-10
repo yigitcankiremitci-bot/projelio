@@ -8,6 +8,7 @@ import type {
   SocialPostMedia,
   SocialPostTarget,
 } from "@projelio/shared";
+import { instagramKaruselHatasi } from "@projelio/shared";
 import { requireSafeUrl } from "../../common/safe-url";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
@@ -694,6 +695,7 @@ export class SocialMediaService {
       const hesapSayisi = input.accountIds ? input.accountIds.length : await this.hedefSayisi(id);
       const planHatasi = hesapsizPlanHatasi(sonDurum, sonYol, hesapSayisi);
       if (planHatasi) throw new BadRequestException(planHatasi);
+      await this.karuselSiniriniDenetle(id, 0, input.accountIds);
     }
 
     if (input.status !== undefined) {
@@ -899,6 +901,41 @@ export class SocialMediaService {
     if (insError) throw insError;
   }
 
+  /**
+   * Instagram karusel sınırı (bkz. MAX_INSTAGRAM_CAROUSEL) — planlarken.
+   *
+   * Yalnızca Instagram hedefi olan gönderide: başka kanallara (ya da elle
+   * yayına) giden içerikte 10'dan fazla medya meşru olabilir. `ek`, henüz
+   * eklenmekte olan medya; `hesapIds` verilirse hedefler kayıttaki değil o liste.
+   */
+  private async karuselSiniriniDenetle(postId: string, ek: number, hesapIds?: string[]): Promise<void> {
+    let hesaplar = hesapIds;
+    if (!hesaplar) {
+      const { data, error } = await this.supabase.client
+        .from("social_post_targets")
+        .select("account_id")
+        .eq("post_id", postId);
+      if (error) throw error;
+      hesaplar = (data ?? []).map((r: any) => r.account_id);
+    }
+    if (hesaplar.length === 0) return;
+    const { count: igSayisi, error: igHata } = await this.supabase.client
+      .from("social_accounts")
+      .select("id", { count: "exact", head: true })
+      .in("id", hesaplar)
+      .eq("platform", "instagram");
+    if (igHata) throw igHata;
+    if (!igSayisi) return;
+
+    const { count, error } = await this.supabase.client
+      .from("social_post_media")
+      .select("id", { count: "exact", head: true })
+      .eq("post_id", postId);
+    if (error) throw error;
+    const hata = instagramKaruselHatasi((count ?? 0) + ek);
+    if (hata) throw new BadRequestException(hata);
+  }
+
   private async hedefSayisi(postId: string): Promise<number> {
     const { count, error } = await this.supabase.client
       .from("social_post_targets")
@@ -1001,6 +1038,12 @@ export class SocialMediaService {
       .order("sort_order", { ascending: false })
       .limit(1);
     const nextOrder = ((last?.[0]?.sort_order as number) ?? -1) + 1;
+
+    // Planlanmış (Projelio'nun yayımlayacağı) bir Instagram gönderisine 11.
+    // medya eklenemez: yoksa hata ancak yayın saatinde çıkıyordu.
+    if (post.status === "scheduled" && post.publish_via !== "external") {
+      await this.karuselSiniriniDenetle(postId, 1);
+    }
 
     const { error } = await this.supabase.client.from("social_post_media").upsert(
       {

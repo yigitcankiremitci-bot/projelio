@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { instagramKaruselHatasi, MAX_INSTAGRAM_CAROUSEL } from "@projelio/shared";
 import { Injectable, Logger } from "@nestjs/common";
 import { SupabaseService } from "../../database/supabase.service";
 import { FilesService } from "../files/files.service";
@@ -36,8 +37,8 @@ const PUBLISH_BUCKET = "social-publish";
  */
 const MAX_VIDEO_BYTES = 300 * 1024 * 1024;
 
-/** Instagram tek gönderide en fazla 10 medya kabul ediyor. */
-const MAX_CAROUSEL_ITEMS = 10;
+/** Yayın API'sinin karusel sınırı — tek kaynak ortak pakette (bkz. MAX_INSTAGRAM_CAROUSEL). */
+const MAX_CAROUSEL_ITEMS = MAX_INSTAGRAM_CAROUSEL;
 
 /** Metin sınırı; aşan gönderi Meta tarafında sessizce kırpılır. */
 const MAX_CAPTION = 2200;
@@ -133,7 +134,7 @@ export class InstagramPublishService {
           throw new PublishError("Instagram gönderisi en az bir görsel ya da video ister.", true);
         }
         if (params.mediaFileIds.length > MAX_CAROUSEL_ITEMS) {
-          throw new PublishError(`Instagram tek gönderide en fazla ${MAX_CAROUSEL_ITEMS} medya kabul ediyor.`, true);
+          throw new PublishError(instagramKaruselHatasi(params.mediaFileIds.length)!, true);
         }
 
         await this.assertWithinRateLimit(params.externalAccountId, token.accessToken);

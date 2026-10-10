@@ -63,6 +63,7 @@ import { ORG_RECEIVABLE_MODULE_KEY } from "../budget/sirket-defteri";
 import { addRole, normalizeName } from "../party/party-dedup";
 import { kartvizitPlani, type OkunanKisi, type PlanKisisi } from "../party/kartvizit-plani";
 import { kartviziKirp } from "../party/kartvizit-kirp";
+import { DriveNotConnectedError } from "../google/google-accounts.service";
 import { qrCoz } from "../party/qr-coz";
 import { kartvizitBaglantisiniCoz } from "../party/qr-baglanti";
 import { kartvizitMetniCoz, kartvizitMetniMi } from "../party/vcard";
@@ -6673,8 +6674,13 @@ export class AiAssistantService {
     const uyarilar: string[] = [];
     const kullanilanMedya = new Set<string>();
 
+    // Drive/OneDrive bağlı değilse görsel saklanamaz — bu bir hata değil, yeni
+    // kullanıcının olağan durumu: bilgiler kaydedilir, görsel denemesi ilk
+    // seferde bırakılır (her kart için aynı uyarı yığılmasın), Lio bir kez söyler.
+    let depoYok = false;
     const kartvizitEkle = async (partyId: string, kaynaklar: { dosya: string; kirpma?: any }[], ad: string) => {
       for (const v of kaynaklar) {
+        if (depoYok) return;
         // Taslaktaki kopya: sohbetteki dosya taslak hazırlanınca bırakıldı.
         const g = gorseller[v.dosya] ?? this.kartvizitGorseli(userId, v.dosya);
         if (!g) {
@@ -6700,6 +6706,10 @@ export class AiAssistantService {
           );
           if (v.dosya.startsWith("med_")) kullanilanMedya.add(v.dosya);
         } catch (err) {
+          if (err instanceof DriveNotConnectedError) {
+            depoYok = true;
+            return;
+          }
           uyarilar.push(`${ad}: kartvizit dosyası eklenemedi (${(err as Error).message})`);
         }
       }
@@ -6779,7 +6789,23 @@ export class AiAssistantService {
     // Kartvizit olarak kullanılan WhatsApp fotoğrafları sosyal medya deposundan
     // çıkar: yoksa Lio her turda "gönderilmemiş fotoğrafın var" diye hatırlatırdı.
     if (kullanilanMedya.size) gelenMedya.birak(userId, [...kullanilanMedya]);
-    return { acilanKart: acilan.length, eklenenKisi: eklenen.length, acilan, eklenen, atlanan, uyarilar };
+    return {
+      acilanKart: acilan.length,
+      eklenenKisi: eklenen.length,
+      acilan,
+      eklenen,
+      atlanan,
+      uyarilar,
+      ...(depoYok
+        ? {
+            kartvizitGorseliSaklanmadi: true,
+            not:
+              "Bilgiler kaydedildi ama Google Drive / OneDrive bağlı olmadığı için kartvizit görselleri SAKLANMADI. " +
+              "Kullanıcıya bunu bir kez, tek cümleyle söyle: Ayarlar > Bağlı hesaplar'dan Drive ya da OneDrive bağlarsa " +
+              "sonraki kartvizitler kartlara dosya olarak eklenir. Tekrar sorma, ısrar etme.",
+          }
+        : {}),
+    };
   }
 
   private async customerScope(

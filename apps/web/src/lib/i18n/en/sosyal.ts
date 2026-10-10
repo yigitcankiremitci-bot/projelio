@@ -230,6 +230,7 @@ export const sosyal: TranslationDict = {
   "Instagram'a bağla": "Connect to Instagram",
   "Instagram'ı bağla": "Connect Instagram",
   "Başka bir Instagram hesabı bağla": "Connect another Instagram account",
+  "Projelio'da {n} içerik": "{n} in Projelio",
   "Instagram giriş ekranında bağlamak istediğiniz hesapla oturum açın.":
     "On the Instagram sign-in screen, log in with the account you want to connect.",
   "Instagram hesabınızı bağlayın — planladığınız içerikler saati gelince kendiliğinden yayımlansın.":

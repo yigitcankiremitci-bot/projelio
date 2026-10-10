@@ -365,16 +365,27 @@ export class InstagramInsightsService {
    */
   private async profiliTazele(accountId: string, accessToken: string): Promise<void> {
     const yanit = await this.getJson(
-      `me?${new URLSearchParams({ fields: "username,profile_picture_url", access_token: accessToken })}`
+      `me?${new URLSearchParams({ fields: "username,profile_picture_url,followers_count,media_count", access_token: accessToken })}`
     );
     if (!yanit.ok) return;
-    const j = yanit.json as { username?: string; profile_picture_url?: string };
+    const j = yanit.json as {
+      username?: string;
+      profile_picture_url?: string;
+      followers_count?: number;
+      media_count?: number;
+    };
     const patch: Record<string, unknown> = { avatar_url: j.profile_picture_url ?? null };
     if (j.username) {
       patch.handle = j.username;
       patch.profile_url = `https://instagram.com/${j.username}`;
     }
+    if (typeof j.followers_count === "number") patch.follower_count = j.followers_count;
     await this.hesabiGuncelle(accountId, patch);
+    // Ayrı yazılıyor: migration 159 uygulanmamışsa yalnızca bu yazım düşsün,
+    // fotoğraf ve takipçi tazelemesi onunla birlikte gitmesin.
+    if (typeof j.media_count === "number") {
+      await this.hesabiGuncelle(accountId, { media_count: j.media_count });
+    }
   }
 
   /** Hesabın günlük takipçi/gönderi sayısı (günde tek satır, üzerine yazar). */

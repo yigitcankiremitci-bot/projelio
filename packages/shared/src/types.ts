@@ -3058,6 +3058,8 @@ export interface SocialAccount {
   profileUrl?: string;
   avatarUrl?: string;
   followerCount?: number;
+  /** Bağlı hesabın platformdaki gerçek gönderi sayısı (senkronla gelir; elle yönetilende boş). */
+  mediaCount?: number;
   /** Kitle tanımı — "25-34, İstanbul, kahve meraklısı". */
   audienceNote?: string;
   /** Marka sesi: bu hesapta nasıl konuşuluyor. */

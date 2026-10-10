@@ -145,6 +145,7 @@ function mapAccount(row: any, ownerName?: string): SocialAccount {
     profileUrl: row.profile_url ?? undefined,
     avatarUrl: row.avatar_url ?? undefined,
     followerCount: row.follower_count ?? undefined,
+    mediaCount: row.media_count ?? undefined,
     audienceNote: row.audience_note ?? undefined,
     toneNote: row.tone_note ?? undefined,
     postingFrequency: row.posting_frequency ?? undefined,

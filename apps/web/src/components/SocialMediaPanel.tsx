@@ -79,6 +79,28 @@ type View = "calendar" | "accounts" | "analysis";
  *
  * Veri kendi tablolarında (bkz. 054_social_media.sql), tek istekte gelir.
  */
+/**
+ * Hesabın profil fotoğrafı; yoksa ya da açılmazsa platformun kısaltması.
+ *
+ * Instagram'ın verdiği adres imzalı ve birkaç günde düşüyor — senkron tazeleyene
+ * kadar kırık görsel yerine kısaltma görünsün.
+ */
+function HesapGorseli({ url, yedek }: { url?: string; yedek: string }) {
+  const [kirik, setKirik] = useState(false);
+  useEffect(() => setKirik(false), [url]);
+  const guvenli = url ? safeExternalUrl(url) : null;
+  if (!guvenli || kirik) return <>{yedek}</>;
+  return (
+    <img
+      src={guvenli}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setKirik(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+}
+
 export default function SocialMediaPanel({ organizationId, departmentId, jobId, canWrite = true }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -1080,8 +1102,22 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
   };
 
   // ============================================================ Hesaplar
+  // Satırdaki eylemler düz metin gibi duruyordu; tıklanabilir oldukları
+  // anlaşılmıyordu (kullanıcı geri bildirimi, 2026-10-10).
+  const kucukButon = (renk: string): CSSProperties => ({
+    fontSize: 11,
+    padding: "3px 10px",
+    background: c.background,
+    border: `1px solid ${c.border}`,
+    borderRadius: 6,
+    cursor: "pointer",
+    color: renk,
+  });
+
   const accountList = () => (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 720 }}>
+    // Tam genişlik: 720 px'lik tavan geniş ekranda satırları sayfanın yarısında
+    // bırakıyordu.
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
       {accounts.length === 0 && (
         <span style={{ fontSize: 13, color: c.textSecondary }}>
           {t("Henüz hesap eklenmedi. İçerik planlamadan önce en az bir kanal ekleyin.")}
@@ -1184,9 +1220,10 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               fontSize: 13,
               fontWeight: 600,
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
-            {t(SOCIAL_PLATFORMS[a.platform].label).slice(0, 2)}
+            <HesapGorseli url={a.avatarUrl} yedek={t(SOCIAL_PLATFORMS[a.platform].label).slice(0, 2)} />
           </span>
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
@@ -1206,9 +1243,19 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                   : null,
                 a.postingFrequency,
                 a.ownerName ? t("Sorumlu: {kisi}", { kisi: a.ownerName }) : null,
-                t("{n} içerik", {
-                  n: posts.filter((p) => p.targets.some((hedef) => hedef.accountId === a.id)).length,
-                }),
+                // Bağlı hesapta platformdaki GERÇEK gönderi sayısı; Projelio'da
+                // planlananlar ayrıca. Eskiden yalnızca ikincisi sayılıyordu ve
+                // yüzlerce gönderili hesap "0 içerik" görünüyordu.
+                ...(() => {
+                  const projelioda = posts.filter((p) => p.targets.some((hedef) => hedef.accountId === a.id)).length;
+                  if (a.connectionStatus === "connected" && typeof a.mediaCount === "number") {
+                    return [
+                      t("{n} gönderi", { n: a.mediaCount.toLocaleString(bicimDili()) }),
+                      projelioda > 0 ? t("Projelio'da {n} içerik", { n: projelioda }) : null,
+                    ];
+                  }
+                  return [t("{n} içerik", { n: projelioda })];
+                })(),
               ]
                 .filter(Boolean)
                 .join(" · ")}
@@ -1243,31 +1290,14 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
               {/* Şifreler herkese görünür bir düğme ama içerik yetkiye bağlı:
                   modülü okuyabilen "kayıt var mı" görür, şifreyi yalnızca
                   yönetici, giren kişi ve izinliler açabilir. */}
-              <button
-                onClick={() => setCredentialsFor(a)}
-                style={{
-                  fontSize: 11,
-                  background: "transparent",
-                  border: "none",
-                  padding: 0,
-                  cursor: "pointer",
-                  color: c.textSecondary,
-                }}
-              >
+              <button onClick={() => setCredentialsFor(a)} style={kucukButon(c.textPrimary)}>
                 {t("Giriş bilgileri")}
               </button>
 
               {canWrite && igConfigured && a.platform === "instagram" && (
                 <button
                   onClick={() => (a.connectionStatus === "connected" ? disconnectInstagram(a) : connectInstagram())}
-                  style={{
-                    fontSize: 11,
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
-                    color: a.connectionStatus === "connected" ? c.textSecondary : c.primary,
-                  }}
+                  style={kucukButon(a.connectionStatus === "connected" ? c.textSecondary : c.primary)}
                 >
                   {a.connectionStatus === "connected" ? t("Bağlantıyı kes") : t("Instagram'a bağla")}
                 </button>

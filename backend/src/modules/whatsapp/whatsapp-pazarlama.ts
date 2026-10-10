@@ -71,7 +71,7 @@ export function redMi(gelen: string): boolean {
   return KESIN_RED.some((k) => (t + " ").includes(k));
 }
 
-/** 1. soruya (ne için kullanacaksınız) cevabı. */
+/** 2. soruya (tek başına mı, ekiple mi) cevabı. */
 export function segmentCoz(gelen: string): Segment {
   const t = fold(gelen);
   if (/^1\b/.test(t) || /(bireysel|freelance|serbest|kendi işim|kendi isim|tek başıma|tek basima)/.test(t)) return "bireysel";
@@ -80,7 +80,7 @@ export function segmentCoz(gelen: string): Segment {
   return "belirsiz";
 }
 
-/** 2. soruya (en çok neye zaman kaybediyorsunuz) cevabı. */
+/** 1. soruya (sizi en çok ne yoruyor) cevabı. */
 export function ilgiCoz(gelen: string): Ilgi {
   const t = fold(gelen);
   if (/^1\b/.test(t) || /(görev|gorev|proje|takip|ekip|iş planı|is plani|planlama)/.test(t)) return "gorev";
@@ -108,32 +108,48 @@ const KOD_TALIMATI =
   "Üye olduktan sonra Ayarlar › Bağlı hesaplar bölümünden aldığınız PROJELIO-XXXX kodunu bu sohbete yazın; sizin için çalışmaya hemen başlayayım.";
 
 export const PAZARLAMA_METINLERI = {
+  // İlk mesaj bilerek uzun: kişi "Projelio'yu tanımak istiyorum" diye yazdı,
+  // tek cümle + soru ona bir şey anlatmıyordu. Önce ne yaptığımızı anlatır,
+  // sonra soruyu ÜRÜNE değil kişinin derdine sorarız — devamı o cevaba göre şekillenir.
+  // Yetenekler madde madde: WhatsApp'ta tek büyük paragraf okunmuyordu.
   tanitim:
-    "Merhaba, ben Lio. Projelio'nun yapay zekâ asistanıyım; görevlerinizi, ekibinizi, müşteri ve tahsilat takibinizi tek yerden yönetmenize yardım ediyorum. " +
-    "Size doğru şeyi anlatabilmem için bir soru: Projelio'yu daha çok ne için düşünüyorsunuz?\n" +
-    "1 - Kendi işim (bireysel)\n2 - Şirket ya da ekip\n3 - Sadece merak ettim",
-  ilgiSorusu: (segment: Segment): string => {
-    const giris =
-      segment === "bireysel"
-        ? "Tek başına çalışanlar için Projelio, işleri ve müşterileri kafada değil düzenli bir yerde tutmayı sağlıyor."
-        : segment === "ekip"
-          ? "Ekipler için Projelio, kimin neyi yaptığını ve paranın nereye gittiğini tek ekranda gösteriyor."
-          : "Projelio iş, ekip, müşteri ve bütçe takibini tek uygulamada topluyor.";
+    "Projelio, proje tabanlı iş yönetim uygulamasıdır. Ben de yapay zekâ ajanı Lio'yum. Sizin için yapabileceklerim özetle:\n\n" +
+    "• İşlerinizi proje ve görevlere bölüp kimin neyi ne zamana yapacağını planlar, yaklaşan teslimleri hatırlatırım.\n" +
+    "• Müşterilerinizi, siparişlerinizi ve ay ay tahsilatlarınızı takip ederim; faturanın fotoğrafını gönderdiğinizde okuyup kaydını açarım.\n" +
+    "• Gelir ve giderlerinizi proje, departman ve şirket bazında tek bir kasada toplar, paranın nereye gittiğini gösteririm.\n" +
+    "• Instagram paylaşımlarınızı planlar, videonuza bakıp açıklama ve etiket önerir, gönderilerinizin performansını çıkarırım.\n" +
+    "• Fuarda aldığınız kartvizitin fotoğrafını atmanız yeterli; kişiyi kaydeder, sonraki teması zamanında hatırlatırım.\n" +
+    "• Dosyalarınızı kendi Google Drive ya da OneDrive hesabınızda, işe göre düzenlenmiş klasörlerde tutar, ekibinizle paylaşırım.\n\n" +
+    "Bunların hepsini uygulamadan ya da doğrudan buradan, WhatsApp'tan bana yazarak yaptırabilirsiniz.\n\n" +
+    "Size en doğru yerden başlamak için birkaç kısa soru sormak istiyorum. Şu an işinizde sizi en çok ne yoruyor ya da zaman kaybettiriyor?\n" +
+    "1 - İşlerin ve ekibin takibi (kim ne yapıyor, ne gecikti)\n" +
+    "2 - Müşteri, tahsilat ve fatura\n" +
+    "3 - Sosyal medya paylaşımları\n" +
+    "4 - Başka bir şey (kısaca yazabilirsiniz)",
+  /** 1. cevaba: derde göre kısa bir çözüm anlatımı + 2. soru (nasıl çalışıyorsunuz). */
+  cozumVeSoru: (ilgi: Ilgi): string => {
+    const cozum =
+      ilgi === "gorev"
+        ? "Bu en sık duyduğum dert. Projelio'da her iş bir projeye, her görev bir sorumluya ve bitiş tarihine bağlanır; geciken ne varsa öne çıkar ve ilgili kişiye ben hatırlatırım."
+        : ilgi === "musteri"
+          ? "Para takibi dağıldığında en çok kaybettiren konu oluyor. Müşteri başına siparişi ve vadesini girersiniz, her tahsilat kasaya kendiliğinden işlenir; kimin ne kadar borcu kaldığını tek ekranda görürsünüz. Faturanın fotoğrafını atarsanız kaydı ben açarım."
+          : ilgi === "sosyal"
+            ? "Düzenli paylaşım yapmak gerçekten vakit alıyor. Videonuzu ya da fotoğrafınızı bana gönderirsiniz, açıklama ve etiket önerisini ben hazırlarım; onayınızla Instagram'a planlanır, sonra hangi gönderinin iyi gittiğini gösteririm."
+            : "Anlattığınız için teşekkürler. Projelio esnek bir yapıda: işi proje ve görevlere bölmekten müşteri, bütçe ve dosya takibine kadar ihtiyacınıza göre şekillenir.";
     return (
-      `${giris}\nEn çok hangisi zamanınızı alıyor?\n` +
-      "1 - Görev ve ekip takibi\n2 - Müşteri, tahsilat ve fatura\n3 - Sosyal medya paylaşımları\n4 - Başka bir şey"
+      `${cozum}\n\nPeki bu işi nasıl yürütüyorsunuz?\n` +
+      "1 - Tek başıma (serbest / kendi işim)\n2 - Bir ekip ya da şirketle\n3 - Henüz bakıyorum, merak ettim"
     );
   },
-  oneri: (ilgi: Ilgi, kayitUrl: string): string => {
-    const konu =
-      ilgi === "gorev"
-        ? "Görevleri, projeleri ve ekibi tek yerden izleyebilir; ben de hatırlatma ve planlamada yardım ederim."
-        : ilgi === "musteri"
-          ? "Müşteri siparişlerini, ay ay tahsilatları ve faturaları takip edebilir; belgeyi okuyup kaydı ben açabilirim."
-          : ilgi === "sosyal"
-            ? "Paylaşımlarınızı planlayıp yayınlayabilir; açıklama ve etiket önerisini ben hazırlayabilirim."
-            : "Ne aradığınızı bilmek isterim ama en kolayı bir bakmak: Projelio'nun neler yaptığını kendiniz görebilirsiniz.";
-    return `${konu}\n\nÜye olmak için: ${kayitUrl}\n${KOD_TALIMATI}`;
+  /** 2. cevaba: çalışma biçimine göre başlangıç önerisi + kayıt bağlantısı. */
+  oneri: (segment: Segment, kayitUrl: string): string => {
+    const baslangic =
+      segment === "bireysel"
+        ? "Tek başına çalışanlar için en hızlı başlangıç: hesabınızı açın, ilk işinizi ekleyin; gerisini birlikte adım adım kurarız."
+        : segment === "ekip"
+          ? "Ekipler için önerim: hesabı siz açın, şirketinizi oluşturup ekibinizi davet edin; kimin neyi yaptığını ilk günden tek ekranda görürsünüz. Ekip arkadaşlarınızın hesaplarını sizin yerinize ben de açabilirim."
+          : "Bakmanın en kolay yolu kendiniz denemek: hesap açmak birkaç dakika sürüyor, bana sorduğunuz her şeyi uygulamanın içinde gösterebilirim.";
+    return `${baslangic}\n\nÜye olmak için: ${kayitUrl}\n${KOD_TALIMATI}`;
   },
   // Adım 3+: konuşma sürüyorsa serbest metne girilmez, kısa şablon döner.
   hatirlatma: (kayitUrl: string, sira: number): string => {
@@ -151,9 +167,9 @@ export const PAZARLAMA_METINLERI = {
 
 /**
  * Akış:
- *  0: tanıtım + 1. soru
- *  1: 1. cevabı → ilgi sorusu (2. soru)
- *  2: 2. cevabı → öneri + kayıt bağlantısı + kod talimatı
+ *  0: uzun tanıtım + 1. soru (sizi en çok ne yoruyor — derde odaklı)
+ *  1: 1. cevabı → o derde çözüm anlatımı + 2. soru (tek başına mı, ekiple mi)
+ *  2: 2. cevabı → çalışma biçimine göre öneri + kayıt bağlantısı + kod talimatı
  *  3..max-2: kısa hatırlatma şablonları (konuşma uzasa da serbest metne girilmez)
  *  max-1: kapanış; sonrası sessizlik
  * Kesin ret gelirse (her adımda) tek bir veda mesajı, sonra sessizlik.
@@ -171,9 +187,9 @@ export function decidePazarlama(cfg: PazarlamaConfig, girdi: PazarlamaGirdi): Pa
     case 0:
       return { reply: PAZARLAMA_METINLERI.tanitim };
     case 1:
-      return { reply: PAZARLAMA_METINLERI.ilgiSorusu(segmentCoz(gelen)) };
+      return { reply: PAZARLAMA_METINLERI.cozumVeSoru(ilgiCoz(gelen)) };
     case 2:
-      return { reply: PAZARLAMA_METINLERI.oneri(ilgiCoz(gelen), kayitUrl) };
+      return { reply: PAZARLAMA_METINLERI.oneri(segmentCoz(gelen), kayitUrl) };
     default:
       return { reply: PAZARLAMA_METINLERI.hatirlatma(kayitUrl, gidenSayisi - 3) };
   }

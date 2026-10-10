@@ -48,12 +48,20 @@ describe("sınıflama", () => {
 });
 
 describe("akış", () => {
-  test("adım adım: tanıtım → soru → öneri+link", () => {
-    const a = adim("merhaba", 0);
-    assert.match(a.reply ?? "", /Ben Lio|ben Lio/);
-    assert.match(a.reply ?? "", /1 - /);
-    assert.match(adim("2", 1).reply ?? "", /zamanınızı/);
+  test("adım adım: uzun tanıtım + dert sorusu → çözüm + soru → öneri+link", () => {
+    const a = adim("Projelio'yu tanımak istiyorum", 0).reply ?? "";
+    assert.ok(a.startsWith("Projelio, proje tabanlı iş yönetim uygulamasıdır."));
+    assert.match(a, /Sizin için yapabileceklerim özetle:/);
+    assert.match(a, /en çok ne yoruyor/);
+    assert.match(a, /1 - /);
+    // Yetenekler paragraf değil madde listesi.
+    const madde = a.split("\n").filter((x) => x.startsWith("• ")).length;
+    assert.ok(madde >= 5 && madde <= 8, String(madde));
+    const b = adim("2", 1).reply ?? "";
+    assert.match(b, /tahsilat/);
+    assert.match(b, /nasıl yürütüyorsunuz/);
     const c = adim("2", 2).reply ?? "";
+    assert.match(c, /Ekipler için/);
     assert.ok(c.includes(URL));
     assert.ok(c.includes("PROJELIO-XXXX"));
   });

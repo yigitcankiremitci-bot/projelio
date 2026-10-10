@@ -34,6 +34,25 @@ interface Props {
   ilkSekme?: AltSekme;
 }
 
+/**
+ * Instagram'ın profil fotoğrafı adresi imzalı ve birkaç günde düşüyor; gece işi
+ * tazeleyene kadar kırık görsel yerine baş harf görünsün.
+ */
+function HesapAvatari({ url, handle }: { url?: string; handle: string }) {
+  const [kirik, setKirik] = useState(false);
+  useEffect(() => setKirik(false), [url]);
+  if (!url || kirik) return <>{handle.slice(0, 1).toUpperCase()}</>;
+  return (
+    <img
+      src={url}
+      alt=""
+      referrerPolicy="no-referrer"
+      onError={() => setKirik(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+}
+
 export type AltSekme = "gonderiler" | "ilerleyis" | "rakipler" | "ilham" | "fikirler";
 type Siralama = "tarih" | "kat" | "izlenme" | "kaydet";
 
@@ -249,11 +268,7 @@ export default function IcerikAnaliziPanel({
                   fontWeight: 700,
                 }}
               >
-                {h.avatarUrl ? (
-                  <img src={h.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  h.handle.slice(0, 1).toUpperCase()
-                )}
+                <HesapAvatari url={h.avatarUrl} handle={h.handle} />
               </span>
               <span style={{ fontWeight: 600, fontSize: 13, color: c.textPrimary }}>@{h.handle}</span>
               {typeof h.followerCount === "number" && (

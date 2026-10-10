@@ -194,6 +194,7 @@ export class InstagramInsightsService {
       return { medya: 0, metrik: 0, hata: liste.hata };
     }
     await this.medyalariYaz(accountId, liste.medya);
+    await this.profiliTazele(accountId, token.accessToken).catch(() => undefined);
 
     // 2) Metrikler — izin yoksa hiç denenmez. Bayrak kapalıysa izin
     // istenmemiştir; bilinmeyen (null) izin listesinde de denemek boşuna.
@@ -351,6 +352,29 @@ export class InstagramInsightsService {
       total_interactions: m.totalInteractions ?? null,
     });
     if (error) this.gecmisHatasi(error);
+  }
+
+  /**
+   * Profil fotoğrafı ve kullanıcı adı.
+   *
+   * NEDEN HER SENKRONDA: `profile_picture_url` Instagram CDN'inin İMZALI adresi;
+   * fotoğraf hiç değişmese bile birkaç gün içinde süresi doluyor. Adres yalnızca
+   * bağlanma anında yazıldığı için hesaplar bir süre sonra kırık görselle
+   * görünüyordu. Gece işi + "Şimdi güncelle" bu yoldan geçer. Metrik izninden
+   * bağımsız (temel izin yetiyor); düşerse senkronu etkilemez.
+   */
+  private async profiliTazele(accountId: string, accessToken: string): Promise<void> {
+    const yanit = await this.getJson(
+      `me?${new URLSearchParams({ fields: "username,profile_picture_url", access_token: accessToken })}`
+    );
+    if (!yanit.ok) return;
+    const j = yanit.json as { username?: string; profile_picture_url?: string };
+    const patch: Record<string, unknown> = { avatar_url: j.profile_picture_url ?? null };
+    if (j.username) {
+      patch.handle = j.username;
+      patch.profile_url = `https://instagram.com/${j.username}`;
+    }
+    await this.hesabiGuncelle(accountId, patch);
   }
 
   /** Hesabın günlük takipçi/gönderi sayısı (günde tek satır, üzerine yazar). */

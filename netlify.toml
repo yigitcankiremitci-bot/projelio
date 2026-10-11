@@ -14,8 +14,13 @@
   # edip önceki yayını olduğu gibi bırakıyor — yönlendirme çalışmaya devam
   # ediyor, derleme dakikası (kredi) harcanmıyor.
   # Yalnızca bu dosya değiştiğinde derlenir (git diff fark bulunca 1 döner).
-  # Eskiden "exit 0" idi: o zaman buradaki bir yönlendirme değişikliği de
-  # hiç yayına girmiyordu.
+  #
+  # ⚠️ AMA: Netlify'daki "projelio" sitesinin GitHub bağlantısı YOK (2026-10-11'de
+  # görüldü; son otomatik yayın 2026-09-01). Bu dosyayı push'lamak hiçbir şey
+  # yayınlamaz. Kurallar elle yayınlanıyor — aynı kurallar `_redirects` olarak:
+  #   npx netlify-cli deploy --dir <klasör> --prod --site f32cb546-82e9-47fc-a71d-4d6aab9b5596
+  # Ana klasörde ÇALIŞTIRMA: yerel bağlantısı başka bir siteye (budnal) ait.
+  # Kural değişirse bu dosyayı da güncelle ki iki kopya ayrışmasın.
   ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- netlify.toml"
 
   command = "mkdir -p yonlendirme && printf '%s' '<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url=https://app.projelio.app\"><title>Projelio taşındı</title><p>Projelio yeni adresine taşındı: <a href=\"https://app.projelio.app\">app.projelio.app</a>' > yonlendirme/index.html"

@@ -3,7 +3,7 @@
  * seçimi, planlama öncesi kontroller. Servisten ayrı (bkz. publish-format.ts).
  */
 
-import { yereldenUtc } from "@projelio/shared";
+import { MAX_INSTAGRAM_CAROUSEL, yereldenUtc } from "@projelio/shared";
 
 const VARSAYILAN_DILIM = process.env.TZ?.trim() || "Europe/Istanbul";
 
@@ -57,8 +57,23 @@ export function icerikTuruSec(mimeTypes: string[], istenen?: string | null): Ice
   return mimeTypes[0]?.startsWith("video/") ? "reel" : "image";
 }
 
-/** Karusel sınırı Instagram'da 10. */
-export const KARUSEL_TAVANI = 10;
+/** Instagram yayın API'sinin karusel sınırı (uygulamada 20, API'de 10) — tek kaynak ortak pakette. */
+export const KARUSEL_TAVANI = MAX_INSTAGRAM_CAROUSEL;
+
+/**
+ * Sınır aşılınca MODELE dönen açıklama: kullanıcıya ne söyleyeceği ve ne
+ * önereceği. Kuru "en çok 10 medya" cevabı modeli ya aynı çağrıyı tekrarlamaya
+ * ya da kullanıcıya "Instagram 10'a izin veriyor" demeye itiyordu — kullanıcı
+ * uygulamada 20 gördüğü için bu yanlış görünüyordu.
+ */
+export function karuselTavaniAciklamasi(gelen: number): string {
+  return (
+    `${gelen} medya var; Instagram otomatik paylaşımda bir karusele en çok ${KARUSEL_TAVANI} görsel/video alıyor ` +
+    `(uygulamadaki 20 sınırı API'de geçerli değil). Aynı çağrıyı TEKRARLAMA. Kullanıcıya bunu tek cümleyle söyle ` +
+    `ve seçenek sun: ikiye bölelim (ilk ${KARUSEL_TAVANI} + kalanı ayrı gönderi) ya da hangi ${KARUSEL_TAVANI} tanesini ` +
+    `istediğini seçsin. Cevabına göre her gönderi için ayrı taslak aç.`
+  );
+}
 
 /**
  * Planlamadan önce taslakta olması gerekenler. Boş dönerse planlanabilir;
@@ -74,6 +89,9 @@ export function planlamaEksikleri(p: {
   const e: string[] = [];
   if (p.medyaSayisi === 0) e.push("Gönderide görsel/video yok.");
   if (p.hedefSayisi === 0) e.push("Gönderinin yayımlanacağı hesap yok.");
+  if (p.medyaSayisi > KARUSEL_TAVANI) {
+    e.push(`Gönderide ${p.medyaSayisi} medya var; Instagram otomatik paylaşımda en çok ${KARUSEL_TAVANI} alıyor.`);
+  }
   if (!p.caption?.trim()) e.push("Açıklama boş.");
   if (!p.vakit) e.push("Yayın zamanı belirtilmemiş.");
   else if (p.vakit.getTime() < p.simdi.getTime() + EN_YAKIN_PLAN_MS) {

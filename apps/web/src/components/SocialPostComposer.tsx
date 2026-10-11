@@ -428,6 +428,14 @@ export default function SocialPostComposer({
   };
 
   const save = async () => {
+    // Fazla medyalı Instagram karuseli PLANLANMAZ: Meta yayın saatinde
+    // reddediyordu. Taslak olarak kaydetmek serbest (kullanıcı medyayı
+    // ayıklayacak ya da ikiye bölecek).
+    // Kuyruğa giren durumlar sunucudaki isQueueable ile aynı (publish-format.ts).
+    if (karuselUyarisi && ["scheduled", "approved", "ready"].includes(form.status)) {
+      setError(karuselUyarisi);
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -473,6 +481,10 @@ export default function SocialPostComposer({
    * geri okunur — hata varsa hangi kanalda olduğu chip'lerde görünür.
    */
   const publishNow = async () => {
+    if (karuselUyarisi) {
+      setError(karuselUyarisi);
+      return;
+    }
     setPublishing(true);
     setError("");
     setNotice("");
@@ -590,7 +602,7 @@ export default function SocialPostComposer({
   const karuselUyarisi =
     instagramSecili && form.publishVia !== "external" && media.length > MAX_INSTAGRAM_CAROUSEL
       ? t(
-          "Instagram'a otomatik yayında karusel en fazla {max} medya alabilir (uygulamada 20 olsa da Instagram'ın yayın API'si {max} kabul ediyor). Bu içerikte {n} medya var: fazlasını çıkarın ya da ikinci bir gönderiye bölün.",
+          "Instagram, otomatik paylaşımda bir karusele en fazla {max} görsel/video alıyor; uygulamadaki 20 sınırı burada geçerli değil. Bu içerikte {n} tane var: fazlasını çıkarın ya da ikinci bir gönderiye bölün. Bu hâliyle planlanamaz.",
           { max: MAX_INSTAGRAM_CAROUSEL, n: media.length }
         )
       : "";
@@ -1120,6 +1132,23 @@ export default function SocialPostComposer({
         {/* ---------------------------------------------- Medya */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {label(t("Görsel / video"))}
+          {/* Yükleme anında görünsün: 11. görsel eklendiği an kullanıcı neden
+              planlanamayacağını burada okur, yayın saatinde değil. */}
+          {karuselUyarisi && (
+            <span
+              role="alert"
+              style={{
+                fontSize: 12,
+                color: c.danger,
+                padding: "6px 10px",
+                border: `1px solid ${c.danger}`,
+                borderRadius: 8,
+                lineHeight: 1.5,
+              }}
+            >
+              {karuselUyarisi}
+            </span>
+          )}
           {media.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {media.map((m) => (
@@ -1388,7 +1417,6 @@ export default function SocialPostComposer({
           </div>
         )}
 
-        {karuselUyarisi && <span style={{ fontSize: 12, color: c.danger }}>{karuselUyarisi}</span>}
         {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}
         {notice && <span style={{ fontSize: 12, color: c.success }}>{notice}</span>}
 

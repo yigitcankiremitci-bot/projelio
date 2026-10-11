@@ -34,8 +34,14 @@ export interface GelenMedya {
 
 /** Bir kullanıcının bekleyen medyası bu kadar kalır (kararsız kullanıcı için yeterli, bellek için kısa). */
 export const MEDYA_OMRU_MS = 3 * 60 * 60 * 1000;
-/** Kullanıcı başına en çok kaç medya (karusel 10 görsel). */
-export const MEDYA_ADET_TAVANI = 12;
+/**
+ * Kullanıcı başına en çok kaç medya.
+ *
+ * 20 = Instagram uygulamasının karusel sınırı. Yayın API'si 10 alıyor ama
+ * kullanıcı uygulamaya bakıp 20 gönderebiliyor; tavan 12'yken ilk 8'i sessizce
+ * düşüyordu ve Lio 10 + 10 bölmeyi öneremiyordu. Bayt tavanı ayrıca geçerli.
+ */
+export const MEDYA_ADET_TAVANI = 20;
 /** Kullanıcı başına toplam bayt tavanı; aşılırsa en eskiler düşer. */
 export const MEDYA_BAYT_TAVANI = 400 * 1024 * 1024;
 /**

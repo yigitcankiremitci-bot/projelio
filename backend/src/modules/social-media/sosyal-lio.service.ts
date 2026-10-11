@@ -8,7 +8,7 @@ import { yedektenYukle, yedekSil } from "./medya-yedegi";
 import { LioOneriService } from "./lio-oneri.service";
 import { denemeReelsHatasi } from "./publish-format";
 import { SocialMediaService, type SocialScope } from "./social-media.service";
-import { icerikTuruSec, KARUSEL_TAVANI, medyaEtiketi, taslakGosterimi, utcAn, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
+import { icerikTuruSec, KARUSEL_TAVANI, karuselTavaniAciklamasi, medyaEtiketi, taslakGosterimi, utcAn, planlamaEksikleri, zamaniCoz, zamaniGoster } from "./sosyal-lio";
 
 /**
  * Lio'nun sosyal medya araçlarının arkasındaki servis: WhatsApp'tan (ya da
@@ -148,7 +148,7 @@ export class SosyalLioService {
     if (!girdi.accountIds?.length) throw new BadRequestException("En az bir hesap seçilmeli (social_list_accounts).");
     if (!girdi.mediaIds?.length) throw new BadRequestException("En az bir görsel ya da video gerekli.");
     if (girdi.mediaIds.length > KARUSEL_TAVANI) {
-      throw new BadRequestException(`Bir gönderiye en çok ${KARUSEL_TAVANI} medya eklenebilir.`);
+      throw new BadRequestException(karuselTavaniAciklamasi(girdi.mediaIds.length));
     }
 
     await yedektenYukle(this.supabase, userId).catch(() => undefined);

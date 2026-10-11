@@ -31,5 +31,5 @@ export const MAX_INSTAGRAM_CAROUSEL = 10;
 /** Karusel sınırı aşıldıysa kullanıcıya gösterilecek cümle; aşılmadıysa null. */
 export function instagramKaruselHatasi(medyaSayisi: number): string | null {
   if (medyaSayisi <= MAX_INSTAGRAM_CAROUSEL) return null;
-  return `Instagram'a otomatik yayında karusel en fazla ${MAX_INSTAGRAM_CAROUSEL} medya alabilir (uygulamada 20 olsa da Instagram'ın yayın API'si 10 kabul ediyor). Bu içerikte ${medyaSayisi} medya var: fazlasını çıkarın ya da ikinci bir gönderiye bölün.`;
+  return `Instagram, otomatik paylaşımda bir karusele en fazla ${MAX_INSTAGRAM_CAROUSEL} görsel/video alıyor; uygulamadaki 20 sınırı burada geçerli değil. Bu içerikte ${medyaSayisi} tane var: fazlasını çıkarın ya da ikinci bir gönderiye bölün. Bu hâliyle planlanamaz.`;
 }

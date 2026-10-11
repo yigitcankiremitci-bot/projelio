@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { test } from "node:test";
-import { cevaptaTaslakVar, icerikTuruSec, medyaEtiketi, taslakGosterimi, taslakIsteniyor, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
+import { cevaptaTaslakVar, icerikTuruSec, karuselTavaniAciklamasi, medyaEtiketi, taslakGosterimi, taslakIsteniyor, utcAn, planlamaEksikleri, zamaniCoz } from "./sosyal-lio";
 
 test("ofsetsiz duvar saati İstanbul saatine göre UTC'ye çevrilir", () => {
   const d = zamaniCoz("2026-10-01T19:00", "Europe/Istanbul");
@@ -87,4 +87,11 @@ test("taslak isteniyor: görmek isteyen kullanıcı ya da onay soran Lio", () =>
   assert.equal(taslakIsteniyor("Göster yeni halini", ""), true);
   assert.equal(taslakIsteniyor("tamam", "Böyle planlayayım mı?"), true);
   assert.equal(taslakIsteniyor("bugün kaç görevim var", "3 görevin var."), false);
+});
+
+test("karusel sınırı: 10'dan fazla medya planlanamaz, açıklama bölmeyi önerir", () => {
+  const iyi = { medyaSayisi: 10, hedefSayisi: 1, caption: "x", vakit: new Date("2026-10-01T12:00:00Z"), simdi: new Date("2026-09-30T12:00:00Z") };
+  assert.deepEqual(planlamaEksikleri(iyi), []);
+  assert.equal(planlamaEksikleri({ ...iyi, medyaSayisi: 20 }).length, 1);
+  assert.match(karuselTavaniAciklamasi(20), /20 medya var.*en çok 10.*ikiye bölelim/);
 });

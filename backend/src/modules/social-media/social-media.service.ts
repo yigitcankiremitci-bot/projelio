@@ -695,6 +695,10 @@ export class SocialMediaService {
       const hesapSayisi = input.accountIds ? input.accountIds.length : await this.hedefSayisi(id);
       const planHatasi = hesapsizPlanHatasi(sonDurum, sonYol, hesapSayisi);
       if (planHatasi) throw new BadRequestException(planHatasi);
+    }
+    // Kuyruğa girecek her hâl (planlandı/onaylandı/hazır) için: Meta fazla
+    // medyalı karuseli yayın saatinde reddediyordu.
+    if (isQueueable(sonDurum, sonYol)) {
       await this.karuselSiniriniDenetle(id, 0, input.accountIds);
     }
 
@@ -1041,7 +1045,7 @@ export class SocialMediaService {
 
     // Planlanmış (Projelio'nun yayımlayacağı) bir Instagram gönderisine 11.
     // medya eklenemez: yoksa hata ancak yayın saatinde çıkıyordu.
-    if (post.status === "scheduled" && post.publish_via !== "external") {
+    if (isQueueable(post.status, post.publish_via)) {
       await this.karuselSiniriniDenetle(postId, 1);
     }
 

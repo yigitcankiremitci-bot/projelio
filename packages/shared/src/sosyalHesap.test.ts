@@ -23,5 +23,5 @@ describe("sosyal kullanıcı adı", () => {
 test("instagramKaruselHatasi: 10'a kadar sorun yok, 11'de uyarır", () => {
   assert.equal(instagramKaruselHatasi(10), null);
   assert.equal(instagramKaruselHatasi(0), null);
-  assert.match(instagramKaruselHatasi(20) ?? "", /en fazla 10 medya.*20 medya var/);
+  assert.match(instagramKaruselHatasi(20) ?? "", /en fazla 10 görsel\/video.*20 tane var/);
 });

@@ -2718,6 +2718,9 @@ export const AI_TOOLS: Anthropic.Tool[] = [
       "Açıklamayı kendin yazmayacaksan aciklama/etiketler'i boş bırak ve hemen ardından social_suggest_caption'ı çağır. " +
       "yayinZamani: kullanıcının saatiyle duvar saati, \"2026-10-01T19:00\" biçiminde (ofset ekleme); " +
       "\"yarın 19:00\" gibi ifadeleri bugünün tarihine göre çöz. Videolu gönderide karusel yapılamaz. " +
+      "KARUSEL SINIRI: bir gönderiye en çok 10 medya (Instagram uygulamada 20'ye izin verse de otomatik paylaşım 10 alıyor). " +
+      "10'dan fazla medya geldiyse taslak açmadan önce bunu kullanıcıya tek cümleyle söyle; ikiye bölmeyi ya da 10 tanesini " +
+      "seçmesini öner. \"Instagram 10'a izin veriyor\" deme — uygulamada 20 gördüğü için yanlış görünür. " +
       "KALİTE: WhatsApp video/fotoğrafı sıkıştırır. bekleyenMedya'da kalite \"sıkıştırılmış\" ise taslak açmadan ÖNCE " +
       "kullanıcıya tek cümleyle öner: dosyayı ataç > Belge olarak göndersin, kalite korunur. Kullanıcı \"böyle gönder\" " +
       "derse sikistirilmisKabul=true ile devam et; dosya olarak yeniden gönderirse (kalite \"orijinal\") onu kullan, " +

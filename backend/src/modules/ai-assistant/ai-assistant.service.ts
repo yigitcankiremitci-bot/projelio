@@ -1290,6 +1290,8 @@ export class AiAssistantService {
         "göndermesini öner ve dur; bunu bir konuşmada yalnızca BİR KEZ öner. " +
         "3) Aynı turda HEMEN social_create_draft (video → reels, çok fotoğraf → karusel; \"deneme\" dediyse denemeReels; " +
         "saat verdiyse yayinZamani) ve ardından social_suggest_caption çağır. Taslak medyayı hemen kalıcı depoya yazar; " +
+        "10'dan fazla fotoğraf/video geldiyse önce kısaca söyle: otomatik paylaşımda karusel en çok 10 alıyor (uygulamadaki " +
+        "20 sınırı burada geçmiyor); ikiye bölmeyi ya da 10 tane seçmeyi öner, cevabına göre taslak(lar)ı aç. " +
         "beklemek medyanın kaybolmasına yol açar. " +
         "4) Kullanıcıya hesabı, türü, TAM açıklamayı, etiketleri ve yayın zamanını göster ve tek bir onay sorusu sor: " +
         "\"Böyle planlayayım mı?\" (devrik ya da bozuk cümle kurma). " +

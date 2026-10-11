@@ -1702,6 +1702,15 @@ function PartyDetail({
         gap: 8,
       }}
     >
+      {/* Kartın genel notu Müşteriler'de yalnızca düzenleme formunda duruyordu;
+          Bağlantılar'dan aktarılan ilişki notu da buraya yazıldığı için açık
+          kartta görünmesi şart (kullanıcı şikâyeti, 2026-10-11). */}
+      {!baglantiModu && party.notes?.trim() && (
+        <div style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, background: c.listeSatirAlt, border: `1px solid ${c.border}` }}>
+          <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Not")}</span>
+          <p style={{ margin: "2px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap" }}>{party.notes}</p>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {baglantiModu ? (
           <>

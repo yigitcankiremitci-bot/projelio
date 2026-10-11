@@ -141,4 +141,14 @@ export const baglantilar: TranslationDict = {
     "A record will be created for this card in Competitor & Industry Analysis; the relationship note goes into its note.",
   "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.":
     "A record will be created for this card in Partnerships & Distribution; the relationship note goes into its note.",
+
+  // ─────────────────────────────────────────────── Tedarik > Tedarikçiler
+  "Talepler": "Requests",
+  "Tedarikçiler": "Suppliers",
+  "Tedarikçi adı": "Supplier name",
+  "+ Tedarikçi ekle": "+ Add supplier",
+  "Tedarikçi eklenemedi": "Couldn't add the supplier",
+  "Eşleşen tedarikçi yok.": "No matching suppliers.",
+  "Henüz tedarikçi yok. Bağlantı ve İlişkiler'den \"Tedarikçi yap\" ile ya da buradan ekleyebilirsin.":
+    "No suppliers yet. Add one here or use \"Make supplier\" in Contacts & Relationships.",
 };

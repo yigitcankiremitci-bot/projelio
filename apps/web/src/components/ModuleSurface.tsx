@@ -15,6 +15,7 @@ import EmailModulePanel from "./EmailModulePanel";
 import ModuleFormPanel from "./ModuleFormPanel";
 import ModulePanelView from "./ModulePanelView";
 import ModuleRecordsPanel from "./ModuleRecordsPanel";
+import TedarikPanel from "./TedarikPanel";
 import SocialMediaPanel from "./SocialMediaPanel";
 import HesaplarPanel from "./hesaplar/HesaplarPanel";
 import EkipHesaplariPanel from "./ekipHesaplari/EkipHesaplariPanel";
@@ -169,6 +170,21 @@ function ModuleSurfaceContent({
         jobId={jobId}
         canWrite={canWrite}
         moduleKey={moduleKey}
+      />
+    );
+  }
+
+  if (moduleKey === "oud_tedarik") {
+    // Talepler + Tedarikçiler: tedarikçi kartı Müşteriler defterinde durur,
+    // burada ayrıca listelenir (bkz. TedarikPanel).
+    return (
+      <TedarikPanel
+        organizationId={organizationId}
+        departmentId={departmentId}
+        jobId={jobId}
+        moduleKey={moduleKey}
+        config={getModuleRecordConfig(moduleKey, moduleName)}
+        canWrite={canWrite}
       />
     );
   }

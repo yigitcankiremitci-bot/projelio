@@ -13,11 +13,24 @@
   # sabit yönlendirme sayfası. ignore komutu 0 dönünce Netlify derlemeyi iptal
   # edip önceki yayını olduğu gibi bırakıyor — yönlendirme çalışmaya devam
   # ediyor, derleme dakikası (kredi) harcanmıyor.
-  # Yeniden derlemek gerekirse bu satırı geçici olarak kaldır.
-  ignore = "exit 0"
+  # Yalnızca bu dosya değiştiğinde derlenir (git diff fark bulunca 1 döner).
+  # Eskiden "exit 0" idi: o zaman buradaki bir yönlendirme değişikliği de
+  # hiç yayına girmiyordu.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- netlify.toml"
 
   command = "mkdir -p yonlendirme && printf '%s' '<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url=https://app.projelio.app\"><title>Projelio taşındı</title><p>Projelio yeni adresine taşındı: <a href=\"https://app.projelio.app\">app.projelio.app</a>' > yonlendirme/index.html"
   publish = "yonlendirme"
+
+# Kök adres tanıtım sitesine gider, uygulamaya değil. Bu adres aylarca
+# uygulamanın adresiydi ve Google'da projelio.app'ten daha güçlü bir izi var;
+# o iz giriş ekranına değil tanıtım sitesine aksın (2026-10-11: "projelio"
+# aramasında projelio.app çıkmıyordu). İlk eşleşen kural kazanır, bu yüzden
+# aşağıdaki joker kuraldan ÖNCE durmalı.
+[[redirects]]
+  from = "/"
+  to = "https://projelio.app/"
+  status = 301
+  force = true
 
 # force = true şart: dosya eşleşse bile yönlendirme kazansın.
 # :splat sayesinde derin bağlantılar korunuyor —

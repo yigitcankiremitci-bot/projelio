@@ -394,12 +394,19 @@ export class SiparisService {
     disKimlik: string;
     shopifyMagazaId: string;
     alanlar: Record<string, unknown>;
+    /**
+     * Stok kodundan bulunan katalog ürünü. Güncellemede YALNIZCA sipariş
+     * henüz ürünsüzse yazılır: kullanıcının elle seçtiği ürünü mağazadan
+     * gelen her güncelleme ezmesin.
+     */
+    urunId?: string | null;
     aktorId: string | null;
   }): Promise<{ siparis: MusteriSiparisi; yeni: boolean }> {
     const mevcutId = await this.disKimliktenBul(p.kaynak, p.disKimlik);
     if (mevcutId) {
       const mevcut = await this.tekil(mevcutId);
-      const alanlar = { ...p.alanlar };
+      const alanlar: Record<string, unknown> = { ...p.alanlar };
+      if (p.urunId && !mevcut.productId) alanlar.product_id = p.urunId;
       const odenen = tahsilEdilen(mevcut);
       if (odenen > 0) {
         delete alanlar.para_birimi;
@@ -417,6 +424,7 @@ export class SiparisService {
       .from("musteri_siparisleri")
       .insert({
         ...p.alanlar,
+        product_id: p.urunId ?? null,
         party_id: p.party.id,
         organization_id: p.party.organizationId ?? null,
         job_id: p.party.jobId ?? null,

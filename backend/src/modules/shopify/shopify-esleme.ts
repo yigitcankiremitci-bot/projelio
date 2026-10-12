@@ -113,7 +113,7 @@ export interface ShopifySiparisi {
   cancelled_at?: string | null;
   test?: boolean;
   payment_gateway_names?: string[];
-  line_items?: Array<{ title?: string; name?: string; quantity?: number }>;
+  line_items?: Array<{ title?: string; name?: string; quantity?: number; sku?: string | null }>;
   customer?: {
     id?: number | string;
     email?: string | null;
@@ -227,6 +227,59 @@ export function siparisAlanlari(o: ShopifySiparisi, bugun: string): { alanlar: S
       odeme_yontemi: odemeYontemiCoz(o.payment_gateway_names),
     },
   };
+}
+
+/** Siparişin kalemlerindeki stok kodları (boşlar hariç, tekil). Ürün sorgusu bununla yapılır. */
+export function kalemStokKodlari(o: ShopifySiparisi): string[] {
+  const kodlar = (o.line_items ?? [])
+    .filter((k) => (k.quantity ?? 0) > 0)
+    .map((k) => (k.sku ?? "").trim())
+    .filter(Boolean);
+  return [...new Set(kodlar)];
+}
+
+/**
+ * Siparişin bağlanacağı katalog ürünü — stok kodundan.
+ *
+ * YALNIZCA tek ürünlü siparişte bağlanır: siparişin bir tek ürün alanı var
+ * ve ürün kartının Satışlar sekmesi siparişin TÜM tutarını o ürüne yazıyor.
+ * Kalem kalem bölmeden "3 tişört + 1 şapka"yı tişörte bağlamak şapkanın
+ * parasını tişörtün satışı gösterirdi. Aynı ürünün birden çok kalemi
+ * (farklı beden aynı stok kodu) tek ürün sayılır.
+ *
+ * Bağlanmayanlar — hepsi null, sipariş yine yazılır, açıklamada kalemler var:
+ *   · stok kodu boş bir kalem (hangi ürün olduğu bilinmiyor);
+ *   · katalogda karşılığı olmayan kod;
+ *   · katalogda AYNI kodu taşıyan birden çok ürün (hangisi olduğu belirsiz);
+ *   · farklı ürünlere giden kalemler.
+ *
+ * Karşılaştırma boşluk ve büyük/küçük harf farkını yok sayar: Shopify'da
+ * "tsh-01", katalogda "TSH-01" yazılmış olabilir. Türkçe yerel kuralı
+ * BİLEREK kullanılmıyor: tr-TR'de "I" küçülünce "ı" olur ve "IKZ" ile "ikz"
+ * farklı kod sayılırdı — stok kodu bir dil değil, bir kimlik.
+ */
+export function stokKoduUrunu(
+  o: ShopifySiparisi,
+  urunler: Array<{ id: string; sku?: string | null }>
+): string | null {
+  const sade = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
+  const kalemler = (o.line_items ?? []).filter((k) => (k.quantity ?? 0) > 0);
+  if (kalemler.length === 0) return null;
+
+  const koda = new Map<string, string[]>();
+  for (const u of urunler) {
+    const kod = sade(u.sku);
+    if (kod) koda.set(kod, [...(koda.get(kod) ?? []), u.id]);
+  }
+
+  let bulunan: string | null = null;
+  for (const k of kalemler) {
+    const adaylar = koda.get(sade(k.sku));
+    if (!adaylar || adaylar.length !== 1) return null;
+    if (bulunan && bulunan !== adaylar[0]) return null;
+    bulunan = adaylar[0];
+  }
+  return bulunan;
 }
 
 /**

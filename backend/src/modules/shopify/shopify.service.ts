@@ -17,6 +17,8 @@ import {
   musteriKimligi,
   shopifyTahsilEdilen,
   siparisAlanlari,
+  stokKoduUrunu,
+  kalemStokKodlari,
   sorguImzasiGecerli,
   yerelGun,
   type ShopifySiparisi,
@@ -648,12 +650,14 @@ export class ShopifyService {
     }
 
     const party = await this.musteriKarti(magaza, o);
+    const urunId = await this.katalogUrunu(magaza.organization_id, o);
     const { siparis } = await this.siparisService.entegrasyonSiparisiYaz({
       party,
       kaynak: "shopify",
       disKimlik: String(o.id),
       shopifyMagazaId: magaza.id,
       alanlar: { ...r.alanlar, notlar: `Shopify · ${magaza.magaza_adi || magaza.shop_domain}` },
+      urunId,
       aktorId,
     });
 
@@ -676,6 +680,29 @@ export class ShopifyService {
       });
     }
     return null;
+  }
+
+  /**
+   * Stok kodundan katalog ürünü (bkz. stokKoduUrunu — yalnızca tek ürünlü
+   * sipariş). Sorgu kodun AYNEN yazılışıyla yapılır, eşleme ise harf
+   * farkını yok sayar; bu yüzden büyük/küçük harf varyantları da sorguya
+   * eklenir. Bulunamazsa sipariş ürünsüz yazılır, bu bir hata değil.
+   */
+  private async katalogUrunu(organizationId: string, o: ShopifySiparisi): Promise<string | null> {
+    const kodlar = kalemStokKodlari(o);
+    if (kodlar.length === 0) return null;
+    const varyantlar = [...new Set(kodlar.flatMap((k) => [k, k.toUpperCase(), k.toLowerCase()]))];
+    const { data, error } = await this.supabase.client
+      .from("products")
+      .select("id, sku")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null)
+      .in("sku", varyantlar);
+    if (error) {
+      this.logger.warn(`Shopify siparişi için ürün aranamadı: ${error.message}`);
+      return null;
+    }
+    return stokKoduUrunu(o, data ?? []);
   }
 
   /**

@@ -79,6 +79,7 @@ API_PUBLIC_URL=https://api.projelio.app   # geri dönüş ve webhook adresi bund
 |---|---|
 | Yeni sipariş | Müşteri kartı bulunur (Shopify kimliği → e-posta) ya da açılır; `musteri_siparisleri` satırı (`kaynak='shopify'`) |
 | Sipariş güncellendi | Aynı satır güncellenir (`dis_kimlik` tekil) |
+| Tek ürünlü sipariş | Kalemlerin stok kodu (`sku`) katalogda TEK bir ürüne denk geliyorsa sipariş o ürüne bağlanır (`product_id`) ve ürün kartının Satışlar sekmesinde görünür. Çok ürünlü siparişler, kodu boş/bilinmeyen/iki üründe aynı olan kalemler bağlanmaz. Elle seçilmiş ürünü güncelleme ezmez (`stokKoduUrunu`) |
 | Ödeme alındı / kısmi ödeme | Shopify'ın "ödendi" dediği ile bizdeki tahsilatların farkı yeni tahsilat → kasa satırı |
 | Test siparişi, sıfır tutar | Atlanır (`shopify_olaylari.durum='atlandi'`, sebebi `hata` sütununda) |
 | İptal edilmiş, bizde kaydı yok | Atlanır |
@@ -91,7 +92,7 @@ API_PUBLIC_URL=https://api.projelio.app   # geri dönüş ve webhook adresi bund
 - **İadeler ve sonradan iptal:** tahsil edilen hiçbir zaman azalmaz. Faz 2'de iade
   kasaya ayrı gider satırı olarak yazılacak.
 - **Geçmiş siparişlerin ilk aktarımı:** yalnızca bağlandıktan sonraki olaylar gelir.
-- **Ürün eşitleme**, siparişten görev açma, Lio araçları.
+- **Ürün eşitleme** (katalog Shopify'dan doldurulmaz; yalnızca stok koduyla eşleşme var), siparişten görev açma, Lio araçları.
 - **Serbest çalışanın işi (job) kapsamı:** yalnızca şirket.
 - **Paket sınırı:** her pakette açık — karar verilmedi.
 - Shopify'dan gelen siparişin Projelio'da elle düzenlenmesi engellenmiyor ama bir

@@ -7,8 +7,10 @@ import {
   musteriKimligi,
   odemeYontemiCoz,
   shopifyTahsilEdilen,
+  kalemStokKodlari,
   siparisAlanlari,
   sorguImzasiGecerli,
+  stokKoduUrunu,
   webhookImzasiGecerli,
   yerelGun,
   type ShopifySiparisi,
@@ -192,5 +194,47 @@ describe("musteriKimligi", () => {
     const k = musteriKimligi({ ...ornek, customer: { id: 77 }, email: null });
     assert.equal(k.ad, null);
     assert.equal(k.shopifyId, "77");
+  });
+});
+
+describe("stokKoduUrunu", () => {
+  const URUNLER = [
+    { id: "tisort", sku: "TSH-01" },
+    { id: "sapka", sku: "SPK-01" },
+    { id: "kodsuz", sku: null },
+    { id: "ikiz-a", sku: "IKZ" },
+    { id: "ikiz-b", sku: "ikz" },
+  ];
+  const siparis = (kalemler: Array<{ sku?: string | null; quantity?: number }>): ShopifySiparisi => ({
+    id: 1,
+    line_items: kalemler.map((k) => ({ title: "x", quantity: 1, ...k })),
+  });
+
+  test("tek ürünlü sipariş stok koduyla bağlanır; harf ve boşluk farkı önemsiz", () => {
+    assert.equal(stokKoduUrunu(siparis([{ sku: "TSH-01" }]), URUNLER), "tisort");
+    assert.equal(stokKoduUrunu(siparis([{ sku: " tsh-01 " }]), URUNLER), "tisort");
+    // Aynı ürünün iki kalemi (ör. iki beden) tek ürün sayılır.
+    assert.equal(stokKoduUrunu(siparis([{ sku: "TSH-01" }, { sku: "tsh-01", quantity: 2 }]), URUNLER), "tisort");
+  });
+
+  test("farklı ürünler içeren sipariş bağlanmaz — tutar tek ürüne yazılırdı", () => {
+    assert.equal(stokKoduUrunu(siparis([{ sku: "TSH-01" }, { sku: "SPK-01" }]), URUNLER), null);
+  });
+
+  test("kodu boş, katalogda olmayan ya da iki ürünün paylaştığı kod bağlanmaz", () => {
+    assert.equal(stokKoduUrunu(siparis([{ sku: "" }]), URUNLER), null);
+    assert.equal(stokKoduUrunu(siparis([{ sku: null }]), URUNLER), null);
+    assert.equal(stokKoduUrunu(siparis([{ sku: "TSH-01" }, { sku: null }]), URUNLER), null);
+    assert.equal(stokKoduUrunu(siparis([{ sku: "YOK-99" }]), URUNLER), null);
+    assert.equal(stokKoduUrunu(siparis([{ sku: "IKZ" }]), URUNLER), null);
+  });
+
+  test("adedi sıfır kalem (iade edilmiş) hesaba katılmaz", () => {
+    assert.equal(stokKoduUrunu(siparis([{ sku: "TSH-01" }, { sku: "SPK-01", quantity: 0 }]), URUNLER), "tisort");
+    assert.equal(stokKoduUrunu(siparis([]), URUNLER), null);
+  });
+
+  test("sorgu için stok kodları tekilleştirilir, boşlar atılır", () => {
+    assert.deepEqual(kalemStokKodlari(siparis([{ sku: "A" }, { sku: " A " }, { sku: "" }, { sku: "B", quantity: 0 }])), ["A"]);
   });
 });

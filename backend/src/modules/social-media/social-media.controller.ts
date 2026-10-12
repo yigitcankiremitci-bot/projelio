@@ -56,12 +56,33 @@ export class SocialMediaController {
     return this.social.createPost(orgScope(organizationId, body.departmentId), body, req.user.userId);
   }
 
+  /** "Dosyalardan seç": kapsamın klasör ağacında gezinme (bkz. SocialMediaService.browseFiles). */
+  @Get("organizations/:organizationId/social-media/files")
+  browseOrgFiles(
+    @Param("organizationId") organizationId: string,
+    @Query("departmentId") departmentId: string | undefined,
+    @Query("kok") kok: string | undefined,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.social.browseFiles(orgScope(organizationId, departmentId), req.user.userId, kok, folderId || undefined);
+  }
+
   // ============================================================ İş kapsamı (serbest çalışan)
 
   @Get("jobs/:jobId/social-media")
   async jobOverview(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     return this.social.overview({ jobId }, req.user.userId);
+  }
+
+  @Get("jobs/:jobId/social-media/files")
+  browseJobFiles(
+    @Param("jobId") jobId: string,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    return this.social.browseFiles({ jobId }, req.user.userId, "job", folderId || undefined);
   }
 
   @Post("jobs/:jobId/social-accounts")
@@ -130,6 +151,18 @@ export class SocialMediaController {
     @Req() req: any
   ) {
     return this.social.attachMedia(id, body, req.user.userId);
+  }
+
+  /** Medyayı başa alır — karuselde kapak ilk medyadır. */
+  @Post("social-media/:mediaId/first")
+  moveMediaFirst(@Param("mediaId") mediaId: string, @Req() req: any) {
+    return this.social.moveMediaFirst(mediaId, req.user.userId);
+  }
+
+  /** Kapak görseli; `fileId: null` kapağı kaldırır (dosya yerinde kalır). */
+  @Patch("social-posts/:id/cover")
+  setCover(@Param("id") id: string, @Body("fileId") fileId: string | null | undefined, @Req() req: any) {
+    return this.social.setCover(id, typeof fileId === "string" && fileId ? fileId : null, req.user.userId);
   }
 
   @Delete("social-media/:mediaId")

@@ -1095,4 +1095,6 @@ export const hatalar: TranslationDict = {
   "İstenmeyen": "Junk",
   "Çöp kutusu": "Trash",
   "Lio'nun yazabilmesi için bir konu ya da birkaç not yazın.": "Write a subject or a few notes so Lio can draft.",
+  "Kapak özelliği henüz etkin değil (veritabanı güncellemesi bekleniyor).":
+    "Covers aren't enabled yet (database update pending).",
 };

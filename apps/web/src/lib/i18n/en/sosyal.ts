@@ -878,4 +878,62 @@ export const sosyal: TranslationDict = {
     "Tracking",
   "{n} kayıt güncellendi.":
     "{n} items updated.",
+  "Bu dosya içerikte zaten var":
+    "This file is already in the post",
+  "Bu içerik karusel: Instagram karusele ayrı kapak almıyor, kapak ilk medyadır.":
+    "This post is a carousel: Instagram doesn't take a separate cover for carousels; the first item is the cover.",
+  "Bu içerik yayımlandı. Buradaki değişiklikler Projelio kaydını günceller ama Instagram'daki gönderiye gitmez — Instagram, yayımlanmış gönderinin açıklamasını ya da kapağını dışarıdan değiştirmeye izin vermiyor. Oradaki gönderiyi Instagram uygulamasından düzenleyebilirsin.":
+    "This post has been published. Changes here update the Projelio record but don't reach the Instagram post — Instagram doesn't allow changing a published post's caption or cover from outside. You can edit it in the Instagram app.",
+  "Bu klasörde görsel ya da video yok.":
+    "No images or videos in this folder.",
+  "Bu klasördekilerin tümünü seç ({n})":
+    "Select all in this folder ({n})",
+  "Dosyalar şirketin dosya alanına yüklenir, buraya bağlanır.":
+    "Files are uploaded to the company's file area and linked here.",
+  "Dosyalardan seç":
+    "Choose from Files",
+  "Eklenemedi":
+    "Couldn't add",
+  "Erişebildiğin bir dosya klasörü yok.":
+    "You don't have access to any file folder.",
+  "Instagram kapakta yalnızca JPEG görsel kabul ediyor.":
+    "Instagram only accepts JPEG images as covers.",
+  "Kapak JPEG olmalı":
+    "Cover must be a JPEG",
+  "Kapak JPEG olmalı; Instagram kapakta başka biçim kabul etmiyor.":
+    "Cover must be a JPEG; Instagram doesn't accept other formats for covers.",
+  "Kapak görseli":
+    "Cover image",
+  "Kapak içerikten kaldırılır; dosya silinmez":
+    "The cover is removed from the post; the file isn't deleted",
+  "Kapak kaydedilemedi":
+    "Couldn't save the cover",
+  "Kapak seç":
+    "Choose cover",
+  "Kapak yap":
+    "Make cover",
+  "Kapak yükle":
+    "Upload cover",
+  "Kapak yüklenemedi":
+    "Couldn't upload the cover",
+  "Kapağı değiştir":
+    "Change cover",
+  "Karuselde kapak ilk medyadır; bunu başa al":
+    "In a carousel the first item is the cover; move this to the front",
+  "Klasörler arasında gezinip birden çok görsel/video seçebilirsin. Seçim sırası karusel sırasıdır.":
+    "Browse folders and select multiple images/videos. The selection order is the carousel order.",
+  "Reels'in profilde ve akışta görünen kapağı. Seçmezsen Instagram videonun ilk karesini kullanır. JPEG olmalı.":
+    "The Reel's cover shown on the profile and in the feed. If you don't choose one, Instagram uses the video's first frame. Must be a JPEG.",
+  "Sıra değiştirilemedi":
+    "Couldn't change the order",
+  "içerikte var":
+    "in post",
+  "{sayi} dosyayı ekle":
+    "Add {sayi} files",
+  "İşin dosyaları":
+    "Job files",
+  "Departman dosyaları":
+    "Department files",
+  "Şirket dosyaları":
+    "Company files",
 };

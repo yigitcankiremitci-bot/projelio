@@ -3243,6 +3243,11 @@ export interface SocialPost {
   externalTool?: string;
   /** Doluysa Instagram'a deneme reels olarak gider (yalnızca tek videolu gönderi). */
   trialReel?: SocialTrialReel;
+  /**
+   * Kapak görseli (JPEG dosya kimliği). Tekil videoda Instagram'a `cover_url`
+   * olarak gider; karuselde kullanılmaz — orada kapak ilk medyadır.
+   */
+  coverFileId?: string;
   /** Hangi hesaplarda yayımlanacak. */
   targets: SocialPostTarget[];
   media: SocialPostMedia[];

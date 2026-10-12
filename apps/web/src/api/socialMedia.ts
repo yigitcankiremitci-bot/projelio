@@ -16,6 +16,7 @@ import type {
   SocialMediaOverview,
   SocialPlatform,
   SocialPost,
+  ProjectFile,
   SocialPostCollaboratorInput,
   SocialPostStatus,
   SocialPublishVia,
@@ -72,6 +73,15 @@ export interface SocialPostInput {
   trialReel?: SocialTrialReel | null;
   /** Verilirse katkıda bulunan listesi bununla değiştirilir. */
   collaborators?: SocialPostCollaboratorInput[];
+}
+
+/** "Dosyalardan seç" penceresinin bir klasörü (bkz. socialMediaApi.browseFiles). */
+export interface SocialFileBrowse {
+  roots: { key: string; label: string }[];
+  root: string | null;
+  folders: { id: string; name: string }[];
+  files: ProjectFile[];
+  breadcrumb: { id: string; name: string }[];
 }
 
 function base(scope: SocialScope): string {
@@ -134,6 +144,26 @@ export const socialMediaApi = {
     api.post<SocialPost>(`/social-posts/${postId}/media`, { fileId, altText }),
 
   detachMedia: (mediaId: string) => api.delete<{ ok: true }>(`/social-media/${mediaId}`),
+
+  /** Medyayı başa alır: karuselde kapak ilk medyadır. */
+  moveMediaFirst: (mediaId: string) => api.post<SocialPost>(`/social-media/${mediaId}/first`, {}),
+
+  /** Reels kapağı (JPEG). `null` kapağı kaldırır; dosya yerinde kalır. */
+  setCover: (postId: string, fileId: string | null) =>
+    api.patch<SocialPost>(`/social-posts/${postId}/cover`, { fileId }),
+
+  /**
+   * "Dosyalardan seç": kapsamın klasör ağacı (iş / departman / şirket).
+   * Kökleri sunucu kapsamdan çıkarır; yalnızca görsel ve video döner.
+   */
+  browseFiles: (scope: SocialScope, kok?: string, folderId?: string) => {
+    const params = new URLSearchParams();
+    if (!("jobId" in scope) && scope.departmentId) params.set("departmentId", scope.departmentId);
+    if (kok) params.set("kok", kok);
+    if (folderId) params.set("folderId", folderId);
+    const q = params.toString();
+    return api.get<SocialFileBrowse>(`${base(scope)}/social-media/files${q ? `?${q}` : ""}`);
+  },
 
   // ---------------------------------------------------------------- Instagram
 

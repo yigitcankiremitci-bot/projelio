@@ -69,7 +69,12 @@ export async function openGooglePicker(
    * jetonuyla açılan Picker'da seçilen dosyayı hedef hesap göremez ve kopyalama
    * "Dosya içe aktarılamadı" ile biter.
    */
-  target?: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string }
+  target?: { jobId?: string; projectId?: string; departmentId?: string; organizationId?: string },
+  /**
+   * Çoklu seçim: `onPicked` seçilen HER dosya için, seçim sırasıyla çağrılır.
+   * Karusel hazırlayan kullanıcı dosyaları tek tek seçmek zorunda kalıyordu.
+   */
+  options: { multiple?: boolean } = {}
 ): Promise<void> {
   // Picker tarayıcıda çalışır ve doğrudan Google'a gider; backend'deki
   // GOOGLE_CLIENT_ID/SECRET buraya yetmez, kendi tarayıcı anahtarını ister.
@@ -99,13 +104,13 @@ export async function openGooglePicker(
     .setOAuthToken(accessToken)
     .setDeveloperKey(apiKey);
   if (appId) builder.setAppId(appId);
+  if (options.multiple) builder.enableFeature(google.picker.Feature.MULTISELECT_ENABLED);
 
   const picker = builder
     .setCallback((data: any) => {
       if (data.action !== google.picker.Action.PICKED) return;
-      const doc = data.docs?.[0];
-      if (!doc) return;
-      onPicked({ id: doc.id, name: doc.name });
+      const docs: any[] = options.multiple ? data.docs ?? [] : (data.docs ?? []).slice(0, 1);
+      for (const doc of docs) onPicked({ id: doc.id, name: doc.name });
     })
     .build();
 

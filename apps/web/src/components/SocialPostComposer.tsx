@@ -15,6 +15,7 @@ import type { ProjectFile } from "@projelio/shared";
 import { driveApi, filesApi, oneDriveApi, uploadFile } from "../api/files";
 import { openGooglePicker } from "../lib/googlePicker";
 import BrowseDriveModal from "./BrowseDriveModal";
+import SocialFilePickerModal from "./SocialFilePickerModal";
 import { socialMediaApi, type SocialPostInput, type SocialScope } from "../api/socialMedia";
 import {
   COLLABORATOR_STATUS,
@@ -40,7 +41,7 @@ import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import ConfirmDialog from "./ConfirmDialog";
 import Modal from "./Modal";
-import { IconExternalLink, IconTrash, IconUpload } from "./icons";
+import { IconExternalLink, IconFolder, IconTrash, IconUpload } from "./icons";
 import { LioMascotIcon } from "./AskLioButton";
 
 interface Props {
@@ -158,6 +159,11 @@ export default function SocialPostComposer({
   const [dropping, setDropping] = useState(false);
   // OneDrive kullanıcısında Drive seçici yerine gezinme penceresi açılır.
   const [browsingDrive, setBrowsingDrive] = useState(false);
+  // "Dosyalardan seç" penceresi: medya (çoklu) ya da kapak (tek JPEG) için.
+  const [dosyaSecici, setDosyaSecici] = useState<"medya" | "kapak" | null>(null);
+  const [kapakOnizleme, setKapakOnizleme] = useState("");
+  const [kapakIsleniyor, setKapakIsleniyor] = useState(false);
+  const kapakInput = useRef<HTMLInputElement>(null);
   const [cloudProvider, setCloudProvider] = useState<"google" | "microsoft" | undefined>(undefined);
   const [uploadPct, setUploadPct] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -193,13 +199,14 @@ export default function SocialPostComposer({
   /**
    * Medya yüklemesinin hedefi.
    *
-   * Dosyalar Projelio'nun mevcut dosya altyapısına gider: iş ya da departman
-   * klasörüne. Organizasyon geneline etkinleştirilmiş (departmansız) bir
-   * modülde yükleme hedefi yok — o durumda yükleme kapalı ve sebebi yazılı.
+   * Dosyalar Projelio'nun mevcut dosya altyapısına gider: iş, departman ya da
+   * şirket klasörüne. Organizasyon geneline etkinleştirilmiş (departmansız)
+   * modülde eskiden yükleme kapalıydı; şirketin kendi klasörü (düz kapsam,
+   * bkz. FilesService FlatScope) artık hedef.
    */
   const uploadTarget = useMemo(() => {
     if ("jobId" in scope) return { jobId: scope.jobId };
-    return scope.departmentId ? { departmentId: scope.departmentId } : null;
+    return scope.departmentId ? { departmentId: scope.departmentId } : { organizationId: scope.organizationId };
   }, [scope]);
 
   // Görsel önizlemeleri imzalı adres ister (<img> Authorization başlığı
@@ -224,6 +231,23 @@ export default function SocialPostComposer({
       cancelled = true;
     };
   }, [saved]);
+
+  // Kapak önizlemesi ayrı: kapak bir medya değil (bkz. migration 164).
+  const kapakId = saved?.coverFileId;
+  useEffect(() => {
+    let iptal = false;
+    setKapakOnizleme("");
+    if (!kapakId) return;
+    filesApi
+      .contentUrl(kapakId)
+      .then((url) => {
+        if (!iptal) setKapakOnizleme(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      iptal = true;
+    };
+  }, [kapakId]);
 
   /**
    * Katkıda bulunan ekler. Aynı platformda aynı ad ikinci kez eklenmez —
@@ -395,25 +419,119 @@ export default function SocialPostComposer({
     }
   };
 
+  /**
+   * Projelio'daki dosyaları (Dosyalar bölümü) TOPLU bağlar, seçim sırasıyla.
+   *
+   * Sırayla, paralel değil: sunucu sıra numarasını "son medya + 1" diye
+   * veriyor; aynı anda giden istekler aynı numarayı alıp karusel sırasını
+   * karıştırırdı.
+   */
+  const attachMany = async (files: ProjectFile[]) => {
+    if (!files.length) return;
+    setUploading(true);
+    setError("");
+    setMedyaHata("");
+    try {
+      let current = saved ?? (await persist());
+      for (const file of files) {
+        current = await socialMediaApi.attachMedia(current.id, file.id);
+        setSaved(current);
+      }
+    } catch (err) {
+      setMedyaHata(err instanceof Error ? err.message : t("Dosya eklenemedi"));
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const openCloudPicker = () => {
     if (!uploadTarget) return;
     if (cloudProvider === "microsoft") {
       setBrowsingDrive(true);
       return;
     }
-    void openGooglePicker(
-      async ({ id, name }) => {
-        try {
-          const imported = await filesApi.importFromDrive(uploadTarget, { sourceFileId: id, name });
-          await attachExisting(imported);
-        } catch (err) {
-          setMedyaHata(err instanceof Error ? err.message : t("Dosya içe aktarılamadı"));
+    // Çoklu seçimde Picker her dosya için ayrı çağırır (aynı anda, döngüyle).
+    // Seçimler toplanıp TEK seferde işlenir: dosya başına attachExisting
+    // çağırmak, henüz kaydedilmemiş içerikte her dosya için ayrı bir taslak
+    // açardı (her çağrı aynı "saved = null" anını görüyor).
+    const secilenler: { id: string; name: string }[] = [];
+    const isle = async () => {
+      setUploading(true);
+      setMedyaHata("");
+      const aktarilan: ProjectFile[] = [];
+      try {
+        for (const { id, name } of secilenler) {
+          aktarilan.push(await filesApi.importFromDrive(uploadTarget, { sourceFileId: id, name }));
         }
+      } catch (err) {
+        setMedyaHata(err instanceof Error ? err.message : t("Dosya içe aktarılamadı"));
+      } finally {
+        setUploading(false);
+      }
+      // İçe aktarılabilenler yine bağlanır; hata zaten yukarıda yazılı.
+      await attachMany(aktarilan).catch(() => undefined);
+    };
+    void openGooglePicker(
+      (dosya) => {
+        secilenler.push(dosya);
+        if (secilenler.length === 1) queueMicrotask(() => void isle());
       },
       // Seçici HEDEFİN depo hesabıyla açılmalı; şirketler ayrı hesap
       // seçebiliyor (bkz. lib/googlePicker.ts).
-      uploadTarget
+      uploadTarget,
+      { multiple: true }
     ).catch((err: Error) => setError(err.message));
+  };
+
+  /**
+   * Kapak: önce gönderi (yoksa taslak olarak açılır), sonra kapak bağı —
+   * medyayla aynı "önce kayıt" kuralı.
+   */
+  const kapakAyarla = async (fileId: string | null) => {
+    setKapakIsleniyor(true);
+    setMedyaHata("");
+    try {
+      const target = saved ?? (await persist());
+      setSaved(await socialMediaApi.setCover(target.id, fileId));
+    } catch (err) {
+      setMedyaHata(err instanceof Error ? err.message : t("Kapak kaydedilemedi"));
+      throw err;
+    } finally {
+      setKapakIsleniyor(false);
+    }
+  };
+
+  const kapakYukle = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (kapakInput.current) kapakInput.current.value = "";
+    if (!file || !uploadTarget) return;
+    // Sunucu da reddediyor; yüklemeden ÖNCE söylemek gereksiz bir yüklemeyi
+    // (ve dosya alanında işe yaramaz bir PNG'yi) önlüyor.
+    if (file.type !== "image/jpeg") {
+      setMedyaHata(t("Kapak JPEG olmalı; Instagram kapakta başka biçim kabul etmiyor."));
+      return;
+    }
+    setKapakIsleniyor(true);
+    setMedyaHata("");
+    try {
+      const uploaded = await yukle(uploadTarget, file);
+      await kapakAyarla(uploaded.id);
+    } catch (err) {
+      setMedyaHata(err instanceof Error ? err.message : t("Kapak yüklenemedi"));
+    } finally {
+      setKapakIsleniyor(false);
+      setUploadPct(0);
+    }
+  };
+
+  /** Karuselde kapak ilk medyadır: seçilen medya başa alınır. */
+  const basaAl = async (mediaId: string) => {
+    try {
+      setSaved(await socialMediaApi.moveMediaFirst(mediaId));
+    } catch (err) {
+      setMedyaHata(err instanceof Error ? err.message : t("Sıra değiştirilemedi"));
+    }
   };
 
   const removeMedia = async (mediaId: string) => {
@@ -587,6 +705,13 @@ export default function SocialPostComposer({
   const cokSatirli = { ...field, height: "auto", resize: "vertical", lineHeight: 1.5 } as const;
   const media = saved?.media ?? [];
   const videoVar = media.some((m) => (m.mimeType ?? "").startsWith("video/"));
+  // Kapak yalnızca tekil videoda Instagram'a gider (cover_url); karuselde
+  // kapak ilk medyadır. Reels türü seçiliyse video henüz eklenmemiş olsa da
+  // kapak alanı görünsün — kullanıcı sırayı kendi seçsin.
+  const tekVideo = media.length === 1 && videoVar;
+  const kapakGoster = tekVideo || (form.contentType === "reel" && media.length <= 1) || !!saved?.coverFileId;
+  // Instagram'a gitmiş bir kanal varsa: buradaki değişiklik oraya YANSIMAZ.
+  const yayimlanmisKanal = (saved?.targets ?? []).some((h) => h.status === "published");
   // Deneme reels yalnızca Instagram'a ve Projelio'nun yaptığı yayında anlamlı.
   const instagramSecili = accounts.some((a) => selected.includes(a.id) && a.platform === "instagram");
   const denemeGoster = form.publishVia === "projelio" && (instagramSecili || !!form.trialReel);
@@ -663,6 +788,25 @@ export default function SocialPostComposer({
           borderRadius: 8,
         }}
       >
+        {/* Yayımlanmış içerikte düzenleme Projelio kaydını değiştirir, Instagram'daki
+            gönderiyi DEĞİL: Meta'nın yayın API'si yayımlanmış gönderinin metnini
+            ya da kapağını değiştirmeye izin vermiyor. Söylemezsek kullanıcı
+            düzelttiğini sanır. */}
+        {yayimlanmisKanal && (
+          <span
+            style={{
+              fontSize: 12,
+              color: c.textSecondary,
+              padding: "6px 10px",
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+              lineHeight: 1.5,
+            }}
+          >
+            {t(
+              "Bu içerik yayımlandı. Buradaki değişiklikler Projelio kaydını günceller ama Instagram'daki gönderiye gitmez — Instagram, yayımlanmış gönderinin açıklamasını ya da kapağını dışarıdan değiştirmeye izin vermiyor. Oradaki gönderiyi Instagram uygulamasından düzenleyebilirsin."
+            )}
+
         {/* ---------------------------------------------- Kanallar */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {label(t("Kanallar"))}
@@ -1151,10 +1295,11 @@ export default function SocialPostComposer({
           )}
           {media.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {media.map((m) => (
+              {media.map((m, sira) => (
                 <div
                   key={m.id}
                   style={{
+                    position: "relative",
                     width: 104,
                     border: `1px solid ${c.border}`,
                     borderRadius: 8,
@@ -1182,6 +1327,45 @@ export default function SocialPostComposer({
                         {m.mimeType?.startsWith("video/") ? t("Video") : t("Dosya")}
                       </span>
                     )}
+                    {/* Karuselde kapak ilk medyadır (Meta ayrı kapak almıyor):
+                        hangisinin kapak olduğu görünsün ve değiştirilebilsin. */}
+                    {media.length > 1 &&
+                      (sira === 0 ? (
+                        <span
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            left: 4,
+                            fontSize: 10,
+                            padding: "1px 6px",
+                            borderRadius: 999,
+                            background: c.accent,
+                            color: c.onPrimary,
+                          }}
+                        >
+                          {t("Kapak")}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void basaAl(m.id)}
+                          title={t("Karuselde kapak ilk medyadır; bunu başa al")}
+                          style={{
+                            position: "absolute",
+                            top: 4,
+                            left: 4,
+                            fontSize: 10,
+                            padding: "1px 6px",
+                            borderRadius: 999,
+                            border: `1px solid ${c.border}`,
+                            background: c.surface,
+                            color: c.textPrimary,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {t("Kapak yap")}
+                        </button>
+                      ))}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 6px" }}>
                     <span
@@ -1216,18 +1400,64 @@ export default function SocialPostComposer({
             </div>
           )}
 
-          {uploadTarget ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={(e) => handleUpload(e.target.files)}
-                style={{ display: "none" }}
-              />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              accept="image/*,video/*"
+              onChange={(e) => handleUpload(e.target.files)}
+              style={{ display: "none" }}
+            />
+            <button
+              onClick={() => fileInput.current?.click()}
+              disabled={uploading}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                cursor: uploading ? "default" : "pointer",
+                color: c.textPrimary,
+              }}
+            >
+              <IconUpload size={14} color={c.textSecondary} />
+              {uploading ? t("Yükleniyor… %{n}", { n: uploadPct }) : t("Bilgisayardan yükle")}
+            </button>
+
+            {/* Dosyalar bölümündeki klasörlerden TOPLU seçim: içerik ekibi
+                görselleri çoğu zaman orada hazırlıyor; indirip yeniden
+                yüklemek gerekmesin. */}
+            <button
+              type="button"
+              onClick={() => setDosyaSecici("medya")}
+              disabled={uploading}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: `1px solid ${c.border}`,
+                background: "transparent",
+                cursor: uploading ? "default" : "pointer",
+                color: c.textPrimary,
+              }}
+            >
+              <IconFolder size={14} color={c.textSecondary} />
+              {t("Dosyalardan seç")}
+            </button>
+
+            {/* Buluttaki mevcut görseli getirmek: içerik ekibi çoğu zaman
+                görseli zaten Drive'da hazırlıyor, yeniden yüklemek gereksiz. */}
+            {cloudProvider && (
               <button
-                onClick={() => fileInput.current?.click()}
+                onClick={openCloudPicker}
                 disabled={uploading}
                 style={{
                   display: "flex",
@@ -1242,47 +1472,107 @@ export default function SocialPostComposer({
                   color: c.textPrimary,
                 }}
               >
-                <IconUpload size={14} color={c.textSecondary} />
-                {uploading ? t("Yükleniyor… %{n}", { n: uploadPct }) : t("Dosya yükle")}
+                {cloudProvider === "microsoft" ? t("OneDrive'dan yükle") : t("Drive'dan yükle")}
               </button>
-
-              {/* Buluttaki mevcut görseli getirmek: içerik ekibi çoğu zaman
-                  görseli zaten Drive'da hazırlıyor, yeniden yüklemek gereksiz. */}
-              {cloudProvider && (
-                <button
-                  onClick={openCloudPicker}
-                  disabled={uploading}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    fontSize: 13,
-                    padding: "6px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${c.border}`,
-                    background: "transparent",
-                    cursor: uploading ? "default" : "pointer",
-                    color: c.textPrimary,
-                  }}
-                >
-                  {cloudProvider === "microsoft" ? t("OneDrive'dan yükle") : t("Drive'dan yükle")}
-                </button>
-              )}
-              <span style={{ fontSize: 11, color: c.textSecondary }}>
-                {"jobId" in scope
-                  ? t("Dosyalar işin dosya alanına yüklenir, buraya bağlanır.")
-                  : t("Dosyalar departmanın dosya alanına yüklenir, buraya bağlanır.")}
-              </span>
-            </div>
-          ) : (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
-              {t(
-                "Dosya yüklemek için modülün bir departmanda etkin olması gerekiyor — dosyalar departmanın klasörüne gider."
-              )}
+            )}
+            <span style={{ fontSize: 11, color: c.textSecondary }}>
+              {"jobId" in scope
+                ? t("Dosyalar işin dosya alanına yüklenir, buraya bağlanır.")
+                : "departmentId" in uploadTarget
+                ? t("Dosyalar departmanın dosya alanına yüklenir, buraya bağlanır.")
+                : t("Dosyalar şirketin dosya alanına yüklenir, buraya bağlanır.")}
             </span>
-          )}
+          </div>
           {medyaHata && <span style={{ fontSize: 12, color: c.danger }}>{medyaHata}</span>}
         </div>
+
+        {/* ---------------------------------------------- Kapak (reels) */}
+        {kapakGoster && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {label(t("Kapak görseli"))}
+            <span style={{ fontSize: 11, color: c.textSecondary }}>
+              {t(
+                "Reels'in profilde ve akışta görünen kapağı. Seçmezsen Instagram videonun ilk karesini kullanır. JPEG olmalı."
+              )}
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {saved?.coverFileId && (
+                <div
+                  style={{
+                    width: 72,
+                    height: 128,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    border: `1px solid ${c.border}`,
+                    background: c.background,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {kapakOnizleme ? (
+                    <img
+                      src={kapakOnizleme}
+                      alt={t("Kapak görseli")}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Kapak")}</span>
+                  )}
+                </div>
+              )}
+              <input
+                ref={kapakInput}
+                type="file"
+                accept="image/jpeg"
+                onChange={(e) => void kapakYukle(e.target.files)}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                onClick={() => kapakInput.current?.click()}
+                disabled={kapakIsleniyor || uploading}
+                style={{ ...ikincilDugme, fontSize: 13, padding: "6px 12px" }}
+              >
+                <IconUpload size={14} color={c.textSecondary} />
+                {kapakIsleniyor && uploadPct > 0
+                  ? t("Yükleniyor… %{n}", { n: uploadPct })
+                  : saved?.coverFileId
+                  ? t("Kapağı değiştir")
+                  : t("Kapak yükle")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDosyaSecici("kapak")}
+                disabled={kapakIsleniyor || uploading}
+                style={{ ...ikincilDugme, fontSize: 13, padding: "6px 12px" }}
+              >
+                <IconFolder size={14} color={c.textSecondary} />
+                {t("Dosyalardan seç")}
+              </button>
+              {saved?.coverFileId && (
+                <button
+                  type="button"
+                  onClick={() => void kapakAyarla(null).catch(() => undefined)}
+                  disabled={kapakIsleniyor}
+                  title={t("Kapak içerikten kaldırılır; dosya silinmez")}
+                  style={{ ...ikincilDugme, fontSize: 13, padding: "6px 12px", color: c.textSecondary }}
+                >
+                  <IconTrash size={13} color={c.textSecondary} />
+                  {t("Kapağı kaldır")}
+                </button>
+              )}
+            </div>
+            {media.length > 1 && saved?.coverFileId && (
+              <span style={{ fontSize: 11, color: c.warning }}>
+                {t("Bu içerik karusel: Instagram karusele ayrı kapak almıyor, kapak ilk medyadır.")}
+              </span>
+            )}
+          </div>
+        )}
+
+          </span>
+        )}
 
         {/* ---------------------------------------------- Plan */}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1528,6 +1818,15 @@ export default function SocialPostComposer({
           confirmLabel={t("Kaldır")}
           onConfirm={remove}
           onCancel={() => setSilinecek(false)}
+        />
+      )}
+      {dosyaSecici && (
+        <SocialFilePickerModal
+          scope={scope}
+          mode={dosyaSecici}
+          mevcut={dosyaSecici === "medya" ? media.map((m) => m.fileId) : []}
+          onClose={() => setDosyaSecici(null)}
+          onPicked={(files) => (dosyaSecici === "kapak" ? kapakAyarla(files[0].id) : attachMany(files))}
         />
       )}
       {browsingDrive && uploadTarget && (

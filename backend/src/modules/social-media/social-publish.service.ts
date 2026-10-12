@@ -154,6 +154,8 @@ export class SocialPublishService {
         // Migration 139 öncesi kolon yok: undefined = normal gönderi.
         trialReel: post.trial_reel,
         mediaFileIds: mediaFileIds(post),
+        // Migration 164 öncesi kolon yok: kapaksız (Meta ilk kareyi seçer).
+        coverFileId: post.cover_file_id ?? null,
         // Dosyalar kullanıcı yetkisiyle okunur; sistem adına arka kapı yok.
         // Zamanlanmış yayında içeriği oluşturan kişi adına hareket edilir.
         actingUserId: post.created_by ?? post.assignee_id,

@@ -7,10 +7,12 @@ import type {
   SocialPostCollaboratorInput,
   SocialPostMedia,
   SocialPostTarget,
+  ProjectFile,
 } from "@projelio/shared";
 import { instagramKaruselHatasi } from "@projelio/shared";
 import { requireSafeUrl } from "../../common/safe-url";
 import { SupabaseService } from "../../database/supabase.service";
+import { FilesService, type FileOwner } from "../files/files.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { hesapsizPlanHatasi, isQueueable, normalizeHandle } from "./publish-format";
 
@@ -243,6 +245,8 @@ function mapPost(row: any, assigneeName?: string): SocialPost {
     publishVia: row.publish_via ?? "projelio",
     externalTool: row.external_tool ?? undefined,
     trialReel: row.trial_reel ?? undefined,
+    // Migration 164 öncesi kolon yok: kapaksız.
+    coverFileId: row.cover_file_id ?? undefined,
     targets: (row.social_post_targets ?? []).map(mapTarget),
     media: (row.social_post_media ?? []).map(mapMedia).sort((a, b) => a.sortOrder - b.sortOrder),
     collaborators: (row.social_post_collaborators ?? [])
@@ -278,7 +282,8 @@ function nullable(value: string | undefined | null): string | null | undefined {
 export class SocialMediaService {
   constructor(
     private supabase: SupabaseService,
-    private moduleMembers: ModuleMembersService
+    private moduleMembers: ModuleMembersService,
+    private files: FilesService
   ) {}
 
   // ============================================================ Yetki
@@ -601,6 +606,8 @@ export class SocialMediaService {
         // Deneme reels de taşınır: bir seriyi önce denemeyle çıkaran ekip
         // kopyada da aynısını bekler. Migration 139 öncesi kolon yok.
         ...("trial_reel" in existing ? { trial_reel: existing.trial_reel ?? null } : {}),
+        // Kapak da taşınır: aynı videoyu tekrar paylaşan, aynı kapağı bekler.
+        ...(existing.cover_file_id ? { cover_file_id: existing.cover_file_id } : {}),
       })
       .select("id")
       .single();
@@ -1027,13 +1034,11 @@ export class SocialMediaService {
     const post = await this.rawPost(postId);
     await this.assertCanWrite(this.scopeOf(post), userId);
     if (!body.fileId) throw new BadRequestException("fileId gerekli");
-
-    const { data: file } = await this.supabase.client
-      .from("files")
-      .select("id")
-      .eq("id", body.fileId)
-      .maybeSingle();
-    if (!file) throw new NotFoundException("Dosya bulunamadı");
+    // Dosya kullanıcının GÖREBİLDİĞİ bir dosya olmalı. Eskiden yalnızca var mı
+    // diye bakılıyordu; dosyalar artık klasör gezinmesinden toplu seçildiği
+    // için kimlik tahmin edip başka bir şirketin dosyasını gönderiye bağlamak
+    // (ve Lio önerisiyle içeriğini okutmak) mümkün olmamalı.
+    await this.dosyaErisimi(body.fileId, userId);
 
     const { data: last } = await this.supabase.client
       .from("social_post_media")
@@ -1080,5 +1085,174 @@ export class SocialMediaService {
       .eq("id", mediaId);
     if (delError) throw delError;
     return { ok: true };
+  }
+
+  /**
+   * Dosyaya erişim kapısı: kullanıcı yoksa (sistem/Lio arka planı) yalnızca
+   * varlık denetlenir, varsa dosya ekranındaki kuralın aynısı (FilesService.findById).
+   */
+  private async dosyaErisimi(fileId: string, userId?: string): Promise<{ mimeType?: string; name?: string }> {
+    if (userId) {
+      const { file } = await this.files.findById(fileId, userId);
+      return { mimeType: file.mimeType ?? undefined, name: file.name };
+    }
+    const { data } = await this.supabase.client
+      .from("files")
+      .select("id, name, mime_type")
+      .eq("id", fileId)
+      .maybeSingle();
+    if (!data) throw new NotFoundException("Dosya bulunamadı");
+    return { mimeType: data.mime_type ?? undefined, name: data.name ?? undefined };
+  }
+
+  /**
+   * İçerik kapağı (reels kapak görseli) — migration 164.
+   *
+   * NEDEN: kapak Projelio'da seçilemediği için kullanıcı gönderiyi yayımlayıp
+   * Instagram uygulamasına girerek kapağı elle değiştiriyordu. Meta tekil
+   * videoda `cover_url` alıyor; kapak burada tutulup yayın anında oraya gider
+   * (bkz. InstagramPublishService).
+   *
+   * Yalnızca JPEG: yayındaki görsel kuralıyla aynı (stageMedia). Seçim anında
+   * reddetmek, hatanın yayın saatinde çıkmasından iyi.
+   *
+   * Instagram'a GİTMİŞ bir gönderinin kapağı buradan değişmez — Meta'nın
+   * yayın API'si yayımlanmış medyayı düzenlemeye izin vermiyor. Kayıt yine
+   * güncellenir (tekrar paylaşımda kullanılır); arayüz bunu ayrıca söylüyor.
+   */
+  async setCover(postId: string, fileId: string | null, userId?: string): Promise<SocialPost> {
+    const post = await this.rawPost(postId);
+    await this.assertCanWrite(this.scopeOf(post), userId);
+    if (fileId) {
+      const dosya = await this.dosyaErisimi(fileId, userId);
+      if (dosya.mimeType !== "image/jpeg") {
+        throw new BadRequestException(
+          `Kapak JPEG olmalı; "${dosya.name ?? "dosya"}" ${dosya.mimeType ?? "bilinmeyen"} biçiminde. Instagram yalnızca JPEG kabul ediyor.`
+        );
+      }
+    }
+    const { error } = await this.supabase.client
+      .from("social_posts")
+      .update({ cover_file_id: fileId || null, updated_at: new Date().toISOString() })
+      .eq("id", postId);
+    if (error) {
+      if (/cover_file_id/.test(error.message ?? "")) {
+        throw new BadRequestException("Kapak özelliği henüz etkin değil (veritabanı güncellemesi bekleniyor).");
+      }
+      throw error;
+    }
+    return this.findPost(postId, userId);
+  }
+
+  /**
+   * Medyayı en başa alır.
+   *
+   * Karuselde kapak İLK medyadır (Meta karusele ayrı kapak almıyor) ve sıra
+   * yükleme sırasıyla belirleniyordu; kapağı değiştirmenin tek yolu medyayı
+   * kaldırıp yeniden eklemekti.
+   */
+  async moveMediaFirst(mediaId: string, userId?: string): Promise<SocialPost> {
+    const { data: media, error } = await this.supabase.client
+      .from("social_post_media")
+      .select("id, post_id")
+      .eq("id", mediaId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!media) throw new NotFoundException("Medya bulunamadı");
+    const post = await this.rawPost(media.post_id);
+    await this.assertCanWrite(this.scopeOf(post), userId);
+
+    const { data: ilk } = await this.supabase.client
+      .from("social_post_media")
+      .select("sort_order")
+      .eq("post_id", media.post_id)
+      .order("sort_order", { ascending: true })
+      .limit(1);
+    const enKucuk = (ilk?.[0]?.sort_order as number) ?? 0;
+    const { error: updError } = await this.supabase.client
+      .from("social_post_media")
+      .update({ sort_order: enKucuk - 1 })
+      .eq("id", mediaId);
+    if (updError) throw updError;
+    return this.findPost(media.post_id, userId);
+  }
+
+  /**
+   * İçerik penceresinden dosya ağacında gezinme ("Dosyalardan seç").
+   *
+   * NEDEN: görseller/videolar çoğu zaman zaten Projelio'nun Dosyalar
+   * bölümünde, klasör klasör duruyor. Pencerede yalnızca bilgisayardan yükleme
+   * ve tek dosyalık Drive seçicisi vardı; kullanıcı aynı dosyaları
+   * bilgisayarına indirip yeniden yüklüyordu.
+   *
+   * Kökler kapsamdan çıkar, istemciden GELMEZ: iş kapsamında işin ağacı,
+   * şirket kapsamında departmanın klasörü (varsa) ve şirketin klasörü —
+   * kullanıcı o klasörü açabiliyorsa. Dosya listesi görsel/video ile süzülür:
+   * gönderiye başka bir şey eklenemiyor.
+   */
+  async browseFiles(
+    scope: SocialScope,
+    userId: string,
+    kok: string | undefined,
+    folderId?: string
+  ): Promise<{
+    roots: { key: string; label: string }[];
+    root: string | null;
+    folders: { id: string; name: string }[];
+    files: ProjectFile[];
+    breadcrumb: { id: string; name: string }[];
+  }> {
+    await this.assertCanRead(scope, userId);
+
+    const kokler: { key: string; label: string; owner: FileOwner }[] = [];
+    if ("jobId" in scope) {
+      kokler.push({ key: "job", label: "İşin dosyaları", owner: { kind: "job", id: scope.jobId } });
+    } else {
+      if (scope.departmentId) {
+        const ok = await this.files
+          .assertFlatAccess({ kind: "department", id: scope.departmentId }, userId)
+          .then(() => true)
+          .catch(() => false);
+        if (ok) {
+          kokler.push({
+            key: "department",
+            label: "Departman dosyaları",
+            owner: { kind: "department", id: scope.departmentId },
+          });
+        }
+      }
+      const orgOk = await this.files
+        .assertFlatAccess({ kind: "organization", id: scope.organizationId }, userId)
+        .then(() => true)
+        .catch(() => false);
+      if (orgOk) {
+        kokler.push({
+          key: "organization",
+          label: "Şirket dosyaları",
+          owner: { kind: "organization", id: scope.organizationId },
+        });
+      }
+    }
+
+    const roots = kokler.map(({ key, label }) => ({ key, label }));
+    const secilen = kokler.find((k) => k.key === kok) ?? kokler[0];
+    if (!secilen) return { roots, root: null, folders: [], files: [], breadcrumb: [] };
+    const owner = secilen.owner;
+
+    const [folders, files, breadcrumb] = await Promise.all([
+      this.files.listFolders(owner, userId, folderId),
+      owner.kind === "job"
+        ? this.files.listByJob(owner.id, userId, { scope: "all", folderId, atRoot: !folderId })
+        : this.files.listByFlat({ kind: owner.kind, id: owner.id }, userId, folderId),
+      folderId ? this.files.folderPath(folderId, userId) : Promise.resolve([]),
+    ]);
+
+    return {
+      roots,
+      root: secilen.key,
+      folders: folders.map((f) => ({ id: f.id, name: f.name })),
+      files: files.filter((f) => /^(image|video)\//.test(f.mimeType ?? "")),
+      breadcrumb: breadcrumb.map((f) => ({ id: f.id, name: f.name })),
+    };
   }
 }

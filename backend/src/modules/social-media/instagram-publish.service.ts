@@ -111,6 +111,8 @@ export class InstagramPublishService {
     collaborators?: string[];
     /** Deneme reels (migration 139): "manual" | "performance". Boşsa normal gönderi. */
     trialReel?: string | null;
+    /** Reels kapak görseli (migration 164). Yalnızca tekil videoda kullanılır. */
+    coverFileId?: string | null;
     actingUserId: string;
     /** Yarım kalmış denemeden gelen konteyner — medya yeniden yüklenmesin. */
     existingContainerId?: string | null;
@@ -125,6 +127,7 @@ export class InstagramPublishService {
     const caption = params.caption.slice(0, MAX_CAPTION);
     let containerId = params.existingContainerId ?? null;
     const staged: StagedMedia[] = [];
+    let kapak: StagedMedia | undefined;
 
     try {
       if (!containerId) {
@@ -143,6 +146,13 @@ export class InstagramPublishService {
           staged.push(await this.stageMedia(fileId, params.actingUserId));
         }
 
+        // Kapak yalnızca TEKİL videoda anlamlı: Meta karusel öğelerine ve
+        // görsele `cover_url` almıyor. Karuselde kapak ilk medyadır.
+        if (params.coverFileId && staged.length === 1 && staged[0].isVideo) {
+          kapak = await this.stageMedia(params.coverFileId, params.actingUserId);
+          if (kapak.isVideo) throw new PublishError("Kapak bir görsel olmalı (JPEG), video olamaz.", true);
+        }
+
         if (params.trialReel) {
           // Medya biçimi ancak dosya açılınca kesinleşiyor; kontrol bu yüzden
           // kopyalamadan sonra. Kopyalar finally'de siliniyor.
@@ -158,7 +168,8 @@ export class InstagramPublishService {
                 staged[0],
                 caption,
                 params.collaborators,
-                params.trialReel
+                params.trialReel,
+                kapak
               )
             : await this.createCarousel(params.externalAccountId, token.accessToken, staged, caption, params.collaborators);
 
@@ -173,7 +184,7 @@ export class InstagramPublishService {
     } finally {
       // Kopyalar her hâlükârda silinir: başarısız denemenin artığı public bir
       // kovada kalmamalı.
-      await this.cleanup(staged.map((s) => s.storagePath));
+      await this.cleanup([...staged, ...(kapak ? [kapak] : [])].map((s) => s.storagePath));
     }
   }
 
@@ -260,7 +271,8 @@ export class InstagramPublishService {
     media: StagedMedia,
     caption: string,
     collaborators?: string[],
-    trialReel?: string | null
+    trialReel?: string | null,
+    kapak?: StagedMedia
   ): Promise<string> {
     const body: Record<string, string> = { caption, access_token: accessToken, ...collaboratorParam(collaborators) };
     if (media.isVideo) {
@@ -270,6 +282,8 @@ export class InstagramPublishService {
       body.media_type = "REELS";
       // Deneme reels: önce yalnızca takipçi olmayanlara gösterilir.
       Object.assign(body, trialParam(trialReel));
+      // Kapak: kullanıcı seçmediyse Meta videonun ilk karesini kullanır.
+      if (kapak) body.cover_url = kapak.publicUrl;
     } else {
       body.image_url = media.publicUrl;
     }

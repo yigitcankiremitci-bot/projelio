@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import {
   ODEME_YONTEMLERI,
   evrakliMi,
+  kalanTutar,
   tahsilatTutariHatasi,
   tahsilEdilen,
   type MusteriSiparisi,
@@ -60,7 +61,7 @@ function metin(value: unknown): string | null {
 }
 
 const SIPARIS_SECIM =
-  "*, tahsilatlar:musteri_tahsilatlari(*), party:party(display_name, owner_user_id), urun:products(name)";
+  "*, tahsilatlar:musteri_tahsilatlari(*), party:party(display_name, owner_user_id), urun:products(name), fatura:module_records!invoice_record_id(id, data)";
 
 function mapTahsilat(row: any, adlar: Map<string, string>): MusteriTahsilati {
   return {
@@ -90,6 +91,13 @@ function mapSiparis(row: any, adlar: Map<string, string>): MusteriSiparisi {
     aciklama: row.aciklama ?? undefined,
     productId: row.product_id ?? undefined,
     productName: row.urun?.name ?? undefined,
+    fatura: row.fatura
+      ? {
+          id: row.fatura.id,
+          faturaNo: row.fatura.data?.invoiceNo || undefined,
+          tarih: row.fatura.data?.issueDate || undefined,
+        }
+      : undefined,
     miktar: row.miktar === null || row.miktar === undefined ? undefined : Number(row.miktar),
     birim: row.birim ?? undefined,
     tutar: Number(row.tutar),
@@ -344,6 +352,7 @@ export class SiparisService {
       `Tahsilat: ${tutar} ${siparis.paraBirimi}`,
       userId
     );
+    await this.faturaDurumunuEsitle(siparis.id);
     return this.tekil(siparis.id);
   }
 
@@ -361,6 +370,7 @@ export class SiparisService {
 
     const { error } = await this.supabase.client.from("musteri_tahsilatlari").delete().eq("id", tahsilatId);
     if (error) throw error;
+    await this.faturaDurumunuEsitle(siparis.id);
     return this.tekil(siparis.id);
   }
 
@@ -472,6 +482,7 @@ export class SiparisService {
       await this.supabase.client.from("musteri_tahsilatlari").delete().eq("id", t.id);
       throw err;
     }
+    await this.faturaDurumunuEsitle(p.siparis.id);
     return this.tekil(p.siparis.id);
   }
 
@@ -484,6 +495,63 @@ export class SiparisService {
       .maybeSingle();
     if (error) throw error;
     return data?.id ?? null;
+  }
+
+  // ============================================================ Fatura bağı
+  //
+  // Faturanın KAYDI ve BELGESİ Faturalar modülünde (FaturalarService). Burada
+  // yalnızca siparişin yetkisi ve bağın kendisi var — faturalar modülü
+  // siparişi bilir, sipariş faturalar modülünü bilmez (bağımlılık tek yönlü).
+
+  /** Faturası değiştirilecek sipariş; müşteriye yazma yetkisi şart. */
+  async faturaIcinSiparis(id: string, userId: string): Promise<MusteriSiparisi> {
+    const siparis = await this.tekil(id);
+    const party = await this.partyService.findOne(siparis.partyId);
+    await this.yetkiIste(party, userId, "yazar");
+    return siparis;
+  }
+
+  /** Bağı kurar ya da (null) koparır. Yetki çağıranda doğrulanmış olmalı. */
+  async faturaBagla(id: string, recordId: string | null): Promise<MusteriSiparisi> {
+    const { error } = await this.supabase.client
+      .from("musteri_siparisleri")
+      .update({ invoice_record_id: recordId, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (error) {
+      if ((error as any).code === "23505") throw new BadRequestException("Bu fatura başka bir siparişe bağlı");
+      throw error;
+    }
+    if (recordId) await this.faturaDurumunuEsitle(id);
+    return this.tekil(id);
+  }
+
+  /**
+   * Faturanın "Ödendi / Bekliyor" durumu tahsilattan gelir.
+   *
+   * Elle tutulsaydı tahsilat girildiği hâlde fatura listesinde "Bekliyor"
+   * kalırdı ve ödenmemiş faturalar sayacı yalan söylerdi. Hata işi DÜŞÜRMEZ:
+   * tahsilat kasaya gerçekten yazıldı, bir etiketin güncellenememesi onu geri
+   * almanın sebebi değil.
+   */
+  private async faturaDurumunuEsitle(siparisId: string): Promise<void> {
+    try {
+      const siparis = await this.tekil(siparisId);
+      if (!siparis.fatura) return;
+      const { data: kayit } = await this.supabase.client
+        .from("module_records")
+        .select("data")
+        .eq("id", siparis.fatura.id)
+        .maybeSingle();
+      if (!kayit) return;
+      const durum = kalanTutar(siparis) <= 0 ? "paid" : "pending";
+      if ((kayit.data as any)?.status === durum) return;
+      await this.supabase.client
+        .from("module_records")
+        .update({ data: { ...(kayit.data as object), status: durum }, updated_at: new Date().toISOString() })
+        .eq("id", siparis.fatura.id);
+    } catch {
+      // Bkz. yukarıdaki gerekçe.
+    }
   }
 
   // ============================================================ Yardımcılar

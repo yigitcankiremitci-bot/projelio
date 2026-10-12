@@ -4629,6 +4629,11 @@ export interface MusteriSiparisi {
    */
   productId?: string;
   productName?: string;
+  /**
+   * Siparişin faturası: Faturalar modülünün kaydı (fm_fatura, migration 166).
+   * Belgesi o kayda bağlı, ay klasöründe ve ay sonu arşivinde.
+   */
+  fatura?: { id: string; faturaNo?: string; tarih?: string };
   miktar?: number;
   birim?: string;
   tutar: number;

@@ -20,6 +20,7 @@ import { memoryStorage } from "multer";
 import type { Response } from "express";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { INLINE_UPLOAD_LIMIT } from "../files/files.service";
+import { AccessService } from "../../common/access/access.service";
 import { FATURA_MODULU, FaturalarService, type FaturaKapsami } from "./faturalar.service";
 import { LioYardimiService } from "./lio-yardimi.service";
 
@@ -46,7 +47,8 @@ function kapsamCoz(scope: string | undefined, scopeId: string | undefined): Fatu
 export class FaturalarController {
   constructor(
     private faturalar: FaturalarService,
-    private lioYardimi: LioYardimiService
+    private lioYardimi: LioYardimiService,
+    private access: AccessService
   ) {}
 
   /** Kayda belge ekler; dosya ay klasörüne iner (bkz. migration 112). */
@@ -131,6 +133,35 @@ export class FaturalarController {
   @UseGuards(AuthGuard("jwt"))
   kasaFaturasiniKaldir(@Param("id") id: string, @Req() req: any) {
     return this.faturalar.kasaFaturasiniKaldir(id, req.user.userId);
+  }
+
+  // ------------------------------------------------------- sipariş bağı
+  //
+  // Belge isteğe bağlı: fatura önce numarasıyla açılıp belgesi sonradan
+  // (module-records/:id/attachments) eklenebilir.
+
+  @Post("siparisler/:id/invoice")
+  @UseGuards(AuthGuard("jwt"), UploadRateLimitGuard)
+  @UseInterceptors(
+    FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: INLINE_UPLOAD_LIMIT } })
+  )
+  async siparisFaturasi(
+    @Param("id") id: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { faturaNo?: string; tarih?: string },
+    @Req() req: any
+  ) {
+    // Sipariş uçlarıyla aynı kapı (bkz. PartyController): taşeron kontrolü
+    // modül yetkisinde değil, uçta.
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.faturalar.siparisFaturasi(id, body ?? {}, file, req.user.userId);
+  }
+
+  @Delete("siparisler/:id/invoice")
+  @UseGuards(AuthGuard("jwt"))
+  async siparisFaturasiniKaldir(@Param("id") id: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.faturalar.siparisFaturasiniKaldir(id, req.user.userId);
   }
 
   // -------------------------------------------------------------- ay sonu

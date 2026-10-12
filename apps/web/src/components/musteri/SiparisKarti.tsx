@@ -16,6 +16,7 @@ import { useT } from "../../lib/i18n";
 import { fmtPara, fmtTarih } from "../butce/butceBicim";
 import { IconTrash } from "../icons";
 import SiparisFormu from "./SiparisFormu";
+import SiparisFaturasi from "./SiparisFaturasi";
 import { Alan, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
 
 /**
@@ -118,6 +119,7 @@ export default function SiparisKarti({
               t("Vade {tarih}", { tarih: fmtTarih(siparis.vadeTarihi) }),
               siparis.miktar !== undefined ? `${siparis.miktar}${siparis.birim ? ` ${siparis.birim}` : ""}` : undefined,
               t(ODEME_YONTEMI_ETIKET[siparis.odemeYontemi]),
+              siparis.fatura ? (siparis.fatura.faturaNo ? t("Fatura #{no}", { no: siparis.fatura.faturaNo }) : t("Faturalı")) : undefined,
               sorumluGoster ? siparis.sorumluAdi ?? t("Sorumlu yok") : undefined,
             ]
               .filter(Boolean)
@@ -172,6 +174,8 @@ export default function SiparisKarti({
               ))}
             </div>
           )}
+
+          <SiparisFaturasi siparis={siparis} yazabilir={yazabilir} onDegisti={onDegisti} />
 
           {mod === "tahsil" ? (
             <TahsilatFormu

@@ -1,4 +1,4 @@
-import type { ProjectFile } from "@projelio/shared";
+import type { MusteriSiparisi, ProjectFile } from "@projelio/shared";
 import { API_URL, api } from "./client";
 
 /**
@@ -94,6 +94,21 @@ export const faturalarApi = {
   /** Kasa satırının faturası: `recordId` verilirse eşleştirir, verilmezse yeni kayıt açar. */
   kasaFaturasi: (transactionId: string, body: { recordId?: string; departmentId?: string } = {}) =>
     api.post<{ recordId: string }>(`/budget/transactions/${transactionId}/invoice`, body),
+
+  /**
+   * Siparişin faturasını açar (Faturalar modülünde kayıt) ve bağlar; belge
+   * verilirse fatura tarihinin ay klasörüne yüklenir.
+   */
+  siparisFaturasi: (siparisId: string, alanlar: { faturaNo?: string; tarih?: string }, file?: File) => {
+    const form = new FormData();
+    if (alanlar.faturaNo) form.append("faturaNo", alanlar.faturaNo);
+    if (alanlar.tarih) form.append("tarih", alanlar.tarih);
+    if (file) form.append("file", file);
+    return api.uploadFile<MusteriSiparisi>(`/siparisler/${siparisId}/invoice`, form);
+  },
+
+  /** Bağı koparır; fatura kaydı ve belgesi Faturalar'da durur. */
+  siparisFaturasiniKaldir: (siparisId: string) => api.delete<MusteriSiparisi>(`/siparisler/${siparisId}/invoice`),
 
   kasaFaturasiniKaldir: (transactionId: string) =>
     api.delete<{ success: true }>(`/budget/transactions/${transactionId}/invoice`),

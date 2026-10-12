@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import type { ModuleRecord } from "@projelio/shared";
+import type { ModuleRecord, MusteriSiparisi } from "@projelio/shared";
 import { MODULE_RECORD_CONFIGS, type ModuleAttachmentsConfig } from "@projelio/shared";
 import { JwtService } from "@nestjs/jwt";
 import { getApiPublicUrl, getJwtSecret } from "../../common/config/env";
@@ -10,11 +10,12 @@ import { FileLinksService } from "../file-links/file-links.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
 import { ButceKademeService } from "../budget/butce-kademe.service";
+import { SiparisService } from "../party/siparis.service";
 import type { ViewerKapsami } from "../budget/butce-erisim";
 import { ayAnahtari, ayKlasorAdi, buAy, ekYolu } from "./fatura-klasoru";
 import type { OkunanFatura } from "./fatura-okuma";
 import { LioYardimiService } from "./lio-yardimi.service";
-import { faturaVerisi, kayitKlasorAdi } from "./kasa-faturasi";
+import { faturaVerisi, kayitKlasorAdi, siparisFaturaVerisi } from "./kasa-faturasi";
 import { zipOlustur, type ZipGirdisi } from "./zip";
 
 /** Fatura modülünün katalog anahtarı (bkz. 024_departments_and_org_structure.sql). */
@@ -69,6 +70,7 @@ export class FaturalarService {
     private moduleRecords: ModuleRecordsService,
     private moduleMembers: ModuleMembersService,
     private butceKademe: ButceKademeService,
+    private siparisler: SiparisService,
     private email: EmailService,
     private jwt: JwtService,
     private lioYardimi: LioYardimiService
@@ -216,6 +218,69 @@ export class FaturalarService {
       { moduleKey: FATURA_MODULU, departmentId: departmentId || satir.department_id || undefined, data },
       userId
     );
+  }
+
+  // ===================================================== Sipariş ile fatura bağı
+
+  /**
+   * Siparişin faturasını açar ve bağlar; belge varsa yükler.
+   *
+   * İki yetki birden gerekir: müşteriye yazma (sipariş onun) VE Faturalar
+   * modülüne yazma (kayıt orada açılıyor). Yalnızca birincisi yetseydi
+   * muhasebeye erişimi olmayan satışçı şirketin fatura defterine yazabilirdi.
+   *
+   * Belge yüklenemezse fatura açık KALIR: kayıt ve bağ doğru, belge sonradan
+   * kartın içinden eklenebilir. Yükleme hatası ise kullanıcıya iletilir.
+   */
+  async siparisFaturasi(
+    siparisId: string,
+    body: { faturaNo?: string; tarih?: string },
+    file: Express.Multer.File | undefined,
+    userId: string
+  ): Promise<MusteriSiparisi> {
+    const siparis = await this.siparisler.faturaIcinSiparis(siparisId, userId);
+    if (siparis.fatura) throw new BadRequestException("Bu siparişin zaten faturası var");
+
+    const data = siparisFaturaVerisi(siparis, body) as unknown as Record<string, unknown>;
+    const record = siparis.jobId
+      ? await this.moduleRecords.createForJob(siparis.jobId, { moduleKey: FATURA_MODULU, data }, userId)
+      : await this.moduleRecords.create(
+          siparis.organizationId!,
+          { moduleKey: FATURA_MODULU, departmentId: await this.faturaDepartmani(siparis.organizationId!), data },
+          userId
+        );
+
+    try {
+      await this.siparisler.faturaBagla(siparisId, record.id);
+    } catch (err) {
+      // Bkz. kasaFaturasi: hiçbir şeye bağlı olmayan boş fatura kalmasın.
+      await this.moduleRecords.remove(record.id, userId).catch(() => {});
+      throw err;
+    }
+
+    if (file) await this.belgeyiKaydaBagla(record, file, userId);
+    return this.siparisler.faturaIcinSiparis(siparisId, userId);
+  }
+
+  /** Bağı koparır; fatura kaydı ve belgesi Faturalar'da DURUR (bkz. kasaFaturasiniKaldir). */
+  async siparisFaturasiniKaldir(siparisId: string, userId: string): Promise<MusteriSiparisi> {
+    await this.siparisler.faturaIcinSiparis(siparisId, userId);
+    return this.siparisler.faturaBagla(siparisId, null);
+  }
+
+  /**
+   * Fatura modülünün açık olduğu departman. Kayıt oraya yazılır ki yetkisi
+   * modülün departmanından çözülsün (bkz. ModuleRecordsService.findByOrganization).
+   */
+  private async faturaDepartmani(organizationId: string): Promise<string | undefined> {
+    const { data } = await this.supabase.client
+      .from("organization_modules")
+      .select("department_id")
+      .eq("organization_id", organizationId)
+      .eq("module_key", FATURA_MODULU)
+      .limit(1)
+      .maybeSingle();
+    return data?.department_id ?? undefined;
   }
 
   // ============================================================== Ay arşivi

@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { faturaVerisi, kayitKlasorAdi } from "./kasa-faturasi";
+import { faturaVerisi, kayitKlasorAdi, siparisFaturaVerisi } from "./kasa-faturasi";
 
 test("gelir bizim kestiğimiz, gider bize kesilen faturadır", () => {
   assert.equal(faturaVerisi({ type: "income" }).direction, "issued");
@@ -67,4 +67,36 @@ test("klasör adı alt klasör AÇMAZ", () => {
 
 test("tarihi bozuk kayıt varsayılana düşer, adsız kalmaz", () => {
   assert.ok(kayitKlasorAdi({ id: "dddddddd", data: { issueDate: "14.09.2026" } }, "2026-09").startsWith("2026-09 "));
+});
+
+const SIPARIS = {
+  partyId: "p1",
+  tutar: 1000,
+  paraBirimi: "USD",
+  siparisTarihi: "2026-09-14",
+  siparisNo: "S-12",
+  aciklama: "200 koli",
+  tahsilatlar: [] as { tutar: number }[],
+};
+
+test("siparişin faturası kesilen faturadır; tutar, birim ve müşteri siparişten gelir", () => {
+  const d = siparisFaturaVerisi(SIPARIS, { faturaNo: " F-7 " });
+  assert.equal(d.direction, "issued");
+  assert.equal(d.amount, 1000);
+  assert.equal(d.currency, "USD");
+  assert.equal(d.counterpartyName, "p1");
+  assert.equal(d.invoiceNo, "F-7");
+  assert.equal(d.notes, "Sipariş #S-12 · 200 koli");
+});
+
+test("sipariş faturasının tarihi verilmezse sipariş tarihidir (ay klasörü ona göre)", () => {
+  assert.equal(siparisFaturaVerisi(SIPARIS, {}).issueDate, "2026-09-14");
+  assert.equal(siparisFaturaVerisi(SIPARIS, { tarih: "2026-10-01" }).issueDate, "2026-10-01");
+  assert.equal(siparisFaturaVerisi(SIPARIS, { tarih: "bozuk" }).issueDate, "2026-09-14");
+});
+
+test("sipariş faturasının durumu tahsilattan gelir", () => {
+  assert.equal(siparisFaturaVerisi(SIPARIS, {}).status, "pending");
+  assert.equal(siparisFaturaVerisi({ ...SIPARIS, tahsilatlar: [{ tutar: 400 }] }, {}).status, "pending");
+  assert.equal(siparisFaturaVerisi({ ...SIPARIS, tahsilatlar: [{ tutar: 400 }, { tutar: 600 }] }, {}).status, "paid");
 });

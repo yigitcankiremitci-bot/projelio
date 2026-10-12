@@ -11,13 +11,15 @@ import { FaturalarController } from "./faturalar.controller";
 import { FaturalarService } from "./faturalar.service";
 import { LioYardimiService } from "./lio-yardimi.service";
 import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
+import { PartyModule } from "../party/party.module";
 
 /**
  * Faturaların BELGE tarafı (bkz. migration 112).
  *
  * Ayrı modül, çünkü işin kendisi dört ayrı modülün kesişiminde duruyor: kayıt
- * (module-records), dosya (files + file-links), para (budget) ve e-posta.
- * Dördünden birinin içine koymak, diğer üçünü oraya bağımlı yapardı.
+ * (module-records), dosya (files + file-links), para (budget) ve e-posta;
+ * siparişin faturası için müşteri siparişleri (party) de.
+ * Birinin içine koymak, diğerlerini oraya bağımlı yapardı.
  *
  * Bağımlılık yönü TEK YÖNLÜ: bu modül hepsini içeri alır, hiçbiri bunu almaz.
  */
@@ -28,6 +30,8 @@ import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
     ModuleRecordsModule,
     ModuleMembersModule,
     BudgetModule,
+    // Siparişin faturası: sipariş yetkisi ve bağ SiparisService'te.
+    PartyModule,
     EmailModule,
     // Kredi defteri ve sağlayıcı yönlendirici: belge okuma ikisini de kullanıyor.
     AiAssistantModule,

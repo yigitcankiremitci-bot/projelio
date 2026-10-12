@@ -881,6 +881,8 @@ export const hatalar: TranslationDict = {
   "Ürün bu müşterinin şirketine ait değil": "This product doesn't belong to the customer's company",
   "Ürün yalnızca şirket müşterilerinin siparişine bağlanabilir": "Products can only be linked to orders of company customers",
   "Arşivdeki ürün siparişe bağlanamaz": "An archived product can't be linked to an order",
+  "Bu fatura başka bir siparişe bağlı": "This invoice is linked to another order",
+  "Bu siparişin zaten faturası var": "This order already has an invoice",
   "Yalnızca sana atanmış müşterileri düzenleyebilirsin": "You can only edit customers assigned to you",
   "Tahsilat, siparişin kalan tutarını aşamaz": "A collection can't exceed the order's remaining amount",
   "Bu kayıt bir müşteri tahsilatından oluştu; Müşteriler ekranında siparişin tahsilatından düzenleyin": "This entry was created by a customer collection; edit it from the order's collection on the Customers screen",

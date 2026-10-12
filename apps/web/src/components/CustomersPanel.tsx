@@ -1231,10 +1231,13 @@ export default function CustomersPanel({
         color: c.textSecondary,
       }}
     >
-      {t("Sırala:")}
+      {/* "Sırala:" yazısı yok — seçenek adları zaten sıralama olduğunu söylüyor
+          (kullanıcı isteği, 2026-10-12); ekran okuyucu için aria-label. */}
       <select
         value={siralama}
         onChange={(e) => siralamaSec(e.target.value as Siralama)}
+        aria-label={t("Sırala")}
+        title={t("Sırala")}
         style={{ fontSize: 12, padding: "3px 6px" }}
       >
         {siralamaSecenekleri.map((s) => (

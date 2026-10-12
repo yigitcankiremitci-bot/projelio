@@ -107,6 +107,7 @@ export const baglantilar: TranslationDict = {
 
   // ─────────────────────────────────────────────── Sıralama
   "Sırala:": "Sort:",
+  "Sırala": "Sort",
   "Ad (A–Z)": "Name (A–Z)",
   "Son eklenen": "Recently added",
   "Son güncellenen": "Recently updated",
@@ -191,7 +192,7 @@ export const baglantilar: TranslationDict = {
   // ─────────────────────────────────────────────── Bağlantı listeleri
   "\"{ad}\" listesi silinsin mi? İçindeki {n} bağlantı silinmez, Tümü'nde kalır.":
     "Delete the \"{ad}\" list? Its {n} contacts aren't deleted; they stay under All.",
-  "\"{ad}\" listesi:": "\"{ad}\" list:",
+  "Listeyi düzenle": "Edit list",
   "\"{liste}\" listesinde {n} bağlantı var.": "The \"{liste}\" list now has {n} contacts from this file.",
   "+ Yeni liste": "+ New list",
   "Hangi bağlantı listesine eklensin?": "Which contact list should they go to?",

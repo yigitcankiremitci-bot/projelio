@@ -74,6 +74,27 @@ textarea {
   }
 }
 
+/*
+ * Açılır kutunun oku. Tarayıcının kendi oku kutunun en sağ kenarına yapışıyor
+ * ve bileşenler satır içi küçük dolgu verince ("3px 6px") kutudan taşıyor gibi
+ * görünüyordu (kullanıcı geri bildirimi, 2026-10-12). Kendi okumuz: sağdan
+ * 10px içerde, metinle çakışmasın diye sağ dolgu sabit.
+ *
+ * `!important` BİLEREK: bileşenler satır içi `padding` ve `background`
+ * kısaltması yazıyor; satır içi stil normal kuralı ezer ve ok kaybolurdu.
+ * Renk iki temada da okunan nötr gri (veri URI'sinde tema değişkeni olmuyor).
+ * Çoklu seçim / liste kutuları (multiple, size) okun dışında.
+ */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%238A93A0' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 10px center !important;
+  background-size: 12px 12px !important;
+  padding-right: 30px !important;
+}
+
 input:focus,
 select:focus,
 textarea:focus {

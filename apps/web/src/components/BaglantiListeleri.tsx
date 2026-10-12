@@ -3,6 +3,7 @@ import type { BaglantiListeKaydi } from "@projelio/shared";
 import { partyApi } from "../api/party";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
+import { IconEdit } from "./icons";
 
 /**
  * Bağlantı listeleri (migration 163) — oynatma listesi mantığı.
@@ -53,7 +54,7 @@ export function BaglantiListeSekmeleri({
   const [gorunenleriEkle, setGorunenleriEkle] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hata, setHata] = useState("");
-  const seciliListe = listeler.find((l) => l.id === secili);
+  const duzenlenen = form?.tur === "adlandir" ? listeler.find((l) => l.id === form.id) : undefined;
 
   const kaydet = async () => {
     if (!ad.trim() || !form) return;
@@ -75,18 +76,19 @@ export function BaglantiListeSekmeleri({
     }
   };
 
-  const sil = async (l: BaglantiListeKaydi) => {
-    if (!window.confirm(t("\"{ad}\" listesi silinsin mi? İçindeki {n} bağlantı silinmez, Tümü'nde kalır.", { ad: l.ad, n: l.sayi }))) return;
+  /** true: silindi. Onay sorusundan vazgeçilirse düzenleme formu açık kalır. */
+  const sil = async (l: BaglantiListeKaydi): Promise<boolean> => {
+    if (!window.confirm(t("\"{ad}\" listesi silinsin mi? İçindeki {n} bağlantı silinmez, Tümü'nde kalır.", { ad: l.ad, n: l.sayi }))) return false;
     try {
       await partyApi.listeSil(l.id);
-      onSec("");
+      if (secili === l.id) onSec("");
       onDegisti();
+      return true;
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Silinemedi"));
+      return false;
     }
   };
-
-  const yaziDugmesi = { fontSize: 12, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", padding: "2px 4px", textDecoration: "underline" } as const;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -95,9 +97,26 @@ export function BaglantiListeSekmeleri({
           {t("Tümü")} ({toplam})
         </button>
         {listeler.map((l) => (
-          <button key={l.id} onClick={() => onSec(l.id)} style={sekmeStili(c, secili === l.id)} title={l.olusturanAd ? t("Oluşturan: {ad}", { ad: l.olusturanAd }) : undefined}>
-            ☰ {l.ad} ({l.sayi})
-          </button>
+          <span key={l.id} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+            <button onClick={() => onSec(l.id)} style={sekmeStili(c, secili === l.id)} title={l.olusturanAd ? t("Oluşturan: {ad}", { ad: l.olusturanAd }) : undefined}>
+              ☰ {l.ad} ({l.sayi})
+            </button>
+            {/* Yeniden adlandırma ve silme kalemden: ayrı bir satır kaplamasın. */}
+            {canWrite && (
+              <button
+                onClick={() => {
+                  setForm({ tur: "adlandir", id: l.id });
+                  setAd(l.ad);
+                  setHata("");
+                }}
+                title={t("Listeyi düzenle")}
+                aria-label={t("Listeyi düzenle")}
+                style={{ border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", padding: 3, display: "inline-flex" }}
+              >
+                <IconEdit size={13} />
+              </button>
+            )}
+          </span>
         ))}
         {canWrite && !form && (
           <button
@@ -113,25 +132,6 @@ export function BaglantiListeSekmeleri({
           </button>
         )}
       </div>
-
-      {canWrite && seciliListe && !form && (
-        <div style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12, color: c.textSecondary }}>
-          <span>{t("\"{ad}\" listesi:", { ad: seciliListe.ad })}</span>
-          <button
-            onClick={() => {
-              setForm({ tur: "adlandir", id: seciliListe.id });
-              setAd(seciliListe.ad);
-              setHata("");
-            }}
-            style={yaziDugmesi}
-          >
-            {t("Yeniden adlandır")}
-          </button>
-          <button onClick={() => sil(seciliListe)} style={yaziDugmesi}>
-            {t("Listeyi sil")}
-          </button>
-        </div>
-      )}
 
       {form && (
         <div
@@ -161,7 +161,17 @@ export function BaglantiListeSekmeleri({
             </label>
           )}
           {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
+            {form.tur === "adlandir" && duzenlenen && (
+              <button
+                onClick={async () => {
+                  if (await sil(duzenlenen)) setForm(null);
+                }}
+                style={{ fontSize: 12, border: "none", background: "transparent", color: c.danger, cursor: "pointer", marginRight: "auto", padding: "4px 0" }}
+              >
+                {t("Listeyi sil")}
+              </button>
+            )}
             <button onClick={() => setForm(null)} style={{ ...sekmeStili(c, false), fontSize: 12, padding: "4px 10px" }}>
               {t("Vazgeç")}
             </button>

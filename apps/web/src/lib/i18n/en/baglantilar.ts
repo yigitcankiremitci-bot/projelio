@@ -135,8 +135,15 @@ export const baglantilar: TranslationDict = {
     "The card will also appear in Customers; the relationship note is added to the card's note and the sales team will see it.",
   "Kart Müşteriler'de potansiyel müşteri olarak görünecek; ilişki notu kartın notuna eklenir.":
     "The card will appear in Customers as a lead; the relationship note is added to the card's note.",
-  "Kart Müşteriler'de tedarikçi olarak görünecek; ilişki notu kartın notuna eklenir.":
-    "The card will appear in Customers as a supplier; the relationship note is added to the card's note.",
+  "Kart Tedarik > Tedarikçiler'de görünecek (Müşteriler'e girmez); ilişki notu kartın notuna eklenir.":
+    "The card will appear in Procurement > Suppliers (not in Customers); the relationship note is added to the card's note.",
+  "{ad} Bağlantı ve İlişkiler listesinden çıkarılsın mı? Kart diğer listelerde kalır.":
+    "Remove {ad} from Contacts & Relationships? The card stays in the other lists.",
+  "{ad} Müşteriler listesinden çıkarılsın mı? Kart diğer listelerde (Bağlantılar, Tedarik) kalır.":
+    "Remove {ad} from Customers? The card stays in the other lists (Contacts, Procurement).",
+  "{ad} silinsin mi? Kart arşive kaldırılır; hemen ardından Geri Al ile geri getirebilirsin.":
+    "Delete {ad}? The card is moved to the archive; you can bring it back right after with Undo.",
+  "Listeden çıkarma": "Removal from list",
   "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.":
     "A record will be created for this card in Competitor & Industry Analysis; the relationship note goes into its note.",
   "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.":

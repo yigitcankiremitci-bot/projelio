@@ -49,11 +49,13 @@ describe("aktarimKaydiVerisi", () => {
 });
 
 describe("defterAktarimiYapildi", () => {
-  test("Müşteriler'de olup tedarikçi rolü yoksa tedarikçi aktarımı yapılmamış sayılır", () => {
+  test("tedarikçi Tedarik defterine gider, Müşteriler'e DEĞİL (kullanıcı şikâyeti, 2026-10-12)", () => {
     const tedarikci = aktarimTanimi("tedarikci")!;
-    assert.equal(defterAktarimiYapildi({ modules: ["crm_musteri"], roles: ["customer"] }, tedarikci), false);
-    assert.equal(defterAktarimiYapildi({ modules: ["crm_musteri"], roles: ["customer", "supplier"] }, tedarikci), true);
-    assert.equal(defterAktarimiYapildi({ modules: ["baglantilar"], roles: ["supplier"] }, tedarikci), false);
+    assert.equal(tedarikci.modul, "oud_tedarik");
+    assert.equal(defterAktarimiYapildi({ modules: ["oud_tedarik"], roles: ["customer"] }, tedarikci), false);
+    assert.equal(defterAktarimiYapildi({ modules: ["baglantilar", "oud_tedarik"], roles: ["supplier"] }, tedarikci), true);
+    // Eski yol: Müşteriler'de tedarikçi rolüyle duran kart aktarılmış sayılmaz.
+    assert.equal(defterAktarimiYapildi({ modules: ["crm_musteri"], roles: ["supplier"] }, tedarikci), false);
   });
 
   test("tanınmayan hedef yok", () => {

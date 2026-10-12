@@ -1,6 +1,7 @@
 import {
   BAGLANTI_MODUL_KEY,
   MUSTERI_MODUL_KEY,
+  TEDARIK_MODUL_KEY,
   type ModuleAccess,
   type PartyModulKey,
 } from "@projelio/shared";
@@ -83,6 +84,13 @@ export function kartDuzenlemeKarari(
   if (modules.includes(MUSTERI_MODUL_KEY) && musteri) {
     return kartDuzenlemeHatasi(musteri, mevcutSorumlu, yeniSorumlu, userId);
   }
+  // Tedarik defteri: Bağlantılar gibi ortak defter, sorumlu süzmesi yok.
+  const tedarik = e[TEDARIK_MODUL_KEY];
+  if (modules.includes(TEDARIK_MODUL_KEY) && tedarik?.canWrite) {
+    const devir = yeniSorumlu !== undefined && yeniSorumlu !== mevcutSorumlu && yeniSorumlu !== userId;
+    if (devir && !tedarik.canManageTeam) return "Kaydı başka birine yalnızca yönetici atayabilir";
+    return null;
+  }
   return "Bu kaydı değiştirme yetkin yok";
 }
 
@@ -110,7 +118,9 @@ export function deftereEklemeHatasi(
   if (!hedefAcik) {
     return hedef === MUSTERI_MODUL_KEY
       ? "Müşteriler modülü burada açık değil"
-      : "Bağlantı ve İlişkiler modülü burada açık değil";
+      : hedef === TEDARIK_MODUL_KEY
+        ? "Tedarik modülü burada açık değil"
+        : "Bağlantı ve İlişkiler modülü burada açık değil";
   }
   if (!hedefErisim?.canWrite) return "Kartı bu deftere eklemek için orada da yazma yetkin olmalı";
   return null;

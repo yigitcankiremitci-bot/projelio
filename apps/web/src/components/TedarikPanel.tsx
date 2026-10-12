@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Party } from "@projelio/shared";
+import { TEDARIK_MODUL_KEY, type Party } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
@@ -12,11 +12,10 @@ import { BaglantiKartiModal } from "./CustomersPanel";
 /**
  * Tedarik modülü: Talepler (kayıt listesi) + Tedarikçiler.
  *
- * Tedarikçinin ayrı bir defteri yok — kart Müşteriler defterinde `supplier`
- * rolüyle durur (bkz. backend party/aktarim.ts). Bağlantılar'dan "Tedarikçi
- * yap" denen kart bu yüzden Tedarik'te hiçbir yerde görünmüyordu, yalnızca
- * talep formunun seçicisinde çıkıyordu (kullanıcı şikâyeti, 2026-10-11).
- * Sahte bir talep kaydı açmak yerine aynı kartlar burada listelenir.
+ * Tedarikçiler Tedarik defterinde (party.modules 'oud_tedarik', 2026-10-12);
+ * eskiden Müşteriler defterine `supplier` rolüyle giriyorlardı, o eski kartlar
+ * da rolleri sayesinde burada listelenir (liste ucu iki defteri birlikte döner).
+ * Sahte bir talep kaydı açmak yerine kartlar burada listelenir.
  */
 export default function TedarikPanel(props: {
   organizationId?: string;
@@ -109,7 +108,13 @@ function TedarikciListesi({
     setEkleniyor(true);
     setHata("");
     try {
-      await api.post(yol, { displayName: ad, partyType: "company", roles: ["supplier"], ...(jobId ? {} : { departmentId }) });
+      await api.post(yol, {
+        displayName: ad,
+        partyType: "company",
+        roles: ["supplier"],
+        modul: TEDARIK_MODUL_KEY,
+        ...(jobId ? {} : { departmentId }),
+      });
       setYeniAd("");
       yukle();
     } catch (err) {

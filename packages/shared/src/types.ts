@@ -695,8 +695,15 @@ export function musteriyeDonusenRoller(roles: readonly PartyRole[]): PartyRole[]
  */
 export const MUSTERI_MODUL_KEY = "crm_musteri";
 export const BAGLANTI_MODUL_KEY = "baglantilar";
-export type PartyModulKey = typeof MUSTERI_MODUL_KEY | typeof BAGLANTI_MODUL_KEY;
-export const PARTY_MODUL_KEYS: readonly PartyModulKey[] = [MUSTERI_MODUL_KEY, BAGLANTI_MODUL_KEY];
+/**
+ * Tedarik defteri (Operasyon > Tedarik). Tedarikçi eskiden Müşteriler
+ * defterine tedarikçi rolüyle giriyordu; Bağlantılar'dan "Tedarikçi yap"
+ * denen kart satış ekibinin müşteri listesine düşüyordu (kullanıcı şikâyeti,
+ * 2026-10-12). Artık kendi defteri var: Tedarik > Tedarikçiler.
+ */
+export const TEDARIK_MODUL_KEY = "oud_tedarik";
+export type PartyModulKey = typeof MUSTERI_MODUL_KEY | typeof BAGLANTI_MODUL_KEY | typeof TEDARIK_MODUL_KEY;
+export const PARTY_MODUL_KEYS: readonly PartyModulKey[] = [MUSTERI_MODUL_KEY, BAGLANTI_MODUL_KEY, TEDARIK_MODUL_KEY];
 
 export function isPartyModulKey(value: unknown): value is PartyModulKey {
   return typeof value === "string" && (PARTY_MODUL_KEYS as readonly string[]).includes(value);

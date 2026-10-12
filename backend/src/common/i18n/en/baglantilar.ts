@@ -52,4 +52,5 @@ export const baglantilar: TranslationDict = {
   "Not bulunamadı": "Note not found",
   "Bu kayıt otomatik oluşturuldu, değiştirilemez": "This entry was created automatically and can't be changed",
   "Yalnızca kendi notunu değiştirebilirsin": "You can only change your own notes",
+  "Tedarik modülü burada açık değil": "The Procurement module isn't enabled here",
 };

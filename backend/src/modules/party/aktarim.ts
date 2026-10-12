@@ -1,13 +1,13 @@
-import { MUSTERI_MODUL_KEY, type Party, type PartyAktarimHedefi, type PartyRole } from "@projelio/shared";
+import { MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY, type Party, type PartyAktarimHedefi, type PartyRole } from "@projelio/shared";
 
 /**
  * Bağlantı kartını başka bir modüle AKTARMA — saf tanımlar.
  *
  * Rol bir etiket; aktarım kartı o rolün yaşadığı modüle taşır:
- *  - Müşteri / potansiyel müşteri / tedarikçi → Müşteriler defteri (party.modules).
- *    Tedarikçinin ayrı modülü yok: ürün kartının tedarikçi seçicisi, fatura ve
- *    tedarik ekranları kişi seçimini Müşteriler defterinden yapıyor — tedarikçi
- *    oraya girmezse hiçbir yerde seçilemez.
+ *  - Müşteri / potansiyel müşteri → Müşteriler defteri (party.modules).
+ *  - Tedarikçi → Tedarik defteri (oud_tedarik, 2026-10-12). Eskiden Müşteriler'e
+ *    giriyordu ve satış listesine karışıyordu. Seçiciler (ürün, fatura, tedarik
+ *    talebi) genel liste ucundan Müşteriler + Tedarik defterlerini birlikte görür.
  *  - Rakip → Rakip ve Sektör Analizi'nde bir kayıt (module_records).
  *  - İşbirliği / bayi → Ortaklık ve Dağıtım'da bir kayıt.
  *
@@ -29,7 +29,7 @@ export interface AktarimTanimi {
 export const AKTARIM_TANIMLARI: readonly AktarimTanimi[] = [
   { hedef: "musteri", rol: "customer", modul: MUSTERI_MODUL_KEY, tur: "defter" },
   { hedef: "potansiyel", rol: "lead", modul: MUSTERI_MODUL_KEY, tur: "defter" },
-  { hedef: "tedarikci", rol: "supplier", modul: MUSTERI_MODUL_KEY, tur: "defter" },
+  { hedef: "tedarikci", rol: "supplier", modul: TEDARIK_MODUL_KEY, tur: "defter" },
   { hedef: "rakip", rol: "competitor", modul: "pd_rakip_sektor_analizi", tur: "kayit" },
   { hedef: "ortaklik", rol: "collaborator", modul: "spd_ortaklik_dagitim", tur: "kayit" },
 ];

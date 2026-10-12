@@ -676,18 +676,40 @@ export default function CustomersPanel({
     }
   };
 
+  /**
+   * Listeden sil. Kart başka bir listede de duruyorsa (Bağlantılar + Müşteriler,
+   * Bağlantılar + Tedarik) yalnızca BU listeden çıkar, öbüründe kalır; yalnızca
+   * buradaysa arşivlenir. Her durumda önce onay sorulur — eskiden tek tıkla,
+   * sorusuz arşivliyordu ve kart iki listeden birden kayboluyordu (kullanıcı
+   * şikâyeti, 2026-10-12).
+   */
   const handleArchive = async (p: Party) => {
-    await api.delete(`/party/${p.id}`).catch(() => {});
+    const defter = baglantiModu ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY;
+    const baskaDefterde = p.modules.some((m) => m !== defter);
+    const soru = baskaDefterde
+      ? baglantiModu
+        ? t("{ad} Bağlantı ve İlişkiler listesinden çıkarılsın mı? Kart diğer listelerde kalır.", { ad: p.displayName })
+        : t("{ad} Müşteriler listesinden çıkarılsın mı? Kart diğer listelerde (Bağlantılar, Tedarik) kalır.", { ad: p.displayName })
+      : t("{ad} silinsin mi? Kart arşive kaldırılır; hemen ardından Geri Al ile geri getirebilirsin.", { ad: p.displayName });
+    if (!window.confirm(soru)) return;
+    let sonuc: "defterdenCikti" | "arsivlendi";
+    try {
+      sonuc = (await api.delete<{ sonuc: "defterdenCikti" | "arsivlendi" }>(`/party/${p.id}?modul=${defter}`))?.sonuc ?? "arsivlendi";
+    } catch (err) {
+      setBildirim(err instanceof Error ? err.message : t("Silinemedi"));
+      return;
+    }
     if (openPartyId === p.id) setOpenPartyId(null);
     load();
     pushUndo({
-      label: baglantiModu ? t("Bağlantı arşivleme") : t("Müşteri arşivleme"),
+      label: sonuc === "defterdenCikti" ? t("Listeden çıkarma") : baglantiModu ? t("Bağlantı arşivleme") : t("Müşteri arşivleme"),
       run: async () => {
-        await api.patch(`/party/${p.id}/restore`, {});
+        if (sonuc === "defterdenCikti") await partyApi.deftereEkle(p.id, defter);
+        else await api.patch(`/party/${p.id}/restore`, {});
         load();
       },
       redo: async () => {
-        await api.delete(`/party/${p.id}`);
+        await api.delete(`/party/${p.id}?modul=${defter}`);
         load();
       },
     });
@@ -1487,8 +1509,8 @@ export default function CustomersPanel({
                     </button>
                     <button
                       onClick={() => handleArchive(p)}
-                      aria-label={t("Arşivle")}
-                      title={t("Arşivle")}
+                      aria-label={t("Sil")}
+                      title={t("Sil")}
                       style={{ background: "transparent", border: "none", cursor: "pointer" }}
                     >
                       <IconTrash size={14} color={c.textSecondary} />
@@ -2394,7 +2416,7 @@ const AKTARIM_YAPILDI: Record<PartyAktarimHedefi, string> = {
 const AKTARIM_ACIKLAMA: Record<PartyAktarimHedefi, string> = {
   musteri: "Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.",
   potansiyel: "Kart Müşteriler'de potansiyel müşteri olarak görünecek; ilişki notu kartın notuna eklenir.",
-  tedarikci: "Kart Müşteriler'de tedarikçi olarak görünecek; ilişki notu kartın notuna eklenir.",
+  tedarikci: "Kart Tedarik > Tedarikçiler'de görünecek (Müşteriler'e girmez); ilişki notu kartın notuna eklenir.",
   rakip: "Rakip ve Sektör Analizi'nde bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.",
   ortaklik: "Ortaklık ve Dağıtım'da bu kart için bir kayıt açılacak; ilişki notu kaydın notuna yazılır.",
 };

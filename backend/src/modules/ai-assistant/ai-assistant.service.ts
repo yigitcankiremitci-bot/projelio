@@ -75,6 +75,7 @@ import {
   isPartyType,
   isReferenceValue,
   MUSTERI_MODUL_KEY,
+  TEDARIK_MODUL_KEY,
   type BaglantiOnem,
   type Party,
   type PartyAddress,
@@ -4870,7 +4871,11 @@ export class AiAssistantService {
         const needsNames = shown.some((r) => partyKeys.some((k) => isReferenceValue(r.data[k])));
         const partyNames = needsNames
           ? new Map(
-              (await this.partyService.findAll(input.jobId ? { jobId: input.jobId } : { organizationId: input.organizationId }))
+              (
+                await this.partyService.findAll(input.jobId ? { jobId: input.jobId } : { organizationId: input.organizationId }, {
+                  moduller: [MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY],
+                })
+              )
                 .map((p) => [p.id, p.displayName] as const)
             )
           : new Map<string, string>();
@@ -6282,7 +6287,8 @@ export class AiAssistantService {
   ): Promise<{ data: Record<string, unknown>; warnings: string[] }> {
     const keys = partyFieldKeys(moduleKey, moduleName).filter((k) => normalized.data[k] !== undefined);
     if (!keys.length || (!scope.organizationId && !scope.jobId)) return normalized;
-    const parties = await this.partyService.findAll(scope);
+    // Tedarikçi alanları (Tedarik talebi) Tedarik defterindeki kartlara bağlanır.
+    const parties = await this.partyService.findAll(scope, { moduller: [MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY] });
     const linked = linkPartyReferences(keys, normalized.data, parties);
     return { data: linked.data, warnings: [...normalized.warnings, ...linked.warnings] };
   }

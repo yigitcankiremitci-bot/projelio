@@ -8,6 +8,7 @@ import {
   kartvizitSosyalNormallestir,
   MUSTERI_MODUL_KEY,
   PARTY_MODUL_KEYS,
+  TEDARIK_MODUL_KEY,
   isPartyRole,
   isPartyType,
   type BaglantiListesi,
@@ -908,14 +909,39 @@ export class PartyService {
   }
 
   /** Arşivleme — silme değil. Geçmiş kayıtlardaki referanslar korunur. */
-  async archive(id: string, userId?: string): Promise<void> {
+  /**
+   * Listeden "Sil". `modul` verilirse ve kart başka bir defterde de duruyorsa
+   * kart yalnızca O defterden çıkarılır — arşivlenmez. Eskiden her silme kartı
+   * arşivliyordu: Müşteriler'den silinen tedarikçi Bağlantılar'dan da kayboldu
+   * (kullanıcı şikâyeti, 2026-10-12). Kart yalnızca bu defterdeyse arşivlenir
+   * (geri alınabilir, veri silinmez). Dönen değer arayüzün geri alma yolunu seçer.
+   */
+  async archive(id: string, userId?: string, modul?: PartyModulKey): Promise<{ sonuc: "defterdenCikti" | "arsivlendi" }> {
     const existing = await this.findOne(id);
     await this.assertKayitYazilir(existing, userId);
+    if (modul && existing.modules.includes(modul) && existing.modules.length > 1) {
+      if (userId && !(await this.access(this.scopeOf(existing), userId, modul)).canWrite) {
+        throw new ForbiddenException("Bu kaydı değiştirme yetkin yok");
+      }
+      const { error } = await this.supabase.client
+        .from("party")
+        .update({ modules: existing.modules.filter((m) => m !== modul), updated_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      await this.logActivity(
+        id,
+        "sistem",
+        modul === MUSTERI_MODUL_KEY ? "Müşteriler'den çıkarıldı" : modul === TEDARIK_MODUL_KEY ? "Tedarik'ten çıkarıldı" : "Bağlantı ve İlişkiler'den çıkarıldı",
+        userId
+      );
+      return { sonuc: "defterdenCikti" };
+    }
     const { error } = await this.supabase.client
       .from("party")
       .update({ archived_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
+    return { sonuc: "arsivlendi" };
   }
 
   async restore(id: string, userId?: string): Promise<Party> {
@@ -1062,10 +1088,12 @@ export class PartyService {
     if (existing.archivedAt) throw new BadRequestException("Arşivdeki kart başka bir deftere eklenemez");
     // Müşteriler'e geçerken ilişki notu kartın genel notuna eklenir — satış ekibi
     // görsün diye (kullanıcı kararı, 2026-10-10; bkz. aktarim.ts notaEkle).
-    const yeniNot = hedef === MUSTERI_MODUL_KEY ? notaEkle(existing.notes, existing.baglanti?.iliskiNotu) : undefined;
+    // Rol taşıyan defterler (Müşteriler, Tedarik); Bağlantılar'ın rolü kartta zaten.
+    const rolluDefter = hedef !== BAGLANTI_MODUL_KEY;
+    const yeniNot = rolluDefter ? notaEkle(existing.notes, existing.baglanti?.iliskiNotu) : undefined;
     if (existing.modules.includes(hedef)) {
       // Kart zaten o defterde (ör. müşteri), yeni rol (tedarikçi) eklenir.
-      if (hedef === MUSTERI_MODUL_KEY && !existing.roles.includes(rol)) await this.addRoleTo(id, rol, userId);
+      if (rolluDefter && !existing.roles.includes(rol)) await this.addRoleTo(id, rol, userId);
       if (yeniNot) {
         const { error } = await this.supabase.client
           .from("party")
@@ -1088,7 +1116,7 @@ export class PartyService {
       modules: [...existing.modules, hedef],
       updated_at: new Date().toISOString(),
     };
-    if (hedef === MUSTERI_MODUL_KEY) patch.roles = addRole(existing.roles, rol);
+    if (rolluDefter) patch.roles = addRole(existing.roles, rol);
     if (yeniNot) patch.notes = yeniNot;
     const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
     if (error) throw error;
@@ -1097,7 +1125,7 @@ export class PartyService {
     await this.logActivity(
       id,
       "sistem",
-      hedef === MUSTERI_MODUL_KEY ? "Müşteriler'e eklendi" : "Bağlantı ve İlişkiler'e eklendi",
+      hedef === MUSTERI_MODUL_KEY ? "Müşteriler'e eklendi" : hedef === TEDARIK_MODUL_KEY ? "Tedarik'e eklendi" : "Bağlantı ve İlişkiler'e eklendi",
       userId
     );
     const guncel = await this.findOne(id, { baglanti: true });
@@ -1180,7 +1208,7 @@ export class PartyService {
     const t = aktarimTanimi(hedef);
     if (!t) throw new BadRequestException("Geçersiz aktarım hedefi");
     if (t.tur === "defter") {
-      return { party: await this.deftereEkle(partyId, MUSTERI_MODUL_KEY, userId, t.rol) };
+      return { party: await this.deftereEkle(partyId, t.modul as PartyModulKey, userId, t.rol) };
     }
     const party = await this.findOne(partyId, { baglanti: true });
     if (party.archivedAt) throw new BadRequestException("Arşivdeki kart aktarılamaz");
@@ -1230,7 +1258,11 @@ export class PartyService {
       if (data?.organization_id !== orgId) throw new BadRequestException("Departman bu kartın şirketinde değil");
       return departmentId;
     }
-    const modul = party.modules.includes(BAGLANTI_MODUL_KEY) ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY;
+    const modul = party.modules.includes(BAGLANTI_MODUL_KEY)
+      ? BAGLANTI_MODUL_KEY
+      : party.modules.includes(MUSTERI_MODUL_KEY)
+        ? MUSTERI_MODUL_KEY
+        : TEDARIK_MODUL_KEY;
     const { data: acik } = await this.supabase.client
       .from("organization_modules")
       .select("department_id")

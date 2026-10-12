@@ -22,7 +22,7 @@ import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
 import { PartyService } from "./party.service";
 import { musteriSablonuOlustur, musteriSayfasiniSec, sablonDosyaAdi, tabloyuOku } from "./musteri-sablonu";
-import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, type PartyModulKey } from "@projelio/shared";
+import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY, type PartyModulKey } from "@projelio/shared";
 import { istemciDili, tarayiciDili } from "../../common/i18n/index";
 import type { PartyScope } from "./party.service";
 import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./siparis.service";
@@ -34,6 +34,9 @@ const KARTVIZIT_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), li
 import { AccessService } from "../../common/access/access.service";
 
 /** Kartın açıldığı defter; gelmezse ya da tanınmazsa Müşteriler (eski istemciler). */
+/** Genel liste ucunun (diğer modüllerin seçicileri) defterleri. Bağlantılar bilerek YOK: rakip seçicide görünmesin. */
+const SECICI_DEFTERLERI: readonly PartyModulKey[] = [MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY];
+
 function defter(modul: unknown): PartyModulKey {
   return isPartyModulKey(modul) ? modul : MUSTERI_MODUL_KEY;
 }
@@ -139,7 +142,8 @@ export class PartyController {
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.findAll({ organizationId, departmentId }, { role });
+    // Seçicilerin listesi: müşteriler + tedarikçiler (ürün, fatura, tedarik talebi).
+    return this.partyService.findAll({ organizationId, departmentId }, { role, moduller: SECICI_DEFTERLERI });
   }
 
   /**
@@ -212,7 +216,7 @@ export class PartyController {
   async findByJob(@Param("jobId") jobId: string, @Req() req: any, @Query("role") role?: PartyRole) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.findAll({ jobId }, { role });
+    return this.partyService.findAll({ jobId }, { role, moduller: SECICI_DEFTERLERI });
   }
 
   @Get("jobs/:jobId/party/musterilerim")
@@ -264,9 +268,10 @@ export class PartyController {
   }
 
   // Silme değil arşivleme: geçmiş kayıtlardaki referanslar korunur.
+  /** `?modul=` verilirse kart başka defterde de duruyorsa yalnızca oradan çıkar (bkz. PartyService.archive). */
   @Delete("party/:id")
-  archive(@Param("id") id: string, @Req() req: any) {
-    return this.partyService.archive(id, req.user.userId);
+  archive(@Param("id") id: string, @Req() req: any, @Query("modul") modul?: string) {
+    return this.partyService.archive(id, req.user.userId, isPartyModulKey(modul) ? modul : undefined);
   }
 
   @Patch("party/:id/restore")

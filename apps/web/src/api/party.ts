@@ -96,6 +96,8 @@ export const partyApi = {
 export interface SiparisGovdesi {
   siparisNo?: string;
   aciklama?: string;
+  /** Katalogdaki ürün; null bağı kaldırır. */
+  productId?: string | null;
   miktar?: number | null;
   birim?: string;
   tutar: number;
@@ -123,6 +125,8 @@ export const siparisApi = {
     api.get<MusteriSiparisListesi>(
       `${kapsamYolu}/siparisler${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`
     ),
+  /** Ürün kartının "Satışlar" sekmesi. */
+  urununkiler: (productId: string) => api.get<MusteriSiparisListesi>(`/products/${productId}/siparisler`),
   musterininkiler: (partyId: string) => api.get<MusteriSiparisi[]>(`/party/${partyId}/siparisler`),
   ekle: (partyId: string, govde: SiparisGovdesi) => api.post<MusteriSiparisi>(`/party/${partyId}/siparisler`, govde),
   guncelle: (id: string, govde: Partial<SiparisGovdesi>) => api.patch<MusteriSiparisi>(`/siparisler/${id}`, govde),

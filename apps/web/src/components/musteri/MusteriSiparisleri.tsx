@@ -84,6 +84,7 @@ export default function MusteriSiparisleri({
       {yeni ? (
         <SiparisFormu
           partyId={party.id}
+          organizationId={party.organizationId}
           onKaydedildi={(s) => {
             setYeni(false);
             setSiparisler((l) => [s, ...(l ?? [])]);

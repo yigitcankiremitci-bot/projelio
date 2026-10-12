@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ODEME_YONTEMI_ETIKET,
   ODEME_YONTEMLERI,
+  PRODUCT_UNIT_LABEL,
   evrakliMi,
   tahsilEdilen,
   vadeTarihiHesapla,
   type MusteriSiparisi,
   type OdemeYontemi,
+  type Product,
 } from "@projelio/shared";
+import { api } from "../../api/client";
 import { siparisApi, type SiparisGovdesi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
@@ -23,14 +26,21 @@ const HAZIR_VADELER = [0, 15, 30, 45, 60, 90, 120];
  * Vade GÜN olarak girilir, tarih hesaplanıp önizlenir: satışta konuşulan dil
  * "60 gün vade", takvim tarihi değil. Veritabanı da aynı hesabı kendi yapıyor
  * (vade_tarihi hesaplanan sütun) — burada yalnızca gösteriliyor.
+ *
+ * Ürün seçimi isteğe bağlı ve yalnızca şirket müşterisinde var: katalog
+ * şirketindir, iş kapsamındaki müşterinin seçebileceği bir katalog yok.
+ * Seçilen ürün BOŞ alanları doldurur (ad, birim, fiyat), yazılmış olanın
+ * üstüne yazmaz — satışçı "özel fiyat" girdiyse ürün seçmek onu silmesin.
  */
 export default function SiparisFormu({
   partyId,
+  organizationId,
   mevcut,
   onKaydedildi,
   onVazgec,
 }: {
   partyId: string;
+  organizationId?: string;
   mevcut?: MusteriSiparisi;
   onKaydedildi: (s: MusteriSiparisi) => void;
   onVazgec: () => void;
@@ -39,6 +49,7 @@ export default function SiparisFormu({
   const t = useT();
   const [f, setF] = useState(() => ({
     siparisNo: mevcut?.siparisNo ?? "",
+    productId: mevcut?.productId ?? "",
     aciklama: mevcut?.aciklama ?? "",
     miktar: mevcut?.miktar !== undefined ? String(mevcut.miktar) : "",
     birim: mevcut?.birim ?? "",
@@ -54,9 +65,46 @@ export default function SiparisFormu({
   const [hata, setHata] = useState("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
+  // Katalog okunamazsa (taşeron, yetki) seçici gizlenir; sipariş metinle girilir.
+  const [urunler, setUrunler] = useState<Product[] | null>(null);
+  useEffect(() => {
+    if (!organizationId) return;
+    let iptal = false;
+    api
+      .get<Product[]>(`/organizations/${organizationId}/products`)
+      .then((l) => !iptal && setUrunler(l))
+      .catch(() => !iptal && setUrunler([]));
+    return () => {
+      iptal = true;
+    };
+  }, [organizationId]);
+
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }));
   const vadeGun = Math.max(0, Math.floor(Number(f.vadeGun) || 0));
   const tahsilatVar = !!mevcut && tahsilEdilen(mevcut) > 0;
+
+  const urunSec = (id: string) => {
+    const u = urunler?.find((x) => x.id === id);
+    setF((x) => {
+      const y = { ...x, productId: id };
+      if (!u) return y;
+      if (!x.aciklama.trim()) y.aciklama = u.name;
+      if (!x.birim.trim() && u.unit) y.birim = t(PRODUCT_UNIT_LABEL[u.unit]);
+      if (!x.tutar.trim() && u.price) {
+        const miktar = Number(x.miktar.replace(",", ".")) || 1;
+        y.tutar = String(Math.round(u.price * miktar * 100) / 100);
+        if (u.currency && !tahsilatVar) y.paraBirimi = u.currency;
+      }
+      return y;
+    });
+  };
+
+  // Mevcut bağ arşivlenmiş bir ürünse listede yok; seçenek olarak yine görünsün
+  // ki kaydetmek bağı sessizce koparmasın.
+  const urunSecenekleri =
+    urunler && mevcut?.productId && !urunler.some((u) => u.id === mevcut.productId)
+      ? [...urunler, { id: mevcut.productId, name: mevcut.productName ?? t("Arşivdeki ürün") } as Product]
+      : urunler ?? [];
 
   const kaydet = async () => {
     const tutar = Number(f.tutar.replace(",", "."));
@@ -71,6 +119,8 @@ export default function SiparisFormu({
     }
     const govde: SiparisGovdesi = {
       siparisNo: f.siparisNo,
+      // Katalog hiç yüklenmediyse alan gönderilmez: mevcut bağ korunur.
+      ...(urunler && urunler.length > 0 ? { productId: f.productId || null } : {}),
       aciklama: f.aciklama,
       miktar,
       birim: f.birim,
@@ -97,6 +147,18 @@ export default function SiparisFormu({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
+      {urunSecenekleri.length > 0 && (
+        <Alan label={t("Ürün / hizmet")}>
+          <select value={f.productId} onChange={(e) => urunSec(e.target.value)} style={TAM_GENISLIK}>
+            <option value="">{t("Katalogdan seçilmedi")}</option>
+            {urunSecenekleri.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.sku ? `${u.name} (${u.sku})` : u.name}
+              </option>
+            ))}
+          </select>
+        </Alan>
+      )}
       <Alan label={t("Ne satıldı")}>
         <input
           value={f.aciklama}

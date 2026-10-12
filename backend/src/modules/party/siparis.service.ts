@@ -59,7 +59,8 @@ function metin(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-const SIPARIS_SECIM = "*, tahsilatlar:musteri_tahsilatlari(*), party:party(display_name, owner_user_id)";
+const SIPARIS_SECIM =
+  "*, tahsilatlar:musteri_tahsilatlari(*), party:party(display_name, owner_user_id), urun:products(name)";
 
 function mapTahsilat(row: any, adlar: Map<string, string>): MusteriTahsilati {
   return {
@@ -87,6 +88,8 @@ function mapSiparis(row: any, adlar: Map<string, string>): MusteriSiparisi {
     jobId: row.job_id ?? undefined,
     siparisNo: row.siparis_no ?? undefined,
     aciklama: row.aciklama ?? undefined,
+    productId: row.product_id ?? undefined,
+    productName: row.urun?.name ?? undefined,
     miktar: row.miktar === null || row.miktar === undefined ? undefined : Number(row.miktar),
     birim: row.birim ?? undefined,
     tutar: Number(row.tutar),
@@ -111,6 +114,8 @@ function mapSiparis(row: any, adlar: Map<string, string>): MusteriSiparisi {
 export interface SiparisGirdisi {
   siparisNo?: string;
   aciklama?: string;
+  /** Katalogdaki ürün; null bağı kaldırır. */
+  productId?: string | null;
   miktar?: number | string | null;
   birim?: string;
   tutar?: number | string;
@@ -177,6 +182,41 @@ export class SiparisService {
     return this.eslestir(data ?? []);
   }
 
+  /**
+   * Ürün kartının "Satışlar" sekmesi: bu ürüne bağlı siparişler.
+   *
+   * Yetki ürünün değil MÜŞTERİ defterinin: ürünü görebilen ama Müşteriler'e
+   * erişimi olmayan biri satış rakamlarını görmemeli, çalışan da yalnızca
+   * kendi müşterilerine yapılan satışı görür — Tahsilat görünümüyle aynı kural.
+   */
+  async urununkiler(productId: string, userId: string): Promise<MusteriSiparisListesi> {
+    const { data: urun, error: urunHatasi } = await this.supabase.client
+      .from("products")
+      .select("id, organization_id")
+      .eq("id", productId)
+      .maybeSingle();
+    if (urunHatasi) throw urunHatasi;
+    if (!urun) throw new NotFoundException("Ürün bulunamadı");
+
+    const a = await this.partyService.access({ organizationId: urun.organization_id }, userId);
+    if (!a.canRead) throw new ForbiddenException("Bu kaydı görme yetkin yok");
+
+    const satirlar = await tumSayfalar<any>((bas, bit) =>
+      this.supabase.client
+        .from("musteri_siparisleri")
+        .select(SIPARIS_SECIM)
+        .eq("product_id", productId)
+        .eq("organization_id", urun.organization_id)
+        .order("siparis_tarihi", { ascending: false })
+        .order("id", { ascending: true })
+        .range(bas, bit)
+    );
+    const gorunen = a.canManageTeam
+      ? satirlar
+      : satirlar.filter((r) => musteriYetkisi(a, r.party?.owner_user_id, userId).okur);
+    return { yonetici: a.canManageTeam, siparisler: await this.eslestir(gorunen) };
+  }
+
   // ============================================================ Sipariş yazma
 
   async olustur(partyId: string, girdi: SiparisGirdisi, userId: string): Promise<MusteriSiparisi> {
@@ -185,6 +225,7 @@ export class SiparisService {
     await this.yetkiIste(party, userId, "yazar");
 
     const alanlar = this.siparisAlanlari(girdi, true);
+    if (girdi.productId !== undefined) alanlar.product_id = await this.urunuCoz(party, girdi.productId);
     const { data: row, error } = await this.supabase.client
       .from("musteri_siparisleri")
       .insert({
@@ -212,6 +253,11 @@ export class SiparisService {
     await this.yetkiIste(party, userId, "yazar");
 
     const alanlar = this.siparisAlanlari(girdi, false);
+    // Bağı değişmeyen ürün yeniden doğrulanmaz: sonradan arşivlenmiş ürünün
+    // siparişi, başka bir alanı düzeltilirken reddedilmesin.
+    if (girdi.productId !== undefined && (girdi.productId || null) !== (mevcut.productId ?? null)) {
+      alanlar.product_id = await this.urunuCoz(party, girdi.productId);
+    }
     const odenen = tahsilEdilen(mevcut);
     if (odenen > 0) {
       // Tahsilat defterde siparişin para biriminde duruyor; birimi değiştirmek
@@ -452,6 +498,30 @@ export class SiparisService {
     if (ne === "okur" ? !y.okur : !y.siparisYazar) {
       throw new ForbiddenException("Bu müşteri sana atanmamış");
     }
+  }
+
+  /**
+   * Siparişe bağlanacak ürünü doğrular. Katalog şirketindir: başka şirketin
+   * ürün kimliği gövdeye yazılırsa o şirketin ürün adı bu siparişte (ve
+   * gömme yoluyla bu müşterinin ekranında) görünürdü.
+   */
+  private async urunuCoz(party: Party, productId: string | null): Promise<string | null> {
+    if (!productId) return null;
+    if (!party.organizationId) {
+      throw new BadRequestException("Ürün yalnızca şirket müşterilerinin siparişine bağlanabilir");
+    }
+    const { data, error } = await this.supabase.client
+      .from("products")
+      .select("id, organization_id, archived_at")
+      .eq("id", productId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new NotFoundException("Ürün bulunamadı");
+    if (data.organization_id !== party.organizationId) {
+      throw new BadRequestException("Ürün bu müşterinin şirketine ait değil");
+    }
+    if (data.archived_at) throw new BadRequestException("Arşivdeki ürün siparişe bağlanamaz");
+    return data.id;
   }
 
   private async tekil(id: string): Promise<MusteriSiparisi> {

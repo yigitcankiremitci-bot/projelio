@@ -532,6 +532,14 @@ export class PartyController {
     return this.siparisService.musterininkiler(id, req.user.userId);
   }
 
+  // Ürün kartının "Satışlar" sekmesi. Yetki ürünün değil müşteri defterinin
+  // (bkz. SiparisService.urununkiler).
+  @Get("products/:productId/siparisler")
+  async urunSiparisleri(@Param("productId") productId: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.siparisService.urununkiler(productId, req.user.userId);
+  }
+
   @Post("party/:id/siparisler")
   async siparisEkle(@Param("id") id: string, @Body() body: SiparisGirdisi, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");

@@ -53,7 +53,7 @@ export default function SiparisKarti({
 
   const baslik = [
     musteriAdiGoster ? siparis.partyName : undefined,
-    siparis.aciklama || (siparis.siparisNo ? `#${siparis.siparisNo}` : undefined),
+    siparis.aciklama || siparis.productName || (siparis.siparisNo ? `#${siparis.siparisNo}` : undefined),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -185,6 +185,7 @@ export default function SiparisKarti({
           ) : mod === "duzenle" ? (
             <SiparisFormu
               partyId={siparis.partyId}
+              organizationId={siparis.organizationId}
               mevcut={siparis}
               onKaydedildi={(s) => {
                 setMod(null);

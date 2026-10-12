@@ -12,6 +12,7 @@ import Modal from "./Modal";
 import ProductForm from "./ProductForm";
 import ModuleFormPanel from "./ModuleFormPanel";
 import EntityDangerZone from "./EntityDangerZone";
+import UrunSatislari from "./musteri/UrunSatislari";
 import { IconCheck, IconExternalLink } from "./icons";
 import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { coverBackground } from "../lib/covers";
@@ -39,7 +40,7 @@ interface Props {
   onDeleted: () => void;
 }
 
-type Sekme = "genel" | "bilgiler" | "strateji" | "moduller";
+type Sekme = "genel" | "bilgiler" | "strateji" | "satislar" | "moduller";
 
 const FORM_ID = "urun-karti-formu";
 
@@ -56,6 +57,9 @@ const FORM_ID = "urun-karti-formu";
  *   Bilgiler    — düzenleme formu (yalnızca düzenleme yetkisi olana)
  *   Strateji    — Ürün Stratejisi modülünün BU ürüne ait kaydı, yerinde
  *                 yazılıp onaylanabilir
+ *   Satışlar    — bu ürüne bağlanmış müşteri siparişleri ve tahsilatı
+ *                 (kendi ucundan, sekme açılınca yüklenir — yetkisi müşteri
+ *                 defterinin, ürünün değil)
  *   Modüllerde  — ürünün adının/kodunun geçtiği tedarik, depo, kalite… kayıtları
  *
  * Veri tek istekte gelir (`GET /products/:id/overview`); modül kayıtları
@@ -110,6 +114,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
     { key: "genel", label: t("Genel bakış") },
     ...(canManage ? [{ key: "bilgiler" as const, label: t("Bilgiler") }] : []),
     { key: "strateji", label: t("Strateji") },
+    { key: "satislar", label: t("Satışlar") },
     {
       key: "moduller",
       label: ozet?.related.length ? t("Modüllerde ({n})", { n: ozet.related.length }) : t("Modüllerde"),
@@ -657,6 +662,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
       )}
 
       {sekme === "strateji" && stratejiSekmesi()}
+      {sekme === "satislar" && <UrunSatislari productId={product.id} />}
       {sekme === "moduller" && modullerSekmesi()}
     </Modal>
   );

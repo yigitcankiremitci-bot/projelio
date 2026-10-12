@@ -4599,6 +4599,12 @@ export interface MusteriSiparisi {
   jobId?: string;
   siparisNo?: string;
   aciklama?: string;
+  /**
+   * Katalogdaki ürün/hizmet (isteğe bağlı, migration 165). Bağlıysa ürün
+   * kartının "Satışlar" sekmesinde görünür; `aciklama` yine serbest kalır.
+   */
+  productId?: string;
+  productName?: string;
   miktar?: number;
   birim?: string;
   tutar: number;

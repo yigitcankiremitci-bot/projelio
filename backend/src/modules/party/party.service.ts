@@ -397,6 +397,14 @@ export class PartyService {
    * simgesi). Kart kimlikleri 150'lik parçalarla sorgulanıyor: yüzlerce
    * kimlik tek `in` filtresinde istek adresini taşırırdı.
    */
+  /**
+   * Liste satırı simgelerinin (kartvizit, ek, kişi sayısı) verisi — Bağlantılar
+   * listesiyle aynı. Tedarik > Tedarikçiler genel liste ucundan `ozet=1` ile ister.
+   */
+  async listeOzetleriniEkle(kartlar: Party[]): Promise<void> {
+    await Promise.all([this.dosyaOzetleriniEkle(kartlar), this.kisiSayilariniEkle(kartlar)]);
+  }
+
   private async dosyaOzetleriniEkle(kartlar: Party[]): Promise<void> {
     const kimlik = new Map(kartlar.map((p) => [p.id, p]));
     const ids = [...kimlik.keys()];

@@ -65,4 +65,23 @@ export const projelioPosta: TranslationDict = {
   "Erişebildiğiniz bir @projelio.app kutusu yok. Kutuyu Projelio yöneticisi E-posta modülünde açar.":
     "You don't have access to a @projelio.app mailbox. A Projelio administrator creates it in the Email module.",
   "Seçilen kutu bu modülde bulunamadı.": "The selected mailbox wasn't found in this module.",
+
+  // Tedarik > Tedarikçiler: talep e-postası ve satır eylemleri
+  "Aşağıdaki ürün/hizmet için fiyat ve teslim süresi bilgisi rica ederiz:":
+    "We'd like to request pricing and delivery time for the following product/service:",
+  "E-posta adresi ekle": "Add email address",
+  "Fiyat ve teslim talebi": "Price and delivery request",
+  "Fiyat ve teslim talebi: {kalem}": "Price and delivery request: {kalem}",
+  "Fiyat/teslim talebi hazır metinle açılır; nereden gönderileceğini seçersin.":
+    "Opens a ready-made price/delivery request; you choose where to send it from.",
+  "Kartta e-posta adresi yok": "No email address on the card",
+  "Merhaba {ad},": "Hello {ad},",
+  "Talep e-postası": "Request email",
+  "Talep oluştur": "Create request",
+  "Tedarikçi ara…": "Search suppliers…",
+  "Teşekkürler, iyi çalışmalar.": "Thank you, best regards.",
+  "{n} açık talep": "{n} open requests",
+  "{n} talep": "{n} requests",
+  "{n} tedarikçi": "{n} suppliers",
+  "İstenen teslim tarihi": "Requested delivery date",
 };

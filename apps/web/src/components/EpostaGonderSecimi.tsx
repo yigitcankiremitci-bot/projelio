@@ -14,6 +14,9 @@ interface Props {
   to: string;
   /** Alıcının adı — yalnızca pencere başlığında. */
   ad?: string;
+  /** Hazır konu ve gövde (örn. Tedarik'teki "Talep e-postası"); seçilen her yola taşınır. */
+  konu?: string;
+  metin?: string;
   onClose: () => void;
 }
 
@@ -31,7 +34,7 @@ interface Props {
  * Kutunun açılacak bir modül sayfası yoksa (departmansız şirket kutusu)
  * pencere burada açılır.
  */
-export default function EpostaGonderSecimi({ to, ad, onClose }: Props) {
+export default function EpostaGonderSecimi({ to, ad, konu, metin, onClose }: Props) {
   const c = useThemeColors();
   const t = useT();
   const navigate = useNavigate();
@@ -45,13 +48,20 @@ export default function EpostaGonderSecimi({ to, ad, onClose }: Props) {
       .catch(() => setKutular([]));
   }, []);
 
+  // Gmail `su`/`body`, mailto `subject`/`body` bekliyor; boşsa hiç eklenmez.
+  const ekParam = (konuAdi: string, metinAdi: string) =>
+    (konu ? `&${konuAdi}=${encodeURIComponent(konu)}` : "") + (metin ? `&${metinAdi}=${encodeURIComponent(metin)}` : "");
+
   const kutuSec = (k: Kutu) => {
     if (!k.link) {
       setYerinde(k);
       return;
     }
     onClose();
-    navigate(`${k.link}?yeniEposta=${encodeURIComponent(to)}&kutu=${encodeURIComponent(k.id)}`);
+    const p = new URLSearchParams({ yeniEposta: to, kutu: k.id });
+    if (konu) p.set("konu", konu);
+    if (metin) p.set("metin", metin);
+    navigate(`${k.link}?${p.toString()}`);
   };
 
   if (yerinde) {
@@ -59,6 +69,8 @@ export default function EpostaGonderSecimi({ to, ad, onClose }: Props) {
       <ProjelioYeniEpostaModal
         account={yerinde}
         initialTo={to}
+        initialSubject={konu}
+        initialText={metin}
         onClose={onClose}
         onSent={() => onClose()}
       />
@@ -102,7 +114,7 @@ export default function EpostaGonderSecimi({ to, ad, onClose }: Props) {
         ))}
 
         <a
-          href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}`}
+          href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}${ekParam("su", "body")}`}
           target="_blank"
           rel="noreferrer"
           onClick={onClose}
@@ -112,7 +124,7 @@ export default function EpostaGonderSecimi({ to, ad, onClose }: Props) {
           <span style={altYazi}>{t("Tarayıcıda Gmail'in yeni e-posta penceresi açılır.")}</span>
         </a>
 
-        <a href={`mailto:${to}`} onClick={onClose} style={secenek}>
+        <a href={`mailto:${to}${ekParam("subject", "body").replace(/^&/, "?")}`} onClick={onClose} style={secenek}>
           <span style={{ fontSize: 14 }}>{t("Bilgisayarımdaki e-posta uygulaması")}</span>
           <span style={altYazi}>{t("Outlook, Apple Mail ya da cihazınızın varsayılan uygulaması.")}</span>
         </a>

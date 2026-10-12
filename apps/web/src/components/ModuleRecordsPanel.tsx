@@ -36,6 +36,12 @@ interface Props {
   // (bkz. 042_module_members.sql yetki sırası). Verilmezse yazma varsayılır —
   // sunucu her hâlükârda kendi kontrolünü yapar, bu yalnızca arayüz kolaylığı.
   canWrite?: boolean;
+  /**
+   * Dışarıdan "şu alanlar dolu bir kayıt aç" isteği — örn. Tedarik >
+   * Tedarikçiler'deki "Talep oluştur" tedarikçiyi seçili getirir. `anahtar`
+   * her istekte değişir; aynı tedarikçiye ikinci kez basmak da formu açsın diye.
+   */
+  onceDoldur?: { data: Record<string, string>; anahtar: number };
 }
 
 type FormMode = { kind: "create" } | { kind: "edit"; id: string } | null;
@@ -72,6 +78,7 @@ export default function ModuleRecordsPanel({
   moduleKey,
   config,
   canWrite = true,
+  onceDoldur,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -264,6 +271,21 @@ export default function ModuleRecordsPanel({
     setError("");
     setFormMode({ kind: "create" });
   };
+
+  // Önceden doldurulan alan hızlı formda gizli kalabilir (Tedarik'te hızlı
+  // form yalnızca "Ürün / Hizmet"); kullanıcı seçili tedarikçiyi görsün diye
+  // tüm alanlar açık gelir.
+  useEffect(() => {
+    if (!onceDoldur || !canWrite) return;
+    const f = emptyForm(config.fields);
+    for (const field of config.fields) {
+      if (onceDoldur.data[field.key] !== undefined) f[field.key] = onceDoldur.data[field.key];
+    }
+    setForm(f);
+    setShowAllFields(true);
+    setError("");
+    setFormMode({ kind: "create" });
+  }, [onceDoldur?.anahtar]);
 
   const openEdit = (record: ModuleRecord) => {
     setForm(formFromRecord(config.fields, record));

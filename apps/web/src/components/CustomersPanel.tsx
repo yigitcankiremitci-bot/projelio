@@ -2275,7 +2275,7 @@ function DosyaBolumu({
  * Adresler tutamaçtan üretilir (KARTVIZIT_SOSYAL), kullanıcının yazdığı URL
  * href'e girmez; web sitesi safeExternalUrl'den geçer.
  */
-function SatirSimgeleri({
+export function SatirSimgeleri({
   party,
   onDosya,
   onKisiler,

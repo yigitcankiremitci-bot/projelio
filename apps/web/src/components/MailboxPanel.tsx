@@ -60,10 +60,10 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
    * pencere açılır; parametreler adres çubuğundan silinir ki yenilemede
    * pencere ikinci kez açılmasın.
    */
-  const [hazirAlici, setHazirAlici] = useState<{ to: string; kutu: string } | null>(() => {
+  const [hazirAlici, setHazirAlici] = useState<{ to: string; kutu: string; konu?: string; metin?: string } | null>(() => {
     const p = new URLSearchParams(window.location.search);
     const to = p.get("yeniEposta");
-    return to ? { to, kutu: p.get("kutu") ?? "" } : null;
+    return to ? { to, kutu: p.get("kutu") ?? "", konu: p.get("konu") ?? undefined, metin: p.get("metin") ?? undefined } : null;
   });
   // Klasör ve listeyi yeniden yükletmek için (gönderim, taşıma, elle yenileme).
   const [yenile, setYenile] = useState(0);
@@ -110,6 +110,8 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
     const p = new URLSearchParams(window.location.search);
     p.delete("yeniEposta");
     p.delete("kutu");
+    p.delete("konu");
+    p.delete("metin");
     const q = p.toString();
     window.history.replaceState({}, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
   }, [loadingAccounts, accounts]);
@@ -622,6 +624,8 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         <ProjelioYeniEpostaModal
           account={account}
           initialTo={hazirAlici?.to}
+          initialSubject={hazirAlici?.konu}
+          initialText={hazirAlici?.metin}
           onClose={() => {
             setYeniEposta(false);
             setHazirAlici(null);

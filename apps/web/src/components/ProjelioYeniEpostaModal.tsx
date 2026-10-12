@@ -9,6 +9,9 @@ interface Props {
   account: MailAccount;
   /** Kişi kartından gelindiyse alıcı hazır dolu (bkz. EpostaGonderSecimi). */
   initialTo?: string;
+  /** Tedarikçiden talep gibi hazır metinli gönderimlerde konu ve gövde. */
+  initialSubject?: string;
+  initialText?: string;
   onClose: () => void;
   onSent: (text: string) => void;
 }
@@ -29,14 +32,14 @@ function boyutYaz(bayt: number): string {
  * Ek tavanı burada da denetleniyor ki kullanıcı 30 MB'ı yükleyip ancak
  * sunucudan "olmadı" yanıtı almasın.
  */
-export default function ProjelioYeniEpostaModal({ account, initialTo, onClose, onSent }: Props) {
+export default function ProjelioYeniEpostaModal({ account, initialTo, initialSubject, initialText, onClose, onSent }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [to, setTo] = useState(initialTo ?? "");
   const [cc, setCc] = useState("");
   const [ccAcik, setCcAcik] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [text, setText] = useState("");
+  const [subject, setSubject] = useState(initialSubject ?? "");
+  const [text, setText] = useState(initialText ?? "");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");

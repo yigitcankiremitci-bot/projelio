@@ -138,12 +138,16 @@ export class PartyController {
     @Param("organizationId") organizationId: string,
     @Req() req: any,
     @Query("role") role?: PartyRole,
-    @Query("departmentId") departmentId?: string
+    @Query("departmentId") departmentId?: string,
+    @Query("ozet") ozet?: string
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
     // Seçicilerin listesi: müşteriler + tedarikçiler (ürün, fatura, tedarik talebi).
-    return this.partyService.findAll({ organizationId, departmentId }, { role, moduller: SECICI_DEFTERLERI });
+    const kartlar = await this.partyService.findAll({ organizationId, departmentId }, { role, moduller: SECICI_DEFTERLERI });
+    // Tedarik > Tedarikçiler satır simgeleri için; seçiciler istemez.
+    if (ozet === "1") await this.partyService.listeOzetleriniEkle(kartlar);
+    return kartlar;
   }
 
   /**
@@ -213,10 +217,17 @@ export class PartyController {
   // ============================================================ Serbest çalışan
 
   @Get("jobs/:jobId/party")
-  async findByJob(@Param("jobId") jobId: string, @Req() req: any, @Query("role") role?: PartyRole) {
+  async findByJob(
+    @Param("jobId") jobId: string,
+    @Req() req: any,
+    @Query("role") role?: PartyRole,
+    @Query("ozet") ozet?: string
+  ) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.findAll({ jobId }, { role, moduller: SECICI_DEFTERLERI });
+    const kartlar = await this.partyService.findAll({ jobId }, { role, moduller: SECICI_DEFTERLERI });
+    if (ozet === "1") await this.partyService.listeOzetleriniEkle(kartlar);
+    return kartlar;
   }
 
   @Get("jobs/:jobId/party/musterilerim")

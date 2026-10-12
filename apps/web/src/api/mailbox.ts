@@ -25,9 +25,39 @@ function scopeQuery(scope: MailScope, extra: Record<string, string | undefined> 
   return q ? `?${q}` : "";
 }
 
+export interface MailStatus {
+  /** Outlook bağlama akışı yapılandırılmış mı. */
+  configured: boolean;
+  /** @projelio.app kutuları: gönderim açık mı, bu kullanıcı adres açabilir mi (yalnızca yönetici). */
+  projelio?: { configured: boolean; canCreate: boolean; domain: string };
+}
+
 export const mailboxApi = {
   /** Entegrasyon bu kurulumda yapılandırılmış mı. */
-  status: () => api.get<{ configured: boolean }>("/mail/status"),
+  status: () => api.get<MailStatus>("/mail/status"),
+
+  /** @projelio.app kutusu açar — yalnızca Projelio yöneticisi (sunucu da denetler). */
+  createProjelio: (scope: MailScope, body: { localPart: string; displayName?: string; signature?: string }) =>
+    api.post<MailAccount>(`${base(scope)}/mail/projelio${scopeQuery(scope)}`, body),
+
+  /** Yeni e-posta (yalnızca @projelio.app kutusu). Ekler için çok parçalı form. */
+  compose: (accountId: string, input: { to: string; cc?: string; subject: string; text: string; files: File[] }) => {
+    const form = new FormData();
+    form.append("to", input.to);
+    if (input.cc?.trim()) form.append("cc", input.cc);
+    form.append("subject", input.subject);
+    form.append("text", input.text);
+    for (const f of input.files) form.append("files", f, f.name);
+    return api.uploadFile<{ ok: true; id: string }>(`/mail/accounts/${accountId}/compose`, form);
+  },
+
+  /** Klasör değiştirir (çöpe at / geri al / spam değil). Yalnızca @projelio.app kutusu. */
+  move: (accountId: string, messageId: string, folder: string) =>
+    api.patch<{ ok: true }>(`/mail/accounts/${accountId}/messages/${encodeURIComponent(messageId)}/folder`, { folder }),
+
+  /** Ekin 5 dakikalık indirme bağlantısı. */
+  attachment: (accountId: string, attachmentId: string) =>
+    api.get<{ url: string; filename: string }>(`/mail/accounts/${accountId}/attachments/${attachmentId}`),
 
   listAccounts: (scope: MailScope) =>
     api.get<MailAccount[]>(`${base(scope)}/mail/accounts${scopeQuery(scope)}`),

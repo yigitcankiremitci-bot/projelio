@@ -3,10 +3,13 @@ import { PassportModule } from "@nestjs/passport";
 import { AiAssistantModule } from "../ai-assistant/ai-assistant.module";
 import { MicrosoftCoreModule } from "../microsoft/microsoft-core.module";
 import { ModuleMembersModule } from "../module-members/module-members.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { UsersModule } from "../users/users.module";
 import { GraphMailService } from "./graph-mail.service";
 import { MailboxController } from "./mailbox.controller";
 import { MailboxService } from "./mailbox.service";
+import { ProjelioPostaService } from "./projelio-posta.service";
+import { ProjelioPostaWebhookController } from "./projelio-posta-webhook.controller";
 
 /**
  * E-posta modülünün gelen kutusu.
@@ -27,10 +30,12 @@ import { MailboxService } from "./mailbox.service";
     AiAssistantModule,
     // Bağlantı çakışmasında hangi Projelio hesabının sahip olduğunu söylemek için.
     UsersModule,
+    // @projelio.app kutusuna posta geldiğinde modül ekibine haber.
+    NotificationsModule,
     PassportModule,
   ],
-  controllers: [MailboxController],
-  providers: [MailboxService, GraphMailService],
+  controllers: [MailboxController, ProjelioPostaWebhookController],
+  providers: [MailboxService, GraphMailService, ProjelioPostaService],
   exports: [MailboxService],
 })
 export class MailboxModule {}

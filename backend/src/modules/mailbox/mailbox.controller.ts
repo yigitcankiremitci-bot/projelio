@@ -1,11 +1,30 @@
-import { Body, Controller, Delete, Get, Logger, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Logger,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { FilesInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
 import type { Response } from "express";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
 import { UsersService } from "../users/users.service";
 import { MAIL_CONNECT_SCOPES, MicrosoftOAuthService } from "../microsoft/microsoft-oauth.service";
 import { GraphMailService } from "./graph-mail.service";
 import { MailboxService, type MailScope } from "./mailbox.service";
+import { postaAlanAdi } from "./projelio-posta";
+import { GONDERIM_EK_TAVANI, ProjelioPostaService } from "./projelio-posta.service";
 
 /**
  * E-posta modülünün gelen kutusu uçları.
@@ -24,7 +43,8 @@ export class MailboxController {
     private msAccounts: MicrosoftAccountsService,
     private graph: GraphMailService,
     // Yalnızca hata mesajında "hangi Projelio hesabına bağlı" diyebilmek için.
-    private users: UsersService
+    private users: UsersService,
+    private projelio: ProjelioPostaService
   ) {}
 
   // ============================================================ Durum ve bağlama
@@ -32,8 +52,38 @@ export class MailboxController {
   /** Entegrasyon bu kurulumda yapılandırılmış mı (ortam değişkenleri). */
   @Get("mail/status")
   @UseGuards(AuthGuard("jwt"))
-  status() {
-    return { configured: this.oauth.isDriveConfigured() };
+  status(@Req() req: any) {
+    return {
+      configured: this.oauth.isDriveConfigured(),
+      // @projelio.app kutusu: düğmeyi yalnızca yönetici görür, karar sunucuda
+      // da ayrıca veriliyor (createProjelioAccount).
+      projelio: {
+        configured: this.projelio.yapilandirildi,
+        canCreate: req.user?.role === "admin",
+        domain: postaAlanAdi(),
+      },
+    };
+  }
+
+  @Post("organizations/:organizationId/mail/projelio")
+  @UseGuards(AuthGuard("jwt"))
+  createOrgProjelio(
+    @Param("organizationId") organizationId: string,
+    @Query("departmentId") departmentId: string | undefined,
+    @Body() body: { localPart?: string; displayName?: string; signature?: string },
+    @Req() req: any
+  ) {
+    return this.mailbox.createProjelioAccount({ organizationId, departmentId }, body ?? {}, req.user);
+  }
+
+  @Post("jobs/:jobId/mail/projelio")
+  @UseGuards(AuthGuard("jwt"))
+  createJobProjelio(
+    @Param("jobId") jobId: string,
+    @Body() body: { localPart?: string; displayName?: string; signature?: string },
+    @Req() req: any
+  ) {
+    return this.mailbox.createProjelioAccount({ jobId }, body ?? {}, req.user);
   }
 
   @Get("organizations/:organizationId/mail/accounts")
@@ -187,7 +237,7 @@ export class MailboxController {
   @Delete("mail/accounts/:id")
   @UseGuards(AuthGuard("jwt"))
   unlinkAccount(@Param("id") id: string, @Req() req: any) {
-    return this.mailbox.unlinkAccount(id, req.user.userId);
+    return this.mailbox.unlinkAccount(id, req.user.userId, req.user.role);
   }
 
   // ============================================================ Posta
@@ -252,6 +302,44 @@ export class MailboxController {
     @Req() req: any
   ) {
     return this.mailbox.reply(id, messageId, body, req.user.userId);
+  }
+
+  // ============================================================ @projelio.app
+
+  /**
+   * Yeni e-posta (çok parçalı form: to, cc, subject, text + files[]).
+   * Dosya başına tavan toplam tavanla aynı; toplamı servis ayrıca denetliyor.
+   */
+  @Post("mail/accounts/:id/compose")
+  @UseGuards(AuthGuard("jwt"))
+  @UseInterceptors(
+    FilesInterceptor("files", 10, { storage: memoryStorage(), limits: { fileSize: GONDERIM_EK_TAVANI } })
+  )
+  compose(
+    @Param("id") id: string,
+    @Body() body: { to?: string | string[]; cc?: string | string[]; subject?: string; text?: string },
+    @UploadedFiles() files: Express.Multer.File[] | undefined,
+    @Req() req: any
+  ) {
+    return this.mailbox.compose(id, body ?? {}, files ?? [], req.user.userId);
+  }
+
+  @Patch("mail/accounts/:id/messages/:messageId/folder")
+  @UseGuards(AuthGuard("jwt"))
+  move(
+    @Param("id") id: string,
+    @Param("messageId") messageId: string,
+    @Body("folder") folder: string,
+    @Req() req: any
+  ) {
+    return this.mailbox.moveMessage(id, messageId, folder, req.user.userId);
+  }
+
+  /** Ekin 5 dakikalık indirme bağlantısı (kova özel). */
+  @Get("mail/accounts/:id/attachments/:attachmentId")
+  @UseGuards(AuthGuard("jwt"))
+  attachment(@Param("id") id: string, @Param("attachmentId") attachmentId: string, @Req() req: any) {
+    return this.mailbox.attachmentUrl(id, attachmentId, req.user.userId);
   }
 
   // ============================================================ Yardımcılar

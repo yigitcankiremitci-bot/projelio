@@ -82,6 +82,7 @@ export const bildirimTercihleri: TranslationDict = {
   "Paylaşım yayımlandığında": "When a post is published",
   "Paylaşım yayımlanamadığında": "When a post fails to publish",
   "Müşteriden WhatsApp mesajı geldiğinde": "When a customer sends a WhatsApp message",
+  "@projelio.app kutusuna e-posta geldiğinde": "When an email arrives at a @projelio.app mailbox",
 
   "Destek ve duyurular": "Support and announcements",
   "Destek yanıtları ve Projelio ekibinden gelen mesajlar. Uygulamada her zaman görünür.":

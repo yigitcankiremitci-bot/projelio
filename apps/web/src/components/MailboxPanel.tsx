@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MailAccount, MailFolder, MailMessage, MailMessageDetail } from "@projelio/shared";
-import { mailboxApi, type MailScope } from "../api/mailbox";
+import { mailboxApi, type MailScope, type MailStatus } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
+import ProjelioYeniEpostaModal from "./ProjelioYeniEpostaModal";
 import { IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
@@ -48,6 +49,12 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   );
 
   const [configured, setConfigured] = useState(false);
+  // @projelio.app kutuları: gönderim açık mı, bu kişi adres açabilir mi (yalnızca yönetici).
+  const [projelioDurum, setProjelioDurum] = useState<MailStatus["projelio"]>();
+  const [adresFormu, setAdresFormu] = useState(false);
+  const [yeniEposta, setYeniEposta] = useState(false);
+  // Klasör ve listeyi yeniden yükletmek için (gönderim, taşıma, elle yenileme).
+  const [yenile, setYenile] = useState(0);
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
   const [accountId, setAccountId] = useState<string>("");
   const [folders, setFolders] = useState<MailFolder[]>([]);
@@ -71,6 +78,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   const [showShared, setShowShared] = useState(false);
 
   const account = accounts.find((a) => a.id === accountId);
+  const projelioKutusu = account?.provider === "projelio";
 
   // ============================================================ Yükleme
   const loadAccounts = () => {
@@ -91,7 +99,10 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   useEffect(() => {
     mailboxApi
       .status()
-      .then(({ configured: ok }) => setConfigured(ok))
+      .then(({ configured: ok, projelio }) => {
+        setConfigured(ok);
+        setProjelioDurum(projelio);
+      })
       .catch(() => setConfigured(false));
   }, []);
 
@@ -121,7 +132,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
       .folders(accountId)
       .then(setFolders)
       .catch(() => setFolders([]));
-  }, [accountId]);
+  }, [accountId, yenile]);
 
   useEffect(() => {
     if (!accountId) return;
@@ -139,7 +150,27 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
         setError(err instanceof Error ? err.message : t("İletiler yüklenemedi"));
       })
       .finally(() => setLoadingList(false));
-  }, [accountId, folderId, search]);
+  }, [accountId, folderId, search, yenile]);
+
+  /**
+   * @projelio.app kutusunda yeni posta webhook'la bize düşüyor, istemciye
+   * itilmiyor; dakikada bir sessizce yokluyoruz. İleti açıkken ya da yazarken
+   * yoklanmaz — liste değişince açık pencere kapanırdı.
+   */
+  useEffect(() => {
+    if (!projelioKutusu || selected || yeniEposta || search) return;
+    const zamanlayici = setInterval(() => {
+      mailboxApi
+        .messages(accountId, { folderId })
+        .then((page) => {
+          setMessages(page.messages);
+          setHasMore(page.hasMore);
+        })
+        .catch(() => undefined);
+      mailboxApi.folders(accountId).then(setFolders).catch(() => undefined);
+    }, 60_000);
+    return () => clearInterval(zamanlayici);
+  }, [projelioKutusu, accountId, folderId, selected, yeniEposta, search]);
 
   // ============================================================ Eylemler
   const openMessage = async (message: MailMessage) => {
@@ -183,7 +214,11 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   };
 
   const unlink = async (target: MailAccount) => {
-    if (!window.confirm(t("{address} kutusu modülden kaldırılsın mı? Microsoft bağlantınız durur.", { address: target.address }))) return;
+    const soru =
+      target.provider === "projelio"
+        ? t("{address} kutusu kapatılsın mı? Bu adrese gelen posta artık hiçbir kutuya düşmez.", { address: target.address })
+        : t("{address} kutusu modülden kaldırılsın mı? Microsoft bağlantınız durur.", { address: target.address });
+    if (!window.confirm(soru)) return;
     try {
       await mailboxApi.unlink(target.id);
       setAccountId("");
@@ -266,6 +301,17 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
             </div>
           )}
         </div>
+        {projelioDurum?.canCreate && (
+          <ProjelioAdresFormu
+            scope={scope}
+            durum={projelioDurum}
+            onCreated={(a) => {
+              setBanner({ kind: "ok", text: t("{adres} adresi oluşturuldu.", { adres: a.address }) });
+              setAccountId(a.id);
+              loadAccounts();
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -278,7 +324,10 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <select
           value={accountId}
-          onChange={(e) => setAccountId(e.target.value)}
+          onChange={(e) => {
+            setAccountId(e.target.value);
+            setFolderId("inbox");
+          }}
           style={{ fontSize: 13, padding: "4px 8px" }}
         >
           {accounts.map((a) => (
@@ -288,6 +337,32 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
             </option>
           ))}
         </select>
+
+        {projelioKutusu && canWrite && (
+          <button
+            onClick={() => setYeniEposta(true)}
+            style={{
+              fontSize: 13,
+              padding: "4px 12px",
+              background: c.primary,
+              color: c.onPrimary,
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            {t("Yeni e-posta")}
+          </button>
+        )}
+        {projelioKutusu && (
+          <button
+            onClick={() => setYenile((n) => n + 1)}
+            title={t("Kutuyu yenile")}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+          >
+            {t("Yenile")}
+          </button>
+        )}
 
         <input
           value={searchInput}
@@ -310,11 +385,24 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
 
         {account && (
           <span style={{ fontSize: 11, color: c.textSecondary, marginLeft: "auto" }}>
-            {account.connectedByName ? t("{kisi} bağladı", { kisi: account.connectedByName }) : t("Modüle bağlı kutu")} ·{" "}
-            {t("ekip erişebilir")}
+            {projelioKutusu
+              ? t("Projelio adresi")
+              : account.connectedByName
+                ? t("{kisi} bağladı", { kisi: account.connectedByName })
+                : t("Modüle bağlı kutu")}{" "}
+            · {t("ekip erişebilir")}
           </span>
         )}
-        {canWrite && account && (
+        {projelioDurum?.canCreate && (
+          <button
+            onClick={() => setAdresFormu((a) => !a)}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+          >
+            {adresFormu ? t("Vazgeç") : t("+ @{alan} adresi", { alan: projelioDurum.domain })}
+          </button>
+        )}
+        {/* @projelio.app kutusunu yalnızca yönetici kapatır (sunucu da denetler). */}
+        {canWrite && account && (!projelioKutusu || projelioDurum?.canCreate) && (
           <button
             onClick={() => unlink(account)}
             aria-label={t("Kutuyu kaldır")}
@@ -325,6 +413,19 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           </button>
         )}
       </div>
+
+      {adresFormu && projelioDurum?.canCreate && (
+        <ProjelioAdresFormu
+          scope={scope}
+          durum={projelioDurum}
+          onCreated={(a) => {
+            setAdresFormu(false);
+            setBanner({ kind: "ok", text: t("{adres} adresi oluşturuldu.", { adres: a.address }) });
+            setAccountId(a.id);
+            loadAccounts();
+          }}
+        />
+      )}
 
       {account?.connectionError && (
         <span style={{ fontSize: 12, color: c.danger }}>{account.connectionError}</span>
@@ -355,7 +456,10 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                 gap: 6,
               }}
             >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {/* @projelio.app klasör adları bizim (Türkçe anahtar); Outlook'unkiler kullanıcının dilinde gelir. */}
+                {projelioKutusu ? t(f.name) : f.name}
+              </span>
               {f.unreadCount > 0 && <span style={{ color: c.textSecondary }}>{f.unreadCount}</span>}
             </button>
           ))}
@@ -435,6 +539,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                   whiteSpace: "nowrap",
                 }}
               >
+                {m.sendError && <span style={{ color: c.danger }}>{t("Gönderilemedi")} · </span>}
                 {m.hasAttachments ? "📎 " : ""}
                 {m.preview}
               </span>
@@ -459,6 +564,19 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
           canWrite={canWrite}
           onClose={() => setSelected(null)}
           onSent={(text) => setBanner({ kind: "ok", text })}
+          provider={account?.provider}
+          onChanged={() => setYenile((n) => n + 1)}
+        />
+      )}
+
+      {yeniEposta && account && (
+        <ProjelioYeniEpostaModal
+          account={account}
+          onClose={() => setYeniEposta(false)}
+          onSent={(text) => {
+            setBanner({ kind: "ok", text });
+            setYenile((n) => n + 1);
+          }}
         />
       )}
     </div>
@@ -497,6 +615,116 @@ function Banner({
       >
         ×
       </button>
+    </div>
+  );
+}
+
+/**
+ * @projelio.app adresi açma formu — yalnızca Projelio yöneticisine görünür.
+ *
+ * Adres kalıcıdır ve dışarıya (kartvizit, imza) basılır; bu yüzden yazarken
+ * tam adres önizlenir. Kurallar sunucuda (projelio-posta.ts adresiDogrula),
+ * burada yalnızca yazım kolaylığı var.
+ */
+function ProjelioAdresFormu({
+  scope,
+  durum,
+  onCreated,
+}: {
+  scope: MailScope;
+  durum: NonNullable<MailStatus["projelio"]>;
+  onCreated: (account: MailAccount) => void;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  const [yerelAd, setYerelAd] = useState("");
+  const [gorunenAd, setGorunenAd] = useState("");
+  const [imza, setImza] = useState("");
+  const [kaydediliyor, setKaydediliyor] = useState(false);
+  const [hata, setHata] = useState("");
+
+  const olustur = async () => {
+    setKaydediliyor(true);
+    setHata("");
+    try {
+      const account = await mailboxApi.createProjelio(scope, {
+        localPart: yerelAd,
+        displayName: gorunenAd.trim() || undefined,
+        signature: imza.trim() || undefined,
+      });
+      onCreated(account);
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Adres oluşturulamadı"));
+    } finally {
+      setKaydediliyor(false);
+    }
+  };
+
+  const girdi = { fontSize: 13, padding: "6px 8px" } as const;
+
+  return (
+    <div
+      style={{
+        border: `1px dashed ${c.accent}`,
+        borderRadius: 10,
+        padding: 16,
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        maxWidth: 560,
+      }}
+    >
+      <span style={{ fontSize: 14, color: c.textPrimary }}>{t("@{alan} adresi oluştur", { alan: durum.domain })}</span>
+      <span style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.5 }}>
+        {t("Adrese gelen posta bu modüle düşer; modüle atanmış herkes okuyup bu adresten yanıt yazabilir. Bu düğmeyi yalnızca Projelio yöneticileri görür.")}
+      </span>
+      {!durum.configured && (
+        <span style={{ fontSize: 12, color: c.danger }}>
+          {t("E-posta gönderimi bu kurulumda yapılandırılmamış (RESEND_API_KEY).")}
+        </span>
+      )}
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <input
+          value={yerelAd}
+          onChange={(e) => setYerelAd(e.target.value.toLowerCase().replace(/\s+/g, ""))}
+          placeholder="satis"
+          style={{ ...girdi, flex: 1 }}
+          autoFocus
+        />
+        <span style={{ fontSize: 13, color: c.textSecondary }}>@{durum.domain}</span>
+      </div>
+      <input
+        value={gorunenAd}
+        onChange={(e) => setGorunenAd(e.target.value)}
+        placeholder={t("Görünen ad (ör. Projelio Satış)")}
+        style={girdi}
+      />
+      <textarea
+        value={imza}
+        onChange={(e) => setImza(e.target.value)}
+        placeholder={t("İmza (isteğe bağlı) — her e-postanın sonuna eklenir")}
+        rows={3}
+        style={{ ...girdi, height: "auto", fontFamily: "inherit", resize: "vertical" }}
+      />
+      {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+      <div>
+        <button
+          onClick={olustur}
+          disabled={kaydediliyor || !yerelAd.trim() || !durum.configured}
+          style={{
+            fontSize: 13,
+            padding: "6px 14px",
+            background: c.primary,
+            color: c.onPrimary,
+            border: "none",
+            borderRadius: 8,
+            cursor: kaydediliyor || !yerelAd.trim() ? "default" : "pointer",
+            opacity: kaydediliyor || !yerelAd.trim() || !durum.configured ? 0.6 : 1,
+          }}
+        >
+          {kaydediliyor ? t("Oluşturuluyor…") : t("Adresi oluştur")}
+        </button>
+      </div>
     </div>
   );
 }

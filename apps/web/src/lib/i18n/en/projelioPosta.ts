@@ -1,0 +1,56 @@
+import type { TranslationDict } from "@projelio/shared";
+
+/** E-posta modülü: @projelio.app kutuları (MailboxPanel, MailMessageModal, ProjelioYeniEpostaModal). */
+export const projelioPosta: TranslationDict = {
+  "+ @{alan} adresi": "+ @{alan} address",
+  "@{alan} adresi oluştur": "Create a @{alan} address",
+  "Adres oluşturulamadı": "Couldn't create the address",
+  "Adrese gelen posta bu modüle düşer; modüle atanmış herkes okuyup bu adresten yanıt yazabilir. Bu düğmeyi yalnızca Projelio yöneticileri görür.":
+    "Mail sent to this address lands in this module; everyone assigned to the module can read it and reply from this address. Only Projelio administrators see this button.",
+  "Adresi oluştur": "Create address",
+  "Oluşturuluyor…": "Creating…",
+  "Bilgi (CC)": "Cc",
+  "Bu e-posta gönderilemedi: {hata}": "This email couldn't be sent: {hata}",
+  "Bu ek kaydedilemedi ya da gönderilen bir iletinin eki; indirilemez.":
+    "This attachment couldn't be saved or belongs to a sent message; it can't be downloaded.",
+  "E-posta gönderilemedi": "Email couldn't be sent",
+  "E-posta gönderildi.": "Email sent.",
+  "E-posta gönderimi bu kurulumda yapılandırılmamış (RESEND_API_KEY).": "Email sending isn't configured on this installation (RESEND_API_KEY).",
+  "E-posta metni boş olamaz": "Email body can't be empty",
+  "E-postanızı yazın…": "Write your email…",
+  "Ek indirilemedi": "Couldn't download the attachment",
+  "Eklerin toplamı 25 MB'ı geçemez": "Attachments can't exceed 25 MB in total",
+  "En az bir alıcı gerekli": "At least one recipient is required",
+  "Gönderen: {adres}": "From: {adres}",
+  "Gönderilemedi": "Not sent",
+  "Gelen kutusu": "Inbox",
+  "Gönderilenler": "Sent",
+  "İstenmeyen": "Junk",
+  "Çöp kutusu": "Trash",
+  "Görünen ad (ör. Projelio Satış)": "Display name (e.g. Projelio Sales)",
+  "Kime (virgülle ayırın)": "To (separate with commas)",
+  "Konu": "Subject",
+  "Konu boş olamaz": "Subject can't be empty",
+  "Kutunun imzası sona kendiliğinden eklenir.": "The mailbox signature is added at the end automatically.",
+  "Kutuyu yenile": "Refresh mailbox",
+  "Yenile": "Refresh",
+  "Orijinal ileti ve ekleri altına eklenir; siz yalnızca üstte görünecek metni yazıyorsunuz.":
+    "The original message and its attachments are added below; you only write the text shown on top.",
+  "Orijinal ileti yanıtın altına alıntılanır; siz yalnızca üstte görünecek metni yazıyorsunuz.":
+    "The original message is quoted below your reply; you only write the text shown on top.",
+  "Projelio adresi": "Projelio address",
+  "Toplam {boyut} / 25 MB": "Total {boyut} / 25 MB",
+  "Yazdığınız e-posta kaybolacak. Kapatılsın mı?": "Your email will be lost. Close anyway?",
+  "Yeni e-posta": "New email",
+  "Dosya ekle": "Attach file",
+  "Eki kaldır": "Remove attachment",
+  "{address} kutusu kapatılsın mı? Bu adrese gelen posta artık hiçbir kutuya düşmez.":
+    "Close the {address} mailbox? Mail sent to this address will no longer land anywhere.",
+  "{adres} adresi oluşturuldu.": "{adres} address created.",
+  "Çöpe at": "Move to trash",
+  "Geri al": "Restore",
+  "İleti geri alındı.": "Message restored.",
+  "İleti taşınamadı": "Couldn't move the message",
+  "İleti çöp kutusuna taşındı.": "Message moved to trash.",
+  "İmza (isteğe bağlı) — her e-postanın sonuna eklenir": "Signature (optional) — added to the end of every email",
+};

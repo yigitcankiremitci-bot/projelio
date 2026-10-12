@@ -409,4 +409,7 @@ export const bildirimler: TranslationDict = {
   '"{ad}" indirildi': '"{ad}" was downloaded',
   "Bugünün işleri": "Today's tasks",
   "Bu haftanın işleri": "This week's tasks",
+  "{adres} kutusuna yeni e-posta": "New email in {adres}",
+  "{gonderen}: {konu}": "{gonderen}: {konu}",
+  "{gonderen} (konusuz)": "{gonderen} (no subject)",
 };

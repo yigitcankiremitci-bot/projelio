@@ -1,11 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { MailAccount, MailFolder, MailListPage, MailMessageDetail } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { decodeUploadFileName } from "../../common/upload-filename.util";
 import { AiAssistantService } from "../ai-assistant/ai-assistant.service";
 import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { GraphMailService } from "./graph-mail.service";
 import { buildReplyBody } from "./mail-format";
+import { adresiDogrula } from "./projelio-posta";
+import { ProjelioPostaService } from "./projelio-posta.service";
 
 /**
  * E-posta modülünün gelen kutusu.
@@ -56,7 +59,8 @@ export class MailboxService {
     private moduleMembers: ModuleMembersService,
     private msAccounts: MicrosoftAccountsService,
     private graph: GraphMailService,
-    private ai: AiAssistantService
+    private ai: AiAssistantService,
+    private projelio: ProjelioPostaService
   ) {}
 
   // ============================================================ Yetki
@@ -168,6 +172,55 @@ export class MailboxService {
     return mapAccount(data);
   }
 
+  /**
+   * @projelio.app kutusu açar. YALNIZCA platform yöneticisi (kullanıcı kararı,
+   * 2026-10-12): müşterinin kendi kendine projelio.app adresi alması, alan
+   * adının gönderici itibarını bizim denetimimiz dışına çıkarırdı.
+   *
+   * Modül yetkisi aranmaz — yönetici kutuyu bir müşterinin modülüne açıyor
+   * olabilir. Kapsamın var olduğu yine doğrulanır (access, yoksa 404 atar).
+   */
+  async createProjelioAccount(
+    scope: MailScope,
+    input: { localPart?: string; displayName?: string; signature?: string },
+    user: { userId: string; role?: string }
+  ): Promise<MailAccount> {
+    if (user.role !== "admin") {
+      throw new ForbiddenException("@projelio.app adresini yalnızca Projelio yöneticisi oluşturabilir."); // dil:anahtar
+    }
+    if (!this.projelio.yapilandirildi) {
+      throw new BadRequestException("E-posta gönderimi bu kurulumda yapılandırılmamış."); // dil:anahtar
+    }
+    const sonuc = adresiDogrula(input.localPart);
+    if ("hata" in sonuc) throw new BadRequestException(sonuc.hata);
+    await this.access(scope, user.userId);
+
+    const scopeColumns =
+      "jobId" in scope
+        ? { job_id: scope.jobId, organization_id: null, department_id: null }
+        : { organization_id: scope.organizationId, job_id: null, department_id: scope.departmentId ?? null };
+
+    const { data, error } = await this.supabase.client
+      .from("mail_accounts")
+      .insert({
+        ...scopeColumns,
+        provider: "projelio",
+        address: sonuc.adres,
+        display_name: input.displayName?.trim().slice(0, 120) || null,
+        signature: input.signature?.trim() || null,
+        connected_by: user.userId,
+        active: true,
+      })
+      .select("*")
+      .single();
+    if (error) {
+      // mail_accounts_projelio_adres_uniq: adres başka bir kutuda açık.
+      if ((error as any).code === "23505") throw new BadRequestException("Bu adres zaten kullanımda."); // dil:anahtar
+      throw error;
+    }
+    return mapAccount(data);
+  }
+
   async updateAccount(
     accountId: string,
     input: { signature?: string; displayName?: string; active?: boolean },
@@ -198,9 +251,17 @@ export class MailboxService {
    * olabilir ve kullanıcı yalnızca "bu kutu ekibe kapansın" demiştir. Jetonu
    * gerçekten iptal etmek Ayarlar'daki ayrı bir eylem.
    */
-  async unlinkAccount(accountId: string, userId: string): Promise<{ ok: true }> {
+  async unlinkAccount(accountId: string, userId: string, role?: string): Promise<{ ok: true }> {
     const row = await this.accountRow(accountId);
-    await this.assertMailAccess(this.scopeOf(row), userId);
+    // @projelio.app kutusunu açan da kapatan da yönetici: modül üyesi kutuyu
+    // kaldırırsa adres serbest kalır ve postası başka bir kutuya akabilirdi.
+    if (row.provider === "projelio") {
+      if (role !== "admin") {
+        throw new ForbiddenException("@projelio.app kutusunu yalnızca Projelio yöneticisi kaldırabilir."); // dil:anahtar
+      }
+    } else {
+      await this.assertMailAccess(this.scopeOf(row), userId);
+    }
 
     const { error } = await this.supabase.client
       .from("mail_accounts")
@@ -214,6 +275,7 @@ export class MailboxService {
 
   async listFolders(accountId: string, userId: string): Promise<MailFolder[]> {
     const { row, token } = await this.open(accountId, userId);
+    if (row.provider === "projelio") return this.projelio.listFolders(row.id);
     return this.graph.listFolders(token, row.shared_mailbox);
   }
 
@@ -223,17 +285,20 @@ export class MailboxService {
     options: { folderId?: string; skip?: number; search?: string }
   ): Promise<MailListPage> {
     const { row, token } = await this.open(accountId, userId);
+    if (row.provider === "projelio") return this.projelio.listMessages(row.id, options);
     return this.graph.listMessages(token, { ...options, sharedMailbox: row.shared_mailbox });
   }
 
   async getMessage(accountId: string, messageId: string, userId: string): Promise<MailMessageDetail> {
     const { row, token } = await this.open(accountId, userId);
+    if (row.provider === "projelio") return this.projelio.getMessage(row.id, messageId);
     return this.graph.getMessage(token, messageId, row.shared_mailbox);
   }
 
   async markRead(accountId: string, messageId: string, isRead: boolean, userId: string): Promise<{ ok: true }> {
     const { row, token } = await this.open(accountId, userId);
-    await this.graph.markRead(token, messageId, isRead, row.shared_mailbox);
+    if (row.provider === "projelio") await this.projelio.markRead(row.id, messageId, isRead);
+    else await this.graph.markRead(token, messageId, isRead, row.shared_mailbox);
     return { ok: true };
   }
 
@@ -253,6 +318,10 @@ export class MailboxService {
   ): Promise<{ ok: true }> {
     const { row, token } = await this.open(accountId, userId);
     if (!input.text?.trim()) throw new BadRequestException("Yanıt metni boş olamaz");
+    if (row.provider === "projelio") {
+      await this.projelio.reply(row, messageId, input, userId);
+      return { ok: true };
+    }
 
     const mode = input.mode ?? "reply";
     if (mode === "forward" && !(input.to ?? []).length) {
@@ -267,6 +336,36 @@ export class MailboxService {
       sharedMailbox: row.shared_mailbox,
     });
     return { ok: true };
+  }
+
+  /**
+   * Yeni e-posta. Yalnızca @projelio.app kutularında: Outlook kutusundan yeni
+   * posta yazmak Graph'ta ayrı bir izin akışı ve henüz istenmedi.
+   */
+  async compose(
+    accountId: string,
+    input: { to?: string | string[]; cc?: string | string[]; subject?: string; text?: string },
+    files: { originalname: string; buffer: Buffer; mimetype?: string }[],
+    userId: string
+  ): Promise<{ ok: true; id: string }> {
+    const row = await this.projelioKutusu(accountId, userId);
+    return this.projelio.compose(
+      row,
+      input,
+      files.map((f) => ({ filename: decodeUploadFileName(f.originalname), content: f.buffer, contentType: f.mimetype })),
+      userId
+    );
+  }
+
+  async moveMessage(accountId: string, messageId: string, folder: string, userId: string): Promise<{ ok: true }> {
+    const row = await this.projelioKutusu(accountId, userId);
+    await this.projelio.moveMessage(row.id, messageId, folder);
+    return { ok: true };
+  }
+
+  async attachmentUrl(accountId: string, attachmentId: string, userId: string): Promise<{ url: string; filename: string }> {
+    const row = await this.projelioKutusu(accountId, userId);
+    return this.projelio.ekBaglantisi(row.id, attachmentId);
   }
 
   /**
@@ -332,6 +431,8 @@ export class MailboxService {
     await this.assertMailAccess(this.scopeOf(row), userId);
 
     if (!row.active) throw new BadRequestException("Bu kutu pasif durumda.");
+    // @projelio.app kutusunun jetonu yok: posta bizim veritabanımızda.
+    if (row.provider === "projelio") return { row, token: "" };
     if (!row.microsoft_account_id) throw new BadRequestException("Kutunun Microsoft bağlantısı yok.");
 
     try {
@@ -347,6 +448,14 @@ export class MailboxService {
         .eq("id", accountId);
       throw new BadRequestException(message);
     }
+  }
+
+  private async projelioKutusu(accountId: string, userId: string): Promise<any> {
+    const { row } = await this.open(accountId, userId);
+    if (row.provider !== "projelio") {
+      throw new BadRequestException("Bu işlem yalnızca @projelio.app kutularında var."); // dil:anahtar
+    }
+    return row;
   }
 
   private async accountRow(accountId: string): Promise<any> {

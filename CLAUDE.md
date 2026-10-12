@@ -34,6 +34,7 @@ Dosya ararken önce buraya bak; `grep`/`find` ile taramadan önce doğru klasör
 | Lio yardımı (belgeden okuyup kayıt + kasa satırı açma) | `backend/src/modules/faturalar/lio-yardimi.service.ts`, `fatura-okuma.ts`; anahtar `organization_modules.ai_assist` |
 | Dosya indirme bağlantısı (üyeliksiz paylaşım) | `backend/src/modules/file-download-links/`, `apps/web/src/components/FileDownloadLinkModal.tsx`, açılan sayfa `apps/web/src/pages/PublicFileDownload.tsx` |
 | Dijital kartvizit (ücretsiz, `<adres>.projelio.app`, logolu QR) | `backend/src/modules/kartvizit/` — sayfa HTML'i sunucuda `kartvizit-sayfa.ts`, Caddy ask ucu `public/kartvizit/izin`; ortak kurallar + QR çizimi `packages/shared/src/kartvizit.ts`; arayüz `apps/web/src/components/kartvizit/KartvizitModal.tsx` (kişi kartındaki QR rozeti + Profili düzenle); sayfanın CSS/JS'i `kartvizit/_ortak/`, joker blok `deploy/Caddyfile` `*.projelio.app` (on_demand_tls) — DNS'te `*` A kaydı şart (migration 151) |
+| @projelio.app posta kutuları (E-posta modülünde, yalnızca admin açar; gelen Resend webhook'u, giden Resend API) | `backend/src/modules/mailbox/projelio-posta*.ts` — saf kurallar `projelio-posta.ts`, webhook `projelio-posta-webhook.controller.ts`; Outlook kutularıyla AYNI `mail_accounts` (`provider='projelio'`), ama iletiler bizde: `mail_messages` + özel `mail-ekleri` kovası (migration 162); MX Google'da kalır, Google yönlendirmesi tanınmayan alıcıları Resend'e verir — kurulum `docs/projelio-posta.md` |
 | Bilgi kartı (şirket/iş künyesi) | `backend/src/modules/bilgi-karti/`, `apps/web/src/components/bilgiKarti/` — künye + belge + diğer modüllerden özet |
 | Hesaplar (üyelikler + şifreli giriş bilgileri) | `backend/src/modules/hesaplar/`, `apps/web/src/components/hesaplar/` — sır yalnızca `hesap-kimlik.service.ts`'ten çıkar |
 | Geçiş anahtarı (WebAuthn) doğrulaması | `backend/src/common/webauthn/` — elle yazıldı, bağımlılık yok; `backend/src/modules/passkeys/` kullanıcının cihazları |
@@ -162,6 +163,7 @@ Bunlar repoda var ama **ortam değişkeni tanımlanana kadar sessizce kapalı**:
 | Lio Bakiyesi tahsilatı (PayTR) | `PAYTR_MERCHANT_ID` + `PAYTR_MERCHANT_KEY` + `PAYTR_MERCHANT_SALT` | `backend/.env` — eksikse eski akış (elle onay) sürer |
 | PayTR canlı tahsilat | `PAYTR_TEST_MODE=0` | `backend/.env` — **varsayılan test modu**, bilerek |
 | Hesap şifrelerinin şifrelenmesi | `HESAP_KIMLIK_ENC_KEY` | `backend/.env` — **eksikse giriş bilgisi kaydedilemez** |
+| @projelio.app kutularına gelen posta | `RESEND_INBOUND_WEBHOOK_SECRET` | canlıda `/srv/projelio/deploy/.env` (tanımlı) — eksikse gelen posta 401'le reddedilir; ayrıca Resend webhook'u + Google Admin yönlendirmesi, bkz. `docs/projelio-posta.md` |
 | Gönderen e-posta adresi | `EMAIL_FROM` | `backend/.env` — **eksikse Resend kum havuzuna düşer** |
 | Yönetici mesajlarının göndereni (isteğe bağlı) | `EMAIL_FROM_DESTEK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `destek@` |
 | Dosya paylaşımlarının göndereni (isteğe bağlı) | `EMAIL_FROM_LINK` | `backend/.env` — tanımsızsa EMAIL_FROM alan adında `link@` |

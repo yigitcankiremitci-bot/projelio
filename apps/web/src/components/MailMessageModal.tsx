@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { MailMessageDetail } from "@projelio/shared";
+import type { MailMessageDetail, MailProvider } from "@projelio/shared";
 import { mailboxApi } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
@@ -14,6 +14,13 @@ interface Props {
   onClose: () => void;
   /** Yanıt gönderildiğinde panele haber verir (şerit göstermek için). */
   onSent: (text: string) => void;
+  /**
+   * Kutunun sağlayıcısı. "projelio" ise iletiler bizde saklı: ekler indirilebilir,
+   * ileti çöpe atılabilir ve yanıtın altına alıntıyı Outlook değil sunucu ekler.
+   */
+  provider?: MailProvider;
+  /** İleti klasör değiştirdiğinde listeyi tazelemek için. */
+  onChanged?: () => void;
 }
 
 type ReplyMode = "reply" | "replyAll" | "forward";
@@ -39,9 +46,11 @@ const MODE_LABELS: Record<ReplyMode, string> = {
  * GÖVDE SANDBOX'LI IFRAME'DE: gelen e-posta güvenilmeyen HTML'dir; doğrudan
  * sayfaya koymak gönderene script çalıştırma imkânı verirdi.
  */
-export default function MailMessageModal({ accountId, message, canWrite, onClose, onSent }: Props) {
+export default function MailMessageModal({ accountId, message, canWrite, onClose, onSent, provider, onChanged }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const projelio = provider === "projelio";
+  const [tasiniyor, setTasiniyor] = useState(false);
   const [replyMode, setReplyMode] = useState<ReplyMode | null>(null);
   const [replyText, setReplyText] = useState("");
   const [forwardTo, setForwardTo] = useState("");
@@ -101,11 +110,39 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
         to: replyMode === "forward" ? forwardTo.split(/[,;\s]+/).filter(Boolean) : undefined,
       });
       onSent(t("{islem} işlemi tamamlandı.", { islem: t(MODE_LABELS[replyMode]) }));
+      onChanged?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Yanıt gönderilemedi"));
     } finally {
       setSending(false);
+    }
+  };
+
+  /** Ek indirme: kova özel, sunucudan 5 dakikalık imzalı bağlantı alınır. */
+  const ekiAc = async (ekId: string) => {
+    setError("");
+    try {
+      const { url } = await mailboxApi.attachment(accountId, ekId);
+      window.open(url, "_blank", "noopener");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Ek indirilemedi"));
+    }
+  };
+
+  /** Çöpe at ya da (çöpte/istenmeyende) geri al. Kalıcı silme yok — kutu ortak. */
+  const tasi = async (hedef: "trash" | "restore") => {
+    setTasiniyor(true);
+    setError("");
+    try {
+      await mailboxApi.move(accountId, message.id, hedef);
+      onSent(hedef === "trash" ? t("İleti çöp kutusuna taşındı.") : t("İleti geri alındı."));
+      onChanged?.();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("İleti taşınamadı"));
+    } finally {
+      setTasiniyor(false);
     }
   };
 
@@ -156,9 +193,45 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
             {t("Kime: {alicilar}", { alicilar: message.to.map((a) => a.address).join(", ") || "—" })}
             {message.cc.length > 0 && ` · CC: ${message.cc.map((t) => t.address).join(", ")}`}
           </span>
-          {message.attachments.length > 0 && (
+          {message.attachments.length > 0 && !projelio && (
             <span style={{ fontSize: 11, color: c.textSecondary }}>
               📎 {message.attachments.map((a) => a.name).join(", ")} {t("— indirmek için Outlook'ta açın")}
+            </span>
+          )}
+          {message.attachments.length > 0 && projelio && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+              {message.attachments.map((a) =>
+                a.downloadable ? (
+                  <button
+                    key={a.id}
+                    onClick={() => ekiAc(a.id)}
+                    style={{
+                      fontSize: 12,
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      border: `1px solid ${c.border}`,
+                      background: "transparent",
+                      color: c.primary,
+                      cursor: "pointer",
+                    }}
+                  >
+                    📎 {a.name}
+                  </button>
+                ) : (
+                  <span
+                    key={a.id}
+                    title={t("Bu ek kaydedilemedi ya da gönderilen bir iletinin eki; indirilemez.")}
+                    style={{ fontSize: 12, padding: "3px 9px", color: c.textSecondary }}
+                  >
+                    📎 {a.name}
+                  </span>
+                )
+              )}
+            </div>
+          )}
+          {message.sendError && (
+            <span style={{ fontSize: 12, color: c.danger }}>
+              {t("Bu e-posta gönderilemedi: {hata}", { hata: message.sendError })}
             </span>
           )}
         </div>
@@ -199,6 +272,25 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
         {/* ---------------------------------------------------- Eylemler */}
         {canWrite && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {projelio && (
+              <button
+                onClick={() => tasi(message.folder === "trash" || message.folder === "spam" ? "restore" : "trash")}
+                disabled={tasiniyor}
+                style={{
+                  order: 1,
+                  marginLeft: "auto",
+                  fontSize: 13,
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  border: `1px solid ${c.border}`,
+                  background: "transparent",
+                  color: c.textSecondary,
+                }}
+              >
+                {message.folder === "trash" || message.folder === "spam" ? t("Geri al") : t("Çöpe at")}
+              </button>
+            )}
             {(Object.keys(MODE_LABELS) as ReplyMode[]).map((mode) => (
               <button
                 key={mode}
@@ -252,7 +344,11 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
             />
 
             <span style={{ fontSize: 11, color: c.textSecondary }}>
-              {t("Gönderdiğinizde Outlook orijinal iletiyi altına kendisi alıntılar; siz yalnızca üstte görünecek metni yazıyorsunuz.")}
+              {projelio
+                ? replyMode === "forward"
+                  ? t("Orijinal ileti ve ekleri altına eklenir; siz yalnızca üstte görünecek metni yazıyorsunuz.")
+                  : t("Orijinal ileti yanıtın altına alıntılanır; siz yalnızca üstte görünecek metni yazıyorsunuz.")
+                : t("Gönderdiğinizde Outlook orijinal iletiyi altına kendisi alıntılar; siz yalnızca üstte görünecek metni yazıyorsunuz.")}
             </span>
 
             {error && <span style={{ fontSize: 12, color: c.danger }}>{error}</span>}

@@ -177,6 +177,7 @@ export const BILDIRIM_KATEGORILERI: BildirimKategorisi[] = [
       { tip: "social_post_published", etiket: "Paylaşım yayımlandığında" }, // dil:anahtar
       { tip: "social_post_failed", etiket: "Paylaşım yayımlanamadığında" }, // dil:anahtar
       { tip: "whatsapp_inbound", etiket: "Müşteriden WhatsApp mesajı geldiğinde" }, // dil:anahtar
+      { tip: "mail_received", etiket: "@projelio.app kutusuna e-posta geldiğinde" }, // dil:anahtar
     ],
   },
   {

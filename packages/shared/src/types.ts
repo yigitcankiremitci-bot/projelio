@@ -2253,6 +2253,9 @@ export interface NotificationPayload {
     | "file_link_downloaded"
     // Proje takviminde bir etkinliğe katılımcı olarak eklendin (bkz. migration 152).
     | "project_event"
+    // @projelio.app kutusuna posta geldi (bkz. migration 162). Modüle atanmış
+    // herkese gider; kutu ortak olduğu için "kime geldi" yok, "kutuya geldi" var.
+    | "mail_received"
     // Admin panelinden yöneticinin yazdığı mesaj (bkz. modules/admin/admin-mesaj.service.ts).
     // Bildirim çanı bu tipi görünce mesajın tamamını bir pencerede açar: gövde
     // listede tek satıra sığmayacak kadar uzun olabilir.
@@ -3615,7 +3618,9 @@ export interface SocialCredentialList {
 // Bu yüzden aşağıdaki tipler bir veritabanı satırının değil, bir Graph
 // yanıtının Projelio'ya çevrilmiş hâlidir.
 
-export type MailProvider = "microsoft" | "google";
+// "projelio": yöneticinin açtığı ad@projelio.app kutusu. Diğerlerinden farkı
+// iletilerin Projelio'da SAKLANMASI — sunucu biziz (bkz. 162_projelio_posta_kutulari.sql).
+export type MailProvider = "microsoft" | "google" | "projelio";
 
 /** Modüle bağlı kutu. */
 export interface MailAccount {
@@ -3664,6 +3669,10 @@ export interface MailMessage {
   /** Graph'ın işaretlediği önem: yüksek olanlar listede belirginleşir. */
   importance?: "low" | "normal" | "high";
   webLink?: string;
+  /** Yalnızca @projelio.app kutusunda: inbox · sent · spam · trash. */
+  folder?: string;
+  /** Yalnızca giden @projelio.app iletisinde: Resend gönderemediyse sebebi. */
+  sendError?: string;
 }
 
 /** Açılan ileti — gövdesiyle birlikte. */
@@ -3673,7 +3682,14 @@ export interface MailMessageDetail extends MailMessage {
   bodyHtml?: string;
   /** Lio'ya ve önizlemeye giden düz metin karşılığı. */
   bodyText: string;
-  attachments: { id: string; name: string; contentType: string; sizeBytes: number }[];
+  attachments: {
+    id: string;
+    name: string;
+    contentType: string;
+    sizeBytes: number;
+    /** @projelio.app kutusunda ek indirilebilir mi (kovaya yazılamamış ek adıyla görünür). */
+    downloadable?: boolean;
+  }[];
 }
 
 export interface MailListPage {

@@ -1038,6 +1038,7 @@ export const moduller: TranslationDict = {
   "Projelio müşteri şablonu": "Projelio customer template",
   "Excel ile toplu ekle": "Bulk add from Excel",
   "Excel ile toplu müşteri ekle": "Bulk add customers from Excel",
+  "Excel ile toplu potansiyel müşteri ekle": "Bulk add leads from Excel",
   "Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.":
     "Download the template, fill it in and upload it here — each row becomes a customer card.",
   "Şablonu indirip doldurun": "Download and fill in the template",

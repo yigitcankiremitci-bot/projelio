@@ -13,6 +13,8 @@ interface Props {
   departmentId?: string;
   /** Bağlantı ve İlişkiler defterine yükler: ayrı şablon (önem, tanışma yeri…), kartlar müşteri listesine girmez. */
   baglanti?: boolean;
+  /** Potansiyel sekmesinden açıldı: dosyadaki Rol ne derse desin kartlar potansiyel açılır. */
+  potansiyel?: boolean;
   onClose: () => void;
   /** Kartlar açıldıktan sonra liste tazelensin; bağlantı listesine aktarıldıysa listenin kimliği gelir. */
   onDone: (listeId?: string) => void;
@@ -37,6 +39,7 @@ export default function MusteriExcelModal({
   scopePath,
   departmentId,
   baglanti = false,
+  potansiyel = false,
   onClose,
   onDone,
   listeler = [],
@@ -66,6 +69,7 @@ export default function MusteriExcelModal({
       const q = new URLSearchParams({ onizleme: onizleme ? "1" : "0" });
       if (departmentId) q.set("departmentId", departmentId);
       if (baglanti) q.set("modul", BAGLANTI_MODUL_KEY);
+      if (potansiyel && !baglanti) q.set("potansiyel", "1");
       if (baglanti && !onizleme) {
         if (listeSecimi === YENI_LISTE) {
           if (yeniListeAdi.trim()) q.set("yeniListe", yeniListeAdi.trim());
@@ -135,7 +139,16 @@ export default function MusteriExcelModal({
   );
 
   return (
-    <Modal title={baglanti ? t("Excel ile toplu bağlantı ekle") : t("Excel ile toplu müşteri ekle")} onClose={onClose}>
+    <Modal
+      title={
+        baglanti
+          ? t("Excel ile toplu bağlantı ekle")
+          : potansiyel
+            ? t("Excel ile toplu potansiyel müşteri ekle")
+            : t("Excel ile toplu müşteri ekle")
+      }
+      onClose={onClose}
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {!bitti && (
           <>

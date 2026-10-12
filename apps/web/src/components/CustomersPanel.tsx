@@ -1338,6 +1338,7 @@ export default function CustomersPanel({
           scopePath={scopePath}
           departmentId={departmentId}
           baglanti={baglantiModu}
+          potansiyel={!baglantiModu && gorunum === "potansiyel"}
           onClose={() => setExcelAcik(false)}
           listeler={listeler}
           acikListeId={etkinListe || undefined}

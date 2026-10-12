@@ -25,6 +25,7 @@ import {
   type PartyDuplicate,
   type PartyAktarimSecenegi,
   musteriyeDonusenRoller,
+  potansiyelRolleri,
   potansiyelMusteriMi,
   type PartyDosyaRolu,
   type PartyGorevi,
@@ -686,11 +687,17 @@ export class PartyService {
       sonSatir?: number;
       kaynak?: string;
       modul?: PartyModulKey;
+      /** Potansiyel sekmesinden yüklendi: her kart potansiyel açılır (bkz. potansiyelRolleri). */
+      potansiyel?: boolean;
     } = {}
   ): Promise<MusteriIceAktarmaSonucu> {
     const modul = opts.modul ?? MODULE_KEY;
     await this.assertCanWrite(scope, userId, modul);
     const plan = planMusteriImport(sheet, { ...opts, tur: modul === BAGLANTI_MODUL_KEY ? "baglanti" : "musteri" });
+    // Yalnızca Müşteriler defterinde anlamlı; Bağlantılar'da potansiyel sekmesi yok.
+    if (opts.potansiyel && modul === MUSTERI_MODUL_KEY) {
+      for (const p of plan.planlanan) p.party.roles = potansiyelRolleri(p.party.roles);
+    }
     // Yalnızca okuyabildiği defterlerle karşılaştırılır: "zaten kayıtlı: X"
     // satırı göremediği defterdeki kartın adını söylerdi (bkz. checkDuplicates).
     const mevcut = await this.findAll(scope, { includeArchived: true, moduller: await this.okunanModuller(scope, userId) });

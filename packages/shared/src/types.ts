@@ -689,6 +689,17 @@ export function musteriyeDonusenRoller(roles: readonly PartyRole[]): PartyRole[]
 }
 
 /**
+ * Potansiyel sekmesinden yapılan Excel aktarımının rol sonucu: kart HER ZAMAN
+ * potansiyel açılır. Dosyadaki Rol sütunu "Müşteri" dese bile `customer`
+ * düşer — kullanıcı potansiyel listesini yüklediği sekmeyi seçerek belirtti;
+ * şablonun örnek satırı "Müşteri" olduğu için 51 aday gerçek müşterilerin
+ * arasına karışmıştı (2026-10-12). Diğer roller (tedarikçi vb.) korunur.
+ */
+export function potansiyelRolleri(roles: readonly PartyRole[] | undefined): PartyRole[] {
+  return ["lead", ...(roles ?? []).filter((r) => r !== "customer" && r !== "lead")];
+}
+
+/**
  * party kaydına bakan modüller. Kaydın hangi defterde durduğu
  * `Party.modules`'ta yazılı (migration 153): Bağlantılar'da açılan kart
  * Müşteriler'de görünmez, müşteriye dönüşünce ikisinde birden görünür.

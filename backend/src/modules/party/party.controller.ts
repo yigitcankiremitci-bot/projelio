@@ -96,12 +96,17 @@ export class PartyController {
     @Query("modul") modul: string | undefined,
     @Query("listeId") listeId: string | undefined,
     @Query("yeniListe") yeniListe: string | undefined,
+    @Query("potansiyel") potansiyel: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, defter(modul), file, { listeId, yeniListe });
+    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, defter(modul), file, {
+      listeId,
+      yeniListe,
+      potansiyel: potansiyel === "1",
+    });
   }
 
   @Post("jobs/:jobId/party/import")
@@ -113,12 +118,17 @@ export class PartyController {
     @Query("modul") modul: string | undefined,
     @Query("listeId") listeId: string | undefined,
     @Query("yeniListe") yeniListe: string | undefined,
+    @Query("potansiyel") potansiyel: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ jobId }, onizleme, req.user.userId, defter(modul), file, { listeId, yeniListe });
+    return this.iceAktar({ jobId }, onizleme, req.user.userId, defter(modul), file, {
+      listeId,
+      yeniListe,
+      potansiyel: potansiyel === "1",
+    });
   }
 
   private async iceAktar(
@@ -127,7 +137,7 @@ export class PartyController {
     userId: string,
     modul: PartyModulKey,
     file?: Express.Multer.File,
-    hedefListe: { listeId?: string; yeniListe?: string } = {}
+    hedefListe: { listeId?: string; yeniListe?: string; potansiyel?: boolean } = {}
   ) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
     // multer dosya adını latin1 okuyor; "Müşteriler.xlsx" bozuk gelmesin.
@@ -143,7 +153,11 @@ export class PartyController {
           ? await this.listeler.kapsamdakiListe(scope, hedefListe.listeId, userId)
           : await this.listeler.adlaBulVeyaAc(scope, hedefListe.yeniListe, userId)
         : undefined;
-    const sonuc = await this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: !uygula, modul });
+    const sonuc = await this.partyService.sablondanIceAktar(scope, sayfa, userId, {
+      onizleme: !uygula,
+      modul,
+      potansiyel: hedefListe.potansiyel,
+    });
     if (!liste) return sonuc;
     // Yeni açılanlar + dosyada olup sistemde zaten kayıtlı olanlar: ikisi de
     // bu listenin parçası (kopya kart açılmadan listeye girer).

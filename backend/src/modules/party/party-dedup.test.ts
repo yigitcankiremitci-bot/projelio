@@ -2,7 +2,7 @@
 // gereği), bu yüzden namespace import kullanılıyor.
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { musteriyeDonusenRoller, potansiyelMusteriMi, type Party, type PartyRole } from "@projelio/shared";
+import { musteriyeDonusenRoller, potansiyelMusteriMi, potansiyelRolleri, type Party, type PartyRole } from "@projelio/shared";
 import { addRole, findDuplicates, normalizeEmail, normalizeName, normalizeTaxNumber, removeRole } from "./party-dedup";
 
 // Ortak varlığın değeri tekilliğine bağlı: "ABC Ltd", "ABC Ltd." ve "abc ltd"
@@ -215,5 +215,13 @@ describe("potansiyel müşteri", () => {
     assert.deepEqual(musteriyeDonusenRoller(["lead", "supplier"]), ["customer", "lead", "supplier"]);
     assert.deepEqual(musteriyeDonusenRoller(["lead", "customer"]), ["customer", "lead"]);
     assert.equal(potansiyelMusteriMi({ roles: musteriyeDonusenRoller(["lead"]) }), false);
+  });
+
+  test("Potansiyel sekmesinden aktarılan kart, dosya Müşteri dese de potansiyel açılır", () => {
+    // Şablonun örnek satırı "Müşteri"; adaylar gerçek müşterilere karışmıştı (2026-10-12).
+    assert.deepEqual(potansiyelRolleri(["customer"]), ["lead"]);
+    assert.deepEqual(potansiyelRolleri(undefined), ["lead"]);
+    assert.deepEqual(potansiyelRolleri(["customer", "supplier", "lead"]), ["lead", "supplier"]);
+    assert.equal(potansiyelMusteriMi({ roles: potansiyelRolleri(["customer", "distributor"]) }), true);
   });
 });

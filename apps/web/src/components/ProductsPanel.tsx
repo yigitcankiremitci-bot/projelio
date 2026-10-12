@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import type { ReactNode } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -35,6 +36,9 @@ interface Props {
   // birebir aynı anlamda — ikisi anasayfada alt alta duruyor, davranışları da
   // aynı adla anlatılsın.
   layout?: "scroll" | "grid";
+  // Başlık satırının en sağına konan ek öğe — şirket anasayfasında bölümü
+  // yukarı/aşağı taşıyan oklar (bkz. OrganizationDetail, lib/anasayfaSirasi).
+  basliktaSag?: ReactNode;
 }
 
 // Ürün Yönetimi departmanından eklenen ürün/hizmetler; hem departman detayında hem de
@@ -42,7 +46,7 @@ interface Props {
 // OrganizationDetail) ve ayrı "Ürün/Hizmet" sekmesinde iş kartlarıyla aynı
 // görünümde (bkz. ProductCard) listelenir.
 const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPanel(
-  { organizationId, departmentId, useFab = true, layout = "scroll" },
+  { organizationId, departmentId, useFab = true, layout = "scroll", basliktaSag },
   ref
 ) {
   const c = useThemeColors();
@@ -128,6 +132,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             hideLabel={t("Ürün/hizmetleri gizle")}
           />
         )}
+        {basliktaSag && <div style={{ marginLeft: "auto" }}>{basliktaSag}</div>}
       </div>
 
       {collapsed ? null : loading ? (

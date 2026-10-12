@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Department, ModuleCatalogEntry, Organization, Task } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
@@ -33,6 +34,8 @@ import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "..
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import { bicimDili } from "../lib/i18n/depo";
+import ReorderButtons from "../components/ReorderButtons";
+import { AnasayfaBolumu, bolumuTasi, getAnasayfaSirasi, setAnasayfaSirasi } from "../lib/anasayfaSirasi";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
 // ayrı şeyler ve akışın altına görev listesi asmak ikisini karıştırıyordu.
@@ -122,6 +125,30 @@ export default function OrganizationDetail() {
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   const ekipRef = useRef<SirketEkibiPanelHandle>(null);
   const [addingFile, setAddingFile] = useState(false);
+  // Anasayfa bölümlerinin kullanıcının dizdiği sırası (bkz. lib/anasayfaSirasi).
+  const [bolumSirasi, setBolumSirasi] = useState<AnasayfaBolumu[]>(() => getAnasayfaSirasi(id ?? ""));
+  useEffect(() => {
+    if (id) setBolumSirasi(getAnasayfaSirasi(id));
+  }, [id]);
+  const bolumuKaydir = (bolum: AnasayfaBolumu, yon: -1 | 1) => {
+    if (!id) return;
+    const yeni = bolumuTasi(bolumSirasi, bolum, yon);
+    setBolumSirasi(yeni);
+    setAnasayfaSirasi(id, yeni);
+  };
+  const siralamaOklari = (bolum: AnasayfaBolumu): ReactNode => {
+    const i = bolumSirasi.indexOf(bolum);
+    return (
+      <ReorderButtons
+        direction="row"
+        isFirst={i === 0}
+        isLast={i === bolumSirasi.length - 1}
+        onMoveUp={() => bolumuKaydir(bolum, -1)}
+        onMoveDown={() => bolumuKaydir(bolum, 1)}
+        iconColor={c.textSecondary}
+      />
+    );
+  };
 
   const reload = () => {
     if (!id) return;
@@ -311,15 +338,34 @@ export default function OrganizationDetail() {
               setAddingFile={setAddingFile}
               onGelirGider={() => setActiveTab("budget")}
             />
-            <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} useFab={false} />
-            <div style={{ marginTop: 28 }}>
-              <DepartmentsPanel ref={departmentsRef} organizationId={id} useFab={false} />
-            </div>
-            <div style={{ marginTop: 28 }}>
-              <SirketEkibiPanel ref={ekipRef} organizationId={id} />
-            </div>
-            <div style={{ marginTop: 28 }}>
-              <ModulesPanel ref={modulesRef} organizationId={id} />
+            {/* Bölümler kullanıcının dizdiği sırayla; her başlığın sağındaki
+                oklar bölümü bir yukarı/aşağı taşır. Paneller her sırada kurulu
+                kalır — "+" menüsü ref'lerle onlara ulaşıyor. */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+              {bolumSirasi.map((bolum) => {
+                const oklar = siralamaOklari(bolum);
+                switch (bolum) {
+                  case "products":
+                    return (
+                      <ProductsPanel
+                        key={bolum}
+                        ref={productsRef}
+                        organizationId={id}
+                        departmentId={productDepartmentId}
+                        useFab={false}
+                        basliktaSag={oklar}
+                      />
+                    );
+                  case "departments":
+                    return (
+                      <DepartmentsPanel key={bolum} ref={departmentsRef} organizationId={id} useFab={false} basliktaSag={oklar} />
+                    );
+                  case "team":
+                    return <SirketEkibiPanel key={bolum} ref={ekipRef} organizationId={id} basliktaSag={oklar} />;
+                  case "modules":
+                    return <ModulesPanel key={bolum} ref={modulesRef} organizationId={id} basliktaSag={oklar} />;
+                }
+              })}
             </div>
           </>
         )}

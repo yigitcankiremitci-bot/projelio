@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import type { ReactNode } from "react";
 import type { Department, ModuleCatalogEntry, ModuleStatsResponse, OrganizationModule } from "@projelio/shared";
 import { sonAcilislar, sonKullanimaGoreSirala } from "../lib/sonKullanilanModul";
 import { api } from "../api/client";
@@ -20,6 +21,9 @@ export interface ModulesPanelHandle {
 
 interface Props {
   organizationId: string;
+  // Başlık satırının en sağına konan ek öğe — şirket anasayfasında bölümü
+  // yukarı/aşağı taşıyan oklar (bkz. OrganizationDetail, lib/anasayfaSirasi).
+  basliktaSag?: ReactNode;
 }
 
 // Şirket anasayfasındaki "Modüller" sekmesi: organizasyonda (hangi departmandan
@@ -30,7 +34,7 @@ interface Props {
 // Bu sayıya kadar tek satır; üstünde iki satıra bölünüp yana kaydırılır.
 const SINGLE_ROW_LIMIT = 4;
 
-const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel({ organizationId }, ref) {
+const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel({ organizationId, basliktaSag }, ref) {
   const c = useThemeColors();
   const t = useT();
   const isDesktop = useIsDesktop();
@@ -114,6 +118,7 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
           showLabel={t("Modülleri göster")}
           hideLabel={t("Modülleri gizle")}
         />
+        {basliktaSag && <div style={{ marginLeft: "auto" }}>{basliktaSag}</div>}
       </div>
 
       {collapsed ? null : loading ? (

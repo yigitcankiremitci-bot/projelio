@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Department, DepartmentCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -36,6 +37,9 @@ interface Props {
   // kadar yan yana dizilip taşınca alt satıra geçen, daha büyük kartlar —
   // burada basılı tutup sürükleyerek sıralama da açık (bkz. useSortableList).
   layout?: "scroll" | "grid";
+  // Başlık satırının en sağına konan ek öğe — şirket anasayfasında bölümü
+  // yukarı/aşağı taşıyan oklar (bkz. OrganizationDetail, lib/anasayfaSirasi).
+  basliktaSag?: ReactNode;
 }
 
 // Anasayfa özetinde (layout="scroll") departmanlar tek satırda, sabit genişlikli
@@ -44,7 +48,7 @@ interface Props {
 // dizilip taşınca alt satıra geçer, yana kaydırma yok. Her karta tıklamak
 // departmanın kendi sayfasına (kadro yönetimi, varsa ürünler) götürür.
 const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function DepartmentsPanel(
-  { organizationId, useFab = true, layout = "scroll" },
+  { organizationId, useFab = true, layout = "scroll", basliktaSag },
   ref
 ) {
   const c = useThemeColors();
@@ -137,6 +141,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
             hideLabel={t("Departmanları gizle")}
           />
         )}
+        {basliktaSag && <div style={{ marginLeft: "auto" }}>{basliktaSag}</div>}
       </div>
 
       {adding && (

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import type { ReactNode } from "react";
 import type { DepartmentMemberRole, EkipHesabi, EkipHesabiSecenekleri, SirketEkibi } from "@projelio/shared";
 import { ApiError } from "../../api/client";
 import { iseAlimApi } from "../../api/iseAlim";
@@ -34,8 +35,12 @@ const ROL_KISA: Record<DepartmentMemberRole, string> = {
  * Hesabı olmayan biri için İşe al formundan Ekip Hesabı formuna geçilir; ikisi
  * aynı yetki kapısından (ekip-hesaplari/secenekler) besleniyor.
  */
-const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: string }>(function SirketEkibiPanel(
-  { organizationId },
+const SirketEkibiPanel = forwardRef<
+  SirketEkibiPanelHandle,
+  // basliktaSag: şirket anasayfasındaki sıralama okları (bkz. ProductsPanel).
+  { organizationId: string; basliktaSag?: ReactNode }
+>(function SirketEkibiPanel(
+  { organizationId, basliktaSag },
   ref
 ) {
   const c = useThemeColors();
@@ -187,6 +192,7 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
         />
         {/* Görünür bir "İşe al" düğmesi yok: anasayfanın ekleme eylemlerinin tek
             adresi "+" menüsü (bkz. OrganizationDetail.HomeAddFabRegistrar). */}
+        {basliktaSag && <div style={{ marginLeft: "auto" }}>{basliktaSag}</div>}
       </div>
 
       {bilgi && <span style={{ fontSize: 12, color: c.success }}>{bilgi}</span>}

@@ -11,9 +11,11 @@ interface Props {
   /** Kart üstü gibi görsel arka plan üzerinde kullanılınca kontrast için ver. */
   background?: string;
   iconColor?: string;
+  /** "row": başlık satırında yan yana — dikey yığın satırı gereksiz yere uzatıyordu. */
+  direction?: "row" | "column";
 }
 
-export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, background, iconColor }: Props) {
+export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, background, iconColor, direction = "column" }: Props) {
   const c = useThemeColors();
   const t = useT();
   const color = iconColor ?? c.textPrimary;
@@ -33,7 +35,7 @@ export default function ReorderButtons({ isFirst, isLast, onMoveUp, onMoveDown, 
   });
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 2 }} onClick={(e) => e.stopPropagation()}>
+    <div style={{ display: "flex", flexDirection: direction, gap: 2 }} onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         aria-label={t("Yukarı taşı")}

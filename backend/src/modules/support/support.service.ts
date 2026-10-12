@@ -59,7 +59,36 @@ export class SupportService {
       .select()
       .single();
     if (error) throw error;
-    return mapRequest(row);
+    const request = mapRequest(row);
+    void this.yoneticilereHaberVer(request).catch(() => {});
+    return request;
+  }
+
+  /**
+   * Yeni talebi yöneticilere bildirir. Talep açılınca kimseye haber
+   * gitmiyordu: talepler ancak biri Admin > Destek'i açınca fark ediliyordu.
+   *
+   * Beklenmez ve hata fırlatmaz — talep zaten kaydedildi, bildirim
+   * gidemedi diye kullanıcıya hata göstermek yanlış olurdu.
+   */
+  private async yoneticilereHaberVer(request: SupportRequest): Promise<void> {
+    const { data: yoneticiler, error } = await this.supabase.client
+      .from("users")
+      .select("id")
+      .eq("role", "admin")
+      .is("deleted_at", null);
+    if (error) return;
+    for (const y of yoneticiler ?? []) {
+      // Talebi yönetici açtıysa kendine bildirim gitmesin.
+      if (y.id === request.userId) continue;
+      this.notifications.notifyUserSafe(
+        y.id,
+        "support_request",
+        "Yeni destek talebi",
+        { metin: "{kisi}: {konu}", params: { kisi: request.name, konu: request.subject } },
+        "/admin?sekme=destek"
+      );
+    }
   }
 
   /** Kullanıcının kendi talepleri — yanıtı buradan da okuyabilir. */

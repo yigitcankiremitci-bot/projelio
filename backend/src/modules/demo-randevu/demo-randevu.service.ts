@@ -20,6 +20,7 @@ import {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { EmailService } from "../auth/email.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { DemoMeetService } from "./demo-meet.service";
 import type { DemoMeetEtkinligi } from "./google-takvim";
 import { getWebAppUrl } from "../../common/config/env";
@@ -107,7 +108,8 @@ export class DemoRandevuService {
   constructor(
     private supabase: SupabaseService,
     private email: EmailService,
-    private meet: DemoMeetService
+    private meet: DemoMeetService,
+    private notifications: NotificationsService
   ) {}
 
   // ───────────────────────────────────────────── Ayarlar
@@ -335,6 +337,7 @@ export class DemoRandevuService {
     const r = data as unknown as RandevuSatiri;
     void this.katilimciyaYaz("alindi", r, slot.ayar);
     void this.ekibeYaz("yeni", r, slot.ayar, await this.yoneticiAdresleri(slot.ayar));
+    void this.yoneticilereBildir("Yeni demo talebi", { metin: "{kisi} canlı demo randevusu istedi.", params: { kisi: r.ad } }).catch(() => {});
     return this.gorunum(r, slot.ayar, Boolean(userId));
   }
 
@@ -781,6 +784,10 @@ export class DemoRandevuService {
     if (yeni.sunucu_id) alicilar.push(...(await this.kullaniciAdresi(yeni.sunucu_id)));
     const kim = eden === "katilimci" ? "Katılımcı iptal etti" : "Yönetici iptal etti";
     void this.ekibeYaz("iptal", yeni, ayar, [...new Set(alicilar)], neden ? `${kim}: ${neden}` : kim);
+    // Yönetici kendi iptalini zaten biliyor; yalnızca katılımcınınki haber.
+    if (eden === "katilimci") {
+      void this.yoneticilereBildir("Demo randevusu iptal edildi", { metin: "{kisi} demo randevusunu iptal etti.", params: { kisi: yeni.ad } }).catch(() => {});
+    }
     return this.gorunum(yeni, ayar, await this.hesabiVar(yeni));
   }
 
@@ -964,6 +971,19 @@ export class DemoRandevuService {
       }
     } catch (err) {
       this.logger.error(`Demo ekip e-postası (${olay}) gönderilemedi: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+
+  /**
+   * Uygulama içi + telefon bildirimi. Yöneticilere yalnızca e-posta gidiyordu;
+   * e-posta gelen kutusunda kaybolunca talep saatler sonra fark ediliyordu.
+   * Ayardaki ek bildirim adresleri (`bildirimEpostalari`) burada YOK: onlar
+   * hesap değil, düz e-posta adresi.
+   */
+  private async yoneticilereBildir(baslik: string, govde: { metin: string; params: Record<string, string> }): Promise<void> {
+    const { data } = await this.supabase.client.from("users").select("id").eq("role", "admin").is("deleted_at", null);
+    for (const u of data ?? []) {
+      this.notifications.notifyUserSafe(u.id, "demo_request", baslik, govde, "/admin?sekme=demoRandevu");
     }
   }
 

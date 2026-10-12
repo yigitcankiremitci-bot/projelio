@@ -2265,6 +2265,13 @@ export interface NotificationPayload {
     // Destek talebi yanıtlandı. Bildirim çanı bu tipi görünce sayfaya
     // yönlendirmek yerine yanıtı bir modalda açar (bkz. NotificationBell).
     | "support_reply"
+    // Yalnızca YÖNETİCİLERE gider: kullanıcı yeni destek talebi bıraktı. Bu
+    // olmadan talepler ancak biri Admin > Destek'i açınca fark ediliyordu.
+    | "support_request"
+    // Yalnızca YÖNETİCİLERE gider: herkese açık takvimden canlı demo istendi ya
+    // da katılımcı randevusunu iptal etti. E-posta zaten gidiyordu; çan ve
+    // telefon bildirimi yoktu (bkz. modules/demo-randevu).
+    | "demo_request"
     // Yalnızca YÖNETİCİLERE gider: Anthropic bakiyesi azaldı ya da günlük harcama
     // ani sıçradı (bkz. ai-spend-alert.processor.ts). Kullanıcıya gösterilmez.
     | "ai_spend_alert"

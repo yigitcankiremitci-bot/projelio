@@ -149,6 +149,12 @@ export const bildirimler: TranslationDict = {
 
   // ─────────────────────────────────────────────── Destek
   "Destek talebin yanıtlandı": "Your support request has a reply",
+  "Yeni destek talebi": "New support request",
+  "{kisi}: {konu}": "{kisi}: {konu}",
+  "Yeni demo talebi": "New demo request",
+  "{kisi} canlı demo randevusu istedi.": "{kisi} requested a live demo.",
+  "Demo randevusu iptal edildi": "Demo booking cancelled",
+  "{kisi} demo randevusunu iptal etti.": "{kisi} cancelled their demo booking.",
 
   // ─────────────────────────────────────────────── WhatsApp
   "WhatsApp · {kisi}": "WhatsApp · {kisi}",

@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { EmailModule } from "../auth/email.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { DemoMeetModule } from "./demo-meet.module";
 import { DemoRandevuAdminController, DemoRandevuController } from "./demo-randevu.controller";
 import { DemoRandevuPublicController } from "./demo-randevu-public.controller";
@@ -8,7 +9,7 @@ import { DemoRandevuService } from "./demo-randevu.service";
 
 /** Canlı demo randevuları (bkz. migration 120). */
 @Module({
-  imports: [EmailModule, DemoMeetModule],
+  imports: [EmailModule, DemoMeetModule, NotificationsModule],
   controllers: [DemoRandevuPublicController, DemoRandevuController, DemoRandevuAdminController],
   providers: [DemoRandevuService, DemoRandevuProcessor],
 })

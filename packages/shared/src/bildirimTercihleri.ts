@@ -64,6 +64,8 @@ export const KILITLI_BILDIRIM_TIPLERI: ReadonlySet<BildirimTipi> = new Set<Bildi
   "support_reply",
   "admin_message",
   "ai_spend_alert",
+  "support_request",
+  "demo_request",
 ]);
 
 /**
@@ -95,7 +97,7 @@ export interface BildirimKategorisi {
 }
 
 /**
- * Ayarlarda görünen gruplar. `ai_spend_alert` yok: yalnızca yöneticilere gidiyor
+ * Ayarlarda görünen gruplar. `ai_spend_alert`, `support_request` ve `demo_request` yok: yalnızca yöneticilere gidiyor
  * ve kilitli; listede görünse kullanıcıların çoğuna anlamsız gelirdi.
  * `daily_digest`/`weekly_digest` de yok: bunlar e-posta kartındaki ayar.
  */

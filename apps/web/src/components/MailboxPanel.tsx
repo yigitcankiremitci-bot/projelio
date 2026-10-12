@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MailAccount, MailFolder, MailMessage, MailMessageDetail } from "@projelio/shared";
 import { mailboxApi, type MailScope, type MailStatus } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
 import ProjelioYeniEpostaModal from "./ProjelioYeniEpostaModal";
+import { getSocket } from "../lib/liveRoom";
 import { IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
@@ -153,24 +154,40 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   }, [accountId, folderId, search, yenile]);
 
   /**
-   * @projelio.app kutusunda yeni posta webhook'la bize düşüyor, istemciye
-   * itilmiyor; dakikada bir sessizce yokluyoruz. İleti açıkken ya da yazarken
-   * yoklanmaz — liste değişince açık pencere kapanırdı.
+   * @projelio.app kutusunda yeni posta webhook'la bize düşüyor; sunucu kutuya
+   * erişen herkese `mail-changed` soket olayı yolluyor (bkz.
+   * notifications.gateway.ts). Liste ve klasör sayıları SESSİZCE tazelenir:
+   * "yükleniyor"a dönmez, açık ileti penceresi ya da yazılan e-posta kapanmaz.
+   *
+   * Dakikalık yoklama yedek olarak duruyor: soket koptuğunda (uyku, ağ
+   * değişimi) posta yine en geç bir dakikada görünsün.
    */
+  const sessizTazele = useRef<() => void>(() => undefined);
+  sessizTazele.current = () => {
+    if (!accountId || search) return;
+    mailboxApi
+      .messages(accountId, { folderId })
+      .then((page) => {
+        setMessages(page.messages);
+        setHasMore(page.hasMore);
+      })
+      .catch(() => undefined);
+    mailboxApi.folders(accountId).then(setFolders).catch(() => undefined);
+  };
+
   useEffect(() => {
-    if (!projelioKutusu || selected || yeniEposta || search) return;
-    const zamanlayici = setInterval(() => {
-      mailboxApi
-        .messages(accountId, { folderId })
-        .then((page) => {
-          setMessages(page.messages);
-          setHasMore(page.hasMore);
-        })
-        .catch(() => undefined);
-      mailboxApi.folders(accountId).then(setFolders).catch(() => undefined);
-    }, 60_000);
-    return () => clearInterval(zamanlayici);
-  }, [projelioKutusu, accountId, folderId, selected, yeniEposta, search]);
+    if (!projelioKutusu) return;
+    const socket = getSocket();
+    const handler = (e: { accountId: string }) => {
+      if (e.accountId === accountId) sessizTazele.current();
+    };
+    socket?.on("mail-changed", handler);
+    const zamanlayici = setInterval(() => sessizTazele.current(), 60_000);
+    return () => {
+      socket?.off("mail-changed", handler);
+      clearInterval(zamanlayici);
+    };
+  }, [projelioKutusu, accountId]);
 
   // ============================================================ Eylemler
   const openMessage = async (message: MailMessage) => {

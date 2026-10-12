@@ -3,6 +3,7 @@ import type { MailAddress, MailFolder, MailListPage, MailMessage, MailMessageDet
 import { SupabaseService } from "../../database/supabase.service";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
 import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationsGateway } from "../notifications/notifications.gateway";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { buildReplyBody, htmlToText } from "./mail-format";
 import {
@@ -69,6 +70,7 @@ export class ProjelioPostaService {
   constructor(
     private supabase: SupabaseService,
     private notifications: NotificationsService,
+    private gateway: NotificationsGateway,
     private moduleMembers: ModuleMembersService
   ) {}
 
@@ -413,6 +415,9 @@ export class ProjelioPostaService {
       );
     }
 
+    // Ekipteki diğer kişilerin (ve göndericinin diğer sekmelerinin) Gönderilenler'i tazelensin.
+    void this.canliHaber(kutu).catch(() => undefined);
+
     if (hata) throw new BadRequestException(`E-posta gönderilemedi: ${hata}`);
     return { ok: true, id: satir.id };
   }
@@ -498,11 +503,11 @@ export class ProjelioPostaService {
       yazilan++;
 
       await this.ekleriIndir(emailId, kutu.id, satir.id, email.attachments ?? []);
-      if (gelenKlasoru(auth) === "inbox") {
-        void this.haberVer(kutu, gonderen, email.subject ?? "").catch((err) =>
-          this.logger.warn(`Posta bildirimi gönderilemedi (${kutu.address}): ${(err as Error).message}`)
-        );
-      }
+      // Ekran her durumda tazelenir (spam'e düşen de klasör sayısını değiştirir);
+      // bildirim yalnızca gelen kutusuna düşende.
+      void this.canliHaber(kutu, gelenKlasoru(auth) === "inbox" ? { gonderen, konu: email.subject ?? "" } : undefined).catch(
+        (err) => this.logger.warn(`Posta haberi gönderilemedi (${kutu.address}): ${(err as Error).message}`)
+      );
     }
     return { kutular: yazilan };
   }
@@ -551,8 +556,17 @@ export class ProjelioPostaService {
     }
   }
 
-  /** Kutuya erişebilen herkese uygulama içi bildirim: modülün onaylı üyeleri + sahip. */
-  private async haberVer(kutu: any, gonderen: MailAddress | undefined, konu: string): Promise<void> {
+  /**
+   * Kutuya erişebilen herkese (modülün onaylı üyeleri + sahip) canlı "kutu
+   * değişti" olayı; `bildirim` verilirse ayrıca uygulama içi bildirim.
+   */
+  private async canliHaber(kutu: any, bildirim?: { gonderen: MailAddress | undefined; konu: string }): Promise<void> {
+    const kisiler = await this.erisenler(kutu);
+    for (const userId of kisiler) this.gateway.sendMailChanged(userId, { accountId: kutu.id });
+    if (bildirim) this.haberVer(kutu, kisiler, bildirim.gonderen, bildirim.konu);
+  }
+
+  private async erisenler(kutu: any): Promise<Set<string>> {
     const kisiler = new Set<string>();
     if (kutu.job_id) {
       const { data: is } = await this.supabase.client.from("jobs").select("owner_id").eq("id", kutu.job_id).maybeSingle();
@@ -574,7 +588,10 @@ export class ProjelioPostaService {
       );
       for (const u of uyeler) if (u.userId && u.status === "approved") kisiler.add(u.userId);
     }
+    return kisiler;
+  }
 
+  private haberVer(kutu: any, kisiler: Set<string>, gonderen: MailAddress | undefined, konu: string): void {
     const link = kutu.job_id
       ? `/jobs/${kutu.job_id}/modules/pd_email`
       : kutu.department_id

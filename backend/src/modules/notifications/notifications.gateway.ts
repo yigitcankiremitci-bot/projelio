@@ -59,6 +59,13 @@ export class NotificationsGateway {
     this.server.to(`user:${userId}`).emit("whatsapp-leads", event);
   }
 
+  // @projelio.app kutusuna posta düştü ya da kutudan gönderildi: açık gelen
+  // kutusu sayfa yenilemeden tazelensin. Bildirimden AYRI — kullanıcı posta
+  // bildirimini kapatmış olsa bile ekrandaki liste güncel kalmalı.
+  sendMailChanged(userId: string, event: { accountId: string }) {
+    this.server.to(`user:${userId}`).emit("mail-changed", event);
+  }
+
   /**
    * "Üzerinde çalışıyorum" durumu değişti — iş ekibi panelini açık tutanlara bildirir.
    *

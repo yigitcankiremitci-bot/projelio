@@ -7,6 +7,8 @@ import { useT } from "../lib/i18n";
 
 interface Props {
   account: MailAccount;
+  /** Kişi kartından gelindiyse alıcı hazır dolu (bkz. EpostaGonderSecimi). */
+  initialTo?: string;
   onClose: () => void;
   onSent: (text: string) => void;
 }
@@ -27,10 +29,10 @@ function boyutYaz(bayt: number): string {
  * Ek tavanı burada da denetleniyor ki kullanıcı 30 MB'ı yükleyip ancak
  * sunucudan "olmadı" yanıtı almasın.
  */
-export default function ProjelioYeniEpostaModal({ account, onClose, onSent }: Props) {
+export default function ProjelioYeniEpostaModal({ account, initialTo, onClose, onSent }: Props) {
   const c = useThemeColors();
   const t = useT();
-  const [to, setTo] = useState("");
+  const [to, setTo] = useState(initialTo ?? "");
   const [cc, setCc] = useState("");
   const [ccAcik, setCcAcik] = useState(false);
   const [subject, setSubject] = useState("");
@@ -101,7 +103,7 @@ export default function ProjelioYeniEpostaModal({ account, onClose, onSent }: Pr
             onChange={(e) => setTo(e.target.value)}
             placeholder={t("Kime (virgülle ayırın)")}
             style={{ ...girdi, flex: 1 }}
-            autoFocus
+            autoFocus={!initialTo}
           />
           {!ccAcik && (
             <button
@@ -115,7 +117,13 @@ export default function ProjelioYeniEpostaModal({ account, onClose, onSent }: Pr
         {ccAcik && (
           <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder={t("Bilgi (CC)")} style={girdi} />
         )}
-        <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder={t("Konu")} style={girdi} />
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          placeholder={t("Konu")}
+          style={girdi}
+          autoFocus={Boolean(initialTo)}
+        />
 
         <textarea
           ref={textarea}

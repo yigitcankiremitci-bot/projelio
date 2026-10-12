@@ -61,6 +61,7 @@ import GorusmeNotlari from "./musteri/GorusmeNotlari";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
 import Modal from "./Modal";
+import EpostaGonderSecimi from "./EpostaGonderSecimi";
 
 interface Props {
   organizationId?: string;
@@ -1695,6 +1696,8 @@ function PartyDetail({
   // "Müşteri yap" iki adımlı: kart satış ekibinin listesine de girer ve geri
   // alma düğmesi yok — tek tıkla olmamalı.
   const [defterSoru, setDefterSoru] = useState(false);
+  // Kartın içindeki kişi e-postası: nereden gönderileceği sorulur (bkz. EpostaGonderSecimi).
+  const [epostaSecimi, setEpostaSecimi] = useState<{ to: string; ad?: string } | null>(null);
   const [defterHata, setDefterHata] = useState("");
   const hedefDefter = baglantiModu ? MUSTERI_MODUL_KEY : BAGLANTI_MODUL_KEY;
   // Bağlantılar'da defter düğmesinin yerini "Aktar" alır (müşteri, tedarikçi,
@@ -2006,9 +2009,20 @@ function PartyDetail({
                     )}
                     {ct.phone && ct.email && " · "}
                     {ct.email && (
-                      <a href={`mailto:${ct.email}`} style={{ color: c.primary, textDecoration: "none" }}>
+                      <button
+                        type="button"
+                        onClick={() => setEpostaSecimi({ to: ct.email!, ad: ct.name })}
+                        style={{
+                          color: c.primary,
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          font: "inherit",
+                          cursor: "pointer",
+                        }}
+                      >
                         {ct.email}
-                      </a>
+                      </button>
                     )}
                   </span>
                 )}
@@ -2028,6 +2042,9 @@ function PartyDetail({
             </div>
           ))}
         </div>
+      )}
+      {epostaSecimi && (
+        <EpostaGonderSecimi to={epostaSecimi.to} ad={epostaSecimi.ad} onClose={() => setEpostaSecimi(null)} />
       )}
     </div>
   );
@@ -2269,6 +2286,8 @@ function SatirSimgeleri({
 }) {
   const c = useThemeColors();
   const t = useT();
+  // "E-posta gönder" doğrudan mailto değil: önce nereden gönderileceği sorulur.
+  const [epostaSecimi, setEpostaSecimi] = useState(false);
   const site = safeExternalUrl(party.website);
   // Hepsi gösterilir; dar ekranda simge grubu alt satıra kayar (flexWrap).
   const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]);
@@ -2334,9 +2353,25 @@ function SatirSimgeleri({
         </a>
       )}
       {eposta && (
-        <a href={`mailto:${eposta}`} onClick={durdur} title={eposta} aria-label={t("E-posta gönder")} style={kutu}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setEpostaSecimi(true);
+          }}
+          title={eposta}
+          aria-label={t("E-posta gönder")}
+          style={kutu}
+        >
           {simge(EPOSTA_IKON)}
-        </a>
+        </button>
+      )}
+      {epostaSecimi && eposta && (
+        // Pencere portalda ama React olayları ağaçta yukarı kabarır: satırın
+        // "kartı aç" tıklamasına ulaşmasın.
+        <div onClick={durdur} style={{ display: "contents" }}>
+          <EpostaGonderSecimi to={eposta} ad={party.displayName} onClose={() => setEpostaSecimi(false)} />
+        </div>
       )}
       {party.sonKartvizitId && (
         <button

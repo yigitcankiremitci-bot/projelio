@@ -173,6 +173,45 @@ export class MailboxService {
   }
 
   /**
+   * Kullanıcının yazabildiği @projelio.app kutuları — müşteri/bağlantı
+   * kartındaki "E-posta gönder" seçiminde listelenir.
+   *
+   * Yalnızca projelio kutuları: Outlook kutusundan YENİ e-posta yazma yolu yok
+   * (bkz. compose). Kutu sayısı küçük (yalnızca yönetici açıyor), bu yüzden
+   * her biri için yetki tek tek çözülüyor; ayrı bir sorgu yazmaya değmez.
+   * `link` modül sayfası: departman ya da iş kapsamı. Departmansız şirket
+   * kutusunun açılacak bir modül sayfası yok — arayüz o zaman yerinde açar.
+   */
+  async myProjelioAccounts(userId: string): Promise<(MailAccount & { link?: string; scopeName?: string })[]> {
+    const { data, error } = await this.supabase.client
+      .from("mail_accounts")
+      .select("*, organizations(name), departments(name), jobs(title)")
+      .eq("provider", "projelio")
+      .eq("active", true)
+      .is("archived_at", null)
+      .order("address", { ascending: true })
+      .limit(100);
+    if (error) throw error;
+
+    const sonuc: (MailAccount & { link?: string; scopeName?: string })[] = [];
+    for (const row of data ?? []) {
+      const access = await this.access(this.scopeOf(row), userId).catch(() => null);
+      if (!access?.canWrite) continue;
+      sonuc.push({
+        ...mapAccount(row),
+        link: row.job_id
+          ? `/jobs/${row.job_id}/modules/${MAIL_MODULE_KEY}`
+          : row.department_id
+            ? `/departments/${row.department_id}/modules/${MAIL_MODULE_KEY}`
+            : undefined,
+        scopeName:
+          [row.organizations?.name, row.departments?.name].filter(Boolean).join(" · ") || row.jobs?.title || undefined,
+      });
+    }
+    return sonuc;
+  }
+
+  /**
    * @projelio.app kutusu açar. YALNIZCA platform yöneticisi (kullanıcı kararı,
    * 2026-10-12): müşterinin kendi kendine projelio.app adresi alması, alan
    * adının gönderici itibarını bizim denetimimiz dışına çıkarırdı.

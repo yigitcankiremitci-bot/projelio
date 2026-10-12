@@ -54,6 +54,17 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   const [projelioDurum, setProjelioDurum] = useState<MailStatus["projelio"]>();
   const [adresFormu, setAdresFormu] = useState(false);
   const [yeniEposta, setYeniEposta] = useState(false);
+  /**
+   * Kişi kartından gelindi: `?yeniEposta=<adres>&kutu=<id>` (bkz.
+   * EpostaGonderSecimi). Kutular yüklenince o kutu seçilir ve alıcısı dolu
+   * pencere açılır; parametreler adres çubuğundan silinir ki yenilemede
+   * pencere ikinci kez açılmasın.
+   */
+  const [hazirAlici, setHazirAlici] = useState<{ to: string; kutu: string } | null>(() => {
+    const p = new URLSearchParams(window.location.search);
+    const to = p.get("yeniEposta");
+    return to ? { to, kutu: p.get("kutu") ?? "" } : null;
+  });
   // Klasör ve listeyi yeniden yükletmek için (gönderim, taşıma, elle yenileme).
   const [yenile, setYenile] = useState(0);
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
@@ -82,6 +93,27 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
   const projelioKutusu = account?.provider === "projelio";
 
   // ============================================================ Yükleme
+  // Bir kez işlenir: kutu listesi sonradan tazelenince (adres açma vb.) pencere yeniden açılmasın.
+  const hazirAliciIslendi = useRef(false);
+  useEffect(() => {
+    if (!hazirAlici || loadingAccounts || hazirAliciIslendi.current) return;
+    hazirAliciIslendi.current = true;
+    const hedef = accounts.find((a) => a.id === hazirAlici.kutu && a.provider === "projelio");
+    if (hedef) {
+      setAccountId(hedef.id);
+      setFolderId("inbox");
+      setYeniEposta(true);
+    } else {
+      setBanner({ kind: "error", text: t("Seçilen kutu bu modülde bulunamadı.") });
+      setHazirAlici(null);
+    }
+    const p = new URLSearchParams(window.location.search);
+    p.delete("yeniEposta");
+    p.delete("kutu");
+    const q = p.toString();
+    window.history.replaceState({}, "", `${window.location.pathname}${q ? `?${q}` : ""}`);
+  }, [loadingAccounts, accounts]);
+
   const loadAccounts = () => {
     setLoadingAccounts(true);
     mailboxApi
@@ -589,7 +621,11 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
       {yeniEposta && account && (
         <ProjelioYeniEpostaModal
           account={account}
-          onClose={() => setYeniEposta(false)}
+          initialTo={hazirAlici?.to}
+          onClose={() => {
+            setYeniEposta(false);
+            setHazirAlici(null);
+          }}
           onSent={(text) => {
             setBanner({ kind: "ok", text });
             setYenile((n) => n + 1);

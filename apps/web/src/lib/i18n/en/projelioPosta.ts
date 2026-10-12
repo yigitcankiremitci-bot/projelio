@@ -53,4 +53,16 @@ export const projelioPosta: TranslationDict = {
   "İleti taşınamadı": "Couldn't move the message",
   "İleti çöp kutusuna taşındı.": "Message moved to trash.",
   "İmza (isteğe bağlı) — her e-postanın sonuna eklenir": "Signature (optional) — added to the end of every email",
+  // Kişi kartından e-posta gönderme seçimi (EpostaGonderSecimi)
+  "E-postayı nereden göndermek istersiniz?": "Where do you want to send the email from?",
+  "Kutular yükleniyor…": "Loading mailboxes…",
+  "Projelio E-posta modülünden": "From the Projelio Email module",
+  "Yazışma modülde kalır, ekip görür; yanıt aynı kutuya düşer.": "The thread stays in the module for the team; replies land in the same mailbox.",
+  "Gmail'de aç": "Open in Gmail",
+  "Tarayıcıda Gmail'in yeni e-posta penceresi açılır.": "Opens Gmail's compose window in your browser.",
+  "Bilgisayarımdaki e-posta uygulaması": "My computer's email app",
+  "Outlook, Apple Mail ya da cihazınızın varsayılan uygulaması.": "Outlook, Apple Mail or your device's default app.",
+  "Erişebildiğiniz bir @projelio.app kutusu yok. Kutuyu Projelio yöneticisi E-posta modülünde açar.":
+    "You don't have access to a @projelio.app mailbox. A Projelio administrator creates it in the Email module.",
+  "Seçilen kutu bu modülde bulunamadı.": "The selected mailbox wasn't found in this module.",
 };

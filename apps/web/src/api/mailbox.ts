@@ -36,6 +36,9 @@ export const mailboxApi = {
   /** Entegrasyon bu kurulumda yapılandırılmış mı. */
   status: () => api.get<MailStatus>("/mail/status"),
 
+  /** Yazabildiğim @projelio.app kutuları; `link` kutunun modül sayfası (yoksa yerinde açılır). */
+  myAccounts: () => api.get<(MailAccount & { link?: string; scopeName?: string })[]>("/mail/my-accounts"),
+
   /** @projelio.app kutusu açar — yalnızca Projelio yöneticisi (sunucu da denetler). */
   createProjelio: (scope: MailScope, body: { localPart: string; displayName?: string; signature?: string }) =>
     api.post<MailAccount>(`${base(scope)}/mail/projelio${scopeQuery(scope)}`, body),

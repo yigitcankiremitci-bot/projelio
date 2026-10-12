@@ -65,6 +65,13 @@ export class MailboxController {
     };
   }
 
+  /** Kullanıcının yazabildiği @projelio.app kutuları (kişi kartından e-posta göndermek için). */
+  @Get("mail/my-accounts")
+  @UseGuards(AuthGuard("jwt"))
+  myAccounts(@Req() req: any) {
+    return this.mailbox.myProjelioAccounts(req.user.userId);
+  }
+
   @Post("organizations/:organizationId/mail/projelio")
   @UseGuards(AuthGuard("jwt"))
   createOrgProjelio(

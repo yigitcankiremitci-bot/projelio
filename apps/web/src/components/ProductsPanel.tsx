@@ -11,6 +11,8 @@ import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import AddEditProductModal from "./AddEditProductModal";
 import ProductDetailModal from "./ProductDetailModal";
+import UrunExcelModal from "./UrunExcelModal";
+import { IconUpload } from "./icons";
 import { useT } from "../lib/i18n";
 
 export interface ProductsPanelHandle {
@@ -57,6 +59,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [excelAcik, setExcelAcik] = useState(false);
   // Açık ürün kartı. Karta tıklamak artık düzenleme formunu değil ürün kartını
   // açar; düzenleme kartın "Bilgiler" sekmesinde (bkz. ProductDetailModal).
   const [open, setOpen] = useState<Product | null>(null);
@@ -92,6 +95,30 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
         >
           {t("Ürün/Hizmet")}
         </h2>
+        {/* Toplu ekleme yalnızca ızgara görünümünde (departman sayfası ve
+            Ürün/Hizmet sekmesi): anasayfa şeridi bir özet, katalog orada
+            yönetilmiyor. Yetkiyi sunucu tek tek eklemeyle aynı kuralla verir. */}
+        {layout === "grid" && (
+          <button
+            onClick={() => setExcelAcik(true)}
+            title={t("Excel ile toplu ürün/hizmet ekle")}
+            style={{
+              marginLeft: "auto",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            <IconUpload size={15} /> {t("Excel ile toplu ekle")}
+          </button>
+        )}
         {collapsible && (
           <SectionToggle
             collapsed={collapsed}
@@ -161,6 +188,15 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             // tamamlanıyor, kullanıcı ürünü listede aramak zorunda kalmasın.
             setOpen(olusan);
           }}
+        />
+      )}
+
+      {excelAcik && (
+        <UrunExcelModal
+          organizationId={organizationId}
+          departmentId={departmentId}
+          onClose={() => setExcelAcik(false)}
+          onDone={load}
         />
       )}
 

@@ -779,6 +779,30 @@ export interface MusteriIceAktarmaSonucu {
 }
 
 /**
+ * Excel ile toplu ürün ekleme sonucu (bkz. backend products/urun-sablonu.ts).
+ * Müşteri aktarımıyla aynı iki adım: önizleme hiçbir şey yazmaz.
+ */
+export interface UrunIceAktarmaSonucu {
+  onizleme: boolean;
+  /** Dolu (boş olmayan) veri satırı sayısı. */
+  okunanSatir: number;
+  /** Önizlemede: açılacak ürün sayısı. Uygulamada: açılması denenen. */
+  acilacak: number;
+  /** Yalnızca uygulamada: gerçekten açılan ürün sayısı. */
+  acilan?: number;
+  eslesenSutunlar: Record<string, string>;
+  kullanilmayanSutunlar: string[];
+  zatenKayitli: { satir: number; ad: string; mevcutKart: string; neden: string }[];
+  atlanan: { satir: number; sebep: string }[];
+  uyarilar: { satir: number; sebep: string }[];
+  hatalar: { satir: number; sebep: string }[];
+  /** Önizlemede açılacak ürünlerin ilk birkaçı. */
+  ornek: { satir: number; ad: string; fiyat?: number; paraBirimi?: string; stokKodu?: string }[];
+  /** Satır tavanına gelindiyse kalanların başladığı satır. */
+  kalanIlkSatir?: number;
+}
+
+/**
  * Bağlantı listesi (migration 163) — oynatma listesi mantığı: bir kart birden
  * çok listede olabilir, liste silinince kartlar yerinde kalır.
  */

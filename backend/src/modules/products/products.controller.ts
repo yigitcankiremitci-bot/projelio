@@ -7,7 +7,9 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -19,6 +21,11 @@ import { memoryStorage } from "multer";
 import { ProductsService } from "./products.service";
 import type { ProductWriteInput } from "./products.service";
 import { AccessService } from "../../common/access/access.service";
+import type { Response } from "express";
+import { isLocale } from "@projelio/shared";
+import { istemciDili, tarayiciDili } from "../../common/i18n/index";
+import { tabloyuOku } from "../party/musteri-sablonu";
+import { urunSablonDosyaAdi, urunSablonuOlustur, urunSayfasiniSec } from "./urun-sablonu";
 
 @Controller()
 @UseGuards(AuthGuard("jwt"))
@@ -40,6 +47,48 @@ export class ProductsController {
   @Post("organizations/:organizationId/products")
   create(@Param("organizationId") organizationId: string, @Body() body: ProductWriteInput, @Req() req: any) {
     return this.productsService.create(organizationId, body, req.user.userId);
+  }
+
+  /**
+   * Boş ürün şablonu. Veri içermez; yalnızca oturum ister. Yol "products/..."
+   * altında DEĞİL: "products/:id" onu kimlik sanıp yakalardı.
+   */
+  @Get("product-template")
+  async sablon(@Query("dil") dilParam: string | undefined, @Req() req: any, @Res() res: Response) {
+    const dil = isLocale(dilParam) ? dilParam : (istemciDili(req) ?? tarayiciDili(req) ?? "tr");
+    const icerik = await urunSablonuOlustur(dil);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Length", String(icerik.length));
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(urunSablonDosyaAdi(dil))}`);
+    res.end(icerik);
+  }
+
+  /**
+   * Doldurulmuş şablonu yükler. `onizleme=0` gelmedikçe HİÇBİR ŞEY YAZILMAZ;
+   * arayüz önce önizler, onaylanınca aynı dosyayı yeniden gönderir (dosya
+   * sunucuda saklanmıyor — bkz. PartyController.importOrg, aynı gerekçe).
+   * Yetki: tek tek eklemeyle aynı (şirket sahibi ya da departman yöneticisi).
+   */
+  @Post("organizations/:organizationId/products/import")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
+  async importExcel(
+    @Param("organizationId") organizationId: string,
+    @Query("onizleme") onizleme: string | undefined,
+    @Query("departmentId") departmentId: string | undefined,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    if (!file) throw new BadRequestException("Dosya bulunamadı");
+    await this.access.assertNotSubcontractor(req.user.userId, "products");
+    // multer dosya adını latin1 okuyor; "Ürünler.xlsx" bozuk gelmesin.
+    const ad = Buffer.from(file.originalname, "latin1").toString("utf8");
+    const sayfa = urunSayfasiniSec(await tabloyuOku(file.buffer, ad));
+    return this.productsService.sablondanIceAktar(organizationId, sayfa, req.user.userId, {
+      onizleme: onizleme !== "0",
+      departmentId,
+    });
   }
 
   @Get("products/:id")

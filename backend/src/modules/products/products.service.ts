@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
-import type { ModuleRecord, Product, ProductImage, ProductKind, ProductOverview, ProductSpec, ProductStatus, ProductUnit } from "@projelio/shared";
+import type { ModuleRecord, Product, ProductImage, UrunIceAktarmaSonucu, ProductKind, ProductOverview, ProductSpec, ProductStatus, ProductUnit } from "@projelio/shared";
 import { PRODUCT_UNITS, URUN_BAGLANTI_ALANLARI, URUN_STRATEJI_MODUL_KEY, urunIliskiliKayitlar } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
@@ -8,6 +8,8 @@ import { ModuleMembersService } from "../module-members/module-members.service";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { safeExternalUrl } from "../../common/safe-url";
 import { hataMetni } from "../../common/i18n/index";
+import type { SheetData } from "../ai-assistant/ai-sheet-import";
+import { mevcutUrunleriAyikla, planUrunImport } from "./urun-sablonu";
 
 const COVER_BUCKET = "product-covers";
 
@@ -28,6 +30,13 @@ const MAX_LIST_TEXT = 300;
 // Kartın "Modüllerde" bölümünde gösterilen en fazla kayıt. Popüler bir ürünün
 // adı yüzlerce sevkiyatta geçebilir; kart bir özet, defterin kendisi değil.
 const MAX_RELATED = 60;
+
+// Excel'den tek seferde açılan en fazla ürün. Müşteri aktarımındaki tavanla
+// aynı gerekçe: istek makul sürede bitsin, yanlış dosya yüzlerce kart açmasın.
+// Kalanlar için önizleme hangi satırdan devam edileceğini söylüyor.
+const MAX_IMPORT_ROWS = 500;
+// Toplu yazmanın parça boyu (bkz. sablondanIceAktar).
+const IMPORT_CHUNK = 100;
 
 /** jsonb dizisini güvenle okur: bozuk/eski satırda kart `.map`'te kırılmasın. */
 function asArray(value: unknown): unknown[] {
@@ -408,6 +417,124 @@ export class ProductsService {
       .single();
     if (error) throw this.translateWriteError(error);
     return mapProduct(row, []);
+  }
+
+  /**
+   * Excel şablonundan toplu ürün ekleme (bkz. urun-sablonu.ts).
+   *
+   * `onizleme` true iken HİÇBİR ŞEY yazılmaz. Her satır tek tek eklemeyle
+   * aynı doğrulamadan geçer (buildPatch); geçemeyen satır tüm dosyayı
+   * düşürmez, gerekçesiyle "atlanan"a yazılır — önizlemede de görünsün diye
+   * doğrulama yazma adımından ÖNCE yapılıyor.
+   *
+   * create()'i satır satır çağırmak her satırda yetkiyi yeniden okurdu; yetki
+   * bir kez bakılıyor, satırlar 100'lük parçalarla yazılıyor. Bir parça düşerse
+   * (ör. bu arada başkası aynı stok kodunu eklemiş) o parça tek tek yeniden
+   * denenir: tek satırın çakışması 99 masum satırı düşürmesin.
+   */
+  async sablondanIceAktar(
+    organizationId: string,
+    sheet: SheetData | undefined,
+    userId: string,
+    opts: { onizleme?: boolean; departmentId?: string } = {}
+  ): Promise<UrunIceAktarmaSonucu> {
+    const departmentId = opts.departmentId || undefined;
+    await this.assertCanManage(organizationId, departmentId, userId);
+    if (departmentId) {
+      // assertCanManage departmanın yöneticisini tanıyor ama departmanın BU
+      // şirkete ait olduğuna bakmıyor: başka şirketteki departmanının
+      // yöneticisi bu şirkete ürün yazamasın.
+      const { data: dep } = await this.supabase.client
+        .from("departments")
+        .select("id")
+        .eq("id", departmentId)
+        .eq("organization_id", organizationId)
+        .maybeSingle();
+      if (!dep) throw new NotFoundException("Departman bulunamadı");
+    }
+    if (!sheet) throw new BadRequestException("Dosyada dolu bir satır bulunamadı.");
+
+    const plan = planUrunImport(sheet);
+    const { data: mevcutSatirlar, error: mevcutHata } = await this.supabase.client
+      .from("products")
+      .select("name, sku, barcode, archived_at")
+      .eq("organization_id", organizationId);
+    if (mevcutHata) throw mevcutHata;
+    const mevcut = (mevcutSatirlar ?? []).map((r: any) => ({
+      name: r.name,
+      sku: r.sku ?? undefined,
+      barcode: r.barcode ?? undefined,
+      archivedAt: r.archived_at ?? undefined,
+    }));
+    const { yeni, zatenVar } = mevcutUrunleriAyikla(plan.planlanan, mevcut);
+
+    const atlanan = [...plan.atlanan];
+    const gecerli: { satir: number; ad: string; kayit: Record<string, unknown> }[] = [];
+    for (const p of yeni) {
+      try {
+        const patch = this.buildPatch(p.urun);
+        gecerli.push({
+          satir: p.satir,
+          ad: p.urun.name,
+          kayit: {
+            organization_id: organizationId,
+            department_id: departmentId ?? null,
+            currency: "TRY",
+            created_by: userId,
+            ...patch,
+          },
+        });
+      } catch (e: any) {
+        atlanan.push({ satir: p.satir, sebep: e?.message ?? "geçersiz satır" });
+      }
+    }
+    atlanan.sort((a, b) => a.satir - b.satir);
+    const islenecek = gecerli.slice(0, MAX_IMPORT_ROWS);
+
+    const sonuc: UrunIceAktarmaSonucu = {
+      onizleme: opts.onizleme !== false,
+      okunanSatir: plan.toplamSatir,
+      acilacak: islenecek.length,
+      eslesenSutunlar: plan.eslesenSutunlar,
+      kullanilmayanSutunlar: plan.kullanilmayanSutunlar,
+      zatenKayitli: zatenVar,
+      atlanan,
+      uyarilar: plan.uyarilar,
+      hatalar: [],
+      ornek: islenecek.slice(0, 5).map((g) => ({
+        satir: g.satir,
+        ad: g.ad,
+        fiyat: typeof g.kayit.price === "number" ? g.kayit.price : undefined,
+        paraBirimi: String(g.kayit.currency ?? "TRY"),
+        stokKodu: typeof g.kayit.sku === "string" ? g.kayit.sku : undefined,
+      })),
+      kalanIlkSatir: gecerli[MAX_IMPORT_ROWS]?.satir,
+    };
+    if (sonuc.onizleme || !islenecek.length) return sonuc;
+
+    let acilan = 0;
+    const hatalar: { satir: number; sebep: string }[] = [];
+    for (let i = 0; i < islenecek.length; i += IMPORT_CHUNK) {
+      const parca = islenecek.slice(i, i + IMPORT_CHUNK);
+      const { error } = await this.supabase.client.from("products").insert(parca.map((g) => g.kayit));
+      if (!error) {
+        acilan += parca.length;
+        continue;
+      }
+      for (const g of parca) {
+        const { error: tekHata } = await this.supabase.client.from("products").insert(g.kayit);
+        if (!tekHata) {
+          acilan++;
+          continue;
+        }
+        const cevrilen = this.translateWriteError(tekHata);
+        // Sunucu tarafı bir sorun (ör. migration eksik) her satırda aynıdır:
+        // 500 satırı tek tek denemek yerine hemen yüzeye çıkar.
+        if (cevrilen instanceof ServiceUnavailableException) throw cevrilen;
+        hatalar.push({ satir: g.satir, sebep: cevrilen.message || "kaydedilemedi" });
+      }
+    }
+    return { ...sonuc, acilan, hatalar };
   }
 
   async update(id: string, data: ProductWriteInput, requestingUserId?: string): Promise<Product> {

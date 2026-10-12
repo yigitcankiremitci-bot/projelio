@@ -1067,6 +1067,22 @@ export const moduller: TranslationDict = {
   "… ve {n} satır daha": "… and {n} more rows",
   "aynı ad": "same name",
   "aynı vergi no": "same tax number",
+  // Excel ile toplu ürün/hizmet ekleme (UrunExcelModal)
+  "Excel ile toplu ürün/hizmet ekle": "Bulk add products/services from Excel",
+  "Her satır bir ürün ya da hizmet. Yalnızca Ad zorunlu; sütunların açıklaması dosyanın ikinci sayfasında. Fotoğrafları sonra ürün kartından ekleyebilirsiniz.":
+    "Each row is a product or service. Only Name is required; the columns are explained on the file's second sheet. You can add photos later from the product card.",
+  "Kendi ürün listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.":
+    "Your own product list works too (.xlsx or .csv); recognized columns are imported.",
+  "Projelio ürün şablonu": "Projelio product template",
+  "Tek seferde en fazla 500 ürün eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
+    "At most 500 products are added at once. For the rest, start the file from row {n} and upload it again.",
+  "{n} satır okundu, eklenecek yeni ürün/hizmet yok.": "{n} rows read, no new products/services to add.",
+  "{n} satır okundu, {m} ürün/hizmet eklenecek.": "{n} rows read, {m} products/services will be added.",
+  "{n} ürün/hizmet eklendi.": "{n} products/services added.",
+  "{n} ürün/hizmeti ekle": "Add {n} products/services",
+  "Ürünleri ekle": "Add products",
+  "aynı stok kodu": "same SKU",
+  "aynı barkod": "same barcode",
   "aynı e-posta": "same email",
 
   // ─────────── Müşteri siparişleri ve tahsilat takibi

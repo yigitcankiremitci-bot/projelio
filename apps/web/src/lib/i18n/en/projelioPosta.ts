@@ -84,4 +84,9 @@ export const projelioPosta: TranslationDict = {
   "{n} talep": "{n} requests",
   "{n} tedarikçi": "{n} suppliers",
   "İstenen teslim tarihi": "Requested delivery date",
+  // Yeni e-postada Lio taslağı
+  "Lio'nun yazabilmesi için bir konu ya da birkaç not yazın.": "Write a subject or a few notes so Lio can draft.",
+  "Lio ile geliştir": "Improve with Lio",
+  "Yazdığınızı düzeltir ve toparlar; rakam ve adları korur. Göndermez.": "Polishes what you wrote, keeping numbers and names. Doesn't send.",
+  "Konudan ya da birkaç nottan taslak yazar. Lio göndermez, siz gönderirsiniz.": "Drafts from the subject or a few notes. Lio doesn't send; you do.",
 };

@@ -1094,4 +1094,5 @@ export const hatalar: TranslationDict = {
   "Gönderilenler": "Sent",
   "İstenmeyen": "Junk",
   "Çöp kutusu": "Trash",
+  "Lio'nun yazabilmesi için bir konu ya da birkaç not yazın.": "Write a subject or a few notes so Lio can draft.",
 };

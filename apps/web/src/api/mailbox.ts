@@ -54,6 +54,11 @@ export const mailboxApi = {
     return api.uploadFile<{ ok: true; id: string }>(`/mail/accounts/${accountId}/compose`, form);
   },
 
+  /** Yeni e-posta için Lio taslağı: metin boşsa yazar, doluysa geliştirir. Göndermez. */
+  draftNew: (accountId: string, body: { to?: string; subject?: string; text?: string }) =>
+    // Model çağrısı 30 sn'yi aşabiliyor; varsayılan zaman aşımı yetmez.
+    api.post<{ subject?: string; text: string }>(`/mail/accounts/${accountId}/draft`, body, undefined, 90_000),
+
   /** Klasör değiştirir (çöpe at / geri al / spam değil). Yalnızca @projelio.app kutusu. */
   move: (accountId: string, messageId: string, folder: string) =>
     api.patch<{ ok: true }>(`/mail/accounts/${accountId}/messages/${encodeURIComponent(messageId)}/folder`, { folder }),

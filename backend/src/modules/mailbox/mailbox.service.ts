@@ -7,7 +7,7 @@ import { MicrosoftAccountsService } from "../microsoft/microsoft-accounts.servic
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { GraphMailService } from "./graph-mail.service";
 import { buildReplyBody } from "./mail-format";
-import { adresiDogrula } from "./projelio-posta";
+import { adresiDogrula, konuyuAyir } from "./projelio-posta";
 import { ProjelioPostaService } from "./projelio-posta.service";
 
 /**
@@ -394,6 +394,56 @@ export class MailboxService {
       files.map((f) => ({ filename: decodeUploadFileName(f.originalname), content: f.buffer, contentType: f.mimetype })),
       userId
     );
+  }
+
+  /**
+   * Yeni e-posta için Lio taslağı — yanıt taslağının (draftReply) eşi.
+   *
+   * İki durum: metin boşsa konudan (ve varsa kullanıcının notundan) yazar;
+   * metin doluysa onu kaba taslak/not sayıp GELİŞTİRİR — anlamı, verilen
+   * rakamları ve adları korur, uydurmaz. Konu boşsa bir konu da önerir.
+   * Lio GÖNDERMEZ: sonuç pencereye düşer, gönderen yine kullanıcı.
+   *
+   * Çıktı biçimi "KONU: ..." + boş satır + gövde; JSON istemiyoruz çünkü ucuz
+   * model uzun metinde JSON kaçışlarını bozabiliyor, iki parçayı ayırmak için
+   * tek satırlık bir önek yetiyor.
+   */
+  async draftNew(
+    accountId: string,
+    input: { to?: string; subject?: string; text?: string; instruction?: string },
+    userId: string
+  ): Promise<{ subject?: string; text: string }> {
+    const row = await this.projelioKutusu(accountId, userId);
+    const konu = (input.subject ?? "").trim().slice(0, 300);
+    const metin = (input.text ?? "").trim().slice(0, 8000);
+    if (!konu && !metin && !input.instruction?.trim()) {
+      throw new BadRequestException("Lio'nun yazabilmesi için bir konu ya da birkaç not yazın."); // dil:anahtar
+    }
+
+    const system = [
+      "Sen bir iş e-postası taslağı yazıyorsun. Kullanıcının metni hangi dildeyse o dilde yaz; boşsa Türkçe.",
+      "Kurallar: kısa ve net ol, gereksiz nezaket kalıbı yığma, somut ol.",
+      "Emin olmadığın bilgiyi UYDURMA — bilmediğin bir tarih/fiyat/ad varsa yerine [ ] içinde yer tutucu bırak.",
+      "Kullanıcının verdiği rakamları, adları, tarihleri ve taahhütleri AYNEN koru.",
+      row.signature ? "İmza sistem tarafından ayrıca ekleniyor; sen imza yazma." : "Kapanışa gönderenin adını yazma; imza ayrıca ekleniyor.",
+      "Çıktı biçimi KESİN: ilk satır 'KONU: <konu satırı>', sonra bir boş satır, sonra yalnızca e-posta gövdesi (selamlama ve kapanış dahil). Başka açıklama ekleme.",
+    ].join("\n");
+
+    const prompt = [
+      `Gönderen: ${row.display_name ? `${row.display_name} <${row.address}>` : row.address}`,
+      input.to?.trim() ? `Alıcı: ${input.to.trim().slice(0, 300)}` : "",
+      konu ? `Konu: ${konu}` : "Konu henüz yok — uygun bir konu öner.",
+      "",
+      metin
+        ? `Kullanıcının yazdığı metin (bunu geliştir: akıcı, düzgün ve profesyonel hâle getir, içeriğini değiştirme):\n${metin}`
+        : "Gövde henüz yok — konuya uygun bir e-posta yaz.",
+      input.instruction?.trim() ? `\nEk istek: ${input.instruction.trim().slice(0, 1000)}` : "",
+    ]
+      .filter((satir) => satir !== "")
+      .join("\n");
+
+    const { text } = await this.ai.draftText({ userId, system, prompt, maxTokens: 1500 });
+    return konuyuAyir(text, konu);
   }
 
   async moveMessage(accountId: string, messageId: string, folder: string, userId: string): Promise<{ ok: true }> {

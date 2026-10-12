@@ -8,6 +8,7 @@ import {
   aliciMetniniAyristir,
   ekYolu,
   gelenKlasoru,
+  konuyuAyir,
   postaAlicilari,
   referanslar,
   svixImzasiGecerli,
@@ -122,5 +123,26 @@ describe("yanıt başlıkları", () => {
 
   test("ek yolu yol ayırıcı taşımaz", () => {
     assert.equal(ekYolu("k", "i", "e", "../../gizli dosya.pdf"), "k/i/e-gizli_dosya.pdf");
+  });
+});
+
+describe("Lio taslağı: konu ve gövde ayrımı", () => {
+  test("KONU satırı ayrılır, konu boşsa öneri döner", () => {
+    assert.deepEqual(konuyuAyir("KONU: Teklif hk.\n\nMerhaba,\nEkte.", ""), {
+      subject: "Teklif hk.",
+      text: "Merhaba,\nEkte.",
+    });
+  });
+
+  test("kullanıcının yazdığı konu ezilmez", () => {
+    assert.deepEqual(konuyuAyir("KONU: Başka\n\nGövde", "Benim konum"), { subject: undefined, text: "Gövde" });
+  });
+
+  test("kalın yazılmış önek de tanınır", () => {
+    assert.equal(konuyuAyir("**Konu:** Toplantı\n\nGövde", "").subject, "Toplantı");
+  });
+
+  test("önek yoksa tamamı gövde", () => {
+    assert.deepEqual(konuyuAyir("Merhaba,\nNasılsınız?", ""), { text: "Merhaba,\nNasılsınız?" });
   });
 });

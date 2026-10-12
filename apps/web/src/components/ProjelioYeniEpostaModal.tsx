@@ -3,6 +3,7 @@ import type { MailAccount } from "@projelio/shared";
 import { mailboxApi } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
+import { IconSparkle } from "./icons";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -43,6 +44,10 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [lioYaziyor, setLioYaziyor] = useState(false);
+  // Lio metni ezdiğinde bir önceki hâl: "Geri al" ile dönülebilsin — kullanıcının
+  // kendi yazdığı uzun bir metin tek tıkla kaybolmasın.
+  const [onceki, setOnceki] = useState<{ subject: string; text: string } | null>(null);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const dosyaGirdisi = useRef<HTMLInputElement>(null);
 
@@ -81,6 +86,29 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
       setError(err instanceof Error ? err.message : t("E-posta gönderilemedi"));
     } finally {
       setSending(false);
+    }
+  };
+
+  /**
+   * Lio taslağı: metin boşsa konudan yazar, doluysa yazılanı geliştirir; konu
+   * boşsa bir konu da önerir. GÖNDERMEZ — sonuç kutulara düşer, gönderen kullanıcı.
+   */
+  const askLio = async () => {
+    if (!subject.trim() && !text.trim()) {
+      setError(t("Lio'nun yazabilmesi için bir konu ya da birkaç not yazın."));
+      return;
+    }
+    setLioYaziyor(true);
+    setError("");
+    try {
+      const sonuc = await mailboxApi.draftNew(account.id, { to, subject, text });
+      setOnceki({ subject, text });
+      if (sonuc.subject && !subject.trim()) setSubject(sonuc.subject);
+      setText(sonuc.text);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("Taslak üretilemedi"));
+    } finally {
+      setLioYaziyor(false);
     }
   };
 
@@ -145,6 +173,47 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
             fontFamily: "inherit",
           }}
         />
+        {/* ---------------------------------------------------- Lio */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={askLio}
+            disabled={lioYaziyor || sending}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              fontSize: 13,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              cursor: lioYaziyor ? "default" : "pointer",
+            }}
+          >
+            <IconSparkle size={14} color={c.accent} />
+            {lioYaziyor ? t("Lio yazıyor…") : text.trim() ? t("Lio ile geliştir") : t("Lio ile taslak")}
+          </button>
+          {onceki && !lioYaziyor && (
+            <button
+              type="button"
+              onClick={() => {
+                setSubject(onceki.subject);
+                setText(onceki.text);
+                setOnceki(null);
+              }}
+              style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            >
+              {t("Geri al")}
+            </button>
+          )}
+          <span style={{ fontSize: 11, color: c.textSecondary, flex: "1 1 220px" }}>
+            {text.trim()
+              ? t("Yazdığınızı düzeltir ve toparlar; rakam ve adları korur. Göndermez.")
+              : t("Konudan ya da birkaç nottan taslak yazar. Lio göndermez, siz gönderirsiniz.")}
+          </span>
+        </div>
         {account.signature && (
           <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Kutunun imzası sona kendiliğinden eklenir.")}</span>
         )}
@@ -226,7 +295,7 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
           </button>
           <button
             onClick={send}
-            disabled={sending}
+            disabled={sending || lioYaziyor}
             style={{
               fontSize: 14,
               padding: "8px 22px",

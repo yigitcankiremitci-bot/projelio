@@ -331,6 +331,17 @@ export class MailboxController {
     return this.mailbox.compose(id, body ?? {}, files ?? [], req.user.userId);
   }
 
+  /** Yeni e-posta için Lio taslağı (yazar, göndermez). */
+  @Post("mail/accounts/:id/draft")
+  @UseGuards(AuthGuard("jwt"))
+  draftNew(
+    @Param("id") id: string,
+    @Body() body: { to?: string; subject?: string; text?: string; instruction?: string },
+    @Req() req: any
+  ) {
+    return this.mailbox.draftNew(id, body ?? {}, req.user.userId);
+  }
+
   @Patch("mail/accounts/:id/messages/:messageId/folder")
   @UseGuards(AuthGuard("jwt"))
   move(

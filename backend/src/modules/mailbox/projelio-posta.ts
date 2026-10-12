@@ -234,3 +234,16 @@ export function ekYolu(kutuId: string, iletiId: string, ekId: string, dosyaAdi: 
       .slice(-80) || "ek";
   return `${kutuId}/${iletiId}/${ekId}-${temiz}`;
 }
+
+/**
+ * Lio çıktısından konu ve gövde. Model "KONU:" satırını atlarsa ya da başka
+ * bir biçim kullanırsa metnin tamamı gövde sayılır; kullanıcının yazdığı konu
+ * hiçbir durumda EZİLMEZ (yalnızca boşsa öneri döner).
+ */
+export function konuyuAyir(cikti: string, mevcutKonu: string): { subject?: string; text: string } {
+  const temiz = cikti.trim();
+  const eslesme = temiz.match(/^\**\s*(?:KONU|Konu|SUBJECT|Subject)\s*:\s*\**\s*(.+)\n+([\s\S]*)$/);
+  if (!eslesme) return { text: temiz };
+  const oneri = eslesme[1].replace(/\*+$/, "").trim();
+  return { subject: mevcutKonu ? undefined : oneri.slice(0, 300) || undefined, text: eslesme[2].trim() };
+}

@@ -64,7 +64,7 @@ export class BilgiKartiOzetService {
     const org = await this.guvenli(async () => {
       const { data } = await this.supabase.client
         .from("organizations")
-        .select("created_at, org_type, group_id, groups(name), users(full_name)") // dil:atla
+        .select("created_at, org_type, group_id, groups(name), users!organizations_owner_id_fkey(full_name)") // dil:atla
         .eq("id", organizationId)
         .maybeSingle();
       return data;

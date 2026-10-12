@@ -12,6 +12,11 @@ import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-ima
 
 const COVER_BUCKET = "organization-covers";
 
+// users'a giden bağ ADIYLA verilir: sirket_anasayfa_sirasi (migration 167)
+// organizations ile users arasında ikinci bir yol açınca ipucusuz "users(...)"
+// PGRST201 verdi ve şirket listesi herkes için boş göründü.
+const ORG_SELECT = "*, users!organizations_owner_id_fkey(full_name), groups(name)";
+
 function mapOrganization(row: any): Organization {
   return {
     id: row.id,
@@ -48,7 +53,7 @@ export class OrganizationsService {
   async findAllForUser(userId: string): Promise<Organization[]> {
     const { data: owned, error: ownedError } = await this.supabase.client
       .from("organizations")
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .eq("owner_id", userId)
       .is("archived_at", null);
     if (ownedError) throw ownedError;
@@ -65,7 +70,7 @@ export class OrganizationsService {
     if (memberOrgIds.length > 0) {
       const { data, error } = await this.supabase.client
         .from("organizations")
-        .select("*, users(full_name), groups(name)")
+        .select(ORG_SELECT)
         .in("id", memberOrgIds)
         .is("archived_at", null);
       if (error) throw error;
@@ -91,7 +96,7 @@ export class OrganizationsService {
       if (deptOrgIds.length > 0) {
         const { data, error } = await this.supabase.client
           .from("organizations")
-          .select("*, users(full_name), groups(name)")
+          .select(ORG_SELECT)
           .in("id", deptOrgIds)
           .is("archived_at", null);
         if (error) throw error;
@@ -129,7 +134,7 @@ export class OrganizationsService {
   async findByGroupId(groupId: string): Promise<Organization[]> {
     const { data, error } = await this.supabase.client
       .from("organizations")
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .eq("group_id", groupId)
       .is("archived_at", null)
       .order("sort_order", { ascending: true })
@@ -179,7 +184,7 @@ export class OrganizationsService {
   async findOne(id: string, requestingUserId?: string): Promise<Organization> {
     const { data, error } = await this.supabase.client
       .from("organizations")
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
@@ -241,7 +246,7 @@ export class OrganizationsService {
         description: data.description ?? null,
         org_type: data.orgType === "isletme" ? "isletme" : "sirket",
       })
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .single();
     if (error) throw error;
     return mapOrganization(row);
@@ -269,7 +274,7 @@ export class OrganizationsService {
       .from("organizations")
       .update(patch)
       .eq("id", id)
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Organizasyon bulunamadı");
@@ -364,7 +369,7 @@ export class OrganizationsService {
       .from("organizations")
       .update({ archived_at: new Date().toISOString() })
       .eq("id", id)
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Organizasyon bulunamadı");
@@ -384,7 +389,7 @@ export class OrganizationsService {
       .from("organizations")
       .update({ archived_at: null })
       .eq("id", id)
-      .select("*, users(full_name), groups(name)")
+      .select(ORG_SELECT)
       .maybeSingle();
     if (error) throw error;
     if (!row) throw new NotFoundException("Organizasyon bulunamadı");

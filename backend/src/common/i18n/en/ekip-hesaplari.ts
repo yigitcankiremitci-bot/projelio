@@ -40,6 +40,9 @@ export const ekipHesaplari: TranslationDict = {
     "This sign-in link is invalid or has expired. Ask your manager for a new one or sign in with your password.",
   "Ekip hesabı açmak için şirket sahibi ya da bir departmanın yöneticisi olmalısın.":
     "You need to be the company owner or a department manager to create team accounts.",
+  "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi işin Ekip sekmesinden davet edebilirsin.":
+    "There's already a Projelio account with this email. You can invite them from the job's Team tab.",
+  "Bu işin ekibine hesabı yalnızca iş sahibi açabilir.": "Only the job owner can create accounts for this job's team.",
   "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi şirket sayfasındaki “İşe al” ile davet edebilirsin.":
     "There's already a Projelio account with this email. Invite them with “Hire” on the company page instead.",
   "Bu hesabı sen açmadın; bağlantıyı şirket sahibi ya da hesabı açan kişi gönderebilir.":

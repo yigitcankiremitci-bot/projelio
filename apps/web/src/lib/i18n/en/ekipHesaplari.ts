@@ -12,8 +12,10 @@ export const ekipHesaplari: TranslationDict = {
   // ─────────────────────────────────────────────── Liste
   "+ Hesap aç": "+ Create account",
   "yalnızca senin açtıkların": "only the ones you created",
-  "Ekip hesapları şirketler için: hesap, şirketin bir departmanının kadrosuna açılır.":
-    "Team accounts are for companies: the account is added to one of the company's departments.",
+  "Açılan hesap doğrudan bu işin ekibine katılır. Kişiyi çıkarmak için işin Ekip sekmesini kullan.":
+    "The new account joins this job's team directly. To remove someone, use the job's Team tab.",
+  "Hesap açılır ve kişi bu işin ekibine katılır; kişiye hesabına doğrudan girebileceği bir bağlantı gider.":
+    "The account is created and the person joins this job's team; they get a link that signs them straight in.",
   "Henüz buradan hesap açılmadı. “Hesap aç” ile ekibinden birine kullanıcı adı ve şifre oluştur; kişi e-postasındaki bağlantıyla doğrudan hesabına girer.":
     "No accounts created here yet. Use “Create account” to set up a username and password for someone on your team; they sign in straight from the link in their email.",
   "{ad} için hesap açıldı": "Account created for {ad}",

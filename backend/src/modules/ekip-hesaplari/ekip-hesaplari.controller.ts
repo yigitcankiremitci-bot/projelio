@@ -55,6 +55,22 @@ export class EkipHesaplariController {
     return this.ekipHesaplari.olustur(organizationId, body, req.user.userId);
   }
 
+  // İş kapsamı: serbest çalışanın işine hesap (bkz. migration 161). Yetki: iş sahibi.
+  @Get("jobs/:jobId/ekip-hesaplari")
+  isListesi(@Param("jobId") jobId: string, @Req() req: any) {
+    return this.ekipHesaplari.isListesi(jobId, req.user.userId);
+  }
+
+  @Get("jobs/:jobId/ekip-hesaplari/kullanici-adi")
+  isKullaniciAdi(@Param("jobId") jobId: string, @Query("username") username: string, @Req() req: any) {
+    return this.ekipHesaplari.isKullaniciAdiUygunMu(jobId, req.user.userId, username);
+  }
+
+  @Post("jobs/:jobId/ekip-hesaplari")
+  isteOlustur(@Param("jobId") jobId: string, @Body() body: EkipHesabiGirdisi, @Req() req: any) {
+    return this.ekipHesaplari.isteOlustur(jobId, body, req.user.userId);
+  }
+
   @Post("ekip-hesaplari/:id/baglanti")
   baglanti(@Param("id") id: string, @Req() req: any) {
     return this.ekipHesaplari.baglantiyiYenidenGonder(id, req.user.userId);

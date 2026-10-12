@@ -15,5 +15,11 @@ export const ekipHesaplariApi = {
     ),
   olustur: (organizationId: string, girdi: EkipHesabiGirdisi) =>
     api.post<{ hesap: EkipHesabi; epostaGonderildi: boolean }>(`/organizations/${organizationId}/ekip-hesaplari`, girdi),
+  // İş kapsamı (serbest çalışan): kişi iş ekibine yazılır, departman seçimi yok.
+  isListesi: (jobId: string) => api.get<EkipHesabi[]>(`/jobs/${jobId}/ekip-hesaplari`),
+  isKullaniciAdiUygun: (jobId: string, username: string) =>
+    api.get<{ uygun: boolean }>(`/jobs/${jobId}/ekip-hesaplari/kullanici-adi?username=${encodeURIComponent(username)}`),
+  isteOlustur: (jobId: string, girdi: EkipHesabiGirdisi) =>
+    api.post<{ hesap: EkipHesabi; epostaGonderildi: boolean }>(`/jobs/${jobId}/ekip-hesaplari`, girdi),
   baglantiGonder: (id: string) => api.post<{ epostaGonderildi: boolean }>(`/ekip-hesaplari/${id}/baglanti`, {}),
 };

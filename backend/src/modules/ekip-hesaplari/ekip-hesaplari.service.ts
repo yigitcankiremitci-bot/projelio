@@ -10,11 +10,41 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { UsersService, normalizeEmail, normalizeUsername } from "../users/users.service";
 import { EmailService } from "../auth/email.service";
 import { GirisBaglantisiService } from "../auth/giris-baglantisi.service";
-import { atanabilirDepartmanlar, girdiyiDogrula, tekilModuller } from "./ekip-hesabi-kurallari";
+import { FilesService } from "../files/files.service";
+import { atanabilirDepartmanlar, girdiyiDogrula, kisiGirdisiniDogrula, tekilModuller } from "./ekip-hesabi-kurallari";
 import { ekipHesabiEpostasi } from "./ekip-hesabi-eposta";
 
 /** Modülün kendi anahtarı — seçeneklerde listelenmez (bkz. secenekler). */
 const MODUL_ANAHTARI = "ekip_hesaplari";
+
+/**
+ * Hesabın açıldığı yer: şirket (departman kadrosu) ya da serbest çalışanın
+ * İŞİ (iş ekibi). Tabloda ikisinden yalnızca biri dolu (bkz. migration 161).
+ */
+type Kapsam = { organizationId: string; jobId?: undefined } | { jobId: string; organizationId?: undefined };
+
+const kapsamSutunlari = (k: Kapsam) => ({ organization_id: k.organizationId ?? null, job_id: k.jobId ?? null });
+
+const LISTE_ALANLARI =
+  "id, user_id, created_at, davet_gonderildi_at, ilk_giris_at, " +
+  "kisi:users!ekip_hesaplari_user_id_fkey(full_name, username, email, title), " +
+  "acan:users!ekip_hesaplari_created_by_fkey(full_name)";
+
+function hesabaCevir(s: any, departmanlar: EkipHesabi["departmanlar"]): EkipHesabi {
+  return {
+    id: s.id,
+    userId: s.user_id,
+    fullName: s.kisi?.full_name ?? "",
+    username: s.kisi?.username ?? "",
+    email: s.kisi?.email ?? "",
+    title: s.kisi?.title ?? undefined,
+    departmanlar,
+    createdByName: s.acan?.full_name ?? undefined,
+    createdAt: s.created_at,
+    davetGonderildiAt: s.davet_gonderildi_at ?? undefined,
+    ilkGirisAt: s.ilk_giris_at ?? undefined,
+  };
+}
 
 /**
  * Ekip Hesapları (bkz. migration 130).
@@ -37,7 +67,8 @@ export class EkipHesaplariService {
     private supabase: SupabaseService,
     private usersService: UsersService,
     private emailService: EmailService,
-    private girisBaglantisi: GirisBaglantisiService
+    private girisBaglantisi: GirisBaglantisiService,
+    private filesService: FilesService
   ) {}
 
   // ------------------------------------------------------------- Yetki + seçenekler
@@ -155,11 +186,7 @@ export class EkipHesaplariService {
 
     let sorgu = this.supabase.client
       .from("ekip_hesaplari")
-      .select(
-        "id, user_id, created_at, davet_gonderildi_at, ilk_giris_at, " +
-          "kisi:users!ekip_hesaplari_user_id_fkey(full_name, username, email, title), " +
-          "acan:users!ekip_hesaplari_created_by_fkey(full_name)"
-      )
+      .select(LISTE_ALANLARI)
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
@@ -193,19 +220,7 @@ export class EkipHesaplariService {
       kadroByUser.set(k.user_id, liste);
     }
 
-    return satirlar.map((s) => ({
-      id: s.id,
-      userId: s.user_id,
-      fullName: s.kisi?.full_name ?? "",
-      username: s.kisi?.username ?? "",
-      email: s.kisi?.email ?? "",
-      title: s.kisi?.title ?? undefined,
-      departmanlar: kadroByUser.get(s.user_id) ?? [],
-      createdByName: s.acan?.full_name ?? undefined,
-      createdAt: s.created_at,
-      davetGonderildiAt: s.davet_gonderildi_at ?? undefined,
-      ilkGirisAt: s.ilk_giris_at ?? undefined,
-    }));
+    return satirlar.map((s) => hesabaCevir(s, kadroByUser.get(s.user_id) ?? []));
   }
 
   /** Form yazarken "bu kullanıcı adı boş mu" — kullanıcı adı zaten herkese görünür bir tanımlayıcı. */
@@ -226,17 +241,81 @@ export class EkipHesaplariService {
     const hata = girdiyiDogrula(girdi, secenekler);
     if (hata) throw new BadRequestException(hata);
 
+    const { yeniId, dil, sifreDegistirmeli } = await this.hesabiAc(
+      { organizationId },
+      girdi,
+      userId,
+      "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi şirket sayfasındaki “İşe al” ile davet edebilirsin.",
+      async (yeniId, title) => {
+        const { error: kadroHatasi } = await this.supabase.client.from("department_members").insert(
+          girdi.departmanlar.map((d) => ({
+            department_id: d.departmentId,
+            user_id: yeniId,
+            role: d.role,
+            title,
+            // Davet değil: hesabı açan yönetici kişiyi zaten kadroya aldı,
+            // onaylayacak bir şey yok.
+            status: "approved",
+            invited_by: userId,
+          }))
+        );
+        if (kadroHatasi) throw kadroHatasi;
+
+        const moduller = tekilModuller(girdi.moduller);
+        if (moduller.length) {
+          const { error: modulHatasi } = await this.supabase.client.from("module_members").insert(
+            moduller.map((m) => ({
+              organization_id: organizationId,
+              department_id: m.departmentId,
+              module_key: m.moduleKey,
+              user_id: yeniId,
+              role: "employee",
+              status: "approved",
+              assigned_by: userId,
+            }))
+          );
+          if (modulHatasi) throw modulHatasi;
+        }
+      }
+    );
+
+    const epostaGonderildi = await this.baglantiGonder({ organizationId }, yeniId, userId, {
+      not: girdi.karsilamaNotu,
+      sifreDegistirmeli,
+      dil,
+    });
+
+    const hesap = (await this.liste(organizationId, userId)).find((h) => h.userId === yeniId);
+    if (!hesap) throw new NotFoundException("Hesap açıldı ama listede bulunamadı");
+    return { hesap, epostaGonderildi };
+  }
+
+  /**
+   * Hesap açmanın iki kapsamda ORTAK gövdesi: çakışma kontrolü, kullanıcı,
+   * profil, `bagla` (kadro ya da iş ekibi) ve ekip_hesaplari kaydı.
+   *
+   * Buradan sonra bir adım düşerse hesap YARIM kalmamalı: kadrosuz, modülsüz
+   * ama giriş yapılabilen bir hesap, yöneticinin listesinde de görünmeyeceği
+   * için kimsenin fark etmediği bir hayalet olurdu. Kullanıcı silinince
+   * kadro/modül/bağlantı satırları da cascade ile gider.
+   */
+  private async hesabiAc(
+    kapsam: Kapsam,
+    girdi: EkipHesabiGirdisi,
+    userId: string,
+    // Tam cümle: çeviri sözlüğü cümle bazlı, parçadan birleştirilen metni bulamaz.
+    epostaVarMesaji: string,
+    bagla: (yeniId: string, title: string | null) => Promise<void>
+  ): Promise<{ yeniId: string; dil: Locale; sifreDegistirmeli: boolean }> {
     const email = normalizeEmail(girdi.email);
     const username = normalizeUsername(girdi.username);
 
-    // Yönetici oturum açmış, şirketin sahibi/yöneticisi olan biri: bu adresin
-    // kayıtlı olduğunu söylemek kayıt ekranındaki gibi bir sızıntı değil — zaten
-    // kadro daveti de aynı bilgiyi veriyor. Söylemezsek neden hesap
-    // açılamadığını anlayamaz.
+    // Yönetici oturum açmış, şirketin sahibi/yöneticisi (ya da işin sahibi)
+    // olan biri: bu adresin kayıtlı olduğunu söylemek kayıt ekranındaki gibi
+    // bir sızıntı değil — zaten kadro daveti de aynı bilgiyi veriyor.
+    // Söylemezsek neden hesap açılamadığını anlayamaz.
     if (await this.usersService.findByEmail(email)) {
-      throw new ConflictException(
-        "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi şirket sayfasındaki “İşe al” ile davet edebilirsin."
-      );
+      throw new ConflictException(epostaVarMesaji);
     }
     if (await this.usersService.isUsernameTaken(username)) {
       throw new ConflictException("Bu kullanıcı adı zaten alınmış, başka bir tane dene.");
@@ -254,16 +333,12 @@ export class EkipHesaplariService {
       locale: dil,
     });
 
-    // Buradan sonra bir adım düşerse hesap YARIM kalmamalı: kadrosuz, modülsüz
-    // ama giriş yapılabilen bir hesap, yöneticinin listesinde de görünmeyeceği
-    // için kimsenin fark etmediği bir hayalet olurdu. Kullanıcı silinince
-    // kadro/modül/bağlantı satırları da cascade ile gider.
     try {
       const { error: profilHatasi } = await this.supabase.client
         .from("users")
         .update({
           // Çalışan hesabı: kurulum sihirbazı (hesap tipi, şirket kurma) onun
-          // için anlamsız — şirketi zaten var.
+          // için anlamsız — şirketi ya da işi zaten var.
           account_type: "employee",
           onboarding_completed_at: new Date().toISOString(),
           title,
@@ -273,38 +348,10 @@ export class EkipHesaplariService {
         .eq("id", yeni.id);
       if (profilHatasi) throw profilHatasi;
 
-      const { error: kadroHatasi } = await this.supabase.client.from("department_members").insert(
-        girdi.departmanlar.map((d) => ({
-          department_id: d.departmentId,
-          user_id: yeni.id,
-          role: d.role,
-          title,
-          // Davet değil: hesabı açan yönetici kişiyi zaten kadroya aldı,
-          // onaylayacak bir şey yok.
-          status: "approved",
-          invited_by: userId,
-        }))
-      );
-      if (kadroHatasi) throw kadroHatasi;
-
-      const moduller = tekilModuller(girdi.moduller);
-      if (moduller.length) {
-        const { error: modulHatasi } = await this.supabase.client.from("module_members").insert(
-          moduller.map((m) => ({
-            organization_id: organizationId,
-            department_id: m.departmentId,
-            module_key: m.moduleKey,
-            user_id: yeni.id,
-            role: "employee",
-            status: "approved",
-            assigned_by: userId,
-          }))
-        );
-        if (modulHatasi) throw modulHatasi;
-      }
+      await bagla(yeni.id, title);
 
       const { error: kayitHatasi } = await this.supabase.client.from("ekip_hesaplari").insert({
-        organization_id: organizationId,
+        ...kapsamSutunlari(kapsam),
         user_id: yeni.id,
         created_by: userId,
         karsilama_notu: girdi.karsilamaNotu?.trim() || null,
@@ -316,13 +363,86 @@ export class EkipHesaplariService {
       throw err;
     }
 
-    const epostaGonderildi = await this.baglantiGonder(organizationId, yeni.id, userId, {
+    return { yeniId: yeni.id, dil, sifreDegistirmeli };
+  }
+
+  // ------------------------------------------------------------- İş kapsamı (serbest çalışan)
+
+  /**
+   * Serbest çalışanın işi için hesap açma yetkisi: YALNIZCA iş sahibi. İş
+   * ekibine kişi eklemenin mevcut kuralıyla aynı (JobMembersService.hire).
+   */
+  private async isSahibiOlmali(jobId: string, userId: string): Promise<{ title: string }> {
+    const { data: job, error } = await this.supabase.client.from("jobs").select("title, owner_id").eq("id", jobId).maybeSingle();
+    if (error) throw error;
+    if (!job) throw new NotFoundException("İş bulunamadı");
+    if (job.owner_id !== userId) throw new ForbiddenException("Bu işin ekibine hesabı yalnızca iş sahibi açabilir.");
+    return { title: job.title ?? "" };
+  }
+
+  async isListesi(jobId: string, userId: string): Promise<EkipHesabi[]> {
+    await this.isSahibiOlmali(jobId, userId);
+    const { data, error } = await this.supabase.client
+      .from("ekip_hesaplari")
+      .select(LISTE_ALANLARI)
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false })
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+    return ((data ?? []) as any[]).map((s) => hesabaCevir(s, []));
+  }
+
+  async isKullaniciAdiUygunMu(jobId: string, userId: string, username: string): Promise<{ uygun: boolean }> {
+    await this.isSahibiOlmali(jobId, userId);
+    if (typeof username !== "string" || !username.trim()) return { uygun: false };
+    return { uygun: !(await this.usersService.isUsernameTaken(username)) };
+  }
+
+  /**
+   * Serbest çalışanın işine hesap açar: kişi doğrudan iş ekibine ONAYLI
+   * yazılır (davet beklemez — hesabı açan zaten onu ekibe aldı). Departman
+   * ve modül seçimi yok; iş üyesi işin modüllerini zaten görüyor.
+   */
+  async isteOlustur(
+    jobId: string,
+    girdi: EkipHesabiGirdisi,
+    userId: string
+  ): Promise<{ hesap: EkipHesabi; epostaGonderildi: boolean }> {
+    await this.isSahibiOlmali(jobId, userId);
+    const hata = kisiGirdisiniDogrula(girdi);
+    if (hata) throw new BadRequestException(hata);
+
+    const { yeniId, dil, sifreDegistirmeli } = await this.hesabiAc(
+      { jobId },
+      girdi,
+      userId,
+      "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi işin Ekip sekmesinden davet edebilirsin.",
+      async (yeniId, title) => {
+        const { error } = await this.supabase.client.from("job_members").insert({
+          job_id: jobId,
+          user_id: yeniId,
+          title: title?.slice(0, 80) ?? null,
+          status: "approved",
+          invited_by: userId,
+          responded_at: new Date().toISOString(),
+        });
+        if (error) throw error;
+      }
+    );
+
+    // Ekibe katılan kişi işin Drive klasörüne erişir (JobMembersService ile
+    // aynı adım); beklemeden — yanıt Drive'ın yavaşlığına takılmasın.
+    void this.filesService
+      .syncJobShares(jobId)
+      .catch((err) => this.logger.warn(`Drive izinleri eşitlenemedi (job=${jobId}): ${String(err)}`));
+
+    const epostaGonderildi = await this.baglantiGonder({ jobId }, yeniId, userId, {
       not: girdi.karsilamaNotu,
       sifreDegistirmeli,
       dil,
     });
 
-    const hesap = (await this.liste(organizationId, userId)).find((h) => h.userId === yeni.id);
+    const hesap = (await this.isListesi(jobId, userId)).find((h) => h.userId === yeniId);
     if (!hesap) throw new NotFoundException("Hesap açıldı ama listede bulunamadı");
     return { hesap, epostaGonderildi };
   }
@@ -377,15 +497,20 @@ export class EkipHesaplariService {
   async baglantiyiYenidenGonder(id: string, userId: string): Promise<{ epostaGonderildi: boolean }> {
     const { data: kayit, error } = await this.supabase.client
       .from("ekip_hesaplari")
-      .select("organization_id, user_id, created_by, ilk_giris_at, karsilama_notu")
+      .select("organization_id, job_id, user_id, created_by, ilk_giris_at, karsilama_notu")
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
     if (!kayit) throw new NotFoundException("Hesap kaydı bulunamadı");
 
-    const secenekler = await this.secenekler(kayit.organization_id, userId);
-    if (!secenekler.sahipMi && kayit.created_by !== userId) {
-      throw new ForbiddenException("Bu hesabı sen açmadın; bağlantıyı şirket sahibi ya da hesabı açan kişi gönderebilir.");
+    const kapsam: Kapsam = kayit.job_id ? { jobId: kayit.job_id } : { organizationId: kayit.organization_id };
+    if (kapsam.jobId) {
+      await this.isSahibiOlmali(kapsam.jobId, userId);
+    } else {
+      const secenekler = await this.secenekler(kapsam.organizationId, userId);
+      if (!secenekler.sahipMi && kayit.created_by !== userId) {
+        throw new ForbiddenException("Bu hesabı sen açmadın; bağlantıyı şirket sahibi ya da hesabı açan kişi gönderebilir.");
+      }
     }
     if (kayit.ilk_giris_at) {
       throw new BadRequestException(
@@ -395,7 +520,7 @@ export class EkipHesaplariService {
 
     const kisi = await this.usersService.findById(kayit.user_id);
     if (!kisi || kisi.deletedAt) throw new NotFoundException("Hesap bulunamadı");
-    const epostaGonderildi = await this.baglantiGonder(kayit.organization_id, kayit.user_id, userId, {
+    const epostaGonderildi = await this.baglantiGonder(kapsam, kayit.user_id, userId, {
       not: kayit.karsilama_notu,
       sifreDegistirmeli: kisi.sifreDegistirmeli === true,
       dil: istekDili(kisi.locale),
@@ -408,22 +533,16 @@ export class EkipHesaplariService {
    * e-postanın gitmemesi onu geri almaz — yönetici listeden yeniden gönderir.
    */
   private async baglantiGonder(
-    organizationId: string,
+    kapsam: Kapsam,
     kisiId: string,
     yoneticiId: string,
     secim: { not?: string | null; sifreDegistirmeli: boolean; dil: Locale }
   ): Promise<boolean> {
     try {
-      const [kisi, yonetici, { data: org }, { data: kadro }] = await Promise.all([
+      const [kisi, yonetici, { ekipAdi, departmanlar }] = await Promise.all([
         this.usersService.findById(kisiId),
         this.usersService.findById(yoneticiId),
-        this.supabase.client.from("organizations").select("name").eq("id", organizationId).maybeSingle(),
-        this.supabase.client
-          .from("department_members")
-          .select("departments!inner(name, organization_id)")
-          .eq("user_id", kisiId)
-          .eq("status", "approved")
-          .eq("departments.organization_id", organizationId),
+        this.ekipBilgisi(kapsam, kisiId),
       ]);
       if (!kisi) return false;
 
@@ -431,8 +550,8 @@ export class EkipHesaplariService {
       const mail = ekipHesabiEpostasi({
         alici: { ad: kisi.fullName, kullaniciAdi: kisi.username, eposta: kisi.email },
         yoneticiAdi: yonetici?.fullName ?? "Yöneticin",
-        sirketAdi: org?.name ?? "Projelio",
-        departmanlar: (kadro ?? []).map((k: any) => k.departments?.name).filter(Boolean),
+        sirketAdi: ekipAdi,
+        departmanlar,
         girisUrl,
         sifreDegistirmeli: secim.sifreDegistirmeli,
         not: secim.not,
@@ -447,7 +566,7 @@ export class EkipHesaplariService {
         await this.supabase.client
           .from("ekip_hesaplari")
           .update({ davet_gonderildi_at: new Date().toISOString() })
-          .eq("organization_id", organizationId)
+          .eq(kapsam.jobId ? "job_id" : "organization_id", kapsam.jobId ?? kapsam.organizationId)
           .eq("user_id", kisiId);
       }
       return gitti;
@@ -455,5 +574,26 @@ export class EkipHesaplariService {
       this.logger.warn(`Ekip hesabı e-postası gönderilemedi (${kisiId}): ${(err as any)?.message ?? err}`);
       return false;
     }
+  }
+
+  /** E-postadaki ekip adı (şirket ya da iş) ve kişinin departmanları (yalnızca şirkette). */
+  private async ekipBilgisi(kapsam: Kapsam, kisiId: string): Promise<{ ekipAdi: string; departmanlar: string[] }> {
+    if (kapsam.jobId) {
+      const { data: job } = await this.supabase.client.from("jobs").select("title").eq("id", kapsam.jobId).maybeSingle();
+      return { ekipAdi: job?.title ?? "Projelio", departmanlar: [] };
+    }
+    const [{ data: org }, { data: kadro }] = await Promise.all([
+      this.supabase.client.from("organizations").select("name").eq("id", kapsam.organizationId).maybeSingle(),
+      this.supabase.client
+        .from("department_members")
+        .select("departments!inner(name, organization_id)")
+        .eq("user_id", kisiId)
+        .eq("status", "approved")
+        .eq("departments.organization_id", kapsam.organizationId),
+    ]);
+    return {
+      ekipAdi: org?.name ?? "Projelio",
+      departmanlar: (kadro ?? []).map((k: any) => k.departments?.name).filter(Boolean),
+    };
   }
 }

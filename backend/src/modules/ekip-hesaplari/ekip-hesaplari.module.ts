@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { EmailModule } from "../auth/email.module";
 import { UsersModule } from "../users/users.module";
+import { FilesModule } from "../files/files.module";
 import { EkipHesaplariController } from "./ekip-hesaplari.controller";
 import { EkipHesaplariService } from "./ekip-hesaplari.service";
 
@@ -13,7 +14,7 @@ import { EkipHesaplariService } from "./ekip-hesaplari.service";
  * kopyası olmamalı.
  */
 @Module({
-  imports: [AuthModule, EmailModule, UsersModule],
+  imports: [AuthModule, EmailModule, UsersModule, FilesModule],
   controllers: [EkipHesaplariController],
   providers: [EkipHesaplariService],
   // Lio hesap açabiliyor (create_team_account); kural ve doğrulama burada kalır.

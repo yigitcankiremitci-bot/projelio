@@ -8,9 +8,11 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
 import KadroSecimi, { DepartmanRolleri, GOREV_ONERILERI, baslangicDepartmanlari, kadroSeciminiTopla } from "./KadroSecimi";
 
+/** Şirkette departman kadrosu seçilir; işte (serbest çalışan) kişi işin ekibine katılır. */
+export type EkipHesabiKapsami = { organizationId: string; secenekler: EkipHesabiSecenekleri } | { jobId: string };
+
 interface Props {
-  organizationId: string;
-  secenekler: EkipHesabiSecenekleri;
+  kapsam: EkipHesabiKapsami;
   onClose: () => void;
   /** Açılan hesap + şifre (bir kez gösterilsin diye) + e-posta gitti mi. */
   onAcildi: (sonuc: { hesap: EkipHesabi; sifre: string; epostaGonderildi: boolean }) => void;
@@ -28,9 +30,12 @@ interface Props {
  *
  * Departman/rol ve modül seçimi İşe al formuyla ortak (bkz. KadroSecimi).
  */
-export default function EkipHesabiModal({ organizationId, secenekler, onClose, onAcildi }: Props) {
+export default function EkipHesabiModal({ kapsam, onClose, onAcildi }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const jobId = "jobId" in kapsam ? kapsam.jobId : undefined;
+  const organizationId = "organizationId" in kapsam ? kapsam.organizationId : undefined;
+  const secenekler = "secenekler" in kapsam ? kapsam.secenekler : null;
 
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
@@ -45,7 +50,9 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
   const [locale, setLocale] = useState<"tr" | "en">("tr");
   const [karsilamaNotu, setKarsilamaNotu] = useState("");
   // Departman → rol. Tek departmanlı şirkette baştan seçili gelir.
-  const [departmanlar, setDepartmanlar] = useState<DepartmanRolleri>(() => baslangicDepartmanlari(secenekler));
+  const [departmanlar, setDepartmanlar] = useState<DepartmanRolleri>(() =>
+    secenekler ? baslangicDepartmanlari(secenekler) : ({} as DepartmanRolleri)
+  );
   // "departmentId:moduleKey"
   const [moduller, setModuller] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -63,15 +70,14 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
     if (!KULLANICI_ADI_DESENI.test(ad)) return;
     const no = ++sonSorgu.current;
     const zamanlayici = setTimeout(() => {
-      ekipHesaplariApi
-        .kullaniciAdiUygun(organizationId, ad)
+      (jobId ? ekipHesaplariApi.isKullaniciAdiUygun(jobId, ad) : ekipHesaplariApi.kullaniciAdiUygun(organizationId!, ad))
         .then((r) => {
           if (no === sonSorgu.current) setKullaniciAdiUygun(r.uygun);
         })
         .catch(() => undefined);
     }, 400);
     return () => clearTimeout(zamanlayici);
-  }, [username, organizationId]);
+  }, [username, organizationId, jobId]);
 
   const kaydet = async () => {
     setError("");
@@ -81,8 +87,10 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
     }
     if (!email.trim()) return setError(t("E-posta gerekli"));
     if (password.length < 8) return setError(t("Şifre en az 8 karakter olmalı."));
-    const kadro = kadroSeciminiTopla(secenekler, departmanlar, moduller);
-    if (kadro.departmanlar.length === 0) return setError(t("En az bir departman seç."));
+    const kadro = secenekler
+      ? kadroSeciminiTopla(secenekler, departmanlar, moduller)
+      : { departmanlar: [], moduller: [] };
+    if (secenekler && kadro.departmanlar.length === 0) return setError(t("En az bir departman seç."));
 
     const govde: EkipHesabiGirdisi = {
       fullName: fullName.trim(),
@@ -99,7 +107,9 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
 
     setBusy(true);
     try {
-      const sonuc = await ekipHesaplariApi.olustur(organizationId, govde);
+      const sonuc = jobId
+        ? await ekipHesaplariApi.isteOlustur(jobId, govde)
+        : await ekipHesaplariApi.olustur(organizationId!, govde);
       onAcildi({ ...sonuc, sifre: password });
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Hesap açılamadı"));
@@ -142,7 +152,11 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
   return (
     <Modal
       title={t("Ekip hesabı aç")}
-      subtitle={t("Hesap, kadro kaydı ve modül yetkileri birlikte açılır; kişiye hesabına doğrudan girebileceği bir bağlantı gider.")}
+      subtitle={
+        jobId
+          ? t("Hesap açılır ve kişi bu işin ekibine katılır; kişiye hesabına doğrudan girebileceği bir bağlantı gider.")
+          : t("Hesap, kadro kaydı ve modül yetkileri birlikte açılır; kişiye hesabına doğrudan girebileceği bir bağlantı gider.")
+      }
       onClose={onClose}
       maxWidth={680}
       mobileFullScreen
@@ -271,14 +285,16 @@ export default function EkipHesabiModal({ organizationId, secenekler, onClose, o
           {t("İlk girişte kendi şifresini belirlesin (önerilir)")}
         </label>
 
-        <KadroSecimi
-          secenekler={secenekler}
-          departmanlar={departmanlar}
-          setDepartmanlar={setDepartmanlar}
-          moduller={moduller}
-          setModuller={setModuller}
-          bolum={bolum}
-        />
+        {secenekler && (
+          <KadroSecimi
+            secenekler={secenekler}
+            departmanlar={departmanlar}
+            setDepartmanlar={setDepartmanlar}
+            moduller={moduller}
+            setModuller={setModuller}
+            bolum={bolum}
+          />
+        )}
 
         {/* ------------------------------------------------------------ Not */}
         {bolum(t("Karşılama notu"))}

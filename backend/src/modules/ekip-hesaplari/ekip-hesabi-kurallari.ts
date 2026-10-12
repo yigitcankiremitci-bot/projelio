@@ -39,6 +39,19 @@ export function atanabilirDepartmanlar(
  * gönderirse (elle yazılmış istek) reddedilir.
  */
 export function girdiyiDogrula(girdi: EkipHesabiGirdisi, secenekler: EkipHesabiSecenekleri): string | null {
+  return (
+    kisiGirdisiniDogrula(girdi) ??
+    kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana hesap açma yetkin yok.")
+  );
+}
+
+/**
+ * Kişi + giriş bilgilerinin doğrulaması (departman/modül seçimi HARİÇ).
+ *
+ * Serbest çalışanın işine açılan hesapta departman yok: kişi işin ekibine
+ * yazılır, işin modüllerini iş üyesi olarak görür (bkz. migration 161).
+ */
+export function kisiGirdisiniDogrula(girdi: EkipHesabiGirdisi): string | null {
   const ad = typeof girdi.fullName === "string" ? girdi.fullName.trim() : "";
   if (ad.length < 2 || ad.length > 120) return "Ad soyad 2-120 karakter olmalı.";
 
@@ -64,8 +77,7 @@ export function girdiyiDogrula(girdi: EkipHesabiGirdisi, secenekler: EkipHesabiS
   if (girdi.karsilamaNotu != null && (typeof girdi.karsilamaNotu !== "string" || girdi.karsilamaNotu.length > 1000)) {
     return "Not en fazla 1000 karakter olabilir.";
   }
-
-  return kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana hesap açma yetkin yok.");
+  return null;
 }
 
 /**

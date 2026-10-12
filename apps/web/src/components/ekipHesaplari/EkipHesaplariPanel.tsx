@@ -27,6 +27,10 @@ const ROL_KISA: Record<DepartmentMemberRole, string> = {
  *
  * Açılan hesabın şifresi YALNIZCA oluşturma anında, bir kez gösterilir:
  * sunucu şifreyi hash'leyip saklıyor, geri okunamaz.
+ *
+ * İki kapsam: şirkette hesap bir departmanın kadrosuna açılır; bir işin
+ * içinde (serbest çalışan) kişi doğrudan işin ekibine yazılır ve departman
+ * seçimi yoktur (bkz. migration 161). İş kapsamında yetki iş sahibinde.
  */
 export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
   const c = useThemeColors();
@@ -44,9 +48,12 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
   const [bilgi, setBilgi] = useState("");
 
   const yukle = () => {
-    if (!organizationId) return;
+    if (!jobId && !organizationId) return;
     setYukleniyor(true);
-    Promise.all([ekipHesaplariApi.secenekler(organizationId), ekipHesaplariApi.liste(organizationId)])
+    const istek: Promise<[EkipHesabiSecenekleri | null, EkipHesabi[]]> = jobId
+      ? ekipHesaplariApi.isListesi(jobId).then((l) => [null, l])
+      : Promise.all([ekipHesaplariApi.secenekler(organizationId!), ekipHesaplariApi.liste(organizationId!)]);
+    istek
       .then(([s, l]) => {
         setSecenekler(s);
         setHesaplar(l);
@@ -59,15 +66,11 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
       .finally(() => setYukleniyor(false));
   };
 
-  useEffect(yukle, [organizationId]);
+  useEffect(yukle, [organizationId, jobId]);
 
-  if (jobId || !organizationId) {
-    return (
-      <p style={{ fontSize: 13, color: c.textSecondary }}>
-        {t("Ekip hesapları şirketler için: hesap, şirketin bir departmanının kadrosuna açılır.")}
-      </p>
-    );
-  }
+  if (!jobId && !organizationId) return null;
+  // İşte seçenek yok (departman seçilmiyor); form yüklenince açılabilir.
+  const formHazir = !!jobId || !!secenekler;
 
   const yenidenGonder = async (h: EkipHesabi) => {
     setGonderiliyor(h.id);
@@ -129,7 +132,7 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
         <div style={{ flex: 1 }} />
         <button
           onClick={() => setFormAcik(true)}
-          disabled={!secenekler}
+          disabled={!formHazir}
           style={{
             fontSize: 13,
             padding: "6px 14px",
@@ -137,7 +140,7 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
             color: c.onPrimary,
             border: "none",
             borderRadius: 8,
-            cursor: secenekler ? "pointer" : "default",
+            cursor: formHazir ? "pointer" : "default",
           }}
         >
           {t("+ Hesap aç")}
@@ -217,7 +220,7 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
                 </span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 4, flex: "1 1 160px" }}>
-                {h.departmanlar.length === 0 ? (
+                {jobId ? null : h.departmanlar.length === 0 ? (
                   <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Kadroda değil")}</span>
                 ) : (
                   h.departmanlar.map((d) => (
@@ -252,13 +255,14 @@ export default function EkipHesaplariPanel({ organizationId, jobId }: Props) {
       )}
 
       <span style={{ fontSize: 11, color: c.textSecondary }}>
-        {t("Rolü değiştirmek ya da kişiyi kadrodan çıkarmak için departmanın Ekip sekmesini kullan.")}
+        {jobId
+          ? t("Açılan hesap doğrudan bu işin ekibine katılır. Kişiyi çıkarmak için işin Ekip sekmesini kullan.")
+          : t("Rolü değiştirmek ya da kişiyi kadrodan çıkarmak için departmanın Ekip sekmesini kullan.")}
       </span>
 
-      {formAcik && secenekler && (
+      {formAcik && formHazir && (
         <EkipHesabiModal
-          organizationId={organizationId}
-          secenekler={secenekler}
+          kapsam={jobId ? { jobId } : { organizationId: organizationId!, secenekler: secenekler! }}
           onClose={() => setFormAcik(false)}
           onAcildi={(sonuc) => {
             setFormAcik(false);

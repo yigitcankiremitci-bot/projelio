@@ -142,8 +142,7 @@ const SirketEkibiPanel = forwardRef<SirketEkibiPanelHandle, { organizationId: st
       )}
       {form === "hesap" && secenekler && (
         <EkipHesabiModal
-          organizationId={organizationId}
-          secenekler={secenekler}
+          kapsam={{ organizationId, secenekler }}
           onClose={() => setForm(null)}
           onAcildi={(sonuc) => {
             setForm(null);

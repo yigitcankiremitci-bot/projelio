@@ -1192,10 +1192,10 @@ export default function CustomersPanel({
         </div>
   ) : null;
 
-  // Özet kutuları ve sıralama: geniş ekranda sağdaki dar sütunda (modül
-  // sayfasında Lio simgesinin hemen altı), dar ekranda listenin üstünde.
-  // Üstte bir satır kaplıyorlardı ve listeyi aşağı itiyorlardı (kullanıcı
-  // geri bildirimi, 2026-10-12).
+  // Özet kutuları: geniş ekranda filtrelerin/listenin yanındaki dar sağ
+  // sütunda, dar ekranda listenin üstünde. Üstte bir satır kaplıyorlardı ve
+  // listeyi aşağı itiyorlardı (kullanıcı geri bildirimi, 2026-10-12).
+  // Sıralama filtre satırında (bkz. siralamaSecici).
   const yanSutun = genisEkran && !loading && parties.length > 0;
   const ozetKutulari = (dikey: boolean) => (
     <div style={{ display: "flex", flexDirection: dikey ? "column" : "row", flexWrap: dikey ? "nowrap" : "wrap", gap: 8 }}>
@@ -1247,8 +1247,7 @@ export default function CustomersPanel({
   );
 
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-    <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         {/* Panelin kendi başlığı yok: modül sayfasının başlığı ya da şirket
             sekmesinin adı zaten modülün adı — iki kez yazıyordu. */}
@@ -1349,6 +1348,12 @@ export default function CustomersPanel({
 
       {!yanSutun && !loading && parties.length > 0 && ozetKutulari(false)}
 
+      {/* Filtreler + liste solda, özet kutuları sağda: sağ sütunun tepesi
+          filtrelerin (yoksa listenin) tepesiyle aynı hizada başlar — sayfanın
+          en üstünden başlayınca orantısız duruyordu (kullanıcı geri bildirimi,
+          2026-10-12). */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
       {showToolbar && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
           <input
@@ -1415,6 +1420,8 @@ export default function CustomersPanel({
               {t("Temizle")}
             </button>
           )}
+          {/* Sıralama filtrelerin yanında; filtre satırı yoksa listenin üstünde. */}
+          {visible.length > 1 && siralamaSecici(false)}
         </div>
       )}
 
@@ -1473,7 +1480,7 @@ export default function CustomersPanel({
                 {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
               </span>
             )}
-            {!yanSutun && visible.length > 1 && siralamaSecici(false)}
+            {!showToolbar && visible.length > 1 && siralamaSecici(false)}
           </div>
           {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
               sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
@@ -1648,26 +1655,26 @@ export default function CustomersPanel({
           </span>
         </div>
       )}
+      </div>
+      {yanSutun && (
+        <aside
+          style={{
+            width: 150,
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            // Uzun listede kaydırırken de özet elde kalsın.
+            position: "sticky",
+            top: 72,
+          }}
+        >
+          {ozetKutulari(true)}
+        </aside>
+      )}
+      </div>
       </>
       )}
-    </div>
-    {yanSutun && (
-      <aside
-        style={{
-          width: 150,
-          flexShrink: 0,
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          // Uzun listede kaydırırken de özet ve sıralama elde kalsın.
-          position: "sticky",
-          top: 72,
-        }}
-      >
-        {ozetKutulari(true)}
-        {sekmeKartlari.length > 1 && siralamaSecici(true)}
-      </aside>
-    )}
     </div>
   );
 }

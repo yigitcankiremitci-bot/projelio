@@ -19,6 +19,11 @@ describe("şirket anasayfası bölüm sırası", () => {
     assert.deepEqual(sira, ["modules", "products", "departments", "team"]);
   });
 
+  test("tekrar eden ve bozuk kayıt temizlenir", () => {
+    assert.deepEqual(anasayfaSirasiniCoz(["team", "team", 5]), ["team", "products", "departments", "modules"]);
+    assert.deepEqual(anasayfaSirasiniCoz("bozuk"), ["products", "departments", "team", "modules"]);
+  });
+
   test("uçtaki bölüm taşınamaz", () => {
     const sira = anasayfaSirasiniCoz([]);
     assert.deepEqual(bolumuTasi(sira, "products", -1), sira);

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { Organization } from "@projelio/shared";
-import { sanitizeHiddenTabs } from "@projelio/shared";
+import { anasayfaSirasiniCoz, sanitizeHiddenTabs } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { JobsService } from "../jobs/jobs.service";
@@ -194,9 +194,41 @@ export class OrganizationsService {
         throw new ForbiddenException("Bu organizasyonu görüntüleme yetkiniz yok");
       }
       organization.viewerAccess = access;
+      organization.viewerHomeSections = await this.anasayfaSirasiniOku(id, requestingUserId);
     }
 
     return organization;
+  }
+
+  /**
+   * Kullanıcının bu şirketin anasayfası için kaydettiği bölüm sırası. Okunamazsa
+   * (ör. migration 167 uygulanmadan) sayfa DÜŞMEZ, boş döner: arayüz varsayılan
+   * sıraya ya da cihazdaki kopyaya geçer.
+   */
+  private async anasayfaSirasiniOku(organizationId: string, userId: string): Promise<string[] | undefined> {
+    const { data, error } = await this.supabase.client
+      .from("sirket_anasayfa_sirasi")
+      .select("bolumler")
+      .eq("organization_id", organizationId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error || !data) return undefined;
+    return anasayfaSirasiniCoz(data.bolumler);
+  }
+
+  /** Anasayfa bölüm sırasını kaydeder — görebilen herkes kendi sırasını dizer. */
+  async anasayfaSirasiniKaydet(organizationId: string, userId: string, bolumler: unknown): Promise<{ bolumler: string[] }> {
+    const access = await this.access.organizationAccess(organizationId, userId);
+    if (!access.canView) throw new ForbiddenException("Bu organizasyonu görüntüleme yetkiniz yok");
+    const sira = anasayfaSirasiniCoz(bolumler);
+    const { error } = await this.supabase.client
+      .from("sirket_anasayfa_sirasi")
+      .upsert(
+        { user_id: userId, organization_id: organizationId, bolumler: sira, updated_at: new Date().toISOString() },
+        { onConflict: "user_id,organization_id" }
+      );
+    if (error) throw error;
+    return { bolumler: sira };
   }
 
   async create(ownerId: string, data: Partial<Organization>): Promise<Organization> {

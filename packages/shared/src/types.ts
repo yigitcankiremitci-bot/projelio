@@ -302,6 +302,10 @@ export interface Organization {
   viewerAccess?: OrganizationAccess;
   // Sahibinin kapattığı sekmeler (bkz. hiddenTabs açıklaması / TabScope).
   hiddenTabs?: string[];
+  // Sunucu tarafında eklenir: İSTEYEN kullanıcının anasayfa bölüm sırası
+  // (bkz. anasayfaSirasi.ts). Kişiseldir — başkasının sırasını etkilemez.
+  // Hiç kaydetmemişse boş: arayüz varsayılan sırayı kullanır.
+  viewerHomeSections?: string[];
 }
 
 // ============================================================ Departmanlar / Kadro

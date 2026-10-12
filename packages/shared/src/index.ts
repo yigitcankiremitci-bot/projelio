@@ -29,3 +29,4 @@ export * from "./rakip";
 export * from "./kartvizit";
 export * from "./kartvizitLogo";
 export * from "./projeTakvimi";
+export * from "./anasayfaSirasi";

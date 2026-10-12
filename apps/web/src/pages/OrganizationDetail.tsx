@@ -35,7 +35,8 @@ import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import { bicimDili } from "../lib/i18n/depo";
 import ReorderButtons from "../components/ReorderButtons";
-import { AnasayfaBolumu, bolumuTasi, getAnasayfaSirasi, setAnasayfaSirasi } from "../lib/anasayfaSirasi";
+import { anasayfaSirasiniCoz, bolumuTasi, type AnasayfaBolumu } from "@projelio/shared";
+import { getAnasayfaSirasi, setAnasayfaSirasi } from "../lib/anasayfaSirasi";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
 // ayrı şeyler ve akışın altına görev listesi asmak ikisini karıştırıyordu.
@@ -125,16 +126,28 @@ export default function OrganizationDetail() {
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   const ekipRef = useRef<SirketEkibiPanelHandle>(null);
   const [addingFile, setAddingFile] = useState(false);
-  // Anasayfa bölümlerinin kullanıcının dizdiği sırası (bkz. lib/anasayfaSirasi).
+  // Anasayfa bölümlerinin kullanıcının dizdiği sırası. Asıl kayıt hesapta
+  // (viewerHomeSections, cihazlar arası); cihaz kopyası ilk boyamayı ve
+  // sunucu kaydı olmayan durumu karşılar (bkz. lib/anasayfaSirasi).
   const [bolumSirasi, setBolumSirasi] = useState<AnasayfaBolumu[]>(() => getAnasayfaSirasi(id ?? ""));
   useEffect(() => {
     if (id) setBolumSirasi(getAnasayfaSirasi(id));
   }, [id]);
+  const hesaptakiSira = organization?.id === id ? organization?.viewerHomeSections : undefined;
+  useEffect(() => {
+    if (!id || !hesaptakiSira) return;
+    const sira = anasayfaSirasiniCoz(hesaptakiSira);
+    setBolumSirasi(sira);
+    setAnasayfaSirasi(id, sira);
+  }, [id, hesaptakiSira?.join(",")]);
   const bolumuKaydir = (bolum: AnasayfaBolumu, yon: -1 | 1) => {
     if (!id) return;
     const yeni = bolumuTasi(bolumSirasi, bolum, yon);
     setBolumSirasi(yeni);
     setAnasayfaSirasi(id, yeni);
+    // Kaydedilemezse (çevrimdışı, migration yok) sıra bu cihazda yine geçerli;
+    // bir görünüm tercihi için hata göstermeye değmez.
+    api.patch(`/organizations/${id}/home-sections`, { bolumler: yeni }).catch(() => {});
   };
   const siralamaOklari = (bolum: AnasayfaBolumu): ReactNode => {
     const i = bolumSirasi.indexOf(bolum);

@@ -54,6 +54,13 @@ export class OrganizationsController {
     return this.organizationsService.reorder(req.user.userId, ids);
   }
 
+  // Kullanıcının kendi anasayfa bölüm sırası (cihazlar arası taşınsın diye
+  // hesapta; bkz. migration 167).
+  @Patch(":id/home-sections")
+  anasayfaSirasi(@Param("id") id: string, @Body("bolumler") bolumler: unknown, @Req() req: any) {
+    return this.organizationsService.anasayfaSirasiniKaydet(id, req.user.userId, bolumler);
+  }
+
   @Patch(":id")
   update(@Param("id") id: string, @Body() body: any, @Req() req: any) {
     return this.organizationsService.update(id, body, req.user.userId);

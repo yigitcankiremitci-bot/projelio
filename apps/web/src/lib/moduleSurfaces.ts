@@ -1,4 +1,5 @@
-import { isEntityModule } from "./entityModules";
+import { isEntityModule, isUrunlerModule } from "./entityModules";
+import { isCekirdekModul } from "./cekirdekModuller";
 import { isFormModule } from "./moduleForms";
 import { MODULE_RECORD_CONFIGS } from "./moduleConfigs";
 import { isPanelModule } from "./panelConfigs";
@@ -26,6 +27,7 @@ export type ModuleArchetype =
   | "a5_plan"
   | "a6_panel"
   | "entity"
+  | "cekirdek"
   | "unknown";
 
 /**
@@ -86,7 +88,8 @@ export function moduleArchetype(moduleKey: string): ModuleArchetype {
   if (A5_PLAN_KEYS.has(moduleKey)) return "a5_plan";
   if (OZEL_MOTOR_KEYS.has(moduleKey)) return "a2_records";
   if (isPanelModule(moduleKey)) return "a6_panel";
-  if (isEntityModule(moduleKey)) return "entity";
+  if (isEntityModule(moduleKey) || isUrunlerModule(moduleKey)) return "entity";
+  if (isCekirdekModul(moduleKey)) return "cekirdek";
   if (MODULE_RECORD_CONFIGS[moduleKey]) return "a2_records";
   return "unknown";
 }
@@ -98,7 +101,10 @@ const ARCHETYPE_SURFACE: Record<ModuleArchetype, ModuleSurface> = {
   a4_pipeline: "page", // kanban yatayda yer ister
   a5_plan: "page", // ay ızgarası modala sığmaz
   a6_panel: "page", // kart ızgarası + kırılım
-  entity: "page", // müşteri listesi
+  entity: "page", // müşteri / ürün listesi
+  // Modül sayfası açılır açılmaz kapsamın ilgili sekmesine yönlendirir (bkz.
+  // ModuleSurface). Modal olsaydı yönlendirme açık bir pencerenin arkasında kalırdı.
+  cekirdek: "page",
   // Tanımı olmayan modül bugün zaten açılmıyor; açılırsa en ucuz yüzey doğrusu.
   unknown: "modal",
 };

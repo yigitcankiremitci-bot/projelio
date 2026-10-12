@@ -1,7 +1,11 @@
 import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import type { ModuleAccess } from "@projelio/shared";
 import { modulKullanildi } from "../lib/sonKullanilanModul";
-import { isEntityModule, isOpenableModule } from "../lib/entityModules";
+import { isEntityModule, isOpenableModule, isUrunlerModule } from "../lib/entityModules";
+import { cekirdekModulAdresi, isCekirdekModul } from "../lib/cekirdekModuller";
+import { useT } from "../lib/i18n";
+import { useThemeColors } from "../theme/useThemeColors";
 import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { getModuleRecordConfig } from "../lib/moduleRecordConfigs";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleConfigs";
@@ -11,6 +15,7 @@ import { isSocialMediaModule } from "../lib/socialMedia";
 import { isHesaplarModule } from "../lib/hesaplar";
 import { isEkipHesaplariModule } from "../lib/ekipHesaplari";
 import CustomersPanel from "./CustomersPanel";
+import ProductsPanel from "./ProductsPanel";
 import EmailModulePanel from "./EmailModulePanel";
 import ModuleFormPanel from "./ModuleFormPanel";
 import ModulePanelView from "./ModulePanelView";
@@ -85,8 +90,21 @@ function ModuleSurfaceContent({
   // Yetki verilmediğinde yazma varsayılır: sunucu her hâlükârda kendi kontrolünü
   // yapar, buradaki yalnızca arayüz kolaylığı (bkz. ModuleRecordsPanel).
   const canWrite = access?.canWrite ?? true;
+  const t = useT();
   // Serbest çalışanda ayrı bir onay makamı yok: işin sahibi hem yazar hem onaylar.
   const canApprove = jobId ? true : access?.canManageTeam ?? false;
+
+  if (isCekirdekModul(moduleKey)) {
+    // Çekirdek modülün kendi paneli yok: verisi kapsamın sekmesinde. replace,
+    // yoksa geri düğmesi bu ara sayfaya dönüp kullanıcıyı tekrar sekmeye atardı.
+    const adres = cekirdekModulAdresi(moduleKey, { departmentId, jobId });
+    return adres ? <Navigate to={adres} replace /> : <Bilgi metin={t("Bu modül işin ya da departmanın kendi sekmesinde açılır.")} />;
+  }
+
+  if (isUrunlerModule(moduleKey)) {
+    if (!organizationId) return <Bilgi metin={t("Ürünler şirket kapsamında tutulur.")} />;
+    return <ProductsPanel organizationId={organizationId} departmentId={departmentId} layout="grid" />;
+  }
 
   const formConfig = MODULE_FORM_CONFIGS[moduleKey];
   if (formConfig) {
@@ -201,6 +219,11 @@ function ModuleSurfaceContent({
       canWrite={canWrite}
     />
   );
+}
+
+function Bilgi({ metin }: { metin: string }) {
+  const c = useThemeColors();
+  return <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{metin}</p>;
 }
 
 /** Modül tıklanınca bir şey açılıyor mu. */

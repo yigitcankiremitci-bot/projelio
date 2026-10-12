@@ -1186,4 +1186,7 @@ export const moduller: TranslationDict = {
   "Bu sekmede müşteri yok; {n} kart Potansiyel sekmesinde. Anlaşması yapılmış olanları oradan müşteriye dönüştürebilirsin.":
     "No customers in this tab; {n} cards are in the Prospects tab. You can convert the ones you've closed a deal with from there.",
   "Potansiyel sekmesine geç": "Go to Prospects",
+  // Çekirdek modüller ve Ürünler modülü (ModuleSurface)
+  "Bu modül işin ya da departmanın kendi sekmesinde açılır.": "This module opens in the job's or department's own tab.",
+  "Ürünler şirket kapsamında tutulur.": "Products are kept at the company level.",
 };

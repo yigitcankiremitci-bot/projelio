@@ -68,7 +68,10 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     }
     // Sayfa yüzeyli modül kendi sayfasında açılır; modal yüzeyli olan burada.
     if (moduleSurface(requested) === "modal") setModalKey(requested);
-    else navigate(`/departments/${departmentId}/modules/${encodeURIComponent(requested)}`);
+    // replace: bu sekme yalnızca bir aktarma durağı. Yeni kayıt açılsaydı modül
+    // sayfasının geri düğmesi kullanıcıyı geldiği yere (anasayfa) değil, hiç
+    // görmediği departman Modüller sekmesine götürürdü.
+    else navigate(`/departments/${departmentId}/modules/${encodeURIComponent(requested)}`, { replace: true });
   }, [searchParams, setSearchParams, departmentId, navigate]);
 
   const load = () => {

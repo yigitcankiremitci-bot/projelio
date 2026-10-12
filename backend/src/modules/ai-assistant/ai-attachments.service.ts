@@ -19,6 +19,7 @@ import {
   type SheetData,
 } from "./ai-sheet-import";
 import { hataMetni } from "../../common/i18n/index";
+import { xlsxYukle } from "../../common/excel/xlsx-yukle";
 
 /** Lio'nun okuyabildiği ek türleri. */
 export type AttachmentKind = "image" | "pdf" | "document" | "sheet" | "text" | "audio";
@@ -591,9 +592,10 @@ export class AiAttachmentsService {
       };
     }
 
-    const workbook = new ExcelJS.Workbook();
+    let workbook: ExcelJS.Workbook;
     try {
-      await workbook.xlsx.load(buffer as any);
+      // Önekli ad alanıyla yazılmış (ERP/.NET çıktısı) dosyaları da açar.
+      workbook = await xlsxYukle(buffer);
     } catch (error) {
       // ExcelJS her xlsx'i açamıyor. Açamadığında da düzgün bir hata atmıyor:
       // `xl/workbook.xml`'i ayrıştıramadığında geriye `undefined` dönüyor ve

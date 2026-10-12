@@ -25,6 +25,7 @@ import {
   type SheetData,
 } from "../ai-assistant/ai-sheet-import";
 import { normalizeEmail, normalizeName, normalizeTaxNumber } from "./party-dedup";
+import { xlsxYukle } from "../../common/excel/xlsx-yukle";
 
 // Derlenmiş sunucu (CommonJS) paketi doğrudan veriyor; Node'un test koşucusu
 // ise ESM olarak yüklüyor ve CommonJS paketi `default` altına koyuyor. İkisinde
@@ -586,9 +587,9 @@ export async function tabloyuOku(buffer: Buffer, dosyaAdi: string): Promise<Shee
   if (ad.endsWith(".xls")) {
     throw new BadRequestException("Eski Excel biçimi (.xls) okunamıyor. Dosyayı .xlsx olarak kaydedip tekrar yükleyin.");
   }
-  const wb = new Workbook();
+  let wb: ExcelJS.Workbook;
   try {
-    await wb.xlsx.load(buffer as any);
+    wb = await xlsxYukle(buffer);
   } catch {
     // ExcelJS bozuk dosyada anlamsız bir TypeError atıyor (bkz. ai-attachments).
     throw new BadRequestException("Dosya Excel (.xlsx) olarak açılamadı. Excel'de açıp yeniden kaydedip deneyin.");

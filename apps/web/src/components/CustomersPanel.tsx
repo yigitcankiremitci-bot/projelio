@@ -51,6 +51,7 @@ import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
 import { timeAgo } from "../lib/dates";
+import { useIsWide } from "../lib/useIsDesktop";
 import { listeCercevesi, listeSatiri } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { partyApi } from "../api/party";
@@ -243,6 +244,8 @@ export default function CustomersPanel({
   const baglantiModu = moduleKey === BAGLANTI_MODUL_KEY;
   const profile = baglantiModu ? BAGLANTI_PROFILE : profileFor(departmentKey);
   const rolSecenekleri = baglantiModu ? BAGLANTI_ROLES : ALL_ROLES;
+  // Geniş ekranda özet kutuları ve sıralama sağdaki dar sütuna geçer (bkz. yanSutun).
+  const genisEkran = useIsWide();
 
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1189,8 +1192,63 @@ export default function CustomersPanel({
         </div>
   ) : null;
 
+  // Özet kutuları ve sıralama: geniş ekranda sağdaki dar sütunda (modül
+  // sayfasında Lio simgesinin hemen altı), dar ekranda listenin üstünde.
+  // Üstte bir satır kaplıyorlardı ve listeyi aşağı itiyorlardı (kullanıcı
+  // geri bildirimi, 2026-10-12).
+  const yanSutun = genisEkran && !loading && parties.length > 0;
+  const ozetKutulari = (dikey: boolean) => (
+    <div style={{ display: "flex", flexDirection: dikey ? "column" : "row", flexWrap: dikey ? "nowrap" : "wrap", gap: 8 }}>
+      {stats.map((s) => (
+        <div
+          key={s.label}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            padding: "6px 12px",
+            borderRadius: 8,
+            background: c.background,
+            border: `1px solid ${c.border}`,
+            minWidth: 84,
+          }}
+        >
+          <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
+          <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+  const siralamaSecici = (dikey: boolean) => (
+    <label
+      style={{
+        marginLeft: dikey ? 0 : "auto",
+        display: "inline-flex",
+        flexDirection: dikey ? "column" : "row",
+        alignItems: dikey ? "stretch" : "center",
+        gap: dikey ? 4 : 6,
+        fontSize: 12,
+        color: c.textSecondary,
+      }}
+    >
+      {t("Sırala:")}
+      <select
+        value={siralama}
+        onChange={(e) => siralamaSec(e.target.value as Siralama)}
+        style={{ fontSize: 12, padding: "3px 6px" }}
+      >
+        {siralamaSecenekleri.map((s) => (
+          <option key={s} value={s}>
+            {t(SIRALAMA_ETIKETI[s])}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
         {/* Panelin kendi başlığı yok: modül sayfasının başlığı ya da şirket
             sekmesinin adı zaten modülün adı — iki kez yazıyordu. */}
@@ -1289,28 +1347,7 @@ export default function CustomersPanel({
         />
       )}
 
-      {!loading && parties.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {stats.map((s) => (
-            <div
-              key={s.label}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 2,
-                padding: "6px 12px",
-                borderRadius: 8,
-                background: c.background,
-                border: `1px solid ${c.border}`,
-                minWidth: 84,
-              }}
-            >
-              <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
-              <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {!yanSutun && !loading && parties.length > 0 && ozetKutulari(false)}
 
       {showToolbar && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
@@ -1436,22 +1473,7 @@ export default function CustomersPanel({
                 {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
               </span>
             )}
-            {visible.length > 1 && (
-              <label style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary }}>
-                {t("Sırala:")}
-                <select
-                  value={siralama}
-                  onChange={(e) => siralamaSec(e.target.value as Siralama)}
-                  style={{ fontSize: 12, padding: "3px 6px" }}
-                >
-                  {siralamaSecenekleri.map((s) => (
-                    <option key={s} value={s}>
-                      {t(SIRALAMA_ETIKETI[s])}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            {!yanSutun && visible.length > 1 && siralamaSecici(false)}
           </div>
           {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
               sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
@@ -1628,6 +1650,24 @@ export default function CustomersPanel({
       )}
       </>
       )}
+    </div>
+    {yanSutun && (
+      <aside
+        style={{
+          width: 150,
+          flexShrink: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          // Uzun listede kaydırırken de özet ve sıralama elde kalsın.
+          position: "sticky",
+          top: 72,
+        }}
+      >
+        {ozetKutulari(true)}
+        {sekmeKartlari.length > 1 && siralamaSecici(true)}
+      </aside>
+    )}
     </div>
   );
 }

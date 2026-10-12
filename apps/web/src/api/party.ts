@@ -1,4 +1,5 @@
 import type {
+  BaglantiListeKaydi,
   BaglantiListesi,
   MusteriListesi,
   MusteriSiparisi,
@@ -48,6 +49,16 @@ export const partyApi = {
     api.get<MusteriListesi>(
       `${scopePath}/musterilerim${departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ""}`
     ),
+
+  /** Bağlantı listeleri (migration 163): oynatma listesi gibi, kart birden çok listede olabilir. */
+  listeAc: (kapsamYolu: string, ad: string, partyIdler: string[] = []) =>
+    api.post<BaglantiListeKaydi>(`${kapsamYolu}/baglanti-listeleri`, { ad, partyIdler }),
+  listeAdlandir: (listeId: string, ad: string) => api.patch(`/baglanti-listeleri/${listeId}`, { ad }),
+  listeSil: (listeId: string) => api.delete(`/baglanti-listeleri/${listeId}`),
+  listeyeEkle: (listeId: string, partyIdler: string[]) =>
+    api.post<{ eklenen: number }>(`/baglanti-listeleri/${listeId}/uyeler`, { partyIdler }),
+  listedenCikar: (listeId: string, partyIdler: string[]) =>
+    api.post(`/baglanti-listeleri/${listeId}/uyeler/cikar`, { partyIdler }),
 
   /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
   deftereEkle: (partyId: string, modul: string) => api.post<Party>(`/party/${partyId}/defter`, { modul }),

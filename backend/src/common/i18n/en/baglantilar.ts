@@ -53,4 +53,10 @@ export const baglantilar: TranslationDict = {
   "Bu kayıt otomatik oluşturuldu, değiştirilemez": "This entry was created automatically and can't be changed",
   "Yalnızca kendi notunu değiştirebilirsin": "You can only change your own notes",
   "Tedarik modülü burada açık değil": "The Procurement module isn't enabled here",
+  // Bağlantı listeleri (migration 163)
+  "Bağlantı listelerini değiştirme yetkin yok": "You don't have permission to change contact lists",
+  "Bir seferde en çok 2000 kart eklenebilir": "At most 2000 cards can be added at once",
+  "Bu adla bir liste zaten var": "A list with this name already exists",
+  "Liste adı gerekli": "List name is required",
+  "Liste bulunamadı": "List not found",
 };

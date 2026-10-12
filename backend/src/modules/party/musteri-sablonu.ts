@@ -873,20 +873,26 @@ export function planMusteriImport(
 export function mevcutlariAyikla(
   planlanan: PlanlananMusteri[],
   mevcut: Pick<Party, "id" | "displayName" | "taxNumber" | "email" | "archivedAt">[]
-): { yeni: PlanlananMusteri[]; zatenVar: { satir: number; ad: string; mevcutKart: string; neden: string }[] } {
-  const vergi = new Map<string, string>();
-  const eposta = new Map<string, string>();
-  const ad = new Map<string, string>();
-  const ekle = (p: { displayName: string; taxNumber?: string; email?: string }, etiket: string) => {
-    if (p.taxNumber && normalizeTaxNumber(p.taxNumber)) vergi.set(normalizeTaxNumber(p.taxNumber), etiket);
-    if (p.email) eposta.set(normalizeEmail(p.email), etiket);
+): {
+  yeni: PlanlananMusteri[];
+  zatenVar: { satir: number; ad: string; mevcutKart: string; neden: string; mevcutId?: string }[];
+} {
+  // Eşleşmenin kimliği de tutulur: içe aktarma bir bağlantı listesine
+  // yapılıyorsa zaten kayıtlı kart da o listeye eklenir (kopya açılmadan).
+  type Eslesme = { etiket: string; id?: string };
+  const vergi = new Map<string, Eslesme>();
+  const eposta = new Map<string, Eslesme>();
+  const ad = new Map<string, Eslesme>();
+  const ekle = (p: { displayName: string; taxNumber?: string; email?: string }, e: Eslesme) => {
+    if (p.taxNumber && normalizeTaxNumber(p.taxNumber)) vergi.set(normalizeTaxNumber(p.taxNumber), e);
+    if (p.email) eposta.set(normalizeEmail(p.email), e);
     const n = normalizeName(p.displayName);
-    if (n) ad.set(n, etiket);
+    if (n) ad.set(n, e);
   };
-  for (const m of mevcut) ekle(m, m.archivedAt ? `${m.displayName} (arşivde)` : m.displayName);
+  for (const m of mevcut) ekle(m, { etiket: m.archivedAt ? `${m.displayName} (arşivde)` : m.displayName, id: m.archivedAt ? undefined : m.id });
 
   const yeni: PlanlananMusteri[] = [];
-  const zatenVar: { satir: number; ad: string; mevcutKart: string; neden: string }[] = [];
+  const zatenVar: { satir: number; ad: string; mevcutKart: string; neden: string; mevcutId?: string }[] = [];
   for (const p of planlanan) {
     const v = p.party.taxNumber ? vergi.get(normalizeTaxNumber(p.party.taxNumber)) : undefined;
     const e = p.party.email ? eposta.get(normalizeEmail(p.party.email)) : undefined;
@@ -896,14 +902,15 @@ export function mevcutlariAyikla(
       zatenVar.push({
         satir: p.satir,
         ad: p.party.displayName,
-        mevcutKart: eslesen,
+        mevcutKart: eslesen.etiket,
         neden: v ? "aynı vergi no" : e ? "aynı e-posta" : "aynı ad",
+        ...(eslesen.id ? { mevcutId: eslesen.id } : {}),
       });
       continue;
     }
     yeni.push(p);
     // Dosyanın kendi içindeki tekrarı da yakalansın: ilk geçen kazanır.
-    ekle(p.party, `${p.party.displayName} (dosyada ${p.satir}. satır)`);
+    ekle(p.party, { etiket: `${p.party.displayName} (dosyada ${p.satir}. satır)` });
   }
   return { yeni, zatenVar };
 }

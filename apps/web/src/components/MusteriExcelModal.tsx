@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { BAGLANTI_MODUL_KEY, type MusteriIceAktarmaSonucu } from "@projelio/shared";
+import { BAGLANTI_MODUL_KEY, type BaglantiListeKaydi, type MusteriIceAktarmaSonucu } from "@projelio/shared";
 import { api } from "../api/client";
 import { partyApi } from "../api/party";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -14,9 +14,15 @@ interface Props {
   /** Bağlantı ve İlişkiler defterine yükler: ayrı şablon (önem, tanışma yeri…), kartlar müşteri listesine girmez. */
   baglanti?: boolean;
   onClose: () => void;
-  /** Kartlar açıldıktan sonra liste tazelensin. */
-  onDone: () => void;
+  /** Kartlar açıldıktan sonra liste tazelensin; bağlantı listesine aktarıldıysa listenin kimliği gelir. */
+  onDone: (listeId?: string) => void;
+  /** Yalnızca Bağlantılar: mevcut bağlantı listeleri ve o an açık olan liste (varsayılan hedef). */
+  listeler?: BaglantiListeKaydi[];
+  acikListeId?: string;
 }
+
+/** Yeni liste seçeneğinin değeri (liste kimlikleri UUID, çakışmaz). */
+const YENI_LISTE = "__yeni";
 
 /**
  * Excel ile toplu müşteri ekleme: şablonu indir → doldur → aynı pencereden yükle.
@@ -27,7 +33,15 @@ interface Props {
  * Dosya iki kez gönderiliyor çünkü sunucu iki istek arasında durum tutmuyor
  * (bkz. PartyController.iceAktar).
  */
-export default function MusteriExcelModal({ scopePath, departmentId, baglanti = false, onClose, onDone }: Props) {
+export default function MusteriExcelModal({
+  scopePath,
+  departmentId,
+  baglanti = false,
+  onClose,
+  onDone,
+  listeler = [],
+  acikListeId,
+}: Props) {
   const c = useThemeColors();
   const t = useT();
   const girdi = useRef<HTMLInputElement>(null);
@@ -37,6 +51,11 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
   const [hata, setHata] = useState("");
   const [surukleniyor, setSurukleniyor] = useState(false);
   const [zatenAcik, setZatenAcik] = useState(false);
+  // Bağlantılar: yüklenen liste hangi bağlantı listesine girsin. Varsayılan
+  // açık sekme; o yoksa dosyanın adıyla YENİ bir liste — Excel'le gelen liste
+  // mevcut bağlantılara karışmasın (kullanıcı isteği, 2026-10-12).
+  const [listeSecimi, setListeSecimi] = useState<string>(acikListeId ?? YENI_LISTE);
+  const [yeniListeAdi, setYeniListeAdi] = useState("");
 
   const gonder = async (f: File, onizleme: boolean) => {
     setCalisiyor(true);
@@ -47,9 +66,14 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
       const q = new URLSearchParams({ onizleme: onizleme ? "1" : "0" });
       if (departmentId) q.set("departmentId", departmentId);
       if (baglanti) q.set("modul", BAGLANTI_MODUL_KEY);
+      if (baglanti && !onizleme) {
+        if (listeSecimi === YENI_LISTE) {
+          if (yeniListeAdi.trim()) q.set("yeniListe", yeniListeAdi.trim());
+        } else if (listeSecimi) q.set("listeId", listeSecimi);
+      }
       const r = await api.uploadFile<MusteriIceAktarmaSonucu>(`${scopePath}/import?${q}`, fd);
       setSonuc(r);
-      if (!onizleme) onDone();
+      if (!onizleme) onDone(r.liste?.id);
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Dosya okunamadı."));
       if (onizleme) setSonuc(null);
@@ -62,6 +86,8 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
     if (!f) return;
     setDosya(f);
     setZatenAcik(false);
+    // Yeni listenin adı dosyanın adı: "Firdevs bağlantılar.xlsx" → "Firdevs bağlantılar".
+    if (!yeniListeAdi.trim()) setYeniListeAdi(f.name.replace(/\.[^.]+$/, "").slice(0, 80));
     void gonder(f, true);
   };
 
@@ -74,6 +100,10 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
   };
 
   const bitti = sonuc && !sonuc.onizleme;
+  const listeyeGidecek = baglanti && (listeSecimi === YENI_LISTE ? !!yeniListeAdi.trim() : !!listeSecimi);
+  // Yeni kart yoksa bile zaten kayıtlı olanlar seçilen listeye eklenebilir.
+  const listeyeEklenecekMevcut = listeyeGidecek ? (sonuc?.zatenKayitli.filter((z) => z.mevcutId).length ?? 0) : 0;
+  const uygulanabilir = !!sonuc && (sonuc.acilacak > 0 || listeyeEklenecekMevcut > 0);
   const adim = (n: number, baslik: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
       <span
@@ -211,6 +241,11 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
                 {baglanti
                   ? t("{n} bağlantı kartı açıldı.", { n: sonuc.acilan ?? 0 })
                   : t("{n} müşteri kartı açıldı.", { n: sonuc.acilan ?? 0 })}
+                {sonuc.liste && (
+                  <div style={{ fontSize: 13, fontWeight: 400, color: c.textPrimary, marginTop: 2 }}>
+                    {t("\"{liste}\" listesinde {n} bağlantı var.", { liste: sonuc.liste.ad, n: sonuc.liste.eklenen })}
+                  </div>
+                )}
               </div>
             ) : (
               <div style={{ fontSize: 15, fontWeight: 500 }}>
@@ -237,7 +272,10 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
                   onClick={() => setZatenAcik((v) => !v)}
                   style={{ padding: 0, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", fontSize: 13 }}
                 >
-                  {t("{n} tanesi zaten kayıtlı, atlanacak", { n: sonuc.zatenKayitli.length })} {zatenAcik ? "▾" : "▸"}
+                  {listeyeGidecek
+                    ? t("{n} tanesi zaten kayıtlı; yeni kart açılmaz, mevcut kart listeye eklenir", { n: sonuc.zatenKayitli.length })
+                    : t("{n} tanesi zaten kayıtlı, atlanacak", { n: sonuc.zatenKayitli.length })}{" "}
+                  {zatenAcik ? "▾" : "▸"}
                 </button>
                 {zatenAcik &&
                   satirListesi(
@@ -279,6 +317,34 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
           </div>
         )}
 
+        {baglanti && sonuc && !bitti && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: c.textPrimary }}>
+            <span style={{ fontWeight: 500 }}>{t("Hangi bağlantı listesine eklensin?")}</span>
+            <select
+              value={listeSecimi}
+              onChange={(e) => setListeSecimi(e.target.value)}
+              style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+            >
+              <option value={YENI_LISTE}>{t("+ Yeni liste")}</option>
+              {listeler.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.ad} ({l.sayi})
+                </option>
+              ))}
+              <option value="">{t("Listeye ekleme (yalnızca Tümü'nde görünür)")}</option>
+            </select>
+            {listeSecimi === YENI_LISTE && (
+              <input
+                value={yeniListeAdi}
+                onChange={(e) => setYeniListeAdi(e.target.value)}
+                maxLength={80}
+                placeholder={t("Liste adı, ör. Firdevs — Ekim bağlantıları")}
+                style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+              />
+            )}
+          </div>
+        )}
+
         {bitti ? (
           <button
             data-primary
@@ -290,7 +356,7 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
         ) : (
           <button
             data-primary
-            disabled={!dosya || !sonuc || sonuc.acilacak === 0 || calisiyor}
+            disabled={!dosya || !uygulanabilir || calisiyor}
             onClick={() => dosya && gonder(dosya, false)}
             style={{
               background: c.primary,
@@ -300,10 +366,12 @@ export default function MusteriExcelModal({ scopePath, departmentId, baglanti = 
               border: "none",
               fontSize: 16,
               fontWeight: 500,
-              opacity: !dosya || !sonuc || sonuc.acilacak === 0 ? 0.5 : 1,
+              opacity: !dosya || !uygulanabilir ? 0.5 : 1,
             }}
           >
-            {sonuc && sonuc.acilacak > 0
+            {sonuc && sonuc.acilacak === 0 && listeyeEklenecekMevcut > 0
+              ? t("{n} kayıtlı bağlantıyı listeye ekle", { n: listeyeEklenecekMevcut })
+              : sonuc && sonuc.acilacak > 0
               ? baglanti
                 ? t("{n} bağlantıyı ekle", { n: sonuc.acilacak })
                 : t("{n} müşteriyi ekle", { n: sonuc.acilacak })

@@ -20,6 +20,7 @@ import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guar
 import type { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
+import { BaglantiListeleriService } from "./baglanti-listeleri.service";
 import { PartyService } from "./party.service";
 import { musteriSablonuOlustur, musteriSayfasiniSec, sablonDosyaAdi, tabloyuOku } from "./musteri-sablonu";
 import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY, type PartyModulKey } from "@projelio/shared";
@@ -47,7 +48,8 @@ export class PartyController {
   constructor(
     private partyService: PartyService,
     private access: AccessService,
-    private siparisService: SiparisService
+    private siparisService: SiparisService,
+    private listeler: BaglantiListeleriService
   ) {}
 
   // ============================================================ Excel şablonu
@@ -92,12 +94,14 @@ export class PartyController {
     @Query("onizleme") onizleme: string | undefined,
     @Query("departmentId") departmentId: string | undefined,
     @Query("modul") modul: string | undefined,
+    @Query("listeId") listeId: string | undefined,
+    @Query("yeniListe") yeniListe: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, defter(modul), file);
+    return this.iceAktar({ organizationId, departmentId }, onizleme, req.user.userId, defter(modul), file, { listeId, yeniListe });
   }
 
   @Post("jobs/:jobId/party/import")
@@ -107,12 +111,14 @@ export class PartyController {
     @Param("jobId") jobId: string,
     @Query("onizleme") onizleme: string | undefined,
     @Query("modul") modul: string | undefined,
+    @Query("listeId") listeId: string | undefined,
+    @Query("yeniListe") yeniListe: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.iceAktar({ jobId }, onizleme, req.user.userId, defter(modul), file);
+    return this.iceAktar({ jobId }, onizleme, req.user.userId, defter(modul), file, { listeId, yeniListe });
   }
 
   private async iceAktar(
@@ -120,13 +126,30 @@ export class PartyController {
     onizleme: string | undefined,
     userId: string,
     modul: PartyModulKey,
-    file?: Express.Multer.File
+    file?: Express.Multer.File,
+    hedefListe: { listeId?: string; yeniListe?: string } = {}
   ) {
     if (!file) throw new BadRequestException("Dosya bulunamadı");
     // multer dosya adını latin1 okuyor; "Müşteriler.xlsx" bozuk gelmesin.
     const ad = Buffer.from(file.originalname, "latin1").toString("utf8");
     const sayfa = musteriSayfasiniSec(await tabloyuOku(file.buffer, ad));
-    return this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: onizleme !== "0", modul });
+    const uygula = onizleme === "0";
+    // Bağlantı listesi yalnızca Bağlantılar defterinde ve uygulama adımında:
+    // önizleme hiçbir şey yazmaz, liste de açmaz.
+    const listeIstegi = modul === BAGLANTI_MODUL_KEY && (hedefListe.listeId || hedefListe.yeniListe?.trim());
+    const liste =
+      uygula && listeIstegi
+        ? hedefListe.listeId
+          ? await this.listeler.kapsamdakiListe(scope, hedefListe.listeId, userId)
+          : await this.listeler.adlaBulVeyaAc(scope, hedefListe.yeniListe, userId)
+        : undefined;
+    const sonuc = await this.partyService.sablondanIceAktar(scope, sayfa, userId, { onizleme: !uygula, modul });
+    if (!liste) return sonuc;
+    // Yeni açılanlar + dosyada olup sistemde zaten kayıtlı olanlar: ikisi de
+    // bu listenin parçası (kopya kart açılmadan listeye girer).
+    const idler = [...(sonuc.acilanIdler ?? []), ...sonuc.zatenKayitli.map((z) => z.mevcutId).filter((x): x is string => !!x)];
+    const eklenen = await this.listeler.uyeEkleKapsamda(liste.id, scope, idler, userId);
+    return { ...sonuc, liste: { id: liste.id, ad: liste.ad, eklenen } };
   }
 
   // ============================================================ Organizasyon
@@ -175,7 +198,8 @@ export class PartyController {
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.baglantilarim({ organizationId, departmentId }, req.user.userId);
+    const yanit = await this.partyService.baglantilarim({ organizationId, departmentId }, req.user.userId);
+    return this.listeler.yanitaEkle(yanit, { organizationId });
   }
 
   /** Tahsilat görünümü ve yönetici raporu: kapsamdaki siparişler. */
@@ -241,7 +265,66 @@ export class PartyController {
   async baglantilarJob(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.baglantilarim({ jobId }, req.user.userId);
+    const yanit = await this.partyService.baglantilarim({ jobId }, req.user.userId);
+    return this.listeler.yanitaEkle(yanit, { jobId });
+  }
+
+  // ============================================================ Bağlantı listeleri (migration 163)
+
+  @Get("organizations/:organizationId/baglanti-listeleri")
+  async listelerOrg(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.listeler.listele({ organizationId }, req.user.userId);
+  }
+
+  @Post("organizations/:organizationId/baglanti-listeleri")
+  async listeAcOrg(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { ad?: string; partyIdler?: string[] },
+    @Req() req: any
+  ) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.listeler.olustur({ organizationId }, body.ad, req.user.userId, body.partyIdler);
+  }
+
+  @Get("jobs/:jobId/baglanti-listeleri")
+  async listelerJob(@Param("jobId") jobId: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.listeler.listele({ jobId }, req.user.userId);
+  }
+
+  @Post("jobs/:jobId/baglanti-listeleri")
+  async listeAcJob(@Param("jobId") jobId: string, @Body() body: { ad?: string; partyIdler?: string[] }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.listeler.olustur({ jobId }, body.ad, req.user.userId, body.partyIdler);
+  }
+
+  @Patch("baglanti-listeleri/:listeId")
+  async listeAdlandir(@Param("listeId") listeId: string, @Body() body: { ad?: string }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.listeler.yenidenAdlandir(listeId, body.ad, req.user.userId);
+    return { ok: true };
+  }
+
+  /** Listeyi siler; kartlar Bağlantılar'da kalır. */
+  @Delete("baglanti-listeleri/:listeId")
+  async listeSil(@Param("listeId") listeId: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.listeler.sil(listeId, req.user.userId);
+    return { ok: true };
+  }
+
+  @Post("baglanti-listeleri/:listeId/uyeler")
+  async listeyeEkle(@Param("listeId") listeId: string, @Body() body: { partyIdler?: string[] }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.listeler.uyeEkle(listeId, body.partyIdler, req.user.userId);
+  }
+
+  @Post("baglanti-listeleri/:listeId/uyeler/cikar")
+  async listedenCikar(@Param("listeId") listeId: string, @Body() body: { partyIdler?: string[] }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.listeler.uyeCikar(listeId, body.partyIdler, req.user.userId);
+    return { ok: true };
   }
 
   @Get("jobs/:jobId/siparisler")

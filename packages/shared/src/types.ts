@@ -753,7 +753,7 @@ export interface MusteriIceAktarmaSonucu {
   eslesenSutunlar: Record<string, string>;
   /** Hiçbir alana gitmeyen başlıklar (veri kaybı burada görünür). */
   kullanilmayanSutunlar: string[];
-  zatenKayitli: { satir: number; ad: string; mevcutKart: string; neden: string }[];
+  zatenKayitli: { satir: number; ad: string; mevcutKart: string; neden: string; mevcutId?: string }[];
   atlanan: { satir: number; sebep: string }[];
   uyarilar: { satir: number; sebep: string }[];
   hatalar: { satir: number; sebep: string }[];
@@ -761,6 +761,23 @@ export interface MusteriIceAktarmaSonucu {
   ornek: { satir: number; ad: string; rol?: string; telefon?: string; eposta?: string }[];
   /** Satır tavanına gelindiyse kalanların başladığı satır. */
   kalanIlkSatir?: number;
+  /** Yalnızca uygulamada, bir bağlantı listesine aktarıldıysa: liste ve ona eklenen kart sayısı (yeni + zaten kayıtlı). */
+  liste?: { id: string; ad: string; eklenen: number };
+  /** Yalnızca uygulamada: açılan kartların kimlikleri (listeye ekleme için). */
+  acilanIdler?: string[];
+}
+
+/**
+ * Bağlantı listesi (migration 163) — oynatma listesi mantığı: bir kart birden
+ * çok listede olabilir, liste silinince kartlar yerinde kalır.
+ */
+export interface BaglantiListeKaydi {
+  id: string;
+  ad: string;
+  /** Listedeki (arşivde olmayan) kart sayısı. */
+  sayi: number;
+  olusturanAd?: string;
+  createdAt: string;
 }
 
 export interface PartyAddress {
@@ -838,6 +855,8 @@ export interface Party {
   sonEkId?: string;
   /** Yalnızca Müşteriler listesinde: görüşme notlarının özeti (bkz. gorusmeNotlari.ts temasOzeti). */
   temas?: TemasOzeti;
+  /** Yalnızca Bağlantılar listesinde: kartın bulunduğu bağlantı listeleri (migration 163). */
+  listeIdleri?: string[];
 }
 
 /** Kurumdaki kişi. B2B'de firma bir, muhatap birden fazladır. */
@@ -927,6 +946,8 @@ export interface BaglantiListesi {
   yonetici: boolean;
   kartYazar: boolean;
   baglantilar: Party[];
+  /** Kapsamdaki bağlantı listeleri (sekmeler); kartların hangisinde olduğu `Party.listeIdleri`. */
+  listeler?: BaglantiListeKaydi[];
 }
 
 export interface PartyDuplicate {

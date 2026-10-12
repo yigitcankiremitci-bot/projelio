@@ -719,7 +719,7 @@ export class PartyService {
     if (sonuc.onizleme || !islenecek.length) return sonuc;
 
     const { olusan, hatalar } = await this.createMany(scope, islenecek, userId, opts.kaynak ?? "excel", modul);
-    return { ...sonuc, acilan: olusan.length, hatalar };
+    return { ...sonuc, acilan: olusan.length, hatalar, acilanIdler: olusan.map((o) => o.party.id) };
   }
 
   /**

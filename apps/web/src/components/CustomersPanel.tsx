@@ -14,6 +14,7 @@ import {
   aramaDurumu,
   potansiyelMusteriMi,
   safeExternalUrl,
+  type BaglantiListeKaydi,
   type KartvizitSosyal,
   type KartvizitSosyalAnahtar,
   type BaglantiOnem,
@@ -58,6 +59,7 @@ import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
 import GorusmeNotlari from "./musteri/GorusmeNotlari";
+import { BaglantiListeSekmeleri, KartListeleri } from "./BaglantiListeleri";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
 import Modal from "./Modal";
@@ -293,13 +295,38 @@ export default function CustomersPanel({
   const scopePath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
   const kapsamYolu = jobId ? `/jobs/${jobId}` : `/organizations/${organizationId}`;
 
+  // Bağlantı listeleri (oynatma listesi gibi sekmeler, bkz. BaglantiListeleri).
+  // Açık sekme bu tarayıcıda kapsam başına hatırlanır (kaybolsa da olur).
+  const [listeler, setListeler] = useState<BaglantiListeKaydi[]>([]);
+  const listeAnahtari = `projelio_baglanti_listesi_${kapsamYolu}`;
+  const [seciliListe, setSeciliListeHam] = useState<string>(() => {
+    try {
+      return localStorage.getItem(listeAnahtari) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const setSeciliListe = (id: string) => {
+    setSeciliListeHam(id);
+    try {
+      localStorage.setItem(listeAnahtari, id);
+    } catch {
+      /* gizli pencere: hatırlamasa da olur */
+    }
+  };
+  // Silinmiş ya da başka kapsamın listesi hatırlandıysa Tümü'ne dönülür.
+  const etkinListe = listeler.some((l) => l.id === seciliListe) ? seciliListe : "";
+
   // Yalnızca İLK yüklemede "Yükleniyor…" gösterilir. Kaydetme/arşivleme
   // sonrası tazelemede de gösterilince liste bir an yok olup geri geliyor,
   // kaydırma başa dönüyordu — sayfa kendi kendine yenileniyor gibi görünüyordu.
   const load = (ilk = false) => {
     if (ilk === true) setLoading(true);
     const istek = baglantiModu
-      ? partyApi.baglantilarim(kapsamYolu, jobId ? undefined : departmentId).then((r) => ({ kartlar: r.baglantilar, yonetici: r.yonetici }))
+      ? partyApi.baglantilarim(kapsamYolu, jobId ? undefined : departmentId).then((r) => {
+          setListeler(r.listeler ?? []);
+          return { kartlar: r.baglantilar, yonetici: r.yonetici };
+        })
       : partyApi.musterilerim(scopePath, jobId ? undefined : departmentId).then((r) => ({ kartlar: r.musteriler, yonetici: r.yonetici }));
     istek
       .then((r) => {
@@ -407,9 +434,11 @@ export default function CustomersPanel({
   const sekmeKartlari = useMemo(
     () =>
       baglantiModu
-        ? parties
+        ? etkinListe
+          ? parties.filter((p) => p.listeIdleri?.includes(etkinListe))
+          : parties
         : parties.filter((p) => (gorunum === "potansiyel") === potansiyelMusteriMi(p)),
-    [parties, baglantiModu, gorunum]
+    [parties, baglantiModu, gorunum, etkinListe]
   );
   const potansiyelSayisi = useMemo(() => parties.filter(potansiyelMusteriMi).length, [parties]);
   // Müşteriler sekmesinin rol seçicisinde "Potansiyel" yok: o kartlar kendi sekmesinde.
@@ -635,6 +664,9 @@ export default function CustomersPanel({
       } else {
         const yeni = await api.post<Party>(scopePath, payload);
         partyId = yeni.id;
+        // Bir liste açıkken eklenen kart o listeye de girer; yoksa eklendiği
+        // anda açık sekmeden kaybolurdu.
+        if (baglantiModu && etkinListe) await partyApi.listeyeEkle(etkinListe, [yeni.id]).catch(() => {});
       }
       // Şirket/kurum kişileri: yeniler eklenir, kayıtlılar güncellenir,
       // formdan çıkarılanlar arşivlenir. İlk kişi yeni kartta birincil olur.
@@ -1190,6 +1222,19 @@ export default function CustomersPanel({
       {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
       {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
 
+      {baglantiModu && (
+        <BaglantiListeSekmeleri
+          listeler={listeler}
+          secili={etkinListe}
+          onSec={setSeciliListe}
+          toplam={parties.length}
+          gorunenIdler={visible.map((p) => p.id)}
+          kapsamYolu={kapsamYolu}
+          canWrite={canWrite}
+          onDegisti={() => load()}
+        />
+      )}
+
       {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
           Bağlantılar'da sipariş yok; sekme de yok. */}
       {!baglantiModu && (
@@ -1234,7 +1279,13 @@ export default function CustomersPanel({
           departmentId={departmentId}
           baglanti={baglantiModu}
           onClose={() => setExcelAcik(false)}
-          onDone={() => load()}
+          listeler={listeler}
+          acikListeId={etkinListe || undefined}
+          onDone={(listeId) => {
+            // Yüklenen liste kendi sekmesinde açılır: mevcut bağlantılara karışmadan görünsün.
+            if (listeId) setSeciliListe(listeId);
+            load();
+          }}
         />
       )}
 
@@ -1538,6 +1589,7 @@ export default function CustomersPanel({
                   // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
                   organizationId={baglantiModu ? undefined : organizationId}
                   sirketId={jobId ? undefined : organizationId}
+                  listeler={baglantiModu ? listeler : undefined}
                 />}
             </div>
           ))}
@@ -1670,8 +1722,11 @@ function PartyDetail({
   profile,
   organizationId,
   sirketId,
+  listeler,
 }: {
   party: Party;
+  /** Yalnızca Bağlantılar: kapsamdaki bağlantı listeleri (kartın içinden ekle / çıkar). */
+  listeler?: BaglantiListeKaydi[];
   /** Takip görevinin açılabileceği şirket (departman seçimi görev penceresinde). */
   sirketId?: string;
   ilkSekme?: "contacts";
@@ -1867,6 +1922,16 @@ function PartyDetail({
             {t("Ekle")}
           </button>
         </div>
+      )}
+
+      {baglantiModu && listeler && (
+        <KartListeleri
+          partyId={party.id}
+          listeler={listeler}
+          uyeOlduklari={party.listeIdleri ?? []}
+          canWrite={canWrite}
+          onDegisti={onDegisti}
+        />
       )}
 
       <KartBaglantilari party={party} />

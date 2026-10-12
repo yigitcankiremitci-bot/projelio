@@ -142,6 +142,27 @@ describe("mevcutlariAyikla", () => {
     const { zatenVar } = mevcutlariAyikla([plan(2, "Mavi")], [{ id: "1", displayName: "Mavi", archivedAt: "2026-01-01" }]);
     assert.match(zatenVar[0].mevcutKart, /arşivde/);
   });
+
+  // Bağlantı listesine içe aktarmada zaten kayıtlı kart kopya açılmadan
+  // listeye eklenir — bunun için eşleşen kartın kimliği gerekli. Arşivdeki
+  // kartın ve dosya içi tekrarın kimliği YOK: onlar listeye girmemeli.
+  test("eşleşen kayıtlı kartın kimliği döner; arşivdeki ve dosya içi tekrarda dönmez", () => {
+    const { zatenVar } = mevcutlariAyikla(
+      [plan(2, "Mavi"), plan(3, "Kırmızı"), plan(4, "Yeşil"), plan(5, "yeşil")],
+      [
+        { id: "k1", displayName: "Mavi" },
+        { id: "k2", displayName: "Kırmızı", archivedAt: "2026-01-01" },
+      ]
+    );
+    assert.deepEqual(
+      zatenVar.map((z) => [z.satir, z.mevcutId]),
+      [
+        [2, "k1"],
+        [3, undefined],
+        [5, undefined],
+      ]
+    );
+  });
 });
 
 describe("tabloyuOku — yüklenen dosya", () => {

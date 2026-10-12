@@ -187,4 +187,25 @@ export const baglantilar: TranslationDict = {
   "Yok": "None",
   "({n}. deneme)": "(attempt {n})",
   "{n} not": "{n} notes",
+
+  // ─────────────────────────────────────────────── Bağlantı listeleri
+  "\"{ad}\" listesi silinsin mi? İçindeki {n} bağlantı silinmez, Tümü'nde kalır.":
+    "Delete the \"{ad}\" list? Its {n} contacts aren't deleted; they stay under All.",
+  "\"{ad}\" listesi:": "\"{ad}\" list:",
+  "\"{liste}\" listesinde {n} bağlantı var.": "The \"{liste}\" list now has {n} contacts from this file.",
+  "+ Yeni liste": "+ New list",
+  "Hangi bağlantı listesine eklensin?": "Which contact list should they go to?",
+  "Liste adı, ör. Firdevs — Ekim bağlantıları": "List name, e.g. Firdevs — October contacts",
+  "Liste adı, ör. İTS 2026 Fuarı": "List name, e.g. ITS 2026 Fair",
+  "Listeden çıkar": "Remove from list",
+  "Listeler:": "Lists:",
+  "Listeye ekle": "Add to list",
+  "Listeye ekleme (yalnızca Tümü'nde görünür)": "Don't add to a list (shown only under All)",
+  "Listeyi oluştur": "Create list",
+  "Listeyi sil": "Delete list",
+  "Oluşturan: {ad}": "Created by: {ad}",
+  "{n} kayıtlı bağlantıyı listeye ekle": "Add {n} existing contacts to the list",
+  "{n} tanesi zaten kayıtlı; yeni kart açılmaz, mevcut kart listeye eklenir":
+    "{n} already exist; no new card is created, the existing card is added to the list",
+  "Şu an listede görünen {n} bağlantıyı bu listeye ekle": "Add the {n} contacts currently shown to this list",
 };

@@ -157,7 +157,6 @@ export const baglantilar: TranslationDict = {
   "+ Not ekle": "+ Add note",
   "Arandı": "Called",
   "Ulaşılamadı": "No answer",
-  "Açmadı / meşgul — tek adımda kaydet": "Didn't pick up / busy — log it in one step",
   "Üst üste {n} kez ulaşılamadı": "No answer {n} times in a row",
   "Bu not silinsin mi?": "Delete this note?",
   "Daha az göster": "Show less",

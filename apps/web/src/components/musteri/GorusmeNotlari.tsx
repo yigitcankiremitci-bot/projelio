@@ -165,9 +165,97 @@ export default function GorusmeNotlari({
       cursor: "pointer",
     }) as const;
 
+  // Türe göre not kartının sol şeridi ve rozet rengi: göz önce ne olduğunu,
+  // sonra kimin yazdığını yakalasın.
+  const turRengi = (k: PartyActivityType): string =>
+    k === "ulasilamadi"
+      ? c.danger
+      : k === "arama"
+        ? c.success
+        : k === "teklif"
+          ? c.accent
+          : k === "not"
+            ? c.textSecondary
+            : c.primary;
+
+  const form = (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        padding: 10,
+        borderRadius: 8,
+        border: `1px solid ${c.border}`,
+        background: c.surface,
+      }}
+    >
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        {GORUSME_TURLERI.map((k) => (
+          <button
+            key={k}
+            onClick={() => {
+              setTur(k);
+              if (k === "ulasilamadi" && !tekrar) setTekrar(oneriler[0].gun);
+            }}
+            style={kucukDugme(tur === k)}
+          >
+            {GORUSME_TURU_SIMGESI[k]} {t(GORUSME_TURU_ETIKETI[k])}
+          </button>
+        ))}
+      </div>
+      <textarea
+        autoFocus
+        value={metin}
+        onChange={(e) => setMetin(e.target.value)}
+        rows={3}
+        placeholder={
+          tur === "ulasilamadi"
+            ? t("İsteğe bağlı: meşguldü, sesli mesaj bırakıldı…")
+            : t("Ne konuşuldu? Örn. Katalog istedi, fiyat teklifi bekliyor, karar verici Ahmet Bey.")
+        }
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) kaydet();
+        }}
+        style={{ fontSize: 13, padding: "6px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 12, color: c.textSecondary }}>
+        <span>{t("Tekrar ara:")}</span>
+        <button onClick={() => setTekrar("")} style={kucukDugme(tekrar === "")}>
+          {t("Yok")}
+        </button>
+        {oneriler.map((o) => (
+          <button key={o.gun} onClick={() => setTekrar(o.gun)} style={kucukDugme(tekrar === o.gun)}>
+            {t(o.etiket)}
+          </button>
+        ))}
+        <input
+          type="date"
+          value={tekrar}
+          min={bugun}
+          onChange={(e) => setTekrar(e.target.value)}
+          style={{ fontSize: 12, padding: "2px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+        />
+      </div>
+      {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+        <button onClick={() => setFormAcik(false)} style={kucukDugme(false)}>
+          {t("Vazgeç")}
+        </button>
+        <button
+          onClick={kaydet}
+          disabled={busy}
+          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
+        >
+          {t("Kaydet")}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      {/* Başlık: sayı + seri uyarısı + ekleme düğmeleri */}
+      {/* Başlık: sayı + seri uyarısı */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>
           {t("Görüşme notları")} {notlar.length > 0 && `(${notlar.length})`}
@@ -176,20 +264,6 @@ export default function GorusmeNotlari({
           <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 6, color: c.danger, border: `1px solid ${c.danger}60` }}>
             {t("Üst üste {n} kez ulaşılamadı", { n: ozet.ulasilamadiSerisi })}
           </span>
-        )}
-        <span style={{ flex: 1 }} />
-        {canWrite && !formAcik && (
-          <>
-            <button onClick={() => formuAc("ulasilamadi")} style={kucukDugme(false)} title={t("Açmadı / meşgul — tek adımda kaydet")}>
-              📵 {t("Ulaşılamadı")}
-            </button>
-            <button
-              onClick={() => formuAc("arama")}
-              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
-            >
-              {t("+ Not ekle")}
-            </button>
-          </>
         )}
       </div>
 
@@ -216,120 +290,53 @@ export default function GorusmeNotlari({
         </div>
       )}
 
-      {/* Yeni not formu */}
-      {formAcik && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 8,
-            padding: 10,
-            borderRadius: 8,
-            border: `1px solid ${c.border}`,
-            background: c.surface,
-          }}
-        >
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-            {GORUSME_TURLERI.map((k) => (
-              <button
-                key={k}
-                onClick={() => {
-                  setTur(k);
-                  if (k === "ulasilamadi" && !tekrar) setTekrar(oneriler[0].gun);
-                }}
-                style={kucukDugme(tur === k)}
-              >
-                {GORUSME_TURU_SIMGESI[k]} {t(GORUSME_TURU_ETIKETI[k])}
-              </button>
-            ))}
-          </div>
-          <textarea
-            autoFocus
-            value={metin}
-            onChange={(e) => setMetin(e.target.value)}
-            rows={3}
-            placeholder={
-              tur === "ulasilamadi"
-                ? t("İsteğe bağlı: meşguldü, sesli mesaj bırakıldı…")
-                : t("Ne konuşuldu? Örn. Katalog istedi, fiyat teklifi bekliyor, karar verici Ahmet Bey.")
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) kaydet();
-            }}
-            style={{ fontSize: 13, padding: "6px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 12, color: c.textSecondary }}>
-            <span>{t("Tekrar ara:")}</span>
-            <button onClick={() => setTekrar("")} style={kucukDugme(tekrar === "")}>
-              {t("Yok")}
-            </button>
-            {oneriler.map((o) => (
-              <button key={o.gun} onClick={() => setTekrar(o.gun)} style={kucukDugme(tekrar === o.gun)}>
-                {t(o.etiket)}
-              </button>
-            ))}
-            <input
-              type="date"
-              value={tekrar}
-              min={bugun}
-              onChange={(e) => setTekrar(e.target.value)}
-              style={{ fontSize: 12, padding: "2px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
-            />
-          </div>
-          {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
-          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-            <button onClick={() => setFormAcik(false)} style={kucukDugme(false)}>
-              {t("Vazgeç")}
-            </button>
-            <button
-              onClick={kaydet}
-              disabled={busy}
-              style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
-            >
-              {t("Kaydet")}
-            </button>
-          </div>
-        </div>
-      )}
-      {!formAcik && hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
-
-      {/* Notlar, en yeni üstte */}
-      {notlar.length === 0 ? (
-        !formAcik && (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>
-            {t("Henüz görüşme notu yok. Aradığında \"+ Not ekle\" ile ne konuşulduğunu yaz.")}
-          </span>
-        )
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 0, borderLeft: `2px solid ${c.border}`, marginLeft: 6 }}>
-          {gorunen.map((a) => {
+      {/* Notlar, en yeni üstte; her biri ayrı kart */}
+      {notlar.length === 0
+        ? !formAcik && (
+            <span style={{ fontSize: 12, color: c.textSecondary }}>
+              {t("Henüz görüşme notu yok. Aradığında \"+ Not ekle\" ile ne konuşulduğunu yaz.")}
+            </span>
+          )
+        : gorunen.map((a) => {
             const benim = !!user && a.userId === user.id;
             const duzenleniyor = duzenlenen?.id === a.id;
-            const renk = a.type === "ulasilamadi" ? c.danger : c.primary;
+            const renk = turRengi(a.type);
             return (
-              <div key={a.id} style={{ padding: "6px 0 8px 12px", position: "relative" }}>
-                <span
-                  style={{
-                    position: "absolute",
-                    left: -6,
-                    top: 9,
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    background: renk,
-                    border: `2px solid ${c.surface}`,
-                  }}
-                />
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 11, color: c.textSecondary }}>
-                  <span style={{ color: renk, fontWeight: 600 }}>
+              <div
+                key={a.id}
+                style={{
+                  background: c.surface,
+                  border: `1px solid ${c.border}`,
+                  borderLeft: `3px solid ${renk}`,
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 4,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: "1px 8px",
+                      borderRadius: 10,
+                      color: renk,
+                      background: `${renk}1A`,
+                    }}
+                  >
                     {GORUSME_TURU_SIMGESI[a.type]} {t(GORUSME_TURU_ETIKETI[a.type])}
                   </span>
-                  <span>·</span>
-                  <span style={{ color: c.textPrimary }}>{a.userName ?? t("Bilinmeyen kullanıcı")}</span>
-                  <span>·</span>
-                  <span title={timeAgo(a.occurredAt)}>{formatDateTime(a.occurredAt)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
+                    {a.userName ?? t("Bilinmeyen kullanıcı")}
+                  </span>
+                  <span style={{ flex: 1 }} />
+                  <span style={{ fontSize: 11, color: c.textSecondary }} title={timeAgo(a.occurredAt)}>
+                    {formatDateTime(a.occurredAt)}
+                  </span>
                   {benim && canWrite && !duzenleniyor && (
-                    <span style={{ display: "inline-flex", gap: 2, marginLeft: "auto" }}>
+                    <span style={{ display: "inline-flex", gap: 2 }}>
                       <button
                         onClick={() => setDuzenlenen({ id: a.id, metin: a.summary })}
                         title={t("Düzenle")}
@@ -348,7 +355,7 @@ export default function GorusmeNotlari({
                   )}
                 </div>
                 {duzenleniyor ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <textarea
                       autoFocus
                       value={duzenlenen.metin}
@@ -367,22 +374,34 @@ export default function GorusmeNotlari({
                   </div>
                 ) : (
                   a.summary && (
-                    <p style={{ margin: "2px 0 0", fontSize: 13, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{a.summary}</p>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{a.summary}</p>
                   )
                 )}
               </div>
             );
           })}
-          {notlar.length > ILK_GOSTERIM && (
-            <button
-              onClick={() => setHepsi((h) => !h)}
-              style={{ alignSelf: "flex-start", marginLeft: 12, fontSize: 12, border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: 0 }}
-            >
-              {hepsi ? t("Daha az göster") : t("Tüm notlar ({n})", { n: notlar.length })}
-            </button>
-          )}
-        </div>
+      {notlar.length > ILK_GOSTERIM && (
+        <button
+          onClick={() => setHepsi((h) => !h)}
+          style={{ alignSelf: "flex-start", fontSize: 12, border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: 0 }}
+        >
+          {hepsi ? t("Daha az göster") : t("Tüm notlar ({n})", { n: notlar.length })}
+        </button>
       )}
+
+      {/* Ekleme listenin altında: önce okunur, sonra yazılır. */}
+      {canWrite &&
+        (formAcik ? (
+          form
+        ) : (
+          <button
+            onClick={() => formuAc("arama")}
+            style={{ alignSelf: "flex-start", fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+          >
+            {t("+ Not ekle")}
+          </button>
+        ))}
+      {!formAcik && hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
     </div>
   );
 }

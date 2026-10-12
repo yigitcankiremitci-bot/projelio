@@ -384,8 +384,27 @@ export class PartyController {
   }
 
   @Post("party/:id/activities")
-  addActivity(@Param("id") id: string, @Body() body: Partial<PartyActivity>, @Req() req: any) {
+  addActivity(
+    @Param("id") id: string,
+    @Body() body: Partial<PartyActivity> & { sonrakiArama?: string | null },
+    @Req() req: any
+  ) {
     return this.partyService.addActivity(id, body, req.user.userId);
+  }
+
+  /** Görüşme notunu düzeltme — yalnızca yazanı (bkz. PartyService.kendiNotu). */
+  @Patch("party-activities/:activityId")
+  updateActivity(
+    @Param("activityId") activityId: string,
+    @Body() body: { summary?: string; type?: PartyActivity["type"] },
+    @Req() req: any
+  ) {
+    return this.partyService.updateActivity(activityId, body, req.user.userId);
+  }
+
+  @Delete("party-activities/:activityId")
+  deleteActivity(@Param("activityId") activityId: string, @Req() req: any) {
+    return this.partyService.deleteActivity(activityId, req.user.userId);
   }
 
   // ============================================================ Sipariş ve tahsilat

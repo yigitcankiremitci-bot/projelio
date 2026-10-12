@@ -9,6 +9,9 @@ import {
   kartvizitSosyalNormallestir,
   WEB_SITESI_IKON,
   MUSTERI_MODUL_KEY,
+  GORUSME_TURU_ETIKETI,
+  GORUSME_TURU_SIMGESI,
+  aramaDurumu,
   potansiyelMusteriMi,
   safeExternalUrl,
   type KartvizitSosyal,
@@ -46,6 +49,7 @@ import { IconEdit, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, I
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
+import { timeAgo } from "../lib/dates";
 import { listeCercevesi, listeSatiri } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { partyApi } from "../api/party";
@@ -53,6 +57,7 @@ import { filesApi } from "../api/files";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
+import GorusmeNotlari from "./musteri/GorusmeNotlari";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
 import Modal from "./Modal";
@@ -102,7 +107,7 @@ function emptyForm() {
 
 const ONEM_SIRASI: Record<BaglantiOnem, number> = { yuksek: 0, orta: 1, dusuk: 2 };
 
-type Siralama = "onem" | "ad" | "yeni" | "temas" | "kurum";
+type Siralama = "onem" | "ad" | "yeni" | "temas" | "kurum" | "arama";
 // dil:anahtar-baslangic
 const SIRALAMA_ETIKETI: Record<Siralama, string> = {
   onem: "Önem",
@@ -110,6 +115,7 @@ const SIRALAMA_ETIKETI: Record<Siralama, string> = {
   yeni: "Son eklenen",
   temas: "Sonraki temas",
   kurum: "Şirket / kurum",
+  arama: "Aranacaklar önce",
 };
 // dil:anahtar-bitis
 
@@ -136,6 +142,16 @@ function sirala(liste: Party[], s: Siralama): Party[] {
         const ta = a.baglanti?.sonrakiTemas ?? "9999";
         const tb = b.baglanti?.sonrakiTemas ?? "9999";
         return ta !== tb ? (ta < tb ? -1 : 1) : ad(a, b);
+      }
+      case "arama": {
+        // Arama listesi: önce planlı aramalar (gecikmiş en üstte), sonra hiç
+        // aranmamışlar, sonra en uzun süredir aranmayanlar.
+        const pa = a.sonrakiArama ?? "9999";
+        const pb = b.sonrakiArama ?? "9999";
+        if (pa !== pb) return pa < pb ? -1 : 1;
+        const sa = a.temas?.sonTemas?.occurredAt ?? "";
+        const sb = b.temas?.sonTemas?.occurredAt ?? "";
+        return sa !== sb ? (sa < sb ? -1 : 1) : ad(a, b);
       }
       case "kurum": {
         // Şirket kartında kurum kendi adı; kurumsuzlar sona.
@@ -353,7 +369,7 @@ export default function CustomersPanel({
   }, [profile.defaultRole]);
 
   const bugun = bugunYmd();
-  const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum"];
+  const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum", "arama"];
   const siralamaAnahtari = `projelio_party_siralama_${baglantiModu ? "baglantilar" : "musteri"}`;
   const [siralama, setSiralama] = useState<Siralama>(() =>
     siralamaOku(siralamaAnahtari, baglantiModu ? "onem" : "ad", siralamaSecenekleri)
@@ -1417,7 +1433,9 @@ export default function CustomersPanel({
                     {baglantiModu && p.baglanti?.sonrakiTemas && (
                       <TemasRozeti tarih={p.baglanti.sonrakiTemas} bugun={bugun} />
                     )}
+                    {!baglantiModu && p.sonrakiArama && <AramaRozeti tarih={p.sonrakiArama} bugun={bugun} />}
                   </div>
+                  {!baglantiModu && p.temas?.sonTemas && <SonTemasSatiri p={p} />}
                   {(profile.detail(p) || yonetici) && (
                     <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
                       {[profile.detail(p), yonetici ? p.ownerName ?? t("Sorumlu yok") : undefined].filter(Boolean).join(" · ")}
@@ -1561,6 +1579,42 @@ function Field({
  * Sonraki temas tarihi: geçtiyse kırmızı, bugünse vurgulu, ileride sade.
  * Tarih karşılaştırması metinle (YYYY-MM-DD sözlük sırası = takvim sırası).
  */
+/** Müşteriler satırında tekrar arama günü (bkz. GorusmeNotlari). */
+function AramaRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
+  const c = useThemeColors();
+  const t = useT();
+  const durum = aramaDurumu(tarih, bugun);
+  const renk = durum === "gecikti" ? c.danger : durum === "bugun" ? c.accent : c.textSecondary;
+  const [y, a, g] = tarih.split("-");
+  return (
+    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
+      📅{" "}
+      {durum === "bugun"
+        ? t("Bugün aranacak")
+        : durum === "gecikti"
+          ? t("Arama gecikti · {tarih}", { tarih: `${g}.${a}.${y}` })
+          : t("Tekrar ara · {tarih}", { tarih: `${g}.${a}.${y}` })}
+    </span>
+  );
+}
+
+/** Müşteriler satırında son görüşme: "📞 Arandı · 2 gün önce · 3 not". */
+function SonTemasSatiri({ p }: { p: Party }) {
+  const c = useThemeColors();
+  const t = useT();
+  const o = p.temas!;
+  const son = o.sonTemas!;
+  return (
+    <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <span style={{ color: son.type === "ulasilamadi" ? c.danger : c.textSecondary }}>
+        {GORUSME_TURU_SIMGESI[son.type]} {t(GORUSME_TURU_ETIKETI[son.type])} · {timeAgo(son.occurredAt)}
+      </span>
+      {o.ulasilamadiSerisi >= 2 && <span style={{ color: c.danger }}>{t("({n}. deneme)", { n: o.ulasilamadiSerisi })}</span>}
+      {o.notSayisi > 1 && <span>· {t("{n} not", { n: o.notSayisi })}</span>}
+    </div>
+  );
+}
+
 function TemasRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
   const c = useThemeColors();
   const t = useT();
@@ -1694,9 +1748,12 @@ function PartyDetail({
   return (
     <div
       style={{
-        margin: "4px 0 2px 10px",
+        // Açılan alan listeden ayrışsın diye kendi renginde (theme.acilanAlan).
+        margin: "2px 6px 8px",
         padding: "10px 12px",
-        borderLeft: `2px solid ${c.border}`,
+        borderRadius: 8,
+        background: c.acilanAlan,
+        border: `1px solid ${c.border}`,
         display: "flex",
         flexDirection: "column",
         gap: 8,
@@ -1706,11 +1763,13 @@ function PartyDetail({
           Bağlantılar'dan aktarılan ilişki notu da buraya yazıldığı için açık
           kartta görünmesi şart (kullanıcı şikâyeti, 2026-10-11). */}
       {!baglantiModu && party.notes?.trim() && (
-        <div style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, background: c.listeSatirAlt, border: `1px solid ${c.border}` }}>
+        <div style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, background: c.surface, border: `1px solid ${c.border}` }}>
           <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Not")}</span>
           <p style={{ margin: "2px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap" }}>{party.notes}</p>
         </div>
       )}
+      {/* Aramalar ve görüşmeler notun altına, yazanı ve tarihiyle (bkz. GorusmeNotlari). */}
+      {!baglantiModu && <GorusmeNotlari party={party} canWrite={canWrite} onDegisti={() => { onDegisti(); load(); }} />}
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {baglantiModu ? (
           <>
@@ -1739,7 +1798,8 @@ function PartyDetail({
         )}
       </div>
 
-      {canWrite && (tab === "activity" || tab === "contacts") && (
+      {/* Müşteriler'de not yukarıdaki Görüşme notları'ndan eklenir; Geçmiş yalnızca okunur günlük. */}
+      {canWrite && (tab === "contacts" || (tab === "activity" && baglantiModu)) && (
         <div style={{ display: "flex", gap: 6, alignItems: "flex-start" }}>
           {tab === "activity" ? (
             // Temas notu iki satır: "aradım, katalog istedi, 15'inde dönülecek"
@@ -1899,7 +1959,7 @@ function PartyDetail({
             {activities.map((a) => (
               <div key={a.id} style={{ fontSize: 12, color: c.textPrimary }}>
                 <span style={{ color: c.textSecondary }}>{a.occurredAt.slice(0, 10)} · </span>
-                {a.summary}
+                {a.summary || t(GORUSME_TURU_ETIKETI[a.type])}
                 {a.userName && <span style={{ color: c.textSecondary }}> — {a.userName}</span>}
               </div>
             ))}

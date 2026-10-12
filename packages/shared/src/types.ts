@@ -2,6 +2,7 @@
 
 import type { Locale } from "./i18n";
 import type { KartvizitSosyal } from "./kartvizit";
+import type { TemasOzeti } from "./gorusmeNotlari";
 
 // "demo": herkese açık demo şirketinin (@celikhan.test) kadrosu (migration 109).
 // Yetki açısından "freelancer" ile aynı — kod yalnızca "admin"i kontrol ediyor;
@@ -807,6 +808,8 @@ export interface Party {
   /** Organizasyona özel ek alanlar. */
   data: Record<string, unknown>;
   notes?: string;
+  /** Müşteriler defterinde tekrar aranacak gün (YYYY-AA-GG, migration 160). */
+  sonrakiArama?: string;
 
   createdBy?: string;
   createdAt: string;
@@ -826,6 +829,8 @@ export interface Party {
   sonKartvizitId?: string;
   ekSayisi?: number;
   sonEkId?: string;
+  /** Yalnızca Müşteriler listesinde: görüşme notlarının özeti (bkz. gorusmeNotlari.ts temasOzeti). */
+  temas?: TemasOzeti;
 }
 
 /** Kurumdaki kişi. B2B'de firma bir, muhatap birden fazladır. */
@@ -842,7 +847,7 @@ export interface PartyContact {
   archivedAt?: string;
 }
 
-export type PartyActivityType = "not" | "arama" | "toplanti" | "eposta" | "teklif" | "ziyaret" | "sistem";
+export type PartyActivityType = "not" | "arama" | "ulasilamadi" | "toplanti" | "eposta" | "teklif" | "ziyaret" | "sistem";
 
 /**
  * Temas geçmişi. Manuel notların yanı sıra diğer modüller de yazar

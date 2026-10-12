@@ -2,6 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
+  GORUSME_TURLERI,
+  temasOzeti,
   KARTVIZIT_SOSYAL,
   kartvizitSosyalNormallestir,
   MUSTERI_MODUL_KEY,
@@ -100,6 +102,7 @@ function mapParty(row: any): Party {
     mergedIntoId: row.merged_into_id ?? undefined,
     data: row.data ?? {},
     notes: row.notes ?? undefined,
+    sonrakiArama: row.sonraki_arama ?? undefined,
     createdBy: row.created_by ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -370,7 +373,7 @@ export class PartyService {
     const hepsi = await this.findAll(scope);
     const yonetici = a.canManageTeam;
     const musteriler = yonetici ? hepsi : hepsi.filter((p) => musteriYetkisi(a, p.ownerUserId, userId).okur);
-    await this.kisiSayilariniEkle(musteriler);
+    await Promise.all([this.kisiSayilariniEkle(musteriler), this.temasOzetleriniEkle(musteriler)]);
     return { yonetici, kartYazar: a.canWrite, musteriler };
   }
 
@@ -417,6 +420,37 @@ export class PartyService {
           p.sonKartvizitId ??= r.file_id;
         }
       }
+    }
+  }
+
+  /**
+   * Listedeki kartlara görüşme özeti: son temas, üst üste kaç kez ulaşılamadı,
+   * not sayısı ("kimi aramalıyım" sorusu listeden cevaplansın). Kart başına
+   * en son 20 not yeter — seri ondan uzunsa zaten "çok kez" demektir.
+   */
+  private async temasOzetleriniEkle(kartlar: Party[]): Promise<void> {
+    const kimlik = new Map(kartlar.map((p) => [p.id, p]));
+    const ids = [...kimlik.keys()];
+    const notlar = new Map<string, { type: PartyActivityType; occurredAt: string }[]>();
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await this.supabase.client
+        .from("party_activity")
+        .select("party_id, type, occurred_at")
+        .in("party_id", ids.slice(i, i + 150))
+        .neq("type", "sistem")
+        .order("occurred_at", { ascending: false })
+        .limit(3000);
+      // Özet bir kolaylık: okunamazsa liste yine açılsın.
+      if (error) return;
+      for (const r of (data ?? []) as any[]) {
+        const liste = notlar.get(r.party_id) ?? [];
+        if (liste.length < 20) liste.push({ type: r.type, occurredAt: r.occurred_at });
+        notlar.set(r.party_id, liste);
+      }
+    }
+    for (const [id, liste] of notlar) {
+      const p = kimlik.get(id);
+      if (p) p.temas = temasOzeti(liste);
     }
   }
 
@@ -861,6 +895,7 @@ export class PartyService {
     assign("parent_party_id", payload.parentPartyId);
     assign("data", payload.data);
     assign("notes", payload.notes);
+    assign("sonraki_arama", payload.sonrakiArama === undefined ? undefined : gunDogrula(payload.sonrakiArama));
 
     const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
     if (error) {
@@ -1512,17 +1547,93 @@ export class PartyService {
     return (data ?? []).map(mapActivity);
   }
 
-  async addActivity(partyId: string, payload: Partial<PartyActivity>, userId?: string): Promise<PartyActivity> {
-    if (!payload.summary?.trim()) throw new BadRequestException("Açıklama gerekli");
+  /**
+   * Görüşme notu. Yazan ve tarih SUNUCUDA damgalanır — istemcinin gönderdiği
+   * occurredAt yalnızca geçmişe dönük girilen bir görüşme için (gelecek tarih
+   * kabul edilmez). `sistem` türü istemciden yazılamaz: "Kayıt oluşturuldu"
+   * gibi otomatik satırlarla elle yazılan not karışmasın.
+   *
+   * `sonrakiArama` verilirse kartın tekrar arama günü de aynı istekte yazılır
+   * (null = planı kaldır): arama sonrası not + "3 gün sonra tekrar ara" tek adım.
+   */
+  async addActivity(
+    partyId: string,
+    payload: Partial<PartyActivity> & { sonrakiArama?: string | null },
+    userId?: string
+  ): Promise<PartyActivity> {
+    const type = (payload.type ?? "not") as PartyActivityType;
+    if (!(GORUSME_TURLERI as readonly string[]).includes(type)) throw new BadRequestException("Geçersiz not türü");
+    const summary = (payload.summary ?? "").trim().slice(0, 4000);
+    // "Ulaşılamadı" tek tıkla girilebilsin: açıklamasız da anlamlı.
+    if (!summary && type !== "ulasilamadi") throw new BadRequestException("Açıklama gerekli");
+    let occurredAt: string | undefined;
+    if (payload.occurredAt) {
+      const t = Date.parse(payload.occurredAt);
+      if (Number.isNaN(t)) throw new BadRequestException("Geçersiz tarih");
+      occurredAt = new Date(Math.min(t, Date.now())).toISOString();
+    }
     const party = await this.findOne(partyId);
     await this.assertKayitYazilir(party, userId);
-    return this.logActivity(
-      partyId,
-      (payload.type as PartyActivityType) ?? "not",
-      payload.summary.trim(),
-      userId,
-      payload.occurredAt
-    );
+    const not = await this.logActivity(partyId, type, summary, userId, occurredAt);
+    if (payload.sonrakiArama !== undefined) {
+      const { error } = await this.supabase.client
+        .from("party")
+        .update({ sonraki_arama: gunDogrula(payload.sonrakiArama), updated_at: new Date().toISOString() })
+        .eq("id", partyId);
+      if (error) throw error;
+    }
+    return not;
+  }
+
+  /**
+   * Görüşme notunu düzeltme / silme: yalnızca YAZANI yapabilir. Kartı
+   * yönetenin bile başkasının notunu değiştirmesi, notun altındaki adı yalan
+   * söyletirdi. Sistem satırları ve başka modüllerin yazdığı satırlar
+   * (fatura kesildi…) dokunulmaz.
+   */
+  private async kendiNotu(activityId: string, userId: string): Promise<any> {
+    const { data: row, error } = await this.supabase.client
+      .from("party_activity")
+      .select("*")
+      .eq("id", activityId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) throw new NotFoundException("Not bulunamadı");
+    if (row.type === "sistem" || row.related_type) throw new BadRequestException("Bu kayıt otomatik oluşturuldu, değiştirilemez");
+    if (row.user_id !== userId) throw new ForbiddenException("Yalnızca kendi notunu değiştirebilirsin");
+    await this.assertKayitYazilir(await this.findOne(row.party_id), userId);
+    return row;
+  }
+
+  async updateActivity(
+    activityId: string,
+    payload: { summary?: string; type?: PartyActivityType },
+    userId: string
+  ): Promise<PartyActivity> {
+    const row = await this.kendiNotu(activityId, userId);
+    const patch: Record<string, unknown> = {};
+    if (payload.type !== undefined) {
+      if (!(GORUSME_TURLERI as readonly string[]).includes(payload.type)) throw new BadRequestException("Geçersiz not türü");
+      patch.type = payload.type;
+    }
+    if (payload.summary !== undefined) patch.summary = payload.summary.trim().slice(0, 4000);
+    const tur = (patch.type ?? row.type) as PartyActivityType;
+    const metin = (patch.summary ?? row.summary) as string;
+    if (!metin && tur !== "ulasilamadi") throw new BadRequestException("Açıklama gerekli");
+    const { data, error } = await this.supabase.client
+      .from("party_activity")
+      .update(patch)
+      .eq("id", activityId)
+      .select("*")
+      .single();
+    if (error) throw error;
+    return mapActivity(data);
+  }
+
+  async deleteActivity(activityId: string, userId: string): Promise<void> {
+    await this.kendiNotu(activityId, userId);
+    const { error } = await this.supabase.client.from("party_activity").delete().eq("id", activityId);
+    if (error) throw error;
   }
 
   /**
@@ -1553,4 +1664,13 @@ export class PartyService {
     if (error) throw error;
     return mapActivity(row);
   }
+}
+
+/** YYYY-AA-GG günü ya da boş (null = planı kaldır). */
+function gunDogrula(v: string | null | undefined): string | null {
+  if (!v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(`${v}T00:00:00Z`))) {
+    throw new BadRequestException("Geçersiz tarih");
+  }
+  return v;
 }

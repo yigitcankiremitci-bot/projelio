@@ -151,4 +151,34 @@ export const baglantilar: TranslationDict = {
   "Eşleşen tedarikçi yok.": "No matching suppliers.",
   "Henüz tedarikçi yok. Bağlantı ve İlişkiler'den \"Tedarikçi yap\" ile ya da buradan ekleyebilirsin.":
     "No suppliers yet. Add one here or use \"Make supplier\" in Contacts & Relationships.",
+
+  // ─────────────────────────────────────────────── Müşteri kartı > Görüşme notları
+  "Görüşme notları": "Call notes",
+  "+ Not ekle": "+ Add note",
+  "Arandı": "Called",
+  "Ulaşılamadı": "No answer",
+  "Açmadı / meşgul — tek adımda kaydet": "Didn't pick up / busy — log it in one step",
+  "Üst üste {n} kez ulaşılamadı": "No answer {n} times in a row",
+  "Bu not silinsin mi?": "Delete this note?",
+  "Daha az göster": "Show less",
+  "Tüm notlar ({n})": "All notes ({n})",
+  "Henüz görüşme notu yok. Aradığında \"+ Not ekle\" ile ne konuşulduğunu yaz.":
+    "No call notes yet. After a call, use \"+ Add note\" to write down what was discussed.",
+  "Ne konuşuldu? Örn. Katalog istedi, fiyat teklifi bekliyor, karar verici Ahmet Bey.":
+    "What was discussed? E.g. Asked for the catalog, waiting for a quote, decision maker is Mr. Ahmet.",
+  "Ne konuşulduğunu kısaca yaz.": "Briefly write what was discussed.",
+  "İsteğe bağlı: meşguldü, sesli mesaj bırakıldı…": "Optional: line was busy, left a voicemail…",
+  "Planı kaldır": "Clear plan",
+  "Tekrar ara:": "Call again:",
+  "Tekrar ara · {tarih}": "Call again · {tarih}",
+  "Bugün aranacak": "Call today",
+  "Arama gecikti · {tarih}": "Call overdue · {tarih}",
+  "Aranacaklar önce": "Calls due first",
+  "Yarın": "Tomorrow",
+  "3 gün sonra": "In 3 days",
+  "1 hafta sonra": "In 1 week",
+  "2 hafta sonra": "In 2 weeks",
+  "Yok": "None",
+  "({n}. deneme)": "(attempt {n})",
+  "{n} not": "{n} notes",
 };

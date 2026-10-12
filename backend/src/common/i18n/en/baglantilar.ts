@@ -47,4 +47,9 @@ export const baglantilar: TranslationDict = {
   "Taslak kullanıcıya henüz gösterilmedi. Özeti göster, rolü sor ve kullanıcının cevabını bekle; onay aynı turda verilemez.":
     "The draft hasn't been shown to the user yet. Show the summary, ask for the role and wait for the user's reply; it can't be confirmed in the same turn.",
   "{hesap} hesabı tanınmadı": "{hesap} account not recognized",
+  // Görüşme notları (migration 160)
+  "Geçersiz not türü": "Invalid note type",
+  "Not bulunamadı": "Note not found",
+  "Bu kayıt otomatik oluşturuldu, değiştirilemez": "This entry was created automatically and can't be changed",
+  "Yalnızca kendi notunu değiştirebilirsin": "You can only change your own notes",
 };

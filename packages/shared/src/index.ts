@@ -8,6 +8,7 @@ export * from "./workLogDuration";
 export * from "./taskSearch";
 export * from "./butceToplama";
 export * from "./tahsilat";
+export * from "./gorusmeNotlari";
 export * from "./hesapAbonelik";
 export * from "./bilgiKartiBelge";
 export * from "./adminKullanici";

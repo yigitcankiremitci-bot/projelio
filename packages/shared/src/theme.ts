@@ -22,6 +22,11 @@ export const colors = {
     // satırlar sayfaya karışıyor, liste sayfadan ayrışmıyordu (kullanıcı
     // geri bildirimi 2026-10-10). Yüzeyle zemin arasında, zemine göre açık.
     listeSatirAlt: "#FBFCFD",
+    // Listede tıklanınca satırın altına açılan detay alanı (müşteri kartı).
+    // Satırlarla aynı renkte açılınca nerede bittiği seçilmiyordu (kullanıcı
+    // geri bildirimi, 2026-10-12): açık temada beyazdan hafif mavi-gri, koyu
+    // temada satırlardan bir ton AÇIK.
+    acilanAlan: "#EEF2F7",
     textPrimary: "#1A1F29",
     textSecondary: "#66707F",
     border: "#E3E6EB",
@@ -53,6 +58,8 @@ export const colors = {
     // bkz. light.listeSatirAlt — koyu temada yüzeyden biraz AÇIK: zemine
     // (#12151B) karışmasın.
     listeSatirAlt: "#20262F",
+    // bkz. light.acilanAlan
+    acilanAlan: "#29313D",
     textPrimary: "#F1F3F5",
     textSecondary: "#9AA2B0",
     border: "#2A3140",

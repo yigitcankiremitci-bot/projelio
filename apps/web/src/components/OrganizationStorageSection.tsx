@@ -11,11 +11,14 @@ import { useT } from "../lib/i18n";
  * ayarlarının içinde. Seçim yapılmazsa eski davranış sürer: dosyalar şirket
  * sahibinin varsayılan hesabına düşer.
  *
- * DEĞİŞTİRMENİN SINIRI: seçim yalnızca BUNDAN SONRA kurulacak departman/iş
- * klasörlerini yönlendirir. Var olan dosyalar bulundukları hesapta kalır;
- * taşımak, kullanıcının Drive'ında bizim kopyalayamayacağımız bir iş. Metinde
- * bunu açıkça yazıyoruz, yoksa "değiştirdim ama eski dosyalar taşınmadı"
- * sürprizi oluyor.
+ * DEĞİŞTİRMENİN SINIRI: seçim BUNDAN SONRAKİ dosyaları yönlendirir. Deposu
+ * başka hesapta kurulmuş departmanlar da bir sonraki dosyada şirketin hesabına
+ * geçer (bkz. FilesService.departmaniSirketDeposunaTasi) — eskiden geçmiyordu ve
+ * departmana yüklenenler kişisel Drive'a düşmeye devam ediyordu. Var olan
+ * dosyalar bulundukları hesapta kalır; taşımak, kullanıcının Drive'ında bizim
+ * kopyalayamayacağımız bir iş. Metinde bunu açıkça yazıyoruz, yoksa
+ * "değiştirdim ama eski dosyalar taşınmadı" sürprizi oluyor. İşlerin deposu
+ * (proje/görev klasör ağacı) bu geçişe girmez.
  */
 export default function OrganizationStorageSection({ organizationId }: { organizationId: string }) {
   const c = useThemeColors();
@@ -71,7 +74,7 @@ export default function OrganizationStorageSection({ organizationId }: { organiz
       </div>
       <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 12px", lineHeight: 1.5 }}>
         {t(
-          "Bu şirketin dosyaları seçtiğiniz hesapta, şirket adını taşıyan bir klasörde toplanır. Seçim yalnızca bundan sonra açılacak klasörler için geçerlidir; hâlihazırdaki dosyalar bulundukları hesapta kalır."
+          "Bu şirketin ve departmanlarının dosyaları seçtiğiniz hesapta, şirket adını taşıyan bir klasörde toplanır. Departmanlara bundan sonra eklenen dosyalar da bu hesaba gider; daha önce eklenmiş dosyalar bulundukları hesapta kalır."
         )}
       </p>
 

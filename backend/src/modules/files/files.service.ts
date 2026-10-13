@@ -1015,6 +1015,10 @@ export class FilesService {
     // eklememiş olabilir, o durumda klasör hâlâ açılmamıştır (bkz. migration 088).
     if (existing && (scope.kind === "department" || existing.drive_folder_id)) {
       const owner = storageOwner(existing);
+      if (scope.kind === "department") {
+        const tasindi = await this.departmaniSirketDeposunaTasi(scope.id, existing, owner);
+        if (tasindi) return tasindi;
+      }
       return { ...owner, folderId: existing.drive_folder_id };
     }
 
@@ -1082,6 +1086,12 @@ export class FilesService {
         organizationId: scope.id,
       });
 
+      // Klasörsüz satır çoğu zaman hesabın DEĞİŞTİRİLDİĞİ anlamına gelir
+      // (OrganizationStorageService.set kök klasörü sıfırlar). Kullanıcının
+      // açtığı alt klasörler hâlâ eski hesabın kimliklerini taşıyor; yeni
+      // hesapta karşılıkları açılmazsa o klasörlere yükleme düşer.
+      if (existing) await this.klasorAgaciniKur(scope, provider, accessToken, folderId);
+
       void this.syncFlatShares(scope).catch((err) =>
         this.logger.warn(`Bulut paylaşımları eşitlenemedi (organization=${scope.id}): ${String(err)}`)
       );
@@ -1106,6 +1116,140 @@ export class FilesService {
     );
 
     return { provider, accountId: account.id, folderId: folder.id };
+  }
+
+  /**
+   * Deposu şirketin seçtiği hesaptan BAŞKA bir hesapta kurulmuş departmanı,
+   * bundan sonraki dosyalar için şirketin hesabına geçirir.
+   *
+   * NEDEN: departmanın deposu ilk dosyada bir kez kuruluyor ve eskiden bir
+   * daha hiç değişmiyordu. Şirket sonradan kendi Drive'ını bağlayıp seçtiğinde
+   * departman yine kişisel Drive'a yüklemeye devam ediyordu — kullanıcı
+   * Pazarlama departmanına koyduğu Instagram içeriklerini kişisel Drive'ında
+   * buldu. Şirket için ayrı hesap seçmenin bütün amacı bu ayrımdı.
+   *
+   * ESKİ DOSYALAR TAŞINMAZ ve bozulmaz: her `files` satırı kendi hesabını
+   * taşıyor (storageAccountColumns), yani açma/indirme eski hesaptan sürer.
+   * Değişen yalnızca kök klasör ve kullanıcının açtığı alt klasörlerin bulut
+   * karşılıkları — yeni dosyalar yeni hesapta aynı ağaca iner.
+   *
+   * Şirket hesabı kullanılamıyorsa (izin geri çekilmiş) `undefined` döner ve
+   * departman eski hesabıyla çalışmaya devam eder; yüklemeyi durdurmak daha kötü.
+   */
+  private async departmaniSirketDeposunaTasi(
+    departmentId: string,
+    existing: any,
+    mevcut: { provider: StorageProvider; accountId: string }
+  ): Promise<{ provider: StorageProvider; accountId: string; folderId: string } | undefined> {
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("name, organization_id")
+      .eq("id", departmentId)
+      .maybeSingle();
+    if (!dept?.organization_id) return undefined;
+
+    // Ucuz kontrol önce: seçim yoksa ya da zaten aynı hesapsa hesabı hiç yüklemeyiz.
+    const binding = await this.orgStorage.find(dept.organization_id);
+    if (!binding) return undefined;
+    if (binding.provider === mevcut.provider && binding.accountId === mevcut.accountId) return undefined;
+
+    const resolved = await this.resolveOrganizationAccount(dept.organization_id);
+    if (!resolved) return undefined;
+    const { provider, account } = resolved;
+
+    const accessToken = await this.cloudStorage.getAccessToken(provider, account.id);
+    const root = await this.ensureScopeRoot({ provider, account, accessToken, organizationId: dept.organization_id });
+    const folder = await this.cloudStorage.findOrCreateFolder(provider, accessToken, dept.name || "Departman", root);
+
+    // Koşullu güncelleme: aynı anda iki yükleme taşımayı başlatırsa yalnızca
+    // biri satırı değiştirir; diğeri kazananın kaydıyla devam eder.
+    const eskiKolon = mevcut.provider === "google" ? "google_account_id" : "microsoft_account_id";
+    const { data: guncel, error } = await this.supabase.client
+      .from("department_storage")
+      .update({
+        ...storageAccountColumns(provider, account.id),
+        drive_folder_id: folder.id,
+        folder_web_view_link: folder.webViewLink ?? null,
+      })
+      .eq("department_id", departmentId)
+      .eq("storage_provider", existing.storage_provider ?? mevcut.provider)
+      .eq(eskiKolon, mevcut.accountId)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
+
+    if (!guncel) {
+      const { data: kazanan } = await this.supabase.client
+        .from("department_storage")
+        .select()
+        .eq("department_id", departmentId)
+        .maybeSingle();
+      if (!kazanan) return undefined;
+      return { ...storageOwner(kazanan), folderId: kazanan.drive_folder_id };
+    }
+
+    this.logger.log(
+      `Departman deposu şirketin hesabına geçirildi (department=${departmentId}, ` +
+        `${mevcut.provider}:${mevcut.accountId} → ${provider}:${account.id})`
+    );
+
+    const scope: FlatScope = { kind: "department", id: departmentId };
+    await this.klasorAgaciniKur(scope, provider, accessToken, folder.id);
+
+    void this.syncFlatShares(scope).catch((err) =>
+      this.logger.warn(`Bulut paylaşımları eşitlenemedi (department=${departmentId}): ${String(err)}`)
+    );
+
+    return { provider, accountId: account.id, folderId: folder.id };
+  }
+
+  /**
+   * Düz kapsamın Projelio'daki klasör ağacını (kind='user') verilen hesapta,
+   * verilen kökün altında kurar ve satırların bulut kimliklerini günceller.
+   *
+   * Depo hesabı değiştiğinde gerekiyor: klasör satırları hesap bilgisi
+   * taşımıyor, yalnızca bulut kimliği. Eski kimlikle yeni hesaba yazmaya
+   * çalışmak "klasör bulunamadı" ile düşerdi. findOrCreateFolder aynı adlı
+   * klasörü yeniden kullandığı için ikinci kez çalışması zararsız.
+   */
+  private async klasorAgaciniKur(
+    scope: FlatScope,
+    provider: StorageProvider,
+    accessToken: string,
+    kokDriveId: string
+  ): Promise<void> {
+    if (!(await this.foldersAvailable())) return;
+
+    const { data: satirlar, error } = await this.supabase.client
+      .from("file_folders")
+      .select("id, name, parent_folder_id")
+      .eq(this.flatTables(scope).idColumn, scope.id)
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+    if (!satirlar?.length) return;
+
+    const cocuklar = new Map<string | null, { id: string; name: string }[]>();
+    for (const s of satirlar as any[]) {
+      const ust = s.parent_folder_id ?? null;
+      cocuklar.set(ust, [...(cocuklar.get(ust) ?? []), s]);
+    }
+
+    // Üstten alta: her klasörün yeni üst kimliği ondan önce belli olmalı.
+    const kuyruk: { ustSatir: string | null; ustDriveId: string }[] = [{ ustSatir: null, ustDriveId: kokDriveId }];
+    while (kuyruk.length) {
+      const { ustSatir, ustDriveId } = kuyruk.shift()!;
+      for (const klasor of cocuklar.get(ustSatir) ?? []) {
+        try {
+          const yeni = await this.cloudStorage.findOrCreateFolder(provider, accessToken, klasor.name, ustDriveId);
+          await this.supabase.client.from("file_folders").update({ drive_folder_id: yeni.id }).eq("id", klasor.id);
+          kuyruk.push({ ustSatir: klasor.id, ustDriveId: yeni.id });
+        } catch (err) {
+          // Tek bir klasör yüzünden bütün geçişi düşürmüyoruz; o dalın altı
+          // eski kimliklerde kalır ve yalnızca oraya yükleme hata verir.
+          this.logger.warn(`Klasör yeni hesapta açılamadı (folder=${klasor.id}): ${String(err)}`);
+        }
+      }
+    }
   }
 
   /**
@@ -2165,7 +2309,12 @@ export class FilesService {
       revoked += 1;
     }
 
-    const existingGrants = new Set((grants ?? []).map((g: any) => g.user_id));
+    // Yalnızca ŞU ANKİ klasöre verilmiş izinler sayılır: depo şirketin hesabına
+    // geçtiğinde (departmaniSirketDeposunaTasi) eski klasördeki izin, yeni
+    // klasörü kadroya açmaz; sayılsaydı kimse yeni klasörü göremezdi.
+    const existingGrants = new Set(
+      (grants ?? []).filter((g: any) => g.drive_file_id === storage.drive_folder_id).map((g: any) => g.user_id)
+    );
     for (const userId of eligible) {
       if (existingGrants.has(userId)) continue;
       granted += await this.grantOneFlat(provider, accessToken, {

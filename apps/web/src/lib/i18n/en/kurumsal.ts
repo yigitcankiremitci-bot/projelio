@@ -393,8 +393,8 @@ export const kurumsal: TranslationDict = {
 
   // ─────────────────────────────────────────────── Şirketin dosya deposu
   "Dosya deposu": "File storage",
-  "Bu şirketin dosyaları seçtiğiniz hesapta, şirket adını taşıyan bir klasörde toplanır. Seçim yalnızca bundan sonra açılacak klasörler için geçerlidir; hâlihazırdaki dosyalar bulundukları hesapta kalır.":
-    "This company's files are collected in the account you choose, in a folder named after the company. The choice applies only to folders created from now on; existing files stay where they are.",
+  "Bu şirketin ve departmanlarının dosyaları seçtiğiniz hesapta, şirket adını taşıyan bir klasörde toplanır. Departmanlara bundan sonra eklenen dosyalar da bu hesaba gider; daha önce eklenmiş dosyalar bulundukları hesapta kalır.":
+    "This company's and its departments' files are collected in the account you choose, in a folder named after the company. Files added to departments from now on go to this account too; files added earlier stay where they are.",
   "Seçim yok — varsayılan hesabım kullanılsın": "No choice — use my default account",
   "Önce Ayarlar > Bağlantılar ekranından bir Drive ya da OneDrive hesabı bağlayın.":
     "Connect a Drive or OneDrive account from Settings > Connections first.",

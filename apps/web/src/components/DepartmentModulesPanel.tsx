@@ -12,6 +12,7 @@ import ModuleModal from "./ModuleModal";
 import ModuleCard from "./ModuleCard";
 import { IconX } from "./icons";
 import { useT } from "../lib/i18n";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 
 interface Props {
   organizationId: string;
@@ -139,6 +140,8 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     try {
       if (modalKey === moduleKey) setModalKey(null);
       await api.delete(`/organizations/${organizationId}/modules/${moduleKey}`);
+      // Sidebar ağacı departmanın altında modülleri listeliyor.
+      notifySidebarChanged();
       load();
       // Modülü kapatmak kayıtları silmez, sadece etkinliği kaldırır — geri alma
       // basitçe aynı modülü yeniden etkinleştirir.
@@ -146,10 +149,12 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
         label: t("Modül kaldırma"),
         run: async () => {
           await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: [moduleKey] });
+          notifySidebarChanged();
           load();
         },
         redo: async () => {
           await api.delete(`/organizations/${organizationId}/modules/${moduleKey}`);
+          notifySidebarChanged();
           load();
         },
       });
@@ -307,6 +312,7 @@ function AddModulesForm({
     setSaving(true);
     try {
       await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: selectedKeys });
+      notifySidebarChanged();
       onAdded();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("Modül eklenemedi"));

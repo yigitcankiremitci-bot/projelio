@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
-import { findCoverPreset } from "../lib/covers";
+import { useEffect, useState, type ReactNode } from "react";
+import { findCoverPreset, presetForSeed } from "../lib/covers";
 import { Link, useLocation } from "react-router-dom";
-import type { Department, Job } from "@projelio/shared";
+import type { Department, Job, ModuleCatalogEntry } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSidebarHierarchy, SidebarGroupNode, SidebarOrgNode } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import { backState, useHereAsBack } from "../lib/backTarget";
+import { getDepartmentCoverUrl } from "../lib/departmentCovers";
+import { departmanModulAdresi, departmanModulleriniYukle } from "../lib/departmanModulleri";
+import { onSidebarChanged } from "../lib/sidebarEvents";
+import ModuleEmblem from "./ModuleEmblem";
 import {
   IconBuilding,
   IconBriefcase,
   IconLayers,
   IconFolder,
-  IconListCheck,
   IconChevronRight,
   IconChevronDown,
   IconActivity,
@@ -59,6 +62,21 @@ export default function SidebarTree() {
   // toplanır. Düğüm varsayılan olarak AÇIK geldiği için açık olanı değil,
   // kullanıcının onu elle kapatıp kapatmadığını tutuyoruz.
   const [myJobsCollapsed, setMyJobsCollapsed] = useState(false);
+  // Departmanın altında listelenen modüller. Departman açılınca TEMBEL
+  // yüklenir: her şirketin her departmanı için açılışta iki istek atmak,
+  // kimsenin bakmadığı dallar için ağacı yavaşlatırdı. Modül eklenip
+  // kaldırılınca (bkz. notifySidebarChanged) önbellek boşaltılır, açık
+  // departmanlar aşağıdaki etkiyle yeniden yüklenir.
+  const [deptModules, setDeptModules] = useState<Map<string, ModuleCatalogEntry[]>>(new Map());
+  const [deptModulesKey, setDeptModulesKey] = useState(0);
+  useEffect(
+    () =>
+      onSidebarChanged(() => {
+        setDeptModules(new Map());
+        setDeptModulesKey((k) => k + 1);
+      }),
+    []
+  );
 
   // Kullanıcı derinlerdeyken (bir işin/organizasyonun/grubun içindeyken) o yolu
   // otomatik aç — elle açılmış diğer dalları kapatmadan, sadece ekler.
@@ -67,6 +85,10 @@ export default function SidebarTree() {
     const orgMatch = location.pathname.match(/^\/organizations\/([^/]+)/);
     const groupMatch = location.pathname.match(/^\/groups\/([^/]+)/);
     const deptMatch = location.pathname.match(/^\/departments\/([^/]+)/);
+    // Departman modülünün kendi sayfası: aktif modül satırı görünsün diye
+    // departmanın kendisi de açılır (departman sayfasının KENDİSİNDE açılmaz —
+    // organizasyondaki gibi, açıp kapatmak bilinçli bir eylem).
+    const deptModuleMatch = location.pathname.match(/^\/departments\/([^/]+)\/modules\//);
     // Bir proje/rutin sayfasındaysak da işin (dolayısıyla üstündeki
     // organizasyon/grubun) açılması gerekir — aksi halde aktif satır (bkz.
     // renderJob'un altına eklediği proje/rutin kısayolları) ağaçta gizli
@@ -146,6 +168,7 @@ export default function SidebarTree() {
       if (deptMatch) {
         const allOrgNodes: SidebarOrgNode[] = [...groups.flatMap((g) => g.orgs), ...standaloneOrgs];
         const parentOrgNode = allOrgNodes.find((node) => node.departments.some((d) => d.id === deptMatch[1]));
+        if (deptModuleMatch) next.add(`dept:${deptMatch[1]}`);
         if (parentOrgNode) {
           next.add(`org:${parentOrgNode.org.id}`);
           const parentGroup = groups.find((g) => g.orgs.some((o) => o.org.id === parentOrgNode.org.id));
@@ -183,6 +206,30 @@ export default function SidebarTree() {
     if (!soleOrgId) return;
     setExpanded((prev) => (prev.has(`org:${soleOrgId}`) ? prev : new Set(prev).add(`org:${soleOrgId}`)));
   }, [soleOrgId]);
+
+  // Açık departmanların modüllerini yükle (yalnızca henüz yüklenmemişleri).
+  useEffect(() => {
+    const allOrgNodes: SidebarOrgNode[] = [...groups.flatMap((g) => g.orgs), ...standaloneOrgs];
+    const bekleyen = allOrgNodes.flatMap((node) =>
+      node.departments.filter((d) => d.catalogKey && expanded.has(`dept:${d.id}`) && !deptModules.has(d.id))
+    );
+    if (bekleyen.length === 0) return;
+    let cancelled = false;
+    for (const d of bekleyen) {
+      departmanModulleriniYukle(d.organizationId, d.catalogKey).then((list) => {
+        if (cancelled) return;
+        // Açılamayan (henüz veri girişi olmayan) modüllerin gidecek yeri yok.
+        const acilabilir = list.filter((e) => departmanModulAdresi(d.id, e.key));
+        setDeptModules((prev) => new Map(prev).set(d.id, acilabilir));
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+    // deptModules bilerek dışarıda: her yanıt onu değiştirir, diğer yüklemeleri
+    // iptal ettirirdi. Tazeleme deptModulesKey ile tetikleniyor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanded, groups, standaloneOrgs, deptModulesKey]);
 
   if (loading) return null;
   if (groups.length === 0 && standaloneOrgs.length === 0 && standaloneJobs.length === 0) return null;
@@ -296,24 +343,55 @@ export default function SidebarTree() {
   };
 
   const renderDepartment = (dept: Department, depth: number) => {
+    const key = `dept:${dept.id}`;
+    const isExpanded = expanded.has(key);
     const active = location.pathname === `/departments/${dept.id}`;
+    const modules = deptModules.get(dept.id);
+    // Katalog dışı (özel) departmanın modülü olmaz; yüklenene kadar ok durur,
+    // boş çıkarsa kaybolur.
+    const hasModules = Boolean(dept.catalogKey) && (modules === undefined || modules.length > 0);
     return (
-      <Row
-        key={dept.id}
-        to={`/departments/${dept.id}`}
-        // Departman sayfasının geri bağlantısı, `from` gelmezse SABİT olarak
-        // şirketin departman sekmesine bakıyor. Sidebar her sayfada durduğu
-        // için kullanıcı anasayfadan girip "← Departmanlar" ile hiç görmediği
-        // bir sayfaya düşüyordu; bulunduğu yeri de yanına koyuyoruz.
-        linkState={hereBack ? backState(hereBack) : undefined}
-        icon={IconListCheck}
-        label={departmanAdi(dept.name, t)}
-        depth={depth}
-        active={active}
-        expandable={false}
-        expanded={false}
-        onToggle={() => {}}
-      />
+      <div key={dept.id}>
+        <Row
+          to={`/departments/${dept.id}`}
+          // Departman sayfasının geri bağlantısı, `from` gelmezse SABİT olarak
+          // şirketin departman sekmesine bakıyor. Sidebar her sayfada durduğu
+          // için kullanıcı anasayfadan girip "← Departmanlar" ile hiç görmediği
+          // bir sayfaya düşüyordu; bulunduğu yeri de yanına koyuyoruz.
+          linkState={hereBack ? backState(hereBack) : undefined}
+          icon={IconLayers}
+          // İşlerdeki gibi kapakla: yüklenmiş kapak, yoksa katalog departmanının
+          // varsayılan fotoğrafı, o da yoksa kimlikten türetilen hazır kapak —
+          // departman kartıyla (DepartmentsPanel) aynı görünüm.
+          imageUrl={getDepartmentCoverUrl(dept) ?? `preset:${presetForSeed(dept.id).key}`}
+          label={departmanAdi(dept.name, t)}
+          depth={depth}
+          active={active}
+          expandable={hasModules}
+          expanded={isExpanded}
+          onToggle={() => toggle(key)}
+          onLabelDoubleClick={hasModules ? () => toggle(key) : undefined}
+        />
+        {isExpanded &&
+          modules?.map((entry) => {
+            const to = departmanModulAdresi(dept.id, entry.key)!;
+            return (
+              <Row
+                key={entry.key}
+                to={to}
+                linkState={hereBack ? backState(hereBack) : undefined}
+                icon={IconLayers}
+                leading={<ModuleEmblem moduleKey={entry.key} size={18} radius="4px" />}
+                label={entry.name}
+                depth={depth + 1}
+                active={location.pathname === `/departments/${dept.id}/modules/${entry.key}`}
+                expandable={false}
+                expanded={false}
+                onToggle={() => {}}
+              />
+            );
+          })}
+      </div>
     );
   };
 
@@ -465,6 +543,7 @@ function Row({
   to,
   linkState,
   icon: Icon,
+  leading,
   imageUrl,
   label,
   depth,
@@ -483,6 +562,8 @@ function Row({
    */
   linkState?: unknown;
   icon: IconComp;
+  // Verilirse ikonun ve kapağın yerine çizilir (örn. modül amblemi).
+  leading?: ReactNode;
   // Varsa ikon yerine gösterilen minik kapak resmi (örn. organizasyonun kapağı).
   // Yüklenemezse sessizce ikona geri düşülür.
   imageUrl?: string;
@@ -520,7 +601,9 @@ function Row({
   };
   const content = (
     <>
-      {presetCover ? (
+      {leading ? (
+        leading
+      ) : presetCover ? (
         <span
           aria-hidden
           style={{

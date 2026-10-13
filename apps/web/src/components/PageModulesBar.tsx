@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import type { JobModule, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
+import type { JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isOpenableModule } from "../lib/entityModules";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { moduleSurface } from "../lib/moduleSurfaces";
+import { departmanModulAdresi, departmanModulleriniYukle } from "../lib/departmanModulleri";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import { sonAcilislar, sonKullanimaGoreSirala } from "../lib/sonKullanilanModul";
 import ListRowLink, { ROW_INNER_HEIGHT } from "./ListRowLink";
@@ -56,16 +57,7 @@ export default function PageModulesBar(props: Props) {
         const atanan = new Set(mods.map((m) => m.moduleKey));
         return cat.filter((e) => atanan.has(e.key));
       }
-      // Katalog dışı (özel) departmanın modülü yok.
-      if (!props.departmentKey) return [];
-      const [cat, org] = await Promise.all([
-        api
-          .get<ModuleCatalogEntry[]>(`/module-catalog?departmentKey=${encodeURIComponent(props.departmentKey)}`)
-          .catch(() => []),
-        api.get<OrganizationModule[]>(`/organizations/${props.organizationId}/modules`).catch(() => []),
-      ]);
-      const etkin = new Set(org.map((m) => m.moduleKey));
-      return cat.filter((e) => etkin.has(e.key));
+      return departmanModulleriniYukle(props.organizationId, props.departmentKey);
     };
     yukle().then((list) => {
       if (!cancelled) setEntries(list);
@@ -84,12 +76,8 @@ export default function PageModulesBar(props: Props) {
 
   /** Modül nerede açılır: sayfa yüzeyli kendi adresinde, modal yüzeyli yerinde. */
   const hedef = (entry: ModuleCatalogEntry): { to?: string; onClick?: () => void } => {
+    if (props.kind === "department") return { to: departmanModulAdresi(props.departmentId, entry.key) };
     if (!isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key]))) return {};
-    if (props.kind === "department") {
-      // Departmanın modül paneli ?module= parametresini zaten çözüyor: sayfa
-      // yüzeyliyi kendi adresine götürüyor, modal yüzeyliyi yerinde açıyor.
-      return { to: `/departments/${props.departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}` };
-    }
     return moduleSurface(entry.key) === "modal"
       ? { onClick: () => setModalEntry(entry) }
       : { to: `/jobs/${props.jobId}/modules/${encodeURIComponent(entry.key)}` };

@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
+import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
 
 interface Props {
@@ -79,6 +80,8 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
     setSaving(true);
     try {
       await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: selectedKeys });
+      // Sidebar ağacı departmanın altında modülleri listeliyor.
+      notifySidebarChanged();
       onAdded();
       onClose();
     } catch (err) {

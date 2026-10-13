@@ -837,6 +837,7 @@ export const hatalar: TranslationDict = {
   "Süreyi anlayamadım. Örnek: \"45\", \"1s 30dk\", \"2 saat\". En fazla {p1} saat.": "I couldn't understand the duration. Examples: \"45\", \"1h 30m\", \"2 hours\". At most {p1} hours.",
   "Tek mesajda en fazla {MAX_ATTACHMENTS_PER_MESSAGE} dosya gönderebilirsin.": "You can send at most {MAX_ATTACHMENTS_PER_MESSAGE} files in one message.",
   "Bu dosyalar birlikte tek mesaj için çok büyük. Birkaç mesaja bölerek gönder.": "These files are too large together for one message. Split them across a few messages.",
+  "items boş: en az bir ürün-görsel eşlemesi gerekli.": "items is empty: at least one product-image pairing is required.",
   "Teknik özellik en fazla {MAX_LIST_TEXT} karakter olabilir": "A technical spec can be at most {MAX_LIST_TEXT} characters",
   "Webhook'taki abonelik bulunamadı: {providerRef}": "Subscription from the webhook not found: {providerRef}",
   "Zorunlu alan(lar) eksik: {p1}": "Required field(s) missing: {p1}",

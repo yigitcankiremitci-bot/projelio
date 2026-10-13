@@ -15,6 +15,7 @@ import ProductDetailModal from "./ProductDetailModal";
 import UrunExcelModal from "./UrunExcelModal";
 import { IconUpload } from "./icons";
 import { useT } from "../lib/i18n";
+import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 
 export interface ProductsPanelHandle {
   openAdd: () => void;
@@ -53,7 +54,11 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   const t = useT();
   const scrollRef = useDragScroll<HTMLDivElement>(layout === "scroll");
   const isDesktop = useIsDesktop();
-  const compactCards = layout === "scroll" && !isDesktop;
+  // Üst üste binen deste (ProductStack) YALNIZCA dokunmatik cihazda. Eskiden
+  // tek ölçüt genişlikti (<880 px): küçük ekranlı ya da yakınlaştırılmış bir
+  // dizüstünde deste açılıyor, kartlar fareyle iç içe geçmiş görünüyordu
+  // (2026-10-13). Dizüstü dar da olsa düz, kaydırmalı satırı görür.
+  const compactCards = layout === "scroll" && !isDesktop && DOKUNMATIK_CIHAZ;
   const cardWidth = 260;
   // Küçültme yalnızca anasayfa şeridinde: ayrı Ürün/Hizmet sekmesinde
   // listeyi gizlemek sekmenin kendisini anlamsızlaştırırdı.
@@ -157,7 +162,9 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
           ref={scrollRef}
           style={
             layout === "grid"
-              ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }
+              ? // min(260px, 100%): kap 260 px'ten darsa tek sütun kabın genişliğine
+                // iner; aksi hâlde kart kabın dışına taşıyordu.
+                { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 14 }
               : {
                   display: "flex",
                   flexWrap: "nowrap",

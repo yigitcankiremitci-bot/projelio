@@ -16,6 +16,7 @@ const JSZip: any = (JSZipModul as any).loadAsync ? JSZipModul : (JSZipModul as a
  * `workbook` etiketini bulamayıp "Cannot read properties of undefined (reading
  * 'sheets')" diye patlıyor. Kullanıcı "dosyam xlsx ama kabul etmiyor" diyordu
  * — haklıydı. "Strict Open XML" kaydı da aynı sınıf: ad alanları farklı adreste.
+ * openpyxl'in mutlak ilişki adresleri de (bkz. relsHedefleriniGoreceYap).
  *
  * Önce dosya olduğu gibi denenir; yalnızca düşerse düzeltilmiş kopya denenir.
  * O da düşerse İLK hata fırlatılır — asıl sebep odur.
@@ -62,6 +63,40 @@ export function xmlNormallestir(xml: string): string {
   return sonuc;
 }
 
+/**
+ * Bir .rels dosyasındaki MUTLAK hedefleri (`Target="/xl/comments/comment1.xml"`)
+ * ilişkinin sahibi olan parçanın klasörüne göre GÖRELİ yazar.
+ *
+ * Neden: Python'un openpyxl'i (Claude'a, ChatGPT'ye düzenletilen dosyaların
+ * hepsi ondan çıkıyor) hedefleri paket kökünden mutlak yazar; standart buna izin
+ * verir ve Excel açar. ExcelJS ise bağları dosya adına göre eşliyor ve mutlak
+ * adresi tanımıyor. Şablonumuzun başlık hücrelerinde açıklama (yorum) olduğu
+ * için "şablonu indir → Claude'a düzenlet → yükle" yolu "reading 'comments'"
+ * hatasıyla her seferinde kırılıyordu (yorumlar için bkz. aşağıdaki not).
+ * Dış bağlantılar (TargetMode="External") adres değil URL, dokunulmaz.
+ */
+export function relsHedefleriniGoreceYap(xml: string, relsYolu: string): string {
+  // xl/worksheets/_rels/sheet1.xml.rels → sahibi xl/worksheets/sheet1.xml → klasörü xl/worksheets
+  const sahipKlasor = relsYolu.replace(/(^|\/)_rels\/[^/]*$/, "").split("/").filter(Boolean);
+  return xml.replace(/<Relationship\b[^>]*>/g, (etiket) => {
+    // Hücre yorumları: ExcelJS yorum dosyasını yalnızca kendi yazdığı adda
+    // (xl/comments1.xml, xl/drawings/vmlDrawing1.vml) tanıyor; openpyxl
+    // xl/comments/comment1.xml yazıyor ve adres göreli olsa da bulunamıyor.
+    // Okumada yorumun değeri yok (bizim şablonda yalnızca sütun açıklaması),
+    // bağı atmak dosyayı açılır kılıyor. Bu yol zaten yalnızca ilk deneme
+    // düştüğünde çalışıyor; düzgün dosyaların yorumları olduğu gibi okunur.
+    if (/Type="[^"]*\/(comments|vmlDrawing)"/.test(etiket)) return "";
+    if (/TargetMode="External"/.test(etiket)) return etiket;
+    return etiket.replace(/Target="\/([^"]*)"/, (_t, hedef: string) => {
+      const parcalar = hedef.split("/");
+      let ortak = 0;
+      while (ortak < sahipKlasor.length && ortak < parcalar.length - 1 && sahipKlasor[ortak] === parcalar[ortak]) ortak++;
+      const goreli = [...Array(sahipKlasor.length - ortak).fill(".."), ...parcalar.slice(ortak)].join("/");
+      return `Target="${goreli}"`;
+    });
+  });
+}
+
 async function xlsxNormallestir(buffer: Buffer): Promise<Buffer | null> {
   const zip = await JSZip.loadAsync(buffer);
   let degisti = false;
@@ -69,7 +104,8 @@ async function xlsxNormallestir(buffer: Buffer): Promise<Buffer | null> {
     const dosya = zip.files[ad];
     if (dosya.dir || !/\.(xml|rels)$/i.test(ad)) continue;
     const eski = await dosya.async("string");
-    const yeni = xmlNormallestir(eski);
+    let yeni = xmlNormallestir(eski);
+    if (/\.rels$/i.test(ad)) yeni = relsHedefleriniGoreceYap(yeni, ad);
     if (yeni !== eski) {
       zip.file(ad, yeni);
       degisti = true;

@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { xmlNormallestir } from "./xlsx-yukle";
+import { relsHedefleriniGoreceYap, xmlNormallestir } from "./xlsx-yukle";
 
 const ANA = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
@@ -30,4 +30,22 @@ test("Strict Open XML ad alanını Transitional'a çevirir", () => {
 test("olağan dosyayı değiştirmez", () => {
   const xml = `<workbook xmlns="${ANA}"><sheets/></workbook>`;
   assert.equal(xmlNormallestir(xml), xml);
+});
+
+test("openpyxl'in mutlak ilişki adreslerini parçanın klasörüne göre göreli yazar", () => {
+  const xml = `<Relationships><Relationship Type="t/drawing" Target="/xl/drawings/drawing1.xml" Id="r1" /><Relationship Type="t/link" Target="https://ornek.com" TargetMode="External" Id="r2" /></Relationships>`;
+  assert.equal(
+    relsHedefleriniGoreceYap(xml, "xl/worksheets/_rels/sheet1.xml.rels"),
+    `<Relationships><Relationship Type="t/drawing" Target="../drawings/drawing1.xml" Id="r1" /><Relationship Type="t/link" Target="https://ornek.com" TargetMode="External" Id="r2" /></Relationships>`
+  );
+  assert.equal(relsHedefleriniGoreceYap(`<Relationship Target="/xl/workbook.xml"/>`, "_rels/.rels"), `<Relationship Target="xl/workbook.xml"/>`);
+  assert.equal(
+    relsHedefleriniGoreceYap(`<Relationship Target="/xl/worksheets/sheet1.xml"/>`, "xl/_rels/workbook.xml.rels"),
+    `<Relationship Target="worksheets/sheet1.xml"/>`
+  );
+});
+
+test("hücre yorumu bağlarını atar (ExcelJS openpyxl'in yorum dosyasını bulamıyor)", () => {
+  const xml = `<Relationships><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments" Target="/xl/comments/comment1.xml" Id="comments" /><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing" Target="/xl/drawings/commentsDrawing1.vml" Id="anysvml" /></Relationships>`;
+  assert.equal(relsHedefleriniGoreceYap(xml, "xl/worksheets/_rels/sheet1.xml.rels"), `<Relationships></Relationships>`);
 });

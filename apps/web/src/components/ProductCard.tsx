@@ -130,6 +130,11 @@ export default function ProductCard({ product, onOpen, onCoverUpdated, compact =
       style={{
         display: "flex",
         flexDirection: "column",
+        // Kök bir <button>: genişlik verilmezse içeriği kadar büyür ve tek
+        // satırlık (nowrap) uzun ürün adı kartı ızgara hücresinden taşırıp
+        // komşusunun üstüne bindiriyordu (2026-10-13, uzun adlı ürünler).
+        width: "100%",
+        minWidth: 0,
         textAlign: "left",
         border: `1px solid ${c.border}`,
         borderRadius: 12,

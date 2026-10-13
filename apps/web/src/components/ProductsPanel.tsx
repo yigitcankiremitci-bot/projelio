@@ -181,7 +181,8 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             // okunamaz hale geliyordu (bkz. DepartmentsPanel'deki aynı ölçü).
             <div
               key={p.id}
-              style={layout === "grid" ? undefined : { flex: `0 0 ${cardWidth}px`, width: cardWidth }}
+              // minWidth 0: ızgara öğesi içeriğinin en dar hâlinden küçülemezse hücreyi aşar.
+              style={layout === "grid" ? { minWidth: 0 } : { flex: `0 0 ${cardWidth}px`, width: cardWidth }}
             >
               <ProductCard product={p} onOpen={() => setOpen(p)} onCoverUpdated={() => load()} />
             </div>

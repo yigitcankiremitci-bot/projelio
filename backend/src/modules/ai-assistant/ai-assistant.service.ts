@@ -806,6 +806,7 @@ const ACTION_LABELS: Record<string, string> = {
   update_operation: "rutin güncellendi",
   create_product: "ürün eklendi",
   update_product: "ürün güncellendi",
+  add_product_images: "ürün fotoğrafları eklendi",
   export_report: "rapor dosyası üretildi",
   import_tasks_from_sheet: "dosyadan toplu görev eklendi",
   import_module_records_from_sheet: "dosyadan toplu modül kaydı eklendi",
@@ -1647,8 +1648,11 @@ export class AiAssistantService {
       "- Her modül kayıt defteri DEĞİLDİR: müşteri, ürünler ve sosyal medya kendi ekranlarına yazar, " +
         "analiz/raporlama/denetim gibi türev paneller ise veriyi başka modüllerden üretir. " +
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
-      "- ÜRÜNLER istisnadır: kendi araçları var (list_products/create_product/update_product). " +
+      "- ÜRÜNLER istisnadır: kendi araçları var (list_products/create_product/update_product/add_product_images). " +
         "Ürün Yönetimi modülünde kayıt istendiğinde kullanıcıyı sayfaya yönlendirme, o araçları kullan.",
+      "- Kullanıcı ürün GÖRSELLERİ gönderip ürünlere eklemeni isterse: görsellerdeki ürünleri sen tanı, " +
+        "list_products ile listeyi al, eşleştir ve add_product_images ile TEK çağrıda ekle. Eşlemeyi kullanıcıya " +
+        "yaptırma; görselleri iş bitmeden release_files ile BIRAKMA.",
       "",
       "## Yaptım (kişisel iş günlüğü)",
       "Kullanıcı sana BİTMİŞ bir işi anlattığında — \"bugün müşteriyle görüştüm\", \"raporu bitirdim\", " +
@@ -3291,14 +3295,17 @@ export class AiAssistantService {
       }
 
       case "create_product":
-      case "update_product": {
+      case "update_product":
+      case "add_product_images": {
         // Ürünün kendi sayfası yok; listesi organizasyonun Ürünler sekmesinde.
         const organizationId = input.organizationId ?? (await this.organizationIdOfProduct(result?.productId));
         if (!organizationId) return null;
         const label =
           toolName === "create_product"
             ? t("Ürün eklendi") + (result?.ad ? `: ${result.ad}` : "")
-            : t("Ürün güncellendi");
+            : toolName === "add_product_images"
+              ? t("Ürün fotoğrafları eklendi")
+              : t("Ürün güncellendi");
         return make(
           label,
           `/organizations/${organizationId}?tab=products`,
@@ -5357,8 +5364,48 @@ export class AiAssistantService {
               fiyat: p.price,
               paraBirimi: p.currency,
               durum: p.status,
+              // Galeri ürün başına 12 ile sınırlı; dolu ürüne eklemeyi model önceden görsün.
+              gorselSayisi: p.images?.length || undefined,
             })
           );
+      }
+
+      case "add_product_images": {
+        const items: { productId: string; dosyaKimligi: string }[] = Array.isArray(input.items) ? input.items : [];
+        if (!items.length) throw new BadRequestException("items boş: en az bir ürün-görsel eşlemesi gerekli.");
+        const eklenen: { dosya: string; urun: string }[] = [];
+        const hatalar: { dosya: string; productId: string; hata: string }[] = [];
+        const gorulen = new Set<string>();
+        let ilkUrun: string | undefined;
+        // Sırayla: aynı ürüne paralel ekleme galeri sırasını (sort_order) çakıştırırdı.
+        for (const item of items.slice(0, 100)) {
+          const anahtar = `${item.productId}:${item.dosyaKimligi}`;
+          if (gorulen.has(anahtar)) continue;
+          gorulen.add(anahtar);
+          const dosya = this.kartvizitGorseli(userId, item.dosyaKimligi);
+          if (!dosya || !dosya.mimeType.startsWith("image/")) {
+            hatalar.push({ dosya: item.dosyaKimligi, productId: item.productId, hata: "görsel bulunamadı (süresi dolmuş olabilir)" });
+            continue;
+          }
+          try {
+            // Yetki addImage içinde (assertCanManage) — ürünün şirketine göre.
+            const urun = await this.productsService.addImage(
+              item.productId,
+              { buffer: dosya.buffer, originalname: dosya.name, mimetype: dosya.mimeType, size: dosya.buffer.length } as Express.Multer.File,
+              userId
+            );
+            ilkUrun ??= urun.id;
+            eklenen.push({ dosya: dosya.name, urun: urun.name });
+          } catch (err) {
+            hatalar.push({ dosya: dosya.name, productId: item.productId, hata: (err as Error).message });
+          }
+        }
+        return pruneEmpty({
+          productId: ilkUrun,
+          eklenenSayisi: eklenen.length,
+          eklenen,
+          hatalar: hatalar.length ? hatalar : undefined,
+        });
       }
 
       case "create_product": {

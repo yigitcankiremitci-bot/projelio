@@ -108,6 +108,8 @@ export const WRITE_TOOLS = new Set<string>([
   // olarak yok: müşteri kartını ekrandan kaldırmak arayüzden yapılsın.
   "create_customer",
   "update_customer",
+  // Ürün galerisine fotoğraf ekler; silmez, yalnızca ekler.
+  "add_product_images",
   // Toplu kart açma; önizleme varsayılan (bkz. import_tasks_from_sheet).
   "import_customers_from_sheet",
   "update_connection",
@@ -2405,6 +2407,35 @@ export const AI_TOOLS: Anthropic.Tool[] = [
         minStock: { type: "number", description: "Kritik stok seviyesi." },
       },
       required: ["productId"],
+    },
+  },
+  {
+    name: "add_product_images",
+    description:
+      "Sohbete gönderilen görselleri ürünlerin fotoğraf galerisine ekler — TOPLU, tek çağrıda. Kullanıcı " +
+      "\"bu görselleri ürünlere ekle\" dediğinde akış şu: (1) her görselde ürünü TANI (ambalajdaki ad, " +
+      "form: tablet/sprey/krem…); (2) list_products ile şirketin ürün listesini al; (3) her görseli adı ve " +
+      "formu en iyi eşleşen ürüne bağla ve HEPSİNİ bu araçla tek seferde ekle. Kullanıcıdan görsel-ürün " +
+      "eşlemesi İSTEME, işi sen yap. Yalnızca gerçekten belirsiz olanları (listede karşılığı yok ya da iki " +
+      "ürüne eşit uyuyor) ekleme ve sonunda kullanıcıya dosya adlarıyla sor. Bir görsel birden çok ürüne " +
+      "eklenebilir. Ürün başına en fazla 12 fotoğraf. dosyaKimligi \"Şu an açık dosyalar\" listesinden.",
+    input_schema: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          maxItems: 100,
+          items: {
+            type: "object",
+            properties: {
+              productId: { type: "string", description: "list_products'tan gelen kimlik." },
+              dosyaKimligi: { type: "string", description: "Açık dosyalar listesindeki görselin kimliği." },
+            },
+            required: ["productId", "dosyaKimligi"],
+          },
+        },
+      },
+      required: ["items"],
     },
   },
   {

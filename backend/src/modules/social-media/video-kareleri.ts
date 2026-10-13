@@ -122,10 +122,13 @@ export async function kareleriCikar(dosya: string, klasor: string, sureSn: numbe
 /**
  * Görseli modele uygun boyuta indirir (JPEG). Anthropic 5 MB'ın üstündeki
  * görseli reddediyor; telefon fotoğrafları sık sık bunu aşıyor.
+ *
+ * `kenar` varsayılanı video karelerininki; Lio'ya doğrudan gönderilen görseller
+ * daha büyük kenarla küçültülüyor (bkz. ai-attachments.service.ts).
  */
-export async function gorseliKucult(dosya: string, klasor: string): Promise<Buffer> {
+export async function gorseliKucult(dosya: string, klasor: string, kenar = KARE_KENAR): Promise<Buffer> {
   const cikti = join(klasor, `gorsel-${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`);
-  await calistir("ffmpeg", ["-v", "error", "-y", "-i", dosya, "-frames:v", "1", "-vf", olcek(), "-q:v", "4", cikti], KOMUT_ZAMAN_ASIMI_MS);
+  await calistir("ffmpeg", ["-v", "error", "-y", "-i", dosya, "-frames:v", "1", "-vf", olcek(kenar), "-q:v", "4", cikti], KOMUT_ZAMAN_ASIMI_MS);
   return readFile(cikti);
 }
 
@@ -153,9 +156,9 @@ export async function sesiCikar(dosya: string, klasor: string): Promise<Buffer |
   }
 }
 
-/** Uzun kenarı KARE_KENAR'a indirir; küçük görseli büyütmez. */
-function olcek(): string {
-  return `scale='if(gt(iw,ih),min(${KARE_KENAR},iw),-2)':'if(gt(iw,ih),-2,min(${KARE_KENAR},ih))'`;
+/** Uzun kenarı `kenar`a (varsayılan KARE_KENAR) indirir; küçük görseli büyütmez. */
+function olcek(kenar = KARE_KENAR): string {
+  return `scale='if(gt(iw,ih),min(${kenar},iw),-2)':'if(gt(iw,ih),-2,min(${kenar},ih))'`;
 }
 
 function calistir(komut: string, argumanlar: string[], zamanAsimiMs: number): Promise<string> {

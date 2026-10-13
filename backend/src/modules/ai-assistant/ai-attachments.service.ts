@@ -20,6 +20,9 @@ import {
 } from "./ai-sheet-import";
 import { hataMetni } from "../../common/i18n/index";
 import { xlsxYukle } from "../../common/excel/xlsx-yukle";
+import { calismaKlasoru, ffmpegVarMi, gorseliKucult, temizle } from "../social-media/video-kareleri";
+import { join } from "node:path";
+import { writeFile } from "node:fs/promises";
 
 /** Lio'nun okuyabildiği ek türleri. */
 export type AttachmentKind = "image" | "pdf" | "document" | "sheet" | "text" | "audio";
@@ -79,8 +82,27 @@ export interface AttachmentSummary {
 // --- Sınırlar -------------------------------------------------------------
 // Her sınır doğrudan ya bir sağlayıcı kısıtı ya da bir maliyet kararıdır.
 
-/** Anthropic'in tek görsel için kabul ettiği üst sınır. */
+/** Anthropic'in tek görsel için kabul ettiği üst sınır (küçültmeden SONRA). */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+/**
+ * Yüklemede kabul edilen görsel. ffmpeg varsa görsel küçültüldükten sonra
+ * MAX_IMAGE_BYTES'a bakılır; telefon fotoğrafları 5 MB'ı sık sık aşıyor.
+ */
+const MAX_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
+/**
+ * Görselin uzun kenarı bu piksele indirilir. Anthropic zaten 1568'in üstünü
+ * kendi tarafında küçültüyor, yani modelin gördüğü değişmiyor; kazanç istek
+ * boyutunda. Ayrıca bir istekte 20'den fazla görsel olduğunda Anthropic
+ * 2000 px'i aşan görseli REDDEDİYOR — 50 ürün fotoğrafı ancak böyle geçer.
+ */
+const IMAGE_MAX_EDGE = 1568;
+/** Bunun altındaki görsel küçültülmez: kazanç ffmpeg'i çalıştırmaya değmez. */
+const IMAGE_SHRINK_FROM_BYTES = 400 * 1024;
+/**
+ * Bir mesajdaki görsel+PDF'lerin base64 toplamı. Anthropic'in istek gövdesi
+ * sınırı 32 MB; geçmiş, araç şemaları ve sabit dosyalar için pay bırakılıyor.
+ */
+const MAX_MESSAGE_BINARY_BYTES = 24 * 1024 * 1024;
 /** PDF base64'e çevrilip istek gövdesine giriyor; bunun üstü isteği şişiriyor. */
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
 /** Word/Excel/metin dosyaları için üst sınır. */
@@ -95,8 +117,16 @@ const MAX_DOCUMENT_BYTES = 15 * 1024 * 1024;
 const MAX_TEXT_CHARS = Number(process.env.AI_ATTACHMENT_TEXT_CHARS ?? 20_000);
 // Excel'de sayfa başına okunacak azami satır artık burada değil: satırlar
 // sunucuda saklandığı için sınır MAX_RETAINED_ROWS (bkz. ai-sheet-import.ts).
-/** Tek mesaja iliştirilebilecek azami ek. */
-export const MAX_ATTACHMENTS_PER_MESSAGE = 5;
+/**
+ * Tek mesaja iliştirilebilecek azami ek.
+ *
+ * 5'ti; kullanıcılar ürün görsellerini toplu atıyor ve beşte takılıyorlardı.
+ * 50 görselin önünde iki engel vardı, ikisi de ele alındı: istek boyutu
+ * (görseller küçültülüyor, toplam MAX_MESSAGE_BINARY_BYTES ile sınırlı) ve
+ * sohbete sabitlenen dosya sınırı (MAX_ACTIVE_FILES bu değere bağlı, bkz.
+ * ai-assistant.service.ts — yoksa fazlası SESSİZCE düşerdi).
+ */
+export const MAX_ATTACHMENTS_PER_MESSAGE = Number(process.env.AI_MAX_ATTACHMENTS ?? 50);
 /**
  * Multer'ın kabul edeceği üst sınır — türe özel sınırlar (görsel 5 MB, PDF 20 MB…)
  * dosya okunduktan sonra ayrıca uygulanır. Buradaki değer en geniş türe (ses) göredir.
@@ -346,13 +376,22 @@ export class AiAttachmentsService {
     if (ids.length > MAX_ATTACHMENTS_PER_MESSAGE) {
       throw new BadRequestException(hataMetni("Tek mesajda en fazla {MAX_ATTACHMENTS_PER_MESSAGE} dosya gönderebilirsin.", { MAX_ATTACHMENTS_PER_MESSAGE }));
     }
-    return ids.map((id) => {
+    const found = ids.map((id) => {
       const found = this.prepared.get(id);
       if (!found || found.userId !== userId) {
         throw new BadRequestException("Dosyanın süresi doldu ya da bulunamadı. Lütfen tekrar yükle.");
       }
       return found;
     });
+    // Sınır API çağrısından ÖNCE: aşılırsa sağlayıcı 413 döner ve kullanıcı
+    // anlamsız bir "istek başarısız" görürdü.
+    const binary = found.reduce((t, a) => t + (a.base64?.length ?? 0), 0);
+    if (binary > MAX_MESSAGE_BINARY_BYTES) {
+      throw new BadRequestException(
+        "Bu dosyalar birlikte tek mesaj için çok büyük. Birkaç mesaja bölerek gönder."
+      );
+    }
+    return found;
   }
 
   discard(userId: string, id: string): void {
@@ -457,10 +496,20 @@ export class AiAttachmentsService {
     };
 
     switch (kind) {
-      case "image":
-        record.base64 = buffer.toString("base64");
-        record.detail = `Görsel · ${humanSize(buffer.length)}`;
+      case "image": {
+        const kucuk = await this.shrinkImage(buffer, name);
+        if (kucuk) {
+          record.mimeType = "image/jpeg";
+          record.sizeBytes = kucuk.length;
+        }
+        const gorsel = kucuk ?? buffer;
+        if (gorsel.length > MAX_IMAGE_BYTES) {
+          throw new BadRequestException(hataMetni("\"{name}\" çok büyük ({p2}). Bu tür için sınır {p3}.", { name, p2: humanSize(gorsel.length), p3: humanSize(MAX_IMAGE_BYTES) }));
+        }
+        record.base64 = gorsel.toString("base64");
+        record.detail = `Görsel · ${humanSize(gorsel.length)}`;
         break;
+      }
 
       case "pdf":
         record.base64 = buffer.toString("base64");
@@ -557,9 +606,33 @@ export class AiAttachmentsService {
     throw new BadRequestException(hataMetni("\"{name}\" türünü ({mimeType}) okuyamıyorum.", { name, mimeType }));
   }
 
+  /**
+   * Görseli uzun kenarı IMAGE_MAX_EDGE olacak JPEG'e çevirir.
+   *
+   * ffmpeg yoksa (yerel geliştirme) ya da çeviri başarısızsa `undefined` döner
+   * ve görsel olduğu gibi kullanılır — küçültme bir iyileştirme, şart değil.
+   * Sonuç orijinalden büyükse de orijinal kalır (zaten küçük bir PNG olabilir).
+   */
+  private async shrinkImage(buffer: Buffer, name: string): Promise<Buffer | undefined> {
+    if (buffer.length < IMAGE_SHRINK_FROM_BYTES) return undefined;
+    if (!(await ffmpegVarMi())) return undefined;
+    const klasor = await calismaKlasoru();
+    try {
+      const girdi = join(klasor, "girdi");
+      await writeFile(girdi, buffer);
+      const kucuk = await gorseliKucult(girdi, klasor, IMAGE_MAX_EDGE);
+      return kucuk.length > 0 && kucuk.length < buffer.length ? kucuk : undefined;
+    } catch (err) {
+      this.logger.warn(`Görsel küçültülemedi (${name}): ${String(err)}`);
+      return undefined;
+    } finally {
+      await temizle(klasor);
+    }
+  }
+
   private assertSize(kind: AttachmentKind, bytes: number, name: string): void {
     const limits: Record<AttachmentKind, number> = {
-      image: MAX_IMAGE_BYTES,
+      image: MAX_IMAGE_UPLOAD_BYTES,
       pdf: MAX_PDF_BYTES,
       audio: MAX_AUDIO_BYTES,
       document: MAX_DOCUMENT_BYTES,

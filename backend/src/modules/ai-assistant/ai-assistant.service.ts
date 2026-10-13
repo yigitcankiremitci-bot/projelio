@@ -99,7 +99,7 @@ import {
   type AiStoredMessage,
   type StoredAttachment,
 } from "./ai-conversations.service";
-import { AiAttachmentsService, type PreparedAttachment } from "./ai-attachments.service";
+import { AiAttachmentsService, MAX_ATTACHMENTS_PER_MESSAGE, type PreparedAttachment } from "./ai-attachments.service";
 import { estimateTranscriptionCredits } from "./ai-credits.config";
 import { FilesService } from "../files/files.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
@@ -680,10 +680,13 @@ const ATTACHMENT_LABELS: Record<string, string> = {
  * Bir sohbette aynı anda sabit tutulabilecek azami dosya.
  *
  * Sabit dosyalar HER TURDA gönderiliyor; sayı arttıkça sohbetin tur başına bedeli
- * de artar. Beş dosya pratikte yeterli, fazlası kullanıcıyı farkında olmadan
- * pahalı bir sohbete kilitler.
+ * de artar. Yine de tek mesajda gönderilebilen ek sayısından AZ olamaz: 5'te
+ * kalsaydı 50 ürün görseli gönderen kullanıcının 45'i daha ilk turda sessizce
+ * düşerdi. Bedeli sınırlayan şey önbellek (sabit dosyalar isteğin en başında,
+ * sonraki turlarda okuma fiyatından geçer) ve modelin işi bitince release_files
+ * ile dosyaları bırakması.
  */
-const MAX_ACTIVE_FILES = 5;
+const MAX_ACTIVE_FILES = Math.max(5, MAX_ATTACHMENTS_PER_MESSAGE);
 
 /** Yalnızca dosya gönderilip hiçbir şey yazılmadığında kullanılan varsayılan istek. */
 // Modele giden varsayılan istek; kullanıcının kendi yazdığı metnin yerine

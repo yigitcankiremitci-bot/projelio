@@ -13,7 +13,7 @@ import ProductForm from "./ProductForm";
 import ModuleFormPanel from "./ModuleFormPanel";
 import EntityDangerZone from "./EntityDangerZone";
 import UrunSatislari from "./musteri/UrunSatislari";
-import { IconCheck, IconExternalLink } from "./icons";
+import { IconCheck, IconExternalLink, IconStar } from "./icons";
 import { MODULE_FORM_CONFIGS } from "../lib/moduleForms";
 import { coverBackground } from "../lib/covers";
 import {
@@ -43,6 +43,21 @@ interface Props {
 type Sekme = "genel" | "bilgiler" | "strateji" | "satislar" | "moduller";
 
 const FORM_ID = "urun-karti-formu";
+
+/** Galerideki büyük fotoğrafın köşesindeki kapak rozeti / "kapak yap" düğmesi. */
+const kapakRozeti: React.CSSProperties = {
+  position: "absolute",
+  left: 10,
+  top: 10,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "5px 10px",
+  borderRadius: 999,
+  fontSize: 12.5,
+  color: "#fff",
+  background: "rgba(26,31,41,0.72)",
+};
 
 /**
  * Ürün kartı: bir ürün ya da hizmet hakkında bilinen HER ŞEY tek pencerede.
@@ -78,6 +93,7 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
   // Form kaydedildikten sonra yeni değerlerle baştan kurulsun diye anahtar.
   const [formSurumu, setFormSurumu] = useState(0);
   const [seciliFoto, setSeciliFoto] = useState(0);
+  const [kapakYapiliyor, setKapakYapiliyor] = useState(false);
 
   const yukle = useCallback(() => {
     setHata("");
@@ -193,9 +209,34 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
 
   // ------------------------------------------------------------------ genel bakış
 
+  /**
+   * Seçili fotoğrafı kapak yapar. Ayrı bir "kapak" alanı yok: sıranın ilki
+   * kapaktır (bkz. ProductsService.syncCoverFromImages), yani seçileni başa
+   * alıp kalanların sırasını koruyoruz.
+   */
+  const kapakYap = async (imageId: string) => {
+    const sira = (product.images ?? []).map((img) => img.id);
+    setKapakYapiliyor(true);
+    setHata("");
+    try {
+      await api.patch<Product>(`/products/${product.id}/images/order`, {
+        imageIds: [imageId, ...sira.filter((id) => id !== imageId)],
+      });
+      await yukle();
+      // Yeni kapak artık ilk sırada; seçim onunla gitsin.
+      setSeciliFoto(0);
+      onChanged();
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Kapak fotoğrafı değiştirilemedi."));
+    } finally {
+      setKapakYapiliyor(false);
+    }
+  };
+
   const galeri = () => {
     const fotolar = (product.images ?? []).filter((img) => img.url);
     const secili = fotolar[seciliFoto] ?? fotolar[0];
+    const seciliKapak = secili && secili.id === fotolar[0]?.id;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
         <div
@@ -211,7 +252,28 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
           {secili ? (
             // "contain": kartta alan dar olduğu için kırpılıyordu (bkz. ProductCard);
             // burada ürünün TAMAMI görünmeli.
-            <img src={secili.url} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+            <>
+              <img src={secili.url} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }} />
+              {fotolar.length > 1 &&
+                (seciliKapak ? (
+                  <span style={{ ...kapakRozeti, cursor: "default" }}>
+                    <IconStar size={12} color="#fff" filled />
+                    {t("Kapak fotoğrafı")}
+                  </span>
+                ) : (
+                  canManage && (
+                    <button
+                      type="button"
+                      onClick={() => void kapakYap(secili.id)}
+                      disabled={kapakYapiliyor}
+                      style={{ ...kapakRozeti, border: "none", cursor: kapakYapiliyor ? "default" : "pointer" }}
+                    >
+                      <IconStar size={12} color="#fff" />
+                      {kapakYapiliyor ? t("Kaydediliyor…") : t("Kapak fotoğrafı yap")}
+                    </button>
+                  )
+                ))}
+            </>
           ) : (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 8 }}>
               <span style={{ fontSize: 14, color: "#fff", textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}>{t("Henüz fotoğraf yok")}</span>
@@ -232,7 +294,9 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
                 onClick={() => setSeciliFoto(index)}
                 aria-label={t("{n}. fotoğrafı göster", { n: index + 1 })}
                 aria-pressed={index === seciliFoto}
+                title={index === 0 ? t("Kapak fotoğrafı") : undefined}
                 style={{
+                  position: "relative",
                   flexShrink: 0,
                   width: 64,
                   height: 48,
@@ -244,6 +308,25 @@ export default function ProductDetailModal({ organizationId, product: ilk, onClo
                 }}
               >
                 <img src={img.url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                {index === 0 && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: 3,
+                      top: 3,
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(26,31,41,0.72)",
+                    }}
+                  >
+                    <IconStar size={9} color="#fff" filled />
+                  </span>
+                )}
               </button>
             ))}
           </div>

@@ -36,9 +36,10 @@ interface Props {
  * arayüzde hiçbir yolu yoktu. Fotoğraf yönetimi artık ürünün kendi
  * düzenleme ekranında, her zaman görünür halde.
  *
- * SIRALAMA = VİTRİN. Listenin ilki ürün kartında görünen fotoğraftır; ayrı bir
- * "kapak seç" alanı yerine sıranın kendisi bu anlamı taşıyor (bkz. migration
- * 074 ve ProductsService.syncCoverFromImages).
+ * SIRALAMA = KAPAK. Listenin ilki ürün kartında görünen fotoğraftır; ayrı bir
+ * "kapak" alanı yerine sıranın kendisi bu anlamı taşıyor (bkz. migration
+ * 074 ve ProductsService.syncCoverFromImages). Yıldız düğmesi seçileni tek
+ * hamlede başa alır — oklarla on bir kez sola taşımak kapak seçmek değildi.
  */
 export default function ProductImagesEditor({ productId, images, pending, onPendingChange, onChanged }: Props) {
   const c = useThemeColors();
@@ -200,8 +201,35 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 }}
               >
                 <IconStar size={10} color="#fff" filled />
-                {t("Vitrin")}
+                {t("Kapak")}
               </span>
+            )}
+
+            {index > 0 && (!productId || kutu.image) && (
+              <button
+                type="button"
+                onClick={() => void move(index, 0)}
+                disabled={busy}
+                aria-label={t("Kapak fotoğrafı yap")}
+                title={t("Kapak fotoğrafı yap")}
+                style={{
+                  position: "absolute",
+                  left: 4,
+                  top: 4,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "50%",
+                  border: "none",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "rgba(26,31,41,0.72)",
+                  cursor: "pointer",
+                }}
+              >
+                <IconStar size={12} color="#fff" />
+              </button>
             )}
 
             <button
@@ -235,7 +263,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
                 onClick={() => void move(index, index - 1)}
                 disabled={busy || index === 0}
                 aria-label={t("Sola taşı")}
-                title={index === 1 ? "Vitrine al" : t("Sola taşı")}
+                title={t("Sola taşı")}
                 style={okStili(index === 0)}
               >
                 <IconChevronLeft size={13} color="#fff" />
@@ -285,7 +313,7 @@ export default function ProductImagesEditor({ productId, images, pending, onPend
       <p style={{ margin: 0, fontSize: 12.5, color: c.textSecondary }}>
         {total === 0
           ? t("İlk fotoğraf ürün kartında görünür. JPEG, PNG, GIF veya WebP; en fazla 8 MB.")
-          : t("Soldaki fotoğraf ürün kartında görünür — oklarla sırayı değiştirebilirsin.")}
+          : t("Soldaki fotoğraf kapaktır — başka birini kapak yapmak için üzerindeki yıldıza bas.")}
       </p>
 
       {error && <p style={{ margin: 0, color: c.danger, fontSize: 14 }}>{error}</p>}

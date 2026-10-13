@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import type {
   CreateFileDownloadLinkInput,
@@ -30,6 +30,7 @@ import {
 } from "./indirme-linki-eposta";
 import { adresleriAyikla } from "./alici-adresleri";
 import { linkGondereni } from "./link-gondereni";
+import { IndirmeToplayici, type IndirmeOzeti } from "./indirme-toplayici";
 
 /** İçerik adresine eklenen kısa ömürlü jetonun gövdesi. */
 interface IcerikJetonu {
@@ -87,8 +88,10 @@ const ICERIK_JETONU_SANIYE = 30 * 60;
  *    yapan kişinin kararını başkasına devretmek olurdu.
  */
 @Injectable()
-export class FileDownloadLinksService {
+export class FileDownloadLinksService implements OnModuleDestroy {
   private readonly logger = new Logger(FileDownloadLinksService.name);
+  /** Bir oturumun indirmeleri tek bildirim olsun (bkz. indirme-toplayici.ts). */
+  private readonly indirmeler = new IndirmeToplayici<any>((ozet) => this.indirmeBildir(ozet));
 
   constructor(
     private supabase: SupabaseService,
@@ -97,6 +100,11 @@ export class FileDownloadLinksService {
     private notifications: NotificationsService,
     private jwt: JwtService
   ) {}
+
+  /** Kapanışta (ör. yeni sürüm dağıtılırken) bekleyen özetler kaybolmasın. */
+  async onModuleDestroy(): Promise<void> {
+    await this.indirmeler.hepsiniBosalt();
+  }
 
   // ==================================================================== Yönetim
 
@@ -416,7 +424,7 @@ export class FileDownloadLinksService {
   }
 
   /**
-   * İndirme gerçekleşti: sayaç + (tercih açıksa) e-posta ve uygulama içi bildirim.
+   * İndirme gerçekleşti: sayaç hemen, (tercih açıksa) bildirim toplanarak.
    *
    * ÇAĞRAN BEKLEMEZ (bkz. controller): dosya akmaya başladıktan sonra tetikleniyor,
    * burada çıkan bir hata indirmeyi bozmamalı.
@@ -427,27 +435,35 @@ export class FileDownloadLinksService {
 
     // Pakette indirilen DOSYANIN adı: sahibi "hangisini aldı" diye merak ediyor.
     const dosyaAdi = await this.dosyaAdi(fileId);
-    const sahip = await this.kullanici(link.created_by);
+    this.indirmeler.ekle(link.id, link, { id: fileId, ad: dosyaAdi }, sayilar.download_count);
+  }
+
+  /** Toplayıcının penceresi kapandı: uygulama içi bildirim + e-posta, birer tane. */
+  private async indirmeBildir({ link, dosyaAdlari, indirmeSayisi, toplamIndirme }: IndirmeOzeti<any>): Promise<void> {
+    const coklu = dosyaAdlari.length > 1;
 
     // Uygulama içi bildirim: notifyUserSafe, çünkü sonucunu beklemiyoruz ve
     // bir DB hatası süreci öldürmemeli (bkz. NotificationsService).
     this.notifications.notifyUserSafe(
       link.created_by,
       "file_link_downloaded",
-      { metin: "Paylaştığınız dosya indirildi" },
-      { metin: '"{ad}" indirildi', params: { ad: dosyaAdi } }
+      { metin: coklu ? "Paylaştığınız dosyalar indirildi" : "Paylaştığınız dosya indirildi" },
+      coklu
+        ? { metin: '"{ad}" ve {sayi} dosya daha indirildi', params: { ad: dosyaAdlari[0], sayi: dosyaAdlari.length - 1 } }
+        : { metin: '"{ad}" indirildi', params: { ad: dosyaAdlari[0] } }
     );
 
+    const sahip = await this.kullanici(link.created_by);
     if (!sahip?.email) return;
     const govde = {
-      dosyaAdi,
+      dosyaAdlari,
       // Kapı varsa indiren kişinin adresini biliyoruz; yoksa uydurmuyoruz.
       alaniAcanEposta: link.recipient_email ?? undefined,
-      indirmeSayisi: sayilar.download_count,
+      indirmeSayisi: Math.max(toplamIndirme, indirmeSayisi),
       yonetimUrl: `${getWebAppUrl()}/`,
     };
     const gonderildi = await this.email.sendPrepared(sahip.email, {
-      subject: indirildiKonusu(dosyaAdi),
+      subject: indirildiKonusu(dosyaAdlari),
       html: indirildiHtml(govde),
       text: indirildiMetni(govde),
       from: linkGondereni(process.env.EMAIL_FROM, process.env.EMAIL_FROM_LINK) ?? undefined,

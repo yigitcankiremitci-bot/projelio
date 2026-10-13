@@ -179,19 +179,31 @@ export function paylasimMetni(p: PaylasimParams): string {
 }
 
 interface IndirildiParams {
-  dosyaAdi: string;
+  /** Penceredeki dosyalar (bkz. indirme-toplayici.ts); çoğu zaman tek dosya. */
+  dosyaAdlari: string[];
   /** Kapının ardındaki adres varsa kim indirdiğini söyleyebiliyoruz. */
   alaniAcanEposta?: string;
   indirmeSayisi: number;
   yonetimUrl: string;
 }
 
-export function indirildiKonusu(dosyaAdi: string): string {
-  return `İndirildi: ${dosyaAdi}`;
+/** E-postada en çok bu kadar dosya adı sayılır; gerisi "ve N dosya daha". */
+const LISTE_SINIRI = 20;
+
+function listeyiKirp(adlar: string[]): { gorunen: string[]; kalan: number } {
+  return { gorunen: adlar.slice(0, LISTE_SINIRI), kalan: Math.max(0, adlar.length - LISTE_SINIRI) };
+}
+
+export function indirildiKonusu(dosyaAdlari: string[]): string {
+  if (dosyaAdlari.length <= 1) return `İndirildi: ${dosyaAdlari[0] ?? "Dosya"}`;
+  return `İndirildi: ${dosyaAdlari.length} dosya`;
 }
 
 /**
  * "Dosyanız indirildi" bildirimi — linki OLUŞTURANA gider.
+ *
+ * Paket bağlantısında bir oturumun indirmeleri TEK e-postada gelir (bkz.
+ * indirme-toplayici.ts): 40 dosyalık klasör 40 e-posta demekti.
  *
  * KİM İNDİRDİ sorusunun cevabı çoğu zaman YOK ve uydurulmuyor: linkte e-posta
  * kapısı varsa kapıyı geçen adres yazılır, yoksa "bilinmiyor" denir. IP ya da
@@ -199,12 +211,20 @@ export function indirildiKonusu(dosyaAdi: string): string {
  * kullanıcısı değil ve onun hakkında veri biriktirmenin gerekçesi yok.
  */
 export function indirildiHtml(p: IndirildiParams): string {
+  const coklu = p.dosyaAdlari.length > 1;
+  const { gorunen, kalan } = listeyiKirp(p.dosyaAdlari);
+  const adlar = gorunen
+    .map((ad) => `<div style="font-size:15px;color:${MARKA.yaziKoyu};font-weight:600;">${kacir(ad)}</div>`)
+    .join("");
+  const fazlasi = kalan
+    ? `<div style="font-size:13px;color:${MARKA.yaziSoluk};margin-top:4px;">ve ${kalan} dosya daha</div>`
+    : "";
   return epostaKabugu(
     "tr",
     `
-<h1 style="margin:0 0 16px;font-size:20px;color:${MARKA.yaziKoyu};">Paylaştığınız dosya indirildi</h1>
+<h1 style="margin:0 0 16px;font-size:20px;color:${MARKA.yaziKoyu};">${coklu ? `Paylaştığınız ${p.dosyaAdlari.length} dosya indirildi` : "Paylaştığınız dosya indirildi"}</h1>
 <div style="margin:0 0 20px;padding:14px 16px;border:1px solid ${MARKA.cizgi};border-radius:10px;">
-  <div style="font-size:15px;color:${MARKA.yaziKoyu};font-weight:600;">${kacir(p.dosyaAdi)}</div>
+  ${adlar}${fazlasi}
   <div style="font-size:13px;color:${MARKA.yaziSoluk};margin-top:4px;">
     ${p.alaniAcanEposta ? `İndiren: ${kacir(p.alaniAcanEposta)}` : "İndiren kişi bilinmiyor (bağlantıda e-posta sorulmuyor)"}
     · Toplam ${p.indirmeSayisi} indirme
@@ -220,10 +240,13 @@ export function indirildiHtml(p: IndirildiParams): string {
 }
 
 export function indirildiMetni(p: IndirildiParams): string {
+  const coklu = p.dosyaAdlari.length > 1;
+  const { gorunen, kalan } = listeyiKirp(p.dosyaAdlari);
   return [
-    "Paylaştığınız dosya indirildi.",
+    coklu ? `Paylaştığınız ${p.dosyaAdlari.length} dosya indirildi.` : "Paylaştığınız dosya indirildi.",
     "",
-    p.dosyaAdi,
+    ...gorunen,
+    ...(kalan ? [`ve ${kalan} dosya daha`] : []),
     p.alaniAcanEposta ? `İndiren: ${p.alaniAcanEposta}` : "İndiren kişi bilinmiyor.",
     `Toplam ${p.indirmeSayisi} indirme`,
     "",

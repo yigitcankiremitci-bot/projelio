@@ -415,6 +415,8 @@ export const bildirimler: TranslationDict = {
   "{proje} için {tutar} ₺ hizmet ödemesi kaydedildi.": "A {tutar} ₺ service payment was recorded for {proje}.",
   "Paylaştığınız dosya indirildi": "A file you shared was downloaded",
   '"{ad}" indirildi': '"{ad}" was downloaded',
+  "Paylaştığınız dosyalar indirildi": "Files you shared were downloaded",
+  '"{ad}" ve {sayi} dosya daha indirildi': '"{ad}" and {sayi} more files were downloaded',
   "Bugünün işleri": "Today's tasks",
   "Bu haftanın işleri": "This week's tasks",
   "{adres} kutusuna yeni e-posta": "New email in {adres}",

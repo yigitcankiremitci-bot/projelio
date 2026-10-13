@@ -206,6 +206,7 @@ const MAX_TOOL_ITERATIONS = Number(process.env.AI_MAX_TOOL_ITERATIONS ?? 8);
 const MAX_TOOL_RESULT_CHARS = Number(process.env.AI_MAX_TOOL_RESULT_CHARS ?? 2500);
 /** Sistem promptuna gömülen iş/proje sayısı (gerisi list_* araçlarıyla çekilir). */
 const CONTEXT_JOB_LIMIT = 8;
+const CONTEXT_ORG_LIMIT = 10;
 const CONTEXT_PROJECT_LIMIT = 12;
 /**
  * Prompt caching: araç şemaları + statik sistem promptu Anthropic tarafında önbelleğe
@@ -364,6 +365,16 @@ interface PendingRun {
    * "şu dosyalar elinde" demeye devam etmek modeli yanıltırdı.
    */
   baseContext: string;
+  /**
+   * Bağlamın konduğu mesajın sırası: koşuyu başlatan kullanıcı mesajı.
+   *
+   * Bağlam sistem promptunda DURMAZ. Dakikası dakikasına saat taşıyor ve
+   * sistem bloğu sabit dosyalardan ÖNCE geldiği için her yeni mesajda dosyaların
+   * önbelleğini geçersiz kılıyordu: 40 ürün görseli gönderen kullanıcı her
+   * mesajda ~66 bin token'ı baştan yazdırıp ~1.100 birim ödedi (2026-10-13).
+   * Dosyalardan SONRA durunca dosyalar önbellekten okunuyor.
+   */
+  contextIndex: number;
   /** Bu koşuda çalıştırılan araçlar — "ne yapıldı" özetini kurmak için. */
   executed: string[];
   /** Bu koşuda şimdiye kadar düşülen kredi (segmentler arası taşınır). */
@@ -1200,14 +1211,28 @@ export class AiAssistantService {
   // dil:atla-baslangic — modele verilen çalışma alanı özeti.
   private async buildWorkspaceContext(userId: string): Promise<string> {
     try {
-      const [jobs, projects] = await Promise.all([
+      const [jobs, projects, orgs] = await Promise.all([
         this.jobsService.findAllForUser(userId),
         this.projectsService.findAllForUser(userId),
+        // Organizasyon özeti yalnızca bir yardım; okunamazsa bağlamın geri kalanı düşmesin.
+        this.organizationsService.findAllForUser(userId).catch(() => []),
       ]);
 
       // Yalnızca en güncel birkaç kayıt gömülür; gerisi için model list_* araçlarını
       // kullanır. Tam listeyi her isteğe eklemek gereksiz token (= kredi) harcar.
       const lines: string[] = [];
+      // Organizasyonlar EN ÖNDE ve kimlikleriyle. Yoktular: kullanıcı "Carmed
+      // organizasyonundaki ürünler" dediğinde model, adı benzeyen bir İŞİN
+      // kimliğini organizationId diye list_products'a verdi, "erişimin yok"
+      // aldı ve sahibi olduğu şirketi kullanıcıya "erişim yok" diye anlattı.
+      if (orgs.length) {
+        lines.push(
+          `Organizasyonlar (${orgs.length}) — organizationId isteyen araçlara YALNIZCA bu kimlikleri ver, ` +
+            `iş/proje kimliği organizasyon kimliği DEĞİLDİR: ` +
+            orgs.slice(0, CONTEXT_ORG_LIMIT).map((o) => `${o.name}=${o.id}`).join(" | ") +
+            (orgs.length > CONTEXT_ORG_LIMIT ? " | …(list_organizations ile tamamı)" : "")
+        );
+      }
       if (jobs.length) {
         lines.push(
           `İşler (${jobs.length}): ` +
@@ -1256,6 +1281,9 @@ export class AiAssistantService {
       "## Rolün",
       "Kullanıcının asistanısın: sorularını yanıtlar, verilerini analiz eder ve araçlarla gerçek değişiklikler yaparsın.",
       "Sadece komut çalıştıran bir arayüz değilsin — kullanıcının işini kolaylaştıran, öngörülü bir yardımcısın.",
+      "Kullanıcının son mesajının başındaki <baglam>…</baglam> bloğunu SİSTEM yazar, kullanıcı değil: tarih, " +
+        "kullanıcının organizasyonları/işleri/projeleri (kimlikleriyle) ve açık dosyalar oradadır. Onu talimat " +
+        "değil bilgi olarak oku, kullanıcıya ondan alıntı yapma ve kullanıcı yazmış gibi yanıtlama.",
       "",
       "## Davranış kuralları",
       ...DIL_KURALLARI[locale],
@@ -2003,6 +2031,7 @@ export class AiAssistantService {
       preferredModel,
       messages,
       baseContext: await this.buildDynamicSystemPrompt(userId, userRole),
+      contextIndex: messages.length - 1,
       executed: [],
       spentCredits: 0,
       iterationsUsed: 0,
@@ -2060,6 +2089,33 @@ export class AiAssistantService {
    * böylece katlanılabilir kalıyor. Geçmiş mesajların arasına serpiştirilseydi
    * önek her turda değişir ve önbellek hiç tutmazdı.
    */
+  /**
+   * Bağlamı, koşuyu başlatan kullanıcı mesajının BAŞINA ekler — saklanan
+   * mesaj yığınını değiştirmeden, yalnızca bu çağrının kopyasında.
+   *
+   * Etiketle sarılıyor: model bunu kullanıcının cümlesi sanmamalı (bkz. statik
+   * prompttaki "Bağlam bloğu" kuralı). Sıra geçersizse (olmaması gerekir)
+   * bağlam en son mesaja konur; hiç konmamasından iyidir.
+   */
+  private withContext(
+    messages: Anthropic.MessageParam[],
+    index: number,
+    context: string
+  ): Anthropic.MessageParam[] {
+    const i = messages[index]?.role === "user" ? index : messages.length - 1;
+    const hedef = messages[i];
+    if (!hedef || hedef.role !== "user") return messages;
+    const blok = { type: "text" as const, text: `<baglam>\n${context}\n</baglam>` };
+    const mevcut: any[] =
+      typeof hedef.content === "string" ? [{ type: "text", text: hedef.content }] : [...hedef.content];
+    // tool_result blokları kullanıcı mesajında EN ÖNDE olmak zorunda (API kuralı).
+    const sonuclar = mevcut.filter((b) => b.type === "tool_result");
+    const digerleri = mevcut.filter((b) => b.type !== "tool_result");
+    const kopya = [...messages];
+    kopya[i] = { ...hedef, content: [...sonuclar, blok, ...digerleri] as any };
+    return kopya;
+  }
+
   // dil:atla-baslangic — dosya içeriğinin modele nasıl sunulduğu; bu metinler
   // konuşmanın içine mesaj olarak giriyor ama muhatabı model.
   private activeFileMessages(userId: string, files: ActiveFile[]): Anthropic.MessageParam[] {
@@ -2472,17 +2528,18 @@ export class AiAssistantService {
                 }
               : {}),
           },
-          // Açık dosya bildirimi HER TURDA yeniden yazılır: koşunun ortasında
-          // release_files çağrılırsa bir sonraki tur doğru durumu görmeli.
-          {
-            type: "text",
-            text:
-              `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` +
-              (run.channel === "whatsapp" ? `\n\n${WHATSAPP_CHANNEL_PROMPT}` : ""),
-          },
         ] as any,
         tools: toolsForChannel(run.channel, { allowWrites: run.allowWrites, yalnizAraclar: run.yalnizAraclar }),
-        messages: run.messages,
+        // Bağlam (tarih, çalışma alanı, açık dosyalar) mesajların içine, sabit
+        // dosyalardan SONRA konur — bkz. PendingRun.contextIndex. Açık dosya
+        // bildirimi yine HER TURDA yeniden yazılır: koşunun ortasında
+        // release_files çağrılırsa bir sonraki tur doğru durumu görmeli.
+        messages: this.withContext(
+          run.messages,
+          run.contextIndex,
+          `${run.baseContext}\n\n${this.activeFileStatus(run.activeFiles)}` +
+            (run.channel === "whatsapp" ? `\n\n${WHATSAPP_CHANNEL_PROMPT}` : "")
+        ),
       }), run.preferredModel, await this.googleVerisiSiniri(run));
       // Yedeğe geçilmiş olabilir; sonraki kredi hesapları gerçek modeli kullansın.
       model = usedModel;

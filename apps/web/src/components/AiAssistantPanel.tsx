@@ -177,6 +177,9 @@ export default function AiAssistantPanel({
   const [credits, setCredits] = useState<AiCredits | null>(null);
   const [confirmation, setConfirmation] = useState<PendingConfirmation | null>(null);
   const [continuation, setContinuation] = useState<AiContinuation | null>(null);
+  // Kademe seçici geri geldi (2026-10-13): zor işte kullanıcı yükseltebilsin.
+  const [tiers, setTiers] = useState<AiModelTierInfo[]>([]);
+  const [tier, setTier] = useState<AiModelTier>(readStoredTier);
   const [attachments, setAttachments] = useState<AiAttachment[]>([]);
   /** Okunmayı bekleyen dosya adları — yükleme sürerken çip olarak görünür. */
   const [attaching, setAttaching] = useState<string[]>([]);
@@ -801,7 +804,8 @@ export default function AiAssistantPanel({
       const result = await aiChat.send(
         trimmed,
         activeId ?? undefined,
-        sentAttachments.map((a) => a.id)
+        sentAttachments.map((a) => a.id),
+        tier
       );
 
       // Yeni sohbet açıldıysa listeyi tazele ki başlık görünsün.
@@ -916,15 +920,37 @@ export default function AiAssistantPanel({
     if (result.type === "out_of_credits") setCreditsBlocked(true);
   };
 
-  const handleContinueRun = async (approveAll: boolean) => {
+  // Kademeler sunucudan gelir (bedel çarpanı orada); panel açıldığında bir kez.
+  useEffect(() => {
+    if (!open || tiers.length > 0) return;
+    aiChat
+      .getModels()
+      .then((res) => setTiers(res.tiers ?? []))
+      .catch(() => {});
+  }, [open, tiers.length]);
+
+  const chooseTier = (next: AiModelTier) => {
+    setTier(next);
+    try {
+      localStorage.setItem(TIER_STORAGE_KEY, next);
+    } catch {
+      // Depolama kapalıysa (gizli sekme) seçim yalnızca bu oturumda geçerli olur.
+    }
+  };
+
+  /**
+   * `nextTier` verilirse koşu o kademeyle sürer ("Modeli yükselt"). Seçici
+   * DEĞİŞMEZ: yükseltme yalnızca o iş için; sonraki mesajlar yine kullanıcının
+   * seçtiği (genelde ucuz) kademeyle gider.
+   */
+  const handleContinueRun = async (approveAll: boolean, nextTier?: AiModelTier) => {
     const pending = continuation;
     if (!pending) return;
     setContinuation(null);
     setSending(true);
     setError(null);
     try {
-      // Kademe yükseltme seçeneği yok: model kararı yöneticide.
-      applyResult(await aiChat.continueRun(pending.runId, true, approveAll));
+      applyResult(await aiChat.continueRun(pending.runId, true, approveAll, nextTier));
     } catch (err: any) {
       if (err?.status === 402) setCreditsBlocked(true);
       setError(String(err?.message ?? t("Devam edilemedi.")));
@@ -1502,6 +1528,48 @@ export default function AiAssistantPanel({
             </div>
           )}
 
+          {/* Model yükseltme isteği sohbetin İÇİNDE, Lio'nun mesajının altında:
+              açılır pencere değil, çünkü bu bir uyarı değil bir seçenek. */}
+          {continuation?.reason === "upgrade" && !sending && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "-4px 0 4px" }}>
+              <button
+                type="button"
+                onClick={() => handleContinueRun(true, continuation.suggestedTier ?? "smart")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: c.accent,
+                  color: "#fff",
+                  fontSize: 13.5,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                <IconSparkle size={14} color="#fff" />
+                {t("Modeli yükselt ve devam et")}
+              </button>
+              <button
+                type="button"
+                onClick={handleStopRun}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: `1px solid ${c.border}`,
+                  background: "transparent",
+                  color: c.textPrimary,
+                  fontSize: 13.5,
+                  cursor: "pointer",
+                }}
+              >
+                {t("Vazgeç")}
+              </button>
+            </div>
+          )}
+
           {sending && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, color: c.textSecondary, fontSize: 13 }}>
               <span style={{ animation: "projelioAiPulse 1.2s ease infinite" }}>
@@ -1850,10 +1918,30 @@ export default function AiAssistantPanel({
               <IconSend size={19} color="#fff" />
             </button>
           </div>
-          {/* Kademe/model seçici KALDIRILDI: hangi modelin çalışacağı bir maliyet
-              kararıdır ve yönetici belirler (Admin paneli > AI sağlayıcıları).
-              Kullanıcıya seçenek göstermek, seçemediği bir şeyi göstermek olurdu. */}
+          {/* Kademe seçici: zor işte yükseltmek adım başına bedeli artırır ama
+              işi yapılabilir kılar — bedeli kullanıcı ödüyor, kararı da o verir.
+              Hangi kademede hangi MODELİN çalıştığı yöneticinin kararı. */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "8px 2px 0", flexWrap: "wrap" }}>
+            {tiers.map((k) => (
+              <button
+                key={k.tier}
+                type="button"
+                onClick={() => chooseTier(k.tier)}
+                title={t("{aciklama} (yaklaşık {kat}× birim)", { aciklama: t(k.description), kat: k.costMultiplier })}
+                style={{
+                  padding: "3px 8px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  cursor: "pointer",
+                  border: `1px solid ${k.tier === tier ? c.accent : c.border}`,
+                  background: k.tier === tier ? c.accent : "transparent",
+                  color: k.tier === tier ? "#fff" : c.textSecondary,
+                }}
+              >
+                {t(k.label)}
+                {k.costMultiplier > 1 && <span style={{ opacity: 0.8 }}> ×{k.costMultiplier}</span>}
+              </button>
+            ))}
             <span style={{ marginLeft: "auto", fontSize: 11, color: c.textSecondary }}>
               {t("Lio hata yapabilir.")}
             </span>
@@ -1869,7 +1957,7 @@ export default function AiAssistantPanel({
         />
       )}
 
-      {continuation && (
+      {continuation && continuation.reason !== "upgrade" && (
         <AiContinueDialog
           continuation={continuation}
           onContinue={handleContinueRun}

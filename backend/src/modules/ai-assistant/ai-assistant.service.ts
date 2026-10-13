@@ -117,6 +117,18 @@ import {
   type ModelTier,
 } from "./ai-credits.config";
 import { IzinliSaglayiciYokHatasi, LlmProviderRegistry, type ProviderChoice } from "./providers/provider-registry";
+import { isValidTier } from "./ai-model-settings.validate";
+import {
+  ESLESTIRME_KENARI,
+  base64GorselTuru,
+  eklenecekMi,
+  eslesmeleriCoz,
+  eslestirmeSistemi,
+  eslestirmeTokenTahmini,
+  gruplara,
+  type EslesmeUrunu,
+  type GorselEslesmesi,
+} from "./urun-gorsel-eslestirme";
 import { AiModelSettingsService } from "./ai-model-settings.service";
 import type { LlmRequest, LlmResponse } from "./providers/llm-provider";
 import type { Locale } from "@projelio/shared";
@@ -206,6 +218,22 @@ const MAX_TOOL_ITERATIONS = Number(process.env.AI_MAX_TOOL_ITERATIONS ?? 8);
 const MAX_TOOL_RESULT_CHARS = Number(process.env.AI_MAX_TOOL_RESULT_CHARS ?? 2500);
 /** Sistem promptuna gömülen iş/proje sayısı (gerisi list_* araçlarıyla çekilir). */
 const CONTEXT_JOB_LIMIT = 8;
+/**
+ * Sohbette bundan fazla görsel varsa görseller ana modele GÖSTERİLMEZ,
+ * yalnızca adları ve kimlikleri gider. 40 ürün görseli her turda ~66 bin
+ * token tutuyordu (hızlı modelde ~1.100, güçlüde ~3.300 birim). Görsellere
+ * bakmak gereken iş araçla yapılır: match_product_images (sunucu tek tek
+ * eşleştirir) ya da view_images (birkaçına bakmak).
+ */
+const INLINE_IMAGE_LIMIT = 6;
+/**
+ * Hızlı modelde ÇALIŞTIRILMAYAN araçlar: sunucu koşuyu "model yükseltmesi
+ * gerekiyor" diye duraklatır. Kararı modele bırakmadık — hızlı model 40
+ * görseli tahminle dağıtıp "bitti" demişti (2026-10-13).
+ */
+const YUKSELTME_ARACLARI = new Set(["match_product_images", "request_model_upgrade"]);
+/** view_images'ın bir çağrıda gösterdiği en çok görsel. */
+const VIEW_IMAGES_LIMIT = 6;
 const CONTEXT_ORG_LIMIT = 10;
 const CONTEXT_PROJECT_LIMIT = 12;
 /**
@@ -256,7 +284,11 @@ export interface ChatUsageInfo {
  * - `budget`: harcama sürerken CREDIT_CONFIRM_THRESHOLD'u aşmak üzere.
  * - `iterations`: tur sınırına gelindi, iş hâlâ bitmedi.
  */
-export type ContinuationReason = "estimate" | "budget" | "iterations";
+/**
+ * "upgrade" = iş hızlı modelde güvenilir yapılamaz (bkz. YUKSELTME_ARACLARI);
+ * kullanıcı modeli yükseltirse iş kaldığı yerden güçlü modelle sürer.
+ */
+export type ContinuationReason = "estimate" | "budget" | "iterations" | "upgrade";
 
 export type ChatResult = (
   | { type: "message"; text: string }
@@ -285,6 +317,8 @@ export type ChatResult = (
       /** Şimdiye kadar gerçekten yapılan kalıcı değişiklikler. */
       doneSummary: string;
       tier: ModelTier;
+      /** reason "upgrade" ise önerilen kademe — arayüzdeki "Modeli yükselt" düğmesi bunu gönderir. */
+      suggestedTier?: ModelTier;
     }
 ) & {
   conversationId: string;
@@ -375,6 +409,13 @@ interface PendingRun {
    * Dosyalardan SONRA durunca dosyalar önbellekten okunuyor.
    */
   contextIndex: number;
+  /**
+   * Model yükseltmesi bekleyen araç çağrısı. Koşu bunun için duraklatıldı;
+   * kullanıcı yükseltirse continueRun aracı ÖNCE çalıştırır, sonra modele
+   * döner — modelin aynı aracı yeniden çağırması için ayrı (pahalı) bir tur
+   * harcanmaz. tool_result yer tutucusu mesaj yığınında hazır bekliyor.
+   */
+  upgradePending?: { useId: string; name: string; input: Record<string, any>; suggestedTier: ModelTier };
   /** Bu koşuda çalıştırılan araçlar — "ne yapıldı" özetini kurmak için. */
   executed: string[];
   /** Bu koşuda şimdiye kadar düşülen kredi (segmentler arası taşınır). */
@@ -807,6 +848,7 @@ const ACTION_LABELS: Record<string, string> = {
   create_product: "ürün eklendi",
   update_product: "ürün güncellendi",
   add_product_images: "ürün fotoğrafları eklendi",
+  match_product_images: "ürün fotoğrafları eşleştirilip eklendi",
   export_report: "rapor dosyası üretildi",
   import_tasks_from_sheet: "dosyadan toplu görev eklendi",
   import_module_records_from_sheet: "dosyadan toplu modül kaydı eklendi",
@@ -1650,9 +1692,10 @@ export class AiAssistantService {
         "describe_module bunlara \"kayitDefteriMi: false\" der — buraya module_record EKLEME.",
       "- ÜRÜNLER istisnadır: kendi araçları var (list_products/create_product/update_product/add_product_images). " +
         "Ürün Yönetimi modülünde kayıt istendiğinde kullanıcıyı sayfaya yönlendirme, o araçları kullan.",
-      "- Kullanıcı ürün GÖRSELLERİ gönderip ürünlere eklemeni isterse: görsellerdeki ürünleri sen tanı, " +
-        "list_products ile listeyi al, eşleştir ve add_product_images ile TEK çağrıda ekle. Eşlemeyi kullanıcıya " +
-        "yaptırma; görselleri iş bitmeden release_files ile BIRAKMA.",
+      "- Kullanıcı ürün GÖRSELLERİ gönderip ürünlere eklemeni isterse DOĞRUDAN match_product_images çağır " +
+        "(organizationId bağlamda). Görselleri kendin eşleştirme, kullanıcıdan eşleme isteme, iş bitmeden " +
+        "release_files ile BIRAKMA. Model yükseltmesi gerekirse sistem kullanıcıya sorar.",
+      "- Bir iş şu anki modelde güvenilir yapılamayacaksa tahmin yürütme: request_model_upgrade çağır.",
       "",
       "## Yaptım (kişisel iş günlüğü)",
       "Kullanıcı sana BİTMİŞ bir işi anlattığında — \"bugün müşteriyle görüştüm\", \"raporu bitirdim\", " +
@@ -1814,6 +1857,12 @@ export class AiAssistantService {
       // istiyor (tablo satırları sohbette değil sunucuda duruyor).
       ...activeFiles.map((file) => `- ${file.name} (${file.detail}) · dosyaKimligi: ${file.id}`),
       "Bu dosyaların içeriği bu isteğin EN BAŞINDA sana verildi; elindeler.",
+      ...(activeFiles.filter((f) => f.kind === "image").length > INLINE_IMAGE_LIMIT
+        ? [
+            "İSTİSNA: görsel sayısı fazla olduğu için GÖRSELLERİN içeriği gösterilmiyor, yalnızca adları var. " +
+              "Ürünlere eklemek için match_product_images, birkaçına bakmak için view_images kullan.",
+          ]
+        : []),
       ...(midRun.length
         ? [
             `Şunlar istisna — bu isteğin ORTASINDA getirildi ve içerikleri en başta değil, ` +
@@ -1932,17 +1981,15 @@ export class AiAssistantService {
     // (bkz. social-media/gelen-medya.ts — onaysız planlama koruması).
     gelenMedya.yeniTur(userId);
 
-    // Kademe ve model kararı ADMİNE aittir, kullanıcıya değil.
+    // KADEME kullanıcının seçimidir (2026-10-13'te geri geldi), MODEL değil.
     //
-    // NEDEN: ikisi de doğrudan maliyet kararı — kademe faturayı 15 kata kadar
-    // (Haiku $1 → Opus $75/milyon çıktı), model seçimi ise sağlayıcı bazında
-    // değiştiriyor. Ayrıca bu uç herkese açık: gövdeye `model` yazan bir
-    // kullanıcı en pahalı modeli çalıştırabiliyordu.
-    //
-    // `tierInput` ve `options.model` imzada DURUYOR ama bilerek kullanılmıyor:
-    // eski istemciler bu alanları göndermeye devam ediyor ve istekleri
-    // reddetmek yerine sessizce yok saymak doğru davranış (bkz. continueRun).
-    const tier = await this.modelSettings.defaultTier();
+    // Model seçimi 2026-09'da kullanıcıdan alınmıştı: gövdeye `model` yazan
+    // herkes en pahalı modeli çalıştırabiliyordu. O alan hâlâ YOK SAYILIYOR —
+    // kademe → model eşlemesi yöneticide (Admin > AI sağlayıcıları). Kullanıcı
+    // yalnızca doğrulanmış üç kademeden birini seçer ve bedelini o öder;
+    // seçmezse yöneticinin varsayılanı geçerli. Kademesiz kalmak, küçük modelin
+    // yapamadığı işte kullanıcıyı çaresiz bırakıyordu (bkz. YUKSELTME_ARACLARI).
+    const tier: ModelTier = isValidTier(tierInput) ? tierInput : await this.modelSettings.defaultTier();
     const preferredModel = this.providers.normalizeModelChoice(
       await this.modelSettings.modelKeyForTier(tier)
     );
@@ -2125,7 +2172,9 @@ export class AiAssistantService {
   private activeFileMessages(userId: string, files: ActiveFile[]): Anthropic.MessageParam[] {
     if (!files.length) return [];
 
-    const blocks = files.map((file) => this.activeFileBlock(userId, file));
+    // Çok görsel varsa görseller metin olarak gider (bkz. INLINE_IMAGE_LIMIT).
+    const gorselleriGosterme = files.filter((f) => f.kind === "image").length > INLINE_IMAGE_LIMIT;
+    const blocks = files.map((file) => this.activeFileBlock(userId, file, gorselleriGosterme));
     // Önbellek işareti son bloğa: önek buraya kadar önbelleğe alınır.
     (blocks[blocks.length - 1] as any).cache_control = CACHING_ENABLED ? { type: "ephemeral" } : undefined;
 
@@ -2147,7 +2196,7 @@ export class AiAssistantService {
    * ayırt etmesi gerekiyor. İkili içerik bellekte tutuluyor ve süresi dolabiliyor;
    * o durumda sessizce kaybolmak yerine ne olduğu açıkça yazılır.
    */
-  private activeFileBlock(userId: string, file: ActiveFile): ContentBlockParam {
+  private activeFileBlock(userId: string, file: ActiveFile, gorseliGosterme = false): ContentBlockParam {
     const label = ATTACHMENT_LABELS[file.kind] ?? "Dosya";
 
     if (file.kind === "image" || file.kind === "pdf") {
@@ -2160,10 +2209,19 @@ export class AiAssistantService {
             "Bu dosyayla ilgili bir şey sorulursa kullanıcıdan tekrar göndermesini iste.]",
         };
       }
+      if (file.kind === "image" && gorseliGosterme) {
+        return {
+          type: "text",
+          text:
+            `[Görsel: "${file.name}" · dosyaKimligi: ${file.id} — sohbette çok görsel olduğu için içeriği ` +
+            "burada gösterilmiyor. Ürünlerle eşleştirmek için match_product_images; birkaçına bakman " +
+            "gerekirse view_images.]",
+        };
+      }
       if (file.kind === "image") {
         return {
           type: "image",
-          source: { type: "base64", media_type: this.imageMediaType(file.name), data: base64 },
+          source: { type: "base64", media_type: base64GorselTuru(base64) ?? this.imageMediaType(file.name), data: base64 },
         } as ContentBlockParam;
       }
       // SDK 0.32 "document" bloğunu yalnızca beta ad alanında tipliyor; API tarafında
@@ -2248,9 +2306,13 @@ export class AiAssistantService {
     }
 
     const balance = await this.creditsService.assertCanStart(userId);
-    // Kademe kullanıcı tarafından değiştirilemez (bkz. chat'teki açıklama).
-    // `tierInput` eski istemciler gönderdiği için imzada duruyor, yok sayılıyor.
-    void tierInput;
+    // Kullanıcı devam ederken kademeyi değiştirebilir ("Modeli yükselt").
+    // Model kimliği yine yöneticinin eşlemesinden gelir (bkz. chat).
+    if (isValidTier(tierInput) && tierInput !== run.tier) {
+      run.tier = tierInput;
+      run.preferredModel = this.providers.normalizeModelChoice(await this.modelSettings.modelKeyForTier(tierInput));
+    }
+    if (run.upgradePending) await this.yukseltmeBekleyeniCalistir(run);
     // Devam ederken de aynı rezervasyon geçerli: kredi yetmiyorsa sürdürmek,
     // kullanıcıyı yarım işle borç bakiyesine sokmak olurdu.
     this.creditsService.assertBalanceCovers(balance, this.minimumTurnCredits(this.modelForTier(run.tier, run.preferredModel), run.messages));
@@ -2369,7 +2431,7 @@ export class AiAssistantService {
      * SONRA: mesaj yığını orada tutarlıdır (her tool_use'un bir tool_result'ı vardır),
      * dolayısıyla onay gelirse hiçbir tur tekrarlanmadan devam edilebilir.
      */
-    const pause = async (reason: ContinuationReason, estimateOverride?: number): Promise<ChatResult> => {
+    const pause = async (reason: ContinuationReason, estimateOverride?: number, textOverride?: string): Promise<ChatResult> => {
       run.createdAt = Date.now();
       this.pendingRuns.set(run.id, run);
 
@@ -2383,8 +2445,9 @@ export class AiAssistantService {
       // Üç farklı durum, üç farklı cümle: hiç başlamadan uyarı, yarıda bütçe
       // uyarısı ve adım sınırı. Aynı metni kullanmak kullanıcıyı yanıltıyordu.
       const t = cevirmen(run.locale);
-      const text =
-        reason === "estimate"
+      const text = textOverride
+        ? textOverride
+        : reason === "estimate"
           ? t(
               "Bu istek tahminen {tahmin} birim tutacak — bu, tek seferde harcanması için yüksek bir tutar (eşik {esik} birim). Henüz hiç bakiye harcamadım. Devam edeyim mi?",
               { tahmin: this.formatCredits(estimate), esik: this.formatCredits(run.creditCeiling) }
@@ -2414,6 +2477,7 @@ export class AiAssistantService {
           estimatedNextCredits: estimate,
           doneSummary: done,
           tier: run.tier,
+          suggestedTier: reason === "upgrade" ? run.upgradePending?.suggestedTier : undefined,
         },
         text
       );
@@ -2660,6 +2724,36 @@ export class AiAssistantService {
         continue;
       }
 
+      // Hızlı modelde yapılmayacak iş: araç çalıştırılmaz, koşu "model
+      // yükseltmesi gerekiyor" diye duraklatılır (bkz. YUKSELTME_ARACLARI).
+      // Mesaj yığını tutarlı kalsın diye her tool_use'a bir yer tutucu sonuç
+      // yazılır; kullanıcı yükseltirse yer tutucu gerçek sonuçla değişir.
+      const yukseltmeUse = toolUses.find((use) => YUKSELTME_ARACLARI.has(use.name));
+      const onerilenKademe: ModelTier | null = run.tier === "fast" ? "smart" : run.tier === "smart" ? "max" : null;
+      const yukseltmeGerekli =
+        !!yukseltmeUse &&
+        !!onerilenKademe &&
+        (yukseltmeUse.name === "request_model_upgrade" || run.tier === "fast");
+      if (yukseltmeUse && yukseltmeGerekli && run.channel !== "whatsapp") {
+        const input = (yukseltmeUse.input as Record<string, any>) ?? {};
+        run.messages.push({ role: "assistant", content: response.content });
+        run.messages.push({
+          role: "user",
+          content: toolUses.map((use) => ({
+            type: "tool_result" as const,
+            tool_use_id: use.id,
+            content:
+              use.id === yukseltmeUse.id
+                ? "Model yükseltmesi bekleniyor."
+                : "Model yükseltmesi beklendiği için bu çağrı çalıştırılmadı; gerekiyorsa tekrar çağır.",
+          })),
+        });
+        run.upgradePending = { useId: yukseltmeUse.id, name: yukseltmeUse.name, input, suggestedTier: onerilenKademe! };
+        const { metin, tahmin } = await this.yukseltmeMetni(run, yukseltmeUse.name, input, onerilenKademe!);
+        run.pausedEstimate = tahmin;
+        return pause("upgrade", tahmin, metin);
+      }
+
       const criticalUse = toolUses.find((use) => CRITICAL_TOOLS.has(use.name));
       // WhatsApp'ta onay diyaloğu gösterilemez. toolsForChannel bu araçları
       // zaten modele vermiyor, yani buraya normalde düşülmez; düşülürse
@@ -2726,6 +2820,46 @@ export class AiAssistantService {
             tool_use_id: use.id,
             content: "Dosyalar bırakıldı; bundan sonra içerikleri sana gönderilmeyecek.",
           });
+          continue;
+        }
+        // Koşunun durumuna (sabit görseller, kademe) ihtiyaç duyan araçlar.
+        if (use.name === "match_product_images" || use.name === "view_images" || use.name === "request_model_upgrade") {
+          try {
+            const input = (use.input as Record<string, any>) ?? {};
+            if (use.name === "view_images") {
+              toolResults.push({ type: "tool_result", tool_use_id: use.id, content: await this.gorselleriGoster(run, input) as any });
+            } else if (use.name === "request_model_upgrade") {
+              // Buraya ancak yükseltilecek kademe kalmadıysa ya da WhatsApp'ta düşülür.
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: use.id,
+                content:
+                  run.channel === "whatsapp"
+                    ? "Model yükseltmesi WhatsApp'tan yapılamaz; kullanıcıya bu işi Projelio uygulamasından istemesini söyle."
+                    : "Zaten en güçlü modeldesin; işe devam et.",
+              });
+            } else if (run.channel === "whatsapp" && run.tier === "fast") {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: use.id,
+                content: "Bu iş güçlü model gerektiriyor ve WhatsApp'tan yükseltilemiyor; kullanıcıya Projelio uygulamasından istemesini söyle.",
+                is_error: true,
+              });
+            } else {
+              const result = await this.urunGorselleriniEslestir(run, input);
+              run.executed.push(use.name);
+              await this.emitActivity(run.userId, use.name, input, result, run.locale);
+              toolResults.push({ type: "tool_result", tool_use_id: use.id, content: this.serializeToolResult(result) });
+            }
+          } catch (err: any) {
+            this.logger.warn(`Tool "${use.name}" failed: ${err?.message}`);
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: use.id,
+              content: `Hata: ${err?.message ?? "bilinmeyen hata"}`,
+              is_error: true,
+            });
+          }
           continue;
         }
         // open_file de sohbetin durumunu değiştiriyor (dosyayı sabitliyor);
@@ -3082,6 +3216,279 @@ export class AiAssistantService {
    * Bırakıldıktan sonra içerik bir daha modele gönderilmez — asıl kazanç bu:
    * biten bir işin dosyası her turda tekrar tekrar ödenmeye devam etmemeli.
    */
+  /**
+   * Model yükseltme duraklamasının metni ve tahmini bedeli.
+   *
+   * Metni SUNUCU yazar: kullanıcıya bedel söylenecek ve bu sayı modelin
+   * uydurabileceği bir şey olmamalı.
+   */
+  private async yukseltmeMetni(
+    run: PendingRun,
+    arac: string,
+    input: Record<string, any>,
+    kademe: ModelTier
+  ): Promise<{ metin: string; tahmin: number }> {
+    const t = cevirmen(run.locale);
+    const tercih = this.providers.normalizeModelChoice(await this.modelSettings.modelKeyForTier(kademe));
+    const model = this.modelForTier(kademe, tercih);
+    // Ana sohbetin güçlü modeldeki bir turu (özet cümlesi).
+    let tahmin = this.minimumTurnCredits(model, run.messages);
+    let neden: string;
+
+    if (arac === "match_product_images") {
+      const gorselSayisi = run.activeFiles.filter((f) => f.kind === "image").length;
+      let urunSayisi = 30;
+      try {
+        const org = await this.requireOwnOrganization(run.userId, input.organizationId);
+        urunSayisi = (await this.productsService.findByOrganization(org)).length || urunSayisi;
+      } catch {
+        // tahmin için kaba sayı yeter
+      }
+      const tok = eslestirmeTokenTahmini(gorselSayisi, urunSayisi);
+      tahmin += calculateUsageCost(model, { inputTokens: tok.input, outputTokens: tok.output }).credits;
+      neden = t("{n} görseli tek tek tanıyıp {m} ürünlük listeyle eşleştirmem gerekiyor.", {
+        n: gorselSayisi,
+        m: urunSayisi,
+      });
+    } else {
+      tahmin += this.minimumTurnCredits(model, run.messages);
+      neden = String(input.reason ?? "").trim().slice(0, 300) || t("Bu iş daha güçlü bir model gerektiriyor.");
+    }
+
+    tahmin = Math.max(1, Math.round(tahmin));
+    const kat = Math.round(MODEL_TIERS[kademe].costMultiplier / MODEL_TIERS[run.tier].costMultiplier);
+    const metin = t(
+      "{neden} Bunu güvenilir yapabilmem için modeli \"{kademe}\" seviyesine yükseltmem gerekiyor. Bu model adım başına yaklaşık {kat} kat daha fazla birim harcar; bu iş için tahminen {tahmin} birim. Yükseltirsen hemen başlıyorum.",
+      { neden, kademe: t(MODEL_TIERS[kademe].label), kat, tahmin: this.formatCredits(tahmin) }
+    );
+    return { metin, tahmin };
+  }
+
+  /**
+   * Yükseltme bekleyen aracı, kullanıcı "Modeli yükselt" dedikten sonra çalıştırır
+   * ve yer tutucu sonucu gerçeğiyle değiştirir (bkz. PendingRun.upgradePending).
+   */
+  private async yukseltmeBekleyeniCalistir(run: PendingRun): Promise<void> {
+    const bekleyen = run.upgradePending!;
+    run.upgradePending = undefined;
+    const son = run.messages[run.messages.length - 1];
+    const blok: any = Array.isArray(son?.content)
+      ? (son.content as any[]).find((b) => b.type === "tool_result" && b.tool_use_id === bekleyen.useId)
+      : undefined;
+    if (!blok) return;
+
+    if (run.tier === "fast") {
+      blok.content =
+        "Kullanıcı modeli yükseltmedi. Bu işi hızlı modelde YAPMA; kullanıcıya güvenilir yapılamayacağını söyle.";
+      return;
+    }
+    if (bekleyen.name === "request_model_upgrade") {
+      blok.content = "Model yükseltildi; artık daha güçlü modeldesin. İşe kaldığın yerden devam et.";
+      return;
+    }
+    try {
+      const sonuc = await this.urunGorselleriniEslestir(run, bekleyen.input);
+      run.executed.push(bekleyen.name);
+      await this.emitActivity(run.userId, bekleyen.name, bekleyen.input, sonuc, run.locale);
+      blok.content = this.serializeToolResult(sonuc);
+    } catch (err: any) {
+      this.logger.warn(`match_product_images başarısız: ${err?.message}`);
+      blok.content = `Hata: ${err?.message ?? "bilinmeyen hata"}`;
+      blok.is_error = true;
+    }
+  }
+
+  /**
+   * Sohbetteki görselleri şirketin ürün listesiyle eşleştirip galeriye ekler.
+   *
+   * Her görsel BİR KEZ, küçültülmüş hâliyle ve küçük gruplar içinde modele
+   * sorulur (bkz. urun-gorsel-eslestirme.ts). Düşük güvenli ya da listede
+   * karşılığı olmayan görsel EKLENMEZ, kullanıcıya sorulmak üzere döner.
+   * Eklenen görseller sohbetten bırakılır: sonraki turlarda ödenmesinler.
+   */
+  private async urunGorselleriniEslestir(run: PendingRun, input: Record<string, any>): Promise<Record<string, any>> {
+    const organizationId = await this.requireOwnOrganization(run.userId, input.organizationId);
+    const urunler = await this.productsService.findByOrganization(organizationId);
+    if (!urunler.length) throw new BadRequestException("Bu şirkette hiç ürün yok; önce ürünleri ekle.");
+
+    const istenen: string[] | undefined =
+      Array.isArray(input.dosyaKimlikleri) && input.dosyaKimlikleri.length ? input.dosyaKimlikleri.map(String) : undefined;
+    const gorseller = run.activeFiles.filter((f) => f.kind === "image" && (!istenen || istenen.includes(f.id)));
+    if (!gorseller.length) {
+      throw new BadRequestException("Sohbette eşleştirilecek görsel yok; kullanıcıdan görselleri göndermesini iste.");
+    }
+
+    // Bakiye bu işi karşılamıyorsa hiç başlama: yarıda kalan eşleştirme hem
+    // parayı harcar hem işi bitirmez.
+    const liste: EslesmeUrunu[] = urunler.map((u) => ({
+      id: u.id,
+      ad: u.name,
+      sku: u.sku ?? undefined,
+      kategori: u.category ?? undefined,
+      marka: u.brand ?? undefined,
+    }));
+    let model = this.modelForTier(run.tier, run.preferredModel);
+    const tok = eslestirmeTokenTahmini(gorseller.length, liste.length);
+    const bakiye = await this.creditsService.assertCanStart(run.userId);
+    this.creditsService.assertBalanceCovers(
+      bakiye,
+      calculateUsageCost(model, { inputTokens: tok.input, outputTokens: tok.output }).credits
+    );
+
+    const sistem = eslestirmeSistemi(liste);
+    const kullanim = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+    const sonuclar = new Map<string, GorselEslesmesi | undefined>();
+
+    const isle = async (grup: ActiveFile[]) => {
+      const icerik: any[] = [];
+      const gecerli: ActiveFile[] = [];
+      for (const f of grup) {
+        const b64 = await this.attachmentsService.getSmallImage(run.userId, f.id, ESLESTIRME_KENARI);
+        if (!b64) continue;
+        gecerli.push(f);
+        icerik.push({ type: "text", text: `Görsel ${gecerli.length}:` });
+        icerik.push({ type: "image", source: { type: "base64", media_type: base64GorselTuru(b64) ?? "image/jpeg", data: b64 } });
+      }
+      if (!gecerli.length) return;
+      icerik.push({ type: "text", text: `Bu ${gecerli.length} görselin her biri için JSON dizisini döndür.` });
+      try {
+        const { response, model: kullanilan } = await this.callModel(
+          run.tier,
+          (choice) => ({
+            model: choice.model,
+            max_tokens: 100 + gecerli.length * 80,
+            // Liste her grupta aynı: önbelleğe alınır, sonraki gruplar okur.
+            system: [
+              {
+                type: "text",
+                text: sistem,
+                ...(CACHING_ENABLED && choice.provider.capabilities.promptCaching
+                  ? { cache_control: { type: "ephemeral" } }
+                  : {}),
+              },
+            ] as any,
+            messages: [{ role: "user", content: icerik }],
+          }),
+          run.preferredModel
+        );
+        model = kullanilan;
+        const u: any = response.usage ?? {};
+        kullanim.input += u.input_tokens ?? 0;
+        kullanim.output += u.output_tokens ?? 0;
+        kullanim.cacheWrite += u.cache_creation_input_tokens ?? 0;
+        kullanim.cacheRead += u.cache_read_input_tokens ?? 0;
+        const metin = response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === "text")
+          .map((b) => b.text)
+          .join("\n");
+        const eslesmeler = eslesmeleriCoz(metin, gecerli.length, liste.length);
+        gecerli.forEach((f, i) => sonuclar.set(f.id, eslesmeler.find((e) => e.no === i + 1)));
+      } catch (err: any) {
+        this.logger.warn(`Ürün görseli eşleştirme grubu başarısız: ${err?.message}`);
+      }
+    };
+
+    const gruplar = gruplara(gorseller);
+    // İlk grup tek başına: sistem istemi önbelleğe yazılsın, kalanlar okusun.
+    await isle(gruplar[0]);
+    const kalan = gruplar.slice(1);
+    for (let i = 0; i < kalan.length; i += 3) await Promise.all(kalan.slice(i, i + 3).map(isle));
+
+    const { credits } = await this.creditsService.chargeUsage({
+      userId: run.userId,
+      model,
+      inputTokens: kullanim.input,
+      outputTokens: kullanim.output,
+      cacheWriteTokens: kullanim.cacheWrite,
+      cacheReadTokens: kullanim.cacheRead,
+      conversationId: run.conversationId,
+    });
+    run.spentCredits += credits;
+
+    const eklenen = new Map<string, string[]>();
+    const eslesmeyen: Record<string, any>[] = [];
+    const hatalar: Record<string, any>[] = [];
+    const eklenenKimlikler: string[] = [];
+    let ilkUrun: string | undefined;
+    for (const f of gorseller) {
+      const e = sonuclar.get(f.id);
+      if (!eklenecekMi(e)) {
+        eslesmeyen.push(
+          pruneEmpty({
+            dosya: f.name,
+            dosyaKimligi: f.id,
+            gorulen: e?.gorulen || undefined,
+            olasiUrun: e && e.urun > 0 ? liste[e.urun - 1].ad : undefined,
+            neden: !e ? "okunamadı" : e.urun === 0 ? "listede karşılığı yok" : "emin olunamadı",
+          })
+        );
+        continue;
+      }
+      const urun = liste[e!.urun - 1];
+      const dosya = this.attachmentsService.getFile(run.userId, f.id);
+      if (!dosya) {
+        hatalar.push({ dosya: f.name, urun: urun.ad, hata: "görselin süresi dolmuş" });
+        continue;
+      }
+      try {
+        await this.productsService.addImage(
+          urun.id,
+          { buffer: dosya.buffer, originalname: dosya.name, mimetype: dosya.mimeType, size: dosya.buffer.length } as Express.Multer.File,
+          run.userId
+        );
+        ilkUrun ??= urun.id;
+        eklenenKimlikler.push(f.id);
+        eklenen.set(urun.ad, [...(eklenen.get(urun.ad) ?? []), f.name]);
+      } catch (err: any) {
+        hatalar.push({ dosya: f.name, urun: urun.ad, hata: err?.message ?? "eklenemedi" });
+      }
+    }
+
+    if (eklenenKimlikler.length) {
+      this.attachmentsService.releaseMany(run.userId, eklenenKimlikler);
+      run.activeFiles = run.activeFiles.filter((f) => !eklenenKimlikler.includes(f.id));
+      await this.conversationsService.setActiveFiles(run.conversationId, run.activeFiles);
+    }
+
+    this.logger.log(
+      `Ürün görseli eşleştirme · kullanıcı=${run.userId.slice(0, 8)}… görsel=${gorseller.length} ` +
+        `eklenen=${eklenenKimlikler.length} eşleşmeyen=${eslesmeyen.length} model=${model} → ${credits} kredi`
+    );
+
+    return pruneEmpty({
+      organizationId,
+      productId: ilkUrun,
+      eklenenSayisi: eklenenKimlikler.length,
+      eklenen: [...eklenen].map(([urun, dosyalar]) => ({ urun, dosyalar })),
+      eslesmeyen: eslesmeyen.length ? eslesmeyen : undefined,
+      hatalar: hatalar.length ? hatalar : undefined,
+      eslestirmeBedeli: credits,
+      not:
+        "Kullanıcıya ürün ürün kısaca özetle. Eşleşmeyenleri dosya adı ve 'gorulen' ile sor; kullanıcı " +
+        "hangi ürün olduğunu söylerse add_product_images ile ekle. Eklenen görseller sohbetten bırakıldı.",
+    });
+  }
+
+  /** view_images: sabit görsellerden birkaçını modele gösterir (küçültülmüş). */
+  private async gorselleriGoster(run: PendingRun, input: Record<string, any>): Promise<any[]> {
+    const kimlikler: string[] = Array.isArray(input.dosyaKimlikleri) ? input.dosyaKimlikleri.map(String) : [];
+    const secilen = run.activeFiles.filter((f) => f.kind === "image" && kimlikler.includes(f.id)).slice(0, VIEW_IMAGES_LIMIT);
+    if (!secilen.length) {
+      return [{ type: "text", text: "Bu kimliklerde sohbette görsel yok. Kimlikleri açık dosyalar listesinden al." }];
+    }
+    const icerik: any[] = [];
+    for (const f of secilen) {
+      const b64 = await this.attachmentsService.getSmallImage(run.userId, f.id, ESLESTIRME_KENARI);
+      if (!b64) {
+        icerik.push({ type: "text", text: `${f.name}: içeriği artık elimde değil.` });
+        continue;
+      }
+      icerik.push({ type: "text", text: `${f.name} (dosyaKimligi: ${f.id}):` });
+      icerik.push({ type: "image", source: { type: "base64", media_type: base64GorselTuru(b64) ?? "image/jpeg", data: b64 } });
+    }
+    return icerik;
+  }
+
   private async releaseActiveFiles(run: PendingRun): Promise<void> {
     if (!run.activeFiles.length) return;
     this.attachmentsService.releaseMany(run.userId, run.activeFiles.map((f) => f.id));
@@ -3296,14 +3703,15 @@ export class AiAssistantService {
 
       case "create_product":
       case "update_product":
-      case "add_product_images": {
+      case "add_product_images":
+      case "match_product_images": {
         // Ürünün kendi sayfası yok; listesi organizasyonun Ürünler sekmesinde.
         const organizationId = input.organizationId ?? (await this.organizationIdOfProduct(result?.productId));
         if (!organizationId) return null;
         const label =
           toolName === "create_product"
             ? t("Ürün eklendi") + (result?.ad ? `: ${result.ad}` : "")
-            : toolName === "add_product_images"
+            : toolName === "add_product_images" || toolName === "match_product_images"
               ? t("Ürün fotoğrafları eklendi")
               : t("Ürün güncellendi");
         return make(

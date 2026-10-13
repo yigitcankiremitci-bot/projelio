@@ -443,6 +443,19 @@ export class AiAttachmentsService {
     return { name: record.name, mimeType: record.mimeType, buffer: Buffer.from(record.base64, "base64") };
   }
 
+  /**
+   * Sabitlenmiş görselin modele gidecek KÜÇÜK kopyası (ürün görseli eşleştirme).
+   *
+   * Galeriye eklenecek olan bu değil, getFile'daki tam boyutlu kopya. ffmpeg
+   * yoksa görsel olduğu gibi döner — eşleştirme yine çalışır, yalnızca pahalı.
+   */
+  async getSmallImage(userId: string, id: string, kenar: number): Promise<string | undefined> {
+    const file = this.getFile(userId, id);
+    if (!file || !file.mimeType.startsWith("image/")) return undefined;
+    const kucuk = await this.shrinkImage(file.buffer, file.name, kenar, 0);
+    return (kucuk ?? file.buffer).toString("base64");
+  }
+
   /** Sabitlenmiş bir metin ekinin içeriği (.vcf, .txt) — read_contact_card için. */
   getText(userId: string, id: string): string | undefined {
     this.sweep();
@@ -613,14 +626,19 @@ export class AiAttachmentsService {
    * ve görsel olduğu gibi kullanılır — küçültme bir iyileştirme, şart değil.
    * Sonuç orijinalden büyükse de orijinal kalır (zaten küçük bir PNG olabilir).
    */
-  private async shrinkImage(buffer: Buffer, name: string): Promise<Buffer | undefined> {
-    if (buffer.length < IMAGE_SHRINK_FROM_BYTES) return undefined;
+  private async shrinkImage(
+    buffer: Buffer,
+    name: string,
+    kenar = IMAGE_MAX_EDGE,
+    esik = IMAGE_SHRINK_FROM_BYTES
+  ): Promise<Buffer | undefined> {
+    if (buffer.length < esik) return undefined;
     if (!(await ffmpegVarMi())) return undefined;
     const klasor = await calismaKlasoru();
     try {
       const girdi = join(klasor, "girdi");
       await writeFile(girdi, buffer);
-      const kucuk = await gorseliKucult(girdi, klasor, IMAGE_MAX_EDGE);
+      const kucuk = await gorseliKucult(girdi, klasor, kenar);
       return kucuk.length > 0 && kucuk.length < buffer.length ? kucuk : undefined;
     } catch (err) {
       this.logger.warn(`Görsel küçültülemedi (${name}): ${String(err)}`);

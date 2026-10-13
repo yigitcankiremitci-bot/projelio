@@ -106,9 +106,8 @@ export class AiAssistantController {
       arkaPlan?: boolean;
     }
   ) {
-    // `tier` gövdede DURUYOR ama artık kullanılmıyor: kademe ve model kararı
-    // adminde (bkz. ai-model-settings.service.ts). Alanı kaldırmak yerine yok
-    // saymak, güncellenmemiş istemcilerin isteklerini kırmamak için.
+    // `tier` kullanıcının kademe seçimi; servis doğrular, geçersizse yöneticinin
+    // varsayılanına düşer. MODEL kimliği istemciden alınmaz (bkz. chat).
     // Dil isteğin içindeyken okunuyor: arka plan işi istek bittikten sonra da sürüyor.
     const locale = istemciDili(req);
     return this.arkaPlandaYaDaHemen(req, body.arkaPlan, () =>
@@ -117,7 +116,7 @@ export class AiAssistantController {
         req.user.role,
         body.message,
         body.conversationId,
-        undefined,
+        body.tier,
         body.attachmentIds,
         // Cevabın dili arayüzün dilidir. Hesaptan okumak demo hesaplarında
         // çalışmıyor: paylaşıldıkları için `users.locale` bilerek boş bırakılır.
@@ -157,10 +156,17 @@ export class AiAssistantController {
   // Kullanıcının seçebileceği model kademeleri (arayüzdeki model seçici bunu okur).
   @Get("models")
   models() {
-    // Model/kademe listesi kullanıcıya GÖNDERİLMEZ: seçim hakkı yok, listeyi
-    // göstermek yalnızca "neden seçemiyorum" sorusunu doğurur. Ek sayısı
-    // arayüzün dosya seçicisi için gerekli olduğundan kalıyor.
-    return { maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE };
+    // Kademeler (Hızlı/Dengeli/Güçlü) ve kaba bedel çarpanları. Hangi MODELİN
+    // çalıştığı gönderilmez: o eşleme yöneticide ve kullanıcının kararı değil.
+    return {
+      maxAttachments: MAX_ATTACHMENTS_PER_MESSAGE,
+      tiers: Object.values(MODEL_TIERS).map(({ tier, label, description, costMultiplier }) => ({
+        tier,
+        label,
+        description,
+        costMultiplier,
+      })),
+    };
   }
 
   // --- Dosya ekleri -------------------------------------------------------

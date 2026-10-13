@@ -110,6 +110,7 @@ export const WRITE_TOOLS = new Set<string>([
   "update_customer",
   // Ürün galerisine fotoğraf ekler; silmez, yalnızca ekler.
   "add_product_images",
+  "match_product_images",
   // Toplu kart açma; önizleme varsayılan (bkz. import_tasks_from_sheet).
   "import_customers_from_sheet",
   "update_connection",
@@ -181,6 +182,8 @@ export function toolsForChannel(
     (tool) =>
       !CRITICAL_TOOLS.has(tool.name) &&
       !tool.name.startsWith("whatsapp_") &&
+      // Model yükseltmesi düğmeyle onaylanıyor; WhatsApp'ta düğme yok.
+      tool.name !== "request_model_upgrade" &&
       (allowWrites || !WRITE_TOOLS.has(tool.name))
   );
 }
@@ -2410,15 +2413,62 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "match_product_images",
+    description:
+      "Sohbetteki ürün görsellerini şirketin ürün listesiyle OTOMATİK eşleştirip ürün galerilerine ekler. " +
+      "Kullanıcı \"bu görselleri ürünlere ekle\" dediğinde İLK ve TEK adım budur: görselleri kendin tanımaya, " +
+      "list_products çağırmaya ya da kullanıcıdan eşleme istemeye gerek yok — sunucu her görseli tek tek " +
+      "okuyup eşleştirir, emin olmadıklarını eklemez ve sana döndürür. Güçlü model gerektirir: hızlı " +
+      "modeldeysen sistem kullanıcıdan model yükseltmesini ister, sen ayrıca bir şey söyleme.",
+    input_schema: {
+      type: "object",
+      properties: {
+        organizationId: { type: "string", description: "Bağlamdaki organizasyon kimliği." },
+        dosyaKimlikleri: {
+          type: "array",
+          items: { type: "string" },
+          description: "Yalnızca bu görseller (opsiyonel; verilmezse sohbetteki tüm görseller).",
+        },
+      },
+      required: ["organizationId"],
+    },
+  },
+  {
+    name: "view_images",
+    description:
+      "Sohbette çok görsel olduğunda görseller sana gösterilmez, yalnızca adları gelir. Birkaçının içeriğine " +
+      "gerçekten bakman gerekiyorsa bu araçla getir (bir çağrıda en çok 6). Ürünlerle eşleştirme için " +
+      "KULLANMA, match_product_images var.",
+    input_schema: {
+      type: "object",
+      properties: {
+        dosyaKimlikleri: { type: "array", items: { type: "string" }, maxItems: 6 },
+      },
+      required: ["dosyaKimlikleri"],
+    },
+  },
+  {
+    name: "request_model_upgrade",
+    description:
+      "İş, şu anki modelle GÜVENİLİR yapılamayacak kadar zorsa çağır (çok sayıda görseli tek tek tanımak, " +
+      "uzun belge analizi, çok adımlı karmaşık planlama). Kullanıcıya bedeliyle birlikte \"Modeli yükselt\" " +
+      "düğmesi gösterilir; onaylarsa güçlü modelde kaldığın yerden devam edersin. Tahmin yürütüp yanlış iş " +
+      "yapmak yerine bunu çağır. Basit işler için ÇAĞIRMA.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reason: { type: "string", description: "Kullanıcıya gösterilecek tek cümlelik neden." },
+      },
+      required: ["reason"],
+    },
+  },
+  {
     name: "add_product_images",
     description:
-      "Sohbete gönderilen görselleri ürünlerin fotoğraf galerisine ekler — TOPLU, tek çağrıda. Kullanıcı " +
-      "\"bu görselleri ürünlere ekle\" dediğinde akış şu: (1) her görselde ürünü TANI (ambalajdaki ad, " +
-      "form: tablet/sprey/krem…); (2) list_products ile şirketin ürün listesini al; (3) her görseli adı ve " +
-      "formu en iyi eşleşen ürüne bağla ve HEPSİNİ bu araçla tek seferde ekle. Kullanıcıdan görsel-ürün " +
-      "eşlemesi İSTEME, işi sen yap. Yalnızca gerçekten belirsiz olanları (listede karşılığı yok ya da iki " +
-      "ürüne eşit uyuyor) ekleme ve sonunda kullanıcıya dosya adlarıyla sor. Bir görsel birden çok ürüne " +
-      "eklenebilir. Ürün başına en fazla 12 fotoğraf. dosyaKimligi \"Şu an açık dosyalar\" listesinden.",
+      "Görselleri BELİRTİLEN ürünlere ekler — eşlemeyi kullanıcı söylediğinde (\"web-12 Vacrol Sprey'e\") ya " +
+      "da match_product_images'ın soramadığı birkaç görsel için. Toplu tanıma için KULLANMA: görselleri " +
+      "kendin eşleştirip buraya göndermek tahmin yürütmektir, match_product_images'ı çağır. Ürün başına en " +
+      "fazla 12 fotoğraf. dosyaKimligi \"Şu an açık dosyalar\" listesinden, productId list_products'tan.",
     input_schema: {
       type: "object",
       properties: {

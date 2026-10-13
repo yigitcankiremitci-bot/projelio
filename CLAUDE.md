@@ -190,18 +190,25 @@ sağlayıcıya özgü 401/404); 400'de geçilmez, çünkü bozuk istek her sağl
 bozuktur. Kredi, yedeğe geçilirse **gerçekten kullanılan** modelin fiyatından
 kesilir.
 
-### Model seçimi — KARAR YÖNETİCİDE
+### Model seçimi — KADEME kullanıcıda, MODEL yöneticide
 
-Kullanıcı model ya da kademe seçemez. Eskiden seçebiliyordu ve iki sorun
-vardı: `POST /ai/chat` gövdesindeki `model` alanı korumasızdı (herkes Opus'u
-çalıştırabiliyordu), kademe seçimi de faturayı 15 kata kadar değiştiriyordu.
-İkisi de tercih değil **maliyet kararı**.
+Kullanıcı **kademe** seçer (Hızlı ×1 / Dengeli ×3 / Güçlü ×15 — Lio panelinin
+altındaki çipler, `POST /ai/chat` ve `/ai/continue` gövdesinde `tier`); sunucu
+`isValidTier` ile doğrular, geçersizse yöneticinin varsayılanına düşer.
+**Model kimliği** istemciden ASLA alınmaz: `model` alanı yok sayılır, çünkü
+eskiden gövdeye `model` yazan herkes Opus'u çalıştırabiliyordu. Kademe → model
+eşlemesi yöneticide. (2026-09'da kademe de kullanıcıdan alınmıştı; küçük modelin
+yapamadığı işte kullanıcı çaresiz kaldığı için 2026-10-13'te geri geldi.)
 
-Sunucu artık kullanıcıdan gelen `tier` ve `model` alanlarını **yok sayar**.
-Alanlar imzalarda duruyor ama kullanılmıyor — güncellenmemiş istemcilerin
-isteklerini reddetmek yerine sessizce yok saymak doğru davranış.
+Hızlı modelde güvenilir yapılamayan işler (`YUKSELTME_ARACLARI`:
+`match_product_images`, `request_model_upgrade`) çalıştırılmaz; koşu
+`reason: "upgrade"` ile duraklar, sohbette "Modeli yükselt ve devam et" düğmesi
+çıkar, basılınca bekleyen araç güçlü modelle hemen çalışır. 6'dan fazla görsel
+varsa görseller ana modele gönderilmez, yalnızca adları gider (`INLINE_IMAGE_LIMIT`)
+— ürün görseli eşleştirmesi sunucuda, görsel görsel yapılır
+(`ai-assistant/urun-gorsel-eslestirme.ts`).
 
-Yönetici kararı iki yerden verebilir:
+Yönetici kademe → model eşlemesini ve varsayılan kademeyi iki yerden belirler:
 
 | Yol | Nasıl | Ne zaman |
 |---|---|---|

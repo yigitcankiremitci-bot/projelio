@@ -62,7 +62,8 @@ export type AiModelTier = "fast" | "smart" | "max";
 
 export interface AiModelTierInfo {
   tier: AiModelTier;
-  model: string;
+  /** Kullanıcı ucunda gelmez: kademe → model eşlemesi yöneticide. */
+  model?: string;
   label: string;
   description: string;
   costMultiplier: number;
@@ -79,13 +80,16 @@ export interface AiContinuation {
    * "estimate" = henüz hiçbir kredi harcanmadan verilen ön uyarı.
    * "budget"   = iş sürerken eşiğin aşılmak üzere olması.
    * "iterations" = adım sınırına gelinmesi.
+   * "upgrade"  = iş hızlı modelde güvenilir yapılamaz; "Modeli yükselt" düğmesi
+   *              `suggestedTier` ile devam ettirir.
    */
-  reason: "estimate" | "budget" | "iterations";
+  reason: "estimate" | "budget" | "iterations" | "upgrade";
   text: string;
   spentCredits: number;
   estimatedNextCredits: number;
   doneSummary: string;
   tier: AiModelTier;
+  suggestedTier?: AiModelTier;
 }
 
 /** Kredi tükendiği için yarıda kesilen istek. */
@@ -311,15 +315,14 @@ export async function isinSonucunuBekle<T>(
 const isiSor = <T>(isId: string) => api.get<IsDurumu<T>>(`/ai/jobs/${encodeURIComponent(isId)}`);
 
 export const aiChat = {
-  // Kademe/model GÖNDERİLMEZ: hangi modelin çalışacağına yönetici karar verir
-  // (bkz. backend ai-model-settings.service.ts). Sunucu gövdedeki tier alanını
-  // zaten yok sayıyor; buradan da göndermiyoruz.
+  // KADEME gönderilir (Hızlı/Dengeli/Güçlü), MODEL gönderilmez: hangi kademede
+  // hangi modelin çalışacağına yönetici karar verir (bkz. backend chat()).
   //
   // Üçü de `arkaPlan` ile gider: tur sunucuda arka planda çalışır, sonuç
   // yoklanarak alınır (bkz. isinSonucunuBekle). Çağıranlar için imza aynı.
-  send: async (message: string, conversationId?: string, attachmentIds?: string[]) =>
+  send: async (message: string, conversationId?: string, attachmentIds?: string[], tier?: AiModelTier) =>
     isinSonucunuBekle(
-      await api.post<AiChatResult | IsBaslatildi>("/ai/chat", { message, conversationId, attachmentIds, arkaPlan: true }),
+      await api.post<AiChatResult | IsBaslatildi>("/ai/chat", { message, conversationId, attachmentIds, tier, arkaPlan: true }),
       isiSor<AiChatResult>
     ),
   confirm: async (actionId: string, confirmed: boolean) =>
@@ -327,13 +330,13 @@ export const aiChat = {
       await api.post<AiConfirmResult | IsBaslatildi>("/ai/confirm", { actionId, confirmed, arkaPlan: true }),
       isiSor<AiConfirmResult>
     ),
-  // Duraklatılmış bir isteği sürdürür/durdurur. Kademe değiştirilemez.
-  continueRun: async (runId: string, confirmed: boolean, approveAll?: boolean) =>
+  // Duraklatılmış bir isteği sürdürür/durdurur. `tier` verilirse güçlü modelle sürer.
+  continueRun: async (runId: string, confirmed: boolean, approveAll?: boolean, tier?: AiModelTier) =>
     isinSonucunuBekle(
-      await api.post<AiChatResult | IsBaslatildi>("/ai/continue", { runId, confirmed, approveAll, arkaPlan: true }),
+      await api.post<AiChatResult | IsBaslatildi>("/ai/continue", { runId, confirmed, approveAll, tier, arkaPlan: true }),
       isiSor<AiChatResult>
     ),
-  getModels: () => api.get<{ maxAttachments: number }>("/ai/models"),
+  getModels: () => api.get<{ maxAttachments: number; tiers?: AiModelTierInfo[] }>("/ai/models"),
   /** Sağlayıcı durumu — yalnızca admin çağırabilir. */
   getHealth: () => api.get<AiHealth>("/ai/health"),
   /** Model ayarları (yalnızca admin): hangi kademede hangi model çalışıyor. */

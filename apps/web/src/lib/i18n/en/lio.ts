@@ -27,6 +27,7 @@ export const lio: TranslationDict = {
   // ─────────────────────────────────────────────── Dosya ekleme
   "Dosyaları bırak": "Drop files here",
   "Dosyayı çıkar": "Remove file",
+  "Tümünü kaldır": "Remove all",
   "Dosyayı önizle": "Preview file",
   "Dosya okunamadı.": "Could not read the file.",
   "Bilgisayardan yükle": "Upload from computer",

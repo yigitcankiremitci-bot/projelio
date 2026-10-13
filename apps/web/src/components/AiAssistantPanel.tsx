@@ -180,6 +180,13 @@ export default function AiAssistantPanel({
   const [attachments, setAttachments] = useState<AiAttachment[]>([]);
   /** Okunmayı bekleyen dosya adları — yükleme sürerken çip olarak görünür. */
   const [attaching, setAttaching] = useState<string[]>([]);
+  // Ek listesi kendi içinde kayıyor; yeni eklenen (ve okunmayı bekleyen) dosya
+  // görünür kalsın diye liste büyüdükçe en alta inilir.
+  const ekListesiRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ekListesiRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [attachments.length, attaching.length]);
   const [attachMenu, setAttachMenu] = useState(false);
   const [cloudPicker, setCloudPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -757,6 +764,13 @@ export default function AiAssistantPanel({
   const removeAttachment = (id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
     aiChat.removeAttachment(id).catch(() => {});
+  };
+
+  // 40 ürün görseli tek tek ✕'lenmez.
+  const removeAllAttachments = () => {
+    const ids = attachments.map((a) => a.id);
+    setAttachments([]);
+    for (const id of ids) aiChat.removeAttachment(id).catch(() => {});
   };
 
   const send = async (text: string) => {
@@ -1553,8 +1567,35 @@ export default function AiAssistantPanel({
           style={{ padding: `14px 14px ${safeBottom(14)}`, borderTop: `1px solid ${c.border}`, flexShrink: 0, position: "relative" }}
         >
           {/* İliştirilmiş dosyalar. Okunanlar dökümüyle, okunmayı bekleyenler soluk görünür. */}
+          {/* Liste YÜKSEKLİĞİ SINIRLI ve kendi içinde kayar. Sınırsızken 40 görsel
+              mesaj kutusunu panelin dışına itiyordu; daha fazlasında kutu hiç
+              görünmüyordu. Dosyalar gizlense de olur, yazı alanı olamaz. */}
+          {attachments.length + attaching.length > 3 && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: c.textSecondary, marginBottom: 4 }}>
+              <span>{t("{n} dosya", { n: attachments.length + attaching.length })}</span>
+              {attachments.length > 0 && (
+                <button
+                  type="button"
+                  onClick={removeAllAttachments}
+                  style={{ background: "transparent", border: "none", padding: 0, cursor: "pointer", color: c.textSecondary, fontSize: 12, textDecoration: "underline" }}
+                >
+                  {t("Tümünü kaldır")}
+                </button>
+              )}
+            </div>
+          )}
           {(attachments.length > 0 || attaching.length > 0) && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+            <div
+              ref={ekListesiRef}
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 6,
+                marginBottom: 8,
+                maxHeight: "min(96px, 20vh)",
+                overflowY: "auto",
+              }}
+            >
               {attachments.map((attachment) => (
                 <span
                   key={attachment.id}

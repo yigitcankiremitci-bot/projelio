@@ -141,7 +141,8 @@ export default function SiparisKarti({
           </div>
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
             {[
-              t("Vade {tarih}", { tarih: fmtTarih(siparis.vadeTarihi) }),
+              // Satırda siparişin günü; vade açılınca ayrıntıda (kullanıcı isteği, 2026-10-20).
+              fmtTarih(siparis.siparisTarihi),
               siparis.kanalAdi,
               t(ODEME_YONTEMI_ETIKET[siparis.odemeYontemi]),
               siparis.fatura ? (siparis.fatura.faturaNo ? t("Fatura #{no}", { no: siparis.fatura.faturaNo }) : t("Faturalı")) : undefined,
@@ -166,7 +167,9 @@ export default function SiparisKarti({
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 10px 10px" }}>
           <div style={{ fontSize: 12, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
             <span>{t("Sipariş tarihi: {tarih}", { tarih: fmtTarih(siparis.siparisTarihi) })}</span>
-            <span>{t("{gun} gün vade", { gun: siparis.vadeGun })}</span>
+            <span>
+              {t("{gun} gün vade", { gun: siparis.vadeGun })} · {t("Vade {tarih}", { tarih: fmtTarih(siparis.vadeTarihi) })}
+            </span>
             {siparis.siparisNo && <span>#{siparis.siparisNo}</span>}
             {evrakliMi(siparis.odemeYontemi) && (siparis.evrakNo || siparis.evrakVadesi) && (
               <span>

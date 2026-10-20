@@ -387,6 +387,9 @@ export default function SiparisExcelModal({
                             </td>
                             <td style={td}>
                               <input
+                                // Tür değişince sunucunun önerdiği vade de değişir; anahtar
+                                // değişmezse kutu eski sayıyı göstermeye devam ederdi.
+                                key={`${k.ad}|${k.tur}|${k.vadeGun}`}
                                 type="number"
                                 min={0}
                                 disabled={!k.yeni}

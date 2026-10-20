@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ODEME_YONTEMI_ETIKET,
   ODEME_YONTEMLERI,
@@ -75,9 +75,16 @@ export default function TahsilatTakibi({
   const [yenile, setYenile] = useState(0);
   const organizationId = /^\/organizations\/([^/]+)/.exec(kapsamYolu)?.[1];
 
+  // Liste yalnızca KAPSAM değişince boşaltılır. Tazelemede (kanal düzenlendi,
+  // toplu tahsilat, içe aktarma) boşaltılsaydı ekran "Yükleniyor"a düşer, açık
+  // kanal paneli sökülür ve kullanıcı bir kutudan ötekine geçerken sayfa
+  // yenilenmiş gibi olurdu — yazdığı değerin yarısı kaydedilip kalırdı.
+  const yuklenenKapsam = useRef("");
   useEffect(() => {
     let iptal = false;
-    setSiparisler(null);
+    const kapsam = `${kapsamYolu}|${departmentId ?? ""}`;
+    if (yuklenenKapsam.current !== kapsam) setSiparisler(null);
+    yuklenenKapsam.current = kapsam;
     siparisApi
       .kapsamdakiler(kapsamYolu, departmentId)
       .then((r) => {
@@ -129,14 +136,19 @@ export default function TahsilatTakibi({
     [siparisler, ay, sorumlu, kanal]
   );
 
+  // Liste sipariş tarihine göre, yeniden eskiye (kullanıcı isteği, 2026-10-20):
+  // kargo dökümüyle karşılaştırılan şey siparişin günü. Ay süzgeci ve rapor
+  // yine VADE ayıyla — "bu ay ne tahsil edilmeli" sorusu onun.
   const liste = useMemo(
     () =>
-      kapsamda.filter((s) => {
-        const d = siparisDurumu(s, bugun);
-        if (durum === "hepsi") return true;
-        if (durum === "acik") return d !== "tahsil_edildi";
-        return d === durum;
-      }),
+      kapsamda
+        .filter((s) => {
+          const d = siparisDurumu(s, bugun);
+          if (durum === "hepsi") return true;
+          if (durum === "acik") return d !== "tahsil_edildi";
+          return d === durum;
+        })
+        .sort((a, b) => b.siparisTarihi.localeCompare(a.siparisTarihi) || b.createdAt.localeCompare(a.createdAt)),
     [kapsamda, durum]
   );
 

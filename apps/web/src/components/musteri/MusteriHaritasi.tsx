@@ -19,8 +19,8 @@ import Modal from "../Modal";
  * çarpık (İstanbul yüzlerce, çoğu il bir-iki); doğrusal ölçek İstanbul
  * dışındaki her ili aynı açık tona boğardı.
  *
- * Erişilebilirlik: renk tek başına bilgi taşımaz — üzerine gelince il adı
- * ve sayı, en çok müşterili iller doğrudan etiketli, yanda sayı tablosu.
+ * Erişilebilirlik: renk tek başına bilgi taşımaz — müşterisi olan her il
+ * sayısıyla etiketli, üzerine gelince il adı, yanda sayı tablosu.
  * Şehri boş ya da tanınmayan kartlar ayrıca sayılır, kaybolmaz.
  *
  * Şimdilik yalnızca Türkiye (kullanıcı isteği, 2026-10-20).
@@ -30,8 +30,14 @@ const ESIKLER = [1, 2, 5, 10, 25] as const;
 // Basamaklar eşit aralıklı değil: düşük sınıflar koyu temada "müşteri yok"
 // zeminine yapışıyordu (önizlemede görüldü), alt uç yukarı çekildi.
 const TON = [28, 48, 66, 84, 100] as const;
-/** Haritada sayısı doğrudan yazılan il sayısı (gerisi üzerine gelince). */
-const ETIKETLI_IL = 6;
+/**
+ * İl üzerindeki sayının boyu (SVG birimi; çizim alanı ~1000 birim geniş).
+ * Müşterisi olan HER ilin sayısı yazılır (kullanıcı isteği, 2026-10-20 —
+ * önce yalnızca en kalabalık 6 il yazılıyordu, 1-2 müşterili iller
+ * üzerine gelmeden okunmuyordu); kalabalık iller biraz daha iri.
+ */
+const ETIKET_BOYU = 17;
+const IRI_ETIKET_BOYU = 21;
 
 function sinif(n: number): number {
   let k = -1;
@@ -77,7 +83,7 @@ export default function MusteriHaritasi({ musteriler, onKapat }: { musteriler: P
     const svg = svgRef.current;
     if (!svg) return;
     const l: { plaka: number; x: number; y: number; n: number }[] = [];
-    for (const s of sirali.slice(0, ETIKETLI_IL)) {
+    for (const s of sirali) {
       const yol = svg.querySelector<SVGPathElement>(`path[data-plaka="${s.plaka}"]`);
       if (!yol) continue;
       const b = yol.getBBox();
@@ -153,9 +159,9 @@ export default function MusteriHaritasi({ musteriler, onKapat }: { musteriler: P
                   // Yazı her zaman metin renginde, yüzey renginde haleyle: tonun
                   // açık ya da koyu olmasından bağımsız okunur (seriden renk almaz).
                   stroke={c.surface}
-                  strokeWidth={3}
+                  strokeWidth={4}
                   paintOrder="stroke"
-                  style={{ fontSize: 13, fontWeight: 600, fill: c.textPrimary, pointerEvents: "none" }}
+                  style={{ fontSize: e.n >= 10 ? IRI_ETIKET_BOYU : ETIKET_BOYU, fontWeight: 700, fill: c.textPrimary, pointerEvents: "none" }}
                 >
                   {e.n}
                 </text>

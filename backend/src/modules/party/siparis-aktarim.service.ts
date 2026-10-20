@@ -12,7 +12,7 @@ import { hataMetni } from "../../common/i18n/index";
 import { tabloyuOku } from "./musteri-sablonu";
 import { PartyService, type PartyScope } from "./party.service";
 import { SatisKanallariService, SATIS_KANALI_TURLERI } from "./satis-kanallari.service";
-import { siparisPlaniCikar, yeniKartKisisi, type SiparisAktarimPlani } from "./siparis-aktarim";
+import { baslikHarfi, siparisPlaniCikar, yeniKartKisisi, type SiparisAktarimPlani } from "./siparis-aktarim";
 import { SiparisService } from "./siparis.service";
 
 /**
@@ -131,7 +131,8 @@ export class SiparisAktarimService {
           displayName: ad,
           partyType: eczane ? "company" : "person",
           roles: ["customer"],
-          address: al.il ? { city: al.il } : undefined,
+          // Kargo dökümünde il büyük harfle ("İSTANBUL"); kartta "İstanbul".
+          address: al.il ? { city: baslikHarfi(al.il) } : undefined,
           source: "Sipariş içe aktarma",
           notes: kisi ? `İlgili kişi: ${kisi}` : undefined,
         } as any,

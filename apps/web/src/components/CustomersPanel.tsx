@@ -61,6 +61,8 @@ import { filesApi } from "../api/files";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
+import MusteriKunyesi from "./musteri/MusteriKunyesi";
+import MusteriHaritasi from "./musteri/MusteriHaritasi";
 import GorusmeNotlari from "./musteri/GorusmeNotlari";
 import { BaglantiListeSekmeleri, KartListeleri } from "./BaglantiListeleri";
 import TaskFromRecordModal from "./TaskFromRecordModal";
@@ -402,6 +404,7 @@ export default function CustomersPanel({
 
   // Şablon indirme ve doldurulmuş dosyayı yükleme aynı pencerede (bkz. MusteriExcelModal).
   const [excelAcik, setExcelAcik] = useState(false);
+  const [haritaAcik, setHaritaAcik] = useState(false);
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => {
@@ -1392,6 +1395,8 @@ export default function CustomersPanel({
         <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
       )}
 
+      {haritaAcik && <MusteriHaritasi musteriler={visible} onKapat={() => setHaritaAcik(false)} />}
+
       {excelAcik && (
         <MusteriExcelModal
           scopePath={scopePath}
@@ -1485,6 +1490,12 @@ export default function CustomersPanel({
           )}
           {/* Sıralama filtrelerin yanında; filtre satırı yoksa listenin üstünde. */}
           {visible.length > 1 && siralamaSecici(false)}
+          {/* Harita listedekileri gösterir (süzgeçler uygulanmış hâliyle). */}
+          {!baglantiModu && visible.length > 0 && (
+            <button onClick={() => setHaritaAcik(true)} style={sekmeStili(c, false)}>
+              {t("Haritada göster")}
+            </button>
+          )}
         </div>
       )}
 
@@ -1938,17 +1949,24 @@ function PartyDetail({
   return (
     <div
       style={{
-        // Açılan alan listeden ayrışsın diye kendi renginde (theme.acilanAlan).
-        margin: "2px 6px 8px",
-        padding: "10px 12px",
-        borderRadius: 8,
+        // Açılan alan listeden ayrışsın diye kendi renginde (theme.acilanAlan);
+        // sol vurgu çizgisi ve gölgeyle satırın altında belirgin dursun
+        // (kullanıcı isteği, 2026-10-20).
+        margin: "2px 8px 10px",
+        padding: "12px 14px",
+        borderRadius: 10,
         background: c.acilanAlan,
         border: `1px solid ${c.border}`,
+        borderLeft: `3px solid ${c.primary}`,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
         display: "flex",
         flexDirection: "column",
-        gap: 8,
+        gap: 10,
       }}
     >
+      {/* Künye: iletişim, adres, vergi ve sipariş özeti — önceden yalnızca
+          düzenleme formunda görünüyordu (bkz. MusteriKunyesi). */}
+      <MusteriKunyesi party={party} siparisOzetiGoster={!baglantiModu} />
       {/* Kartın genel notu Müşteriler'de yalnızca düzenleme formunda duruyordu;
           Bağlantılar'dan aktarılan ilişki notu da buraya yazıldığı için açık
           kartta görünmesi şart (kullanıcı şikâyeti, 2026-10-11). */}

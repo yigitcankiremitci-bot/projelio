@@ -109,7 +109,9 @@ export default function TahsilatTakibi({
   const [yonetici, setYonetici] = useState(false);
   const [hata, setHata] = useState("");
   const [ay, setAy] = useState(buAy);
-  const [durum, setDurum] = useState<DurumSuzgeci>("acik");
+  // Varsayılan "Hepsi" (kullanıcı isteği, 2026-10-20): "Açık olanlar" ile
+  // açılınca, siparişleri tahsil edilmiş bir şirkette sekme boş görünüyordu.
+  const [durum, setDurum] = useState<DurumSuzgeci>("hepsi");
   const [sorumlu, setSorumlu] = useState("");
   const [kanal, setKanal] = useState("");
   const [arama, setArama] = useState("");
@@ -356,7 +358,7 @@ export default function TahsilatTakibi({
   const thK: React.CSSProperties = { textAlign: "right", fontWeight: 500, color: c.textSecondary, padding: "4px 6px", whiteSpace: "nowrap" };
   const tdK: React.CSSProperties = { textAlign: "right", padding: "4px 6px", whiteSpace: "nowrap", color: c.textPrimary };
 
-  const suzgecVar = !!arama.trim() || durum !== "acik" || ay !== buAy || !!kanal || !!sorumlu;
+  const suzgecVar = !!arama.trim() || durum !== "hepsi" || ay !== buAy || !!kanal || !!sorumlu;
   // Özet kutuları: geniş ekranda sağ sütunda alt alta (müşteri ve bağlantı
   // listesindeki gibi), dar ekranda listenin üstünde yan yana.
   const ozetKutulari = (dikey: boolean) =>
@@ -470,7 +472,7 @@ export default function TahsilatTakibi({
           <button
             onClick={() => {
               setArama("");
-              setDurum("acik");
+              setDurum("hepsi");
               setAy(buAy);
               setKanal("");
               setSorumlu("");

@@ -1145,4 +1145,6 @@ export const hatalar: TranslationDict = {
   "Miktar okunamadı": "Quantity couldn't be read",
   "Alıcı atlandı": "Recipient skipped",
   "Kanal yok": "No channel",
+  "Bu modülde böyle bir sekme yok": "This module has no such tab",
+  "Bu modülün sekmesi yok": "This module has no tabs",
 };

@@ -97,17 +97,30 @@ export function tahsilatTutariHatasi(
 }
 // dil:anahtar-bitis
 
+/** Ay ekseni: vade ayı ("ne gelmeliydi") ya da sipariş ayı ("ne satıldı"). */
+export type TahsilatAyEkseni = "vade" | "siparis";
+
+export function siparisAyi(s: Pick<MusteriSiparisi, "vadeTarihi" | "siparisTarihi">, eksen: TahsilatAyEkseni): string {
+  return (eksen === "siparis" ? s.siparisTarihi : s.vadeTarihi).slice(0, 7);
+}
+
 /**
- * Yönetici raporu: sorumlu × vade ayı × para birimi.
+ * Yönetici raporu: sorumlu × ay × para birimi.
  *
- * Satırlar vade AYINA göre gruplanır ("Ekim'de ne gelmeliydi, ne geldi"),
- * tahsilatın yapıldığı aya göre değil — çalışanın takip ettiği şey ay ay
- * vadesi gelen alacak. Geç gelen bir ödeme vadesinin ayını kapatır.
+ * Varsayılan eksen vade AYI ("Ekim'de ne gelmeliydi, ne geldi"), tahsilatın
+ * yapıldığı ay değil — geç gelen bir ödeme vadesinin ayını kapatır. Tahsilat
+ * ekranı sipariş ayıyla çalışıyor (kullanıcı isteği, 2026-10-20: kargo
+ * dökümüyle karşılaştırılan şey siparişin ayı); liste süzgeci ile rapor AYNI
+ * ekseni kullanmalı, yoksa aynı ay için farklı rakam gösterirlerdi.
  */
-export function tahsilatRaporu(siparisler: MusteriSiparisi[], bugun: string): TahsilatRaporSatiri[] {
+export function tahsilatRaporu(
+  siparisler: MusteriSiparisi[],
+  bugun: string,
+  eksen: TahsilatAyEkseni = "vade"
+): TahsilatRaporSatiri[] {
   const kovalar = new Map<string, TahsilatRaporSatiri>();
   for (const s of siparisler) {
-    const ay = s.vadeTarihi.slice(0, 7);
+    const ay = siparisAyi(s, eksen);
     const para = s.paraBirimi || "TRY";
     const anahtar = `${s.sorumluId ?? ""}|${ay}|${para}`;
     let satir = kovalar.get(anahtar);

@@ -29,6 +29,7 @@ import type { PartyScope } from "./party.service";
 import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./siparis.service";
 import { SatisKanallariService, type SatisKanaliGirdisi } from "./satis-kanallari.service";
 import { SiparisAktarimService } from "./siparis-aktarim.service";
+import { ModulAcilisService } from "./modul-acilis.service";
 
 /** Şablon dosyası: 1000 satırlık dolu bir xlsx bile 1 MB'ı bulmuyor, 5 MB bol. */
 const SABLON_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -55,6 +56,7 @@ export class PartyController {
     private siparisService: SiparisService,
     private kanallar: SatisKanallariService,
     private siparisAktarim: SiparisAktarimService,
+    private modulAcilis: ModulAcilisService,
     private listeler: BaglantiListeleriService
   ) {}
 
@@ -642,6 +644,43 @@ export class PartyController {
   async kanalGuncelle(@Param("id") id: string, @Body() body: SatisKanaliGirdisi, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.kanallar.guncelle(id, body ?? {}, req.user.userId);
+  }
+
+  // ============================================================ Açılış sekmesi (migration 169)
+  //
+  // Kişisel görünüm tercihi: modülü okuyabilen herkes kendi açılış sekmesini seçer.
+
+  @Get("organizations/:organizationId/modul-acilis/:modul")
+  async acilisOrg(@Param("organizationId") organizationId: string, @Param("modul") modul: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.modulAcilis.oku({ organizationId }, modul, req.user.userId);
+  }
+
+  @Patch("organizations/:organizationId/modul-acilis/:modul")
+  async acilisOrgKaydet(
+    @Param("organizationId") organizationId: string,
+    @Param("modul") modul: string,
+    @Body() body: { sekme?: string },
+    @Req() req: any
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.modulAcilis.kaydet({ organizationId }, modul, body?.sekme, req.user.userId);
+  }
+
+  @Get("jobs/:jobId/modul-acilis/:modul")
+  async acilisJob(@Param("jobId") jobId: string, @Param("modul") modul: string, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.modulAcilis.oku({ jobId }, modul, req.user.userId);
+  }
+
+  @Patch("jobs/:jobId/modul-acilis/:modul")
+  async acilisJobKaydet(@Param("jobId") jobId: string, @Param("modul") modul: string, @Body() body: { sekme?: string }, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.modulAcilis.kaydet({ jobId }, modul, body?.sekme, req.user.userId);
   }
 
   // ============================================================ Sipariş içe aktarma

@@ -175,6 +175,14 @@ export interface SatisKanaliGovdesi {
   aktif?: boolean;
 }
 
+/** Modülün kişisel açılış sekmesi (migration 169). `kapsamYolu` = /organizations/:id ya da /jobs/:id */
+export const acilisApi = {
+  oku: (kapsamYolu: string, modul: string) =>
+    api.get<{ sekme?: string; kayitli: boolean }>(`${kapsamYolu}/modul-acilis/${encodeURIComponent(modul)}`),
+  kaydet: (kapsamYolu: string, modul: string, sekme: string) =>
+    api.patch<{ sekme: string; kayitli: true }>(`${kapsamYolu}/modul-acilis/${encodeURIComponent(modul)}`, { sekme }),
+};
+
 export const kanalApi = {
   /** `kapsamYolu` = /organizations/:id ya da /jobs/:id */
   liste: (kapsamYolu: string) => api.get<SatisKanali[]>(`${kapsamYolu}/satis-kanallari`),

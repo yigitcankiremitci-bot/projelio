@@ -4,6 +4,7 @@ import {
   ODEME_YONTEMLERI,
   kalanTutar,
   siparisDurumu,
+  siparisAyi,
   tahsilatRaporu,
   tahsilEdilen,
   type MusteriSiparisi,
@@ -14,6 +15,9 @@ import { siparisApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { fmtPara } from "../butce/butceBicim";
+import { IconUpload } from "../icons";
+import { listeCercevesi, listeSatiri, ozetKutusu } from "../../lib/listeStili";
+import { useIsWide } from "../../lib/useIsDesktop";
 import SiparisFormu from "./SiparisFormu";
 import SiparisKarti from "./SiparisKarti";
 import SatisKanallari from "./SatisKanallari";
@@ -24,6 +28,34 @@ type DurumSuzgeci = "acik" | "gecikti" | "tahsil_edildi" | "hepsi";
 
 /** Uzun listede (bir yılın siparişleri) tek seferde çizilen kart sayısı. */
 const SAYFA = 100;
+type Siralama = "yeni" | "eski" | "tutar" | "vade" | "ad";
+const SIRALAMALAR: Siralama[] = ["yeni", "eski", "tutar", "vade", "ad"];
+// dil:anahtar-baslangic — etiketler; çeviri kullanım yerinde (t())
+const SIRALAMA_ETIKET: Record<Siralama, string> = {
+  yeni: "Sipariş tarihi (yeni)",
+  eski: "Sipariş tarihi (eski)",
+  tutar: "Tutar (büyükten)",
+  vade: "Vade tarihi (yakın)",
+  ad: "Alıcı (A–Z)",
+};
+// dil:anahtar-bitis
+/** Seçilen sıralama tarayıcıda hatırlanır (müşteri listesindeki gibi). */
+const SIRALAMA_ANAHTARI = "projelio_tahsilat_siralama";
+
+function siralamaOku(): Siralama {
+  try {
+    const v = localStorage.getItem(SIRALAMA_ANAHTARI) as Siralama | null;
+    return v && SIRALAMALAR.includes(v) ? v : "yeni";
+  } catch {
+    return "yeni";
+  }
+}
+
+/** Kim: müşteri kartı ya da (müşterisiz siparişte) alıcı. Arama ve A–Z sırası buradan. */
+function kimAdi(s: MusteriSiparisi): string {
+  return s.partyName ?? s.alici?.ad ?? "";
+}
+
 /** Kanal süzgecinde "kanalı yok" seçeneği. */
 const KANALSIZ = "\u0000";
 
@@ -35,9 +67,10 @@ const KANALSIZ = "\u0000";
  * raporu ve sorumlu süzgeci. Kimin neyi göreceğine SUNUCU karar veriyor
  * (bkz. backend party/siparis-erisim.ts); burada yalnızca gösterim var.
  *
- * Ay, VADE ayıdır: "Ekim'de ne gelmeliydi, ne geldi". Tahsilat raporuyla
- * (tahsilatRaporu) aynı eksen — ikisi farklı ay tanımı kullansaydı liste ile
- * rapor aynı ay için farklı rakam gösterirdi.
+ * Ay, SİPARİŞ ayıdır (kullanıcı isteği, 2026-10-20 — önceden vade ayıydı):
+ * kargo dökümüyle karşılaştırılan şey siparişin ayı. Rapor da aynı eksenle
+ * (tahsilatRaporu "siparis") — ikisi farklı ay tanımı kullansaydı liste ile
+ * rapor aynı ay için farklı rakam gösterirdi. Gecikme yine vadeden hesaplanır.
  *
  * Satış kanalı (migration 168): süzgeç + yönetici için kanal kırılımı.
  * Muhasebe pazaryerinin ödemesini görünce o kanalın siparişlerini seçip
@@ -65,6 +98,17 @@ export default function TahsilatTakibi({
   const [durum, setDurum] = useState<DurumSuzgeci>("acik");
   const [sorumlu, setSorumlu] = useState("");
   const [kanal, setKanal] = useState("");
+  const [arama, setArama] = useState("");
+  const [siralama, setSiralamaDurumu] = useState<Siralama>(siralamaOku);
+  const setSiralama = (v: Siralama) => {
+    setSiralamaDurumu(v);
+    try {
+      localStorage.setItem(SIRALAMA_ANAHTARI, v);
+    } catch {
+      // Tarayıcı depolaması kapalıysa sıralama yalnızca bu oturumda kalır.
+    }
+  };
+  const genisEkran = useIsWide();
   const [gosterilen, setGosterilen] = useState(SAYFA);
   const [secili, setSecili] = useState<Set<string>>(new Set());
   const [toplu, setToplu] = useState<{ tarih: string; yontem: OdemeYontemi | "" } | null>(null);
@@ -106,7 +150,7 @@ export default function TahsilatTakibi({
 
   const aylar = useMemo(() => {
     const set = new Set<string>([buAy]);
-    for (const s of tumu) set.add(s.vadeTarihi.slice(0, 7));
+    for (const s of tumu) set.add(siparisAyi(s, "siparis"));
     return Array.from(set).sort().reverse();
   }, [siparisler]);
 
@@ -129,30 +173,47 @@ export default function TahsilatTakibi({
     () =>
       tumu.filter(
         (s) =>
-          (!ay || s.vadeTarihi.startsWith(ay)) &&
+          (!ay || siparisAyi(s, "siparis") === ay) &&
           (!sorumlu || (s.sorumluId ?? "") === sorumlu) &&
           (!kanal || (s.kanalAdi ?? KANALSIZ) === kanal)
       ),
     [siparisler, ay, sorumlu, kanal]
   );
 
-  // Liste sipariş tarihine göre, yeniden eskiye (kullanıcı isteği, 2026-10-20):
-  // kargo dökümüyle karşılaştırılan şey siparişin günü. Ay süzgeci ve rapor
-  // yine VADE ayıyla — "bu ay ne tahsil edilmeli" sorusu onun.
-  const liste = useMemo(
-    () =>
-      kapsamda
-        .filter((s) => {
-          const d = siparisDurumu(s, bugun);
-          if (durum === "hepsi") return true;
-          if (durum === "acik") return d !== "tahsil_edildi";
-          return d === durum;
-        })
-        .sort((a, b) => b.siparisTarihi.localeCompare(a.siparisTarihi) || b.createdAt.localeCompare(a.createdAt)),
-    [kapsamda, durum]
-  );
+  // Arama: alıcı / müşteri, kanal, sipariş no, ürün. Özeti ve raporu
+  // DEĞİŞTİRMEZ — "Gamze'yi bul" demek ayın toplamını küçültmemeli.
+  // Varsayılan sıra sipariş tarihi, yeniden eskiye (kullanıcı isteği,
+  // 2026-10-20): kargo dökümüyle karşılaştırılan şey siparişin günü.
+  const liste = useMemo(() => {
+    const q = arama.trim().toLocaleLowerCase("tr");
+    const l = kapsamda.filter((s) => {
+      const d = siparisDurumu(s, bugun);
+      if (durum === "acik" && d === "tahsil_edildi") return false;
+      if (durum !== "hepsi" && durum !== "acik" && d !== durum) return false;
+      if (!q) return true;
+      return [kimAdi(s), s.kanalAdi, s.siparisNo, s.aciklama, ...s.kalemler.map((k) => k.productName ?? k.aciklama)]
+        .filter(Boolean)
+        .some((x) => String(x).toLocaleLowerCase("tr").includes(q));
+    });
+    const yeniden = (a: MusteriSiparisi, b: MusteriSiparisi) =>
+      b.siparisTarihi.localeCompare(a.siparisTarihi) || b.createdAt.localeCompare(a.createdAt);
+    return l.sort((a, b) => {
+      switch (siralama) {
+        case "eski":
+          return -yeniden(a, b);
+        case "tutar":
+          return Number(b.tutar) - Number(a.tutar) || yeniden(a, b);
+        case "vade":
+          return a.vadeTarihi.localeCompare(b.vadeTarihi) || yeniden(a, b);
+        case "ad":
+          return kimAdi(a).localeCompare(kimAdi(b), "tr") || yeniden(a, b);
+        default:
+          return yeniden(a, b);
+      }
+    });
+  }, [kapsamda, durum, arama, siralama]);
 
-  const rapor = useMemo(() => tahsilatRaporu(kapsamda, bugun), [kapsamda]);
+  const rapor = useMemo(() => tahsilatRaporu(kapsamda, bugun, "siparis"), [kapsamda]);
 
   // Kanal kırılımı (yönetici): kanal × para birimi. Kur dönüşümü yok.
   const kanalRaporu = useMemo(() => {
@@ -175,7 +236,7 @@ export default function TahsilatTakibi({
   useEffect(() => {
     setGosterilen(SAYFA);
     setSecili(new Set());
-  }, [ay, durum, sorumlu, kanal]);
+  }, [ay, durum, sorumlu, kanal, arama, siralama]);
 
   // Özet şeridi: para birimi başına (kur dönüşümü yok).
   const ozet = useMemo(() => {
@@ -198,7 +259,7 @@ export default function TahsilatTakibi({
       ay
         ? tumu.filter(
             (s) =>
-              !s.vadeTarihi.startsWith(ay) &&
+              siparisAyi(s, "siparis") !== ay &&
               (!sorumlu || (s.sorumluId ?? "") === sorumlu) &&
               siparisDurumu(s, bugun) === "gecikti"
           ).length
@@ -246,7 +307,7 @@ export default function TahsilatTakibi({
   };
 
   const raporuIndir = () => {
-    const baslik = [t("Çalışan"), t("Vade ayı"), t("Para birimi"), t("Sipariş"), t("Beklenen"), t("Tahsil edilen"), t("Kalan"), t("Geciken")];
+    const baslik = [t("Çalışan"), t("Sipariş ayı"), t("Para birimi"), t("Sipariş"), t("Beklenen"), t("Tahsil edilen"), t("Kalan"), t("Geciken")];
     const satirlar = rapor.map((r) => [
       r.sorumluAdi ?? t("Sorumlu yok"),
       r.ay,
@@ -278,10 +339,73 @@ export default function TahsilatTakibi({
   const thK: React.CSSProperties = { textAlign: "right", fontWeight: 500, color: c.textSecondary, padding: "4px 6px", whiteSpace: "nowrap" };
   const tdK: React.CSSProperties = { textAlign: "right", padding: "4px 6px", whiteSpace: "nowrap", color: c.textPrimary };
 
+  const suzgecVar = !!arama.trim() || durum !== "acik" || ay !== buAy || !!kanal || !!sorumlu;
+  // Özet kutuları: geniş ekranda sağ sütunda alt alta (müşteri ve bağlantı
+  // listesindeki gibi), dar ekranda listenin üstünde yan yana.
+  const ozetKutulari = (dikey: boolean) =>
+    ozet.map(([para, o]) => (
+      <div key={para} style={{ display: "flex", flexDirection: dikey ? "column" : "row", flexWrap: dikey ? "nowrap" : "wrap", gap: 8 }}>
+        <Kutu etiket={t("Beklenen")} deger={fmtPara(o.beklenen, para)} />
+        <Kutu etiket={t("Tahsil edilen")} deger={fmtPara(o.tahsil, para)} renk={c.success} />
+        <Kutu etiket={t("Kalan")} deger={fmtPara(o.kalan, para)} />
+        {o.geciken > 0 && <Kutu etiket={t("Geciken")} deger={fmtPara(o.geciken, para)} renk={c.danger} />}
+      </div>
+    ));
+  const yanSutun = genisEkran && ozet.length > 0;
+  const sadeDugme: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "4px 10px",
+    borderRadius: 6,
+    border: `1px solid ${c.border}`,
+    background: "transparent",
+    color: c.textSecondary,
+    fontSize: 12,
+    cursor: "pointer",
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {panel === "yeni" && organizationId && (
+        <SiparisFormu
+          kapsamYolu={kapsamYolu}
+          organizationId={organizationId}
+          onKaydedildi={(s) => {
+            setPanel(null);
+            setSiparisler((l) => [s, ...(l ?? [])]);
+          }}
+          onVazgec={() => setPanel(null)}
+        />
+      )}
+      {panel === "kanallar" && <SatisKanallari kapsamYolu={kapsamYolu} sorumluSecenekleri={sorumluSecenekleri} onDegisti={() => setYenile((x) => x + 1)} />}
+      {excel && organizationId && (
+        <SiparisExcelModal
+          organizationId={organizationId}
+          onKapat={() => setExcel(false)}
+          onAktarildi={() => setYenile((x) => x + 1)}
+        />
+      )}
+
+      {!yonetici && (
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Yalnızca sana atanmış müşterilerin siparişleri görünüyor.")}</span>
+      )}
+
+      {!yanSutun && ozetKutulari(false)}
+
+      {/* Süzgeçler + liste solda, özet kutuları sağda — Müşteriler ve
+          Bağlantılar listesinin düzeni (kullanıcı isteği, 2026-10-20). */}
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-        <select value={ay} onChange={(e) => setAy(e.target.value)} style={secim} aria-label={t("Vade ayı")}>
+        <input
+          value={arama}
+          onChange={(e) => setArama(e.target.value)}
+          placeholder={t("Ara…")}
+          aria-label={t("Siparişlerde ara")}
+          style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
+        />
+        <select value={ay} onChange={(e) => setAy(e.target.value)} style={secim} aria-label={t("Sipariş ayı")}>
           <option value="">{t("Tüm aylar")}</option>
           {aylar.map((a) => (
             <option key={a} value={a}>
@@ -315,61 +439,33 @@ export default function TahsilatTakibi({
             ))}
           </select>
         )}
-      </div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-        {organizationId && (
-          <button onClick={() => setPanel(panel === "yeni" ? null : "yeni")} style={baglanti}>
-            {t("+ Müşterisiz sipariş")}
-          </button>
-        )}
-        {yonetici && organizationId && (
-          <button onClick={() => setExcel(true)} style={baglanti}>
-            {t("Excel'den sipariş aktar")}
-          </button>
-        )}
-        {yonetici && (
-          <button onClick={() => setPanel(panel === "kanallar" ? null : "kanallar")} style={baglanti}>
-            {t("Satış kanalları")}
-          </button>
-        )}
-      </div>
-      {panel === "yeni" && organizationId && (
-        <SiparisFormu
-          kapsamYolu={kapsamYolu}
-          organizationId={organizationId}
-          onKaydedildi={(s) => {
-            setPanel(null);
-            setSiparisler((l) => [s, ...(l ?? [])]);
-          }}
-          onVazgec={() => setPanel(null)}
-        />
-      )}
-      {panel === "kanallar" && <SatisKanallari kapsamYolu={kapsamYolu} sorumluSecenekleri={sorumluSecenekleri} onDegisti={() => setYenile((x) => x + 1)} />}
-      {excel && organizationId && (
-        <SiparisExcelModal
-          organizationId={organizationId}
-          onKapat={() => setExcel(false)}
-          onAktarildi={() => setYenile((x) => x + 1)}
-        />
-      )}
-
-      {!yonetici && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Yalnızca sana atanmış müşterilerin siparişleri görünüyor.")}</span>
-      )}
-
-      {ozet.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {ozet.map(([para, o]) => (
-            <div key={para} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <Kutu etiket={t("Beklenen")} deger={fmtPara(o.beklenen, para)} />
-              <Kutu etiket={t("Tahsil edilen")} deger={fmtPara(o.tahsil, para)} renk={c.success} />
-              <Kutu etiket={t("Kalan")} deger={fmtPara(o.kalan, para)} />
-              {o.geciken > 0 && <Kutu etiket={t("Geciken")} deger={fmtPara(o.geciken, para)} renk={c.danger} />}
-            </div>
+        <select value={siralama} onChange={(e) => setSiralama(e.target.value as Siralama)} style={secim} aria-label={t("Sıralama")}>
+          {SIRALAMALAR.map((x) => (
+            <option key={x} value={x}>
+              {t(SIRALAMA_ETIKET[x])}
+            </option>
           ))}
-        </div>
-      )}
+        </select>
+        {suzgecVar && (
+          <button
+            onClick={() => {
+              setArama("");
+              setDurum("acik");
+              setAy(buAy);
+              setKanal("");
+              setSorumlu("");
+            }}
+            style={baglanti}
+          >
+            {t("Temizle")}
+          </button>
+        )}
+        {organizationId && (
+          <button onClick={() => setPanel(panel === "yeni" ? null : "yeni")} style={{ ...baglanti, marginLeft: "auto", fontSize: 13 }}>
+            {panel === "yeni" ? t("Vazgeç") : t("+ Müşterisiz sipariş")}
+          </button>
+        )}
+      </div>
 
       {baskaAyGeciken > 0 && (
         <button
@@ -459,37 +555,66 @@ export default function TahsilatTakibi({
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {tumu.length === 0
             ? t("Henüz sipariş yok. Siparişler müşteri kartındaki Siparişler sekmesinden eklenir.")
-            : t("Bu süzgeçle eşleşen sipariş yok.")}
+            : arama.trim()
+              ? t("Aramanla eşleşen sipariş yok.")
+              : t("Bu süzgeçle eşleşen sipariş yok.")}
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {liste.slice(0, gosterilen).map((s) => (
-            <SiparisKarti
-              key={s.id}
-              siparis={s}
-              // Liste zaten sunucunun izin verdiği siparişler: yönetici hepsine,
-              // çalışan yalnızca kendi müşterilerine yazar.
-              yazabilir
-              musteriAdiGoster
-              sorumluGoster={yonetici}
-              onDegisti={degisti}
-              onSilindi={(id) => setSiparisler((l) => (l ?? []).filter((x) => x.id !== id))}
-              secili={secili.has(s.id)}
-              onSec={(v) =>
-                setSecili((x) => {
-                  const y = new Set(x);
-                  if (v) y.add(s.id);
-                  else y.delete(s.id);
-                  return y;
-                })
-              }
-            />
-          ))}
+          {(arama.trim() || suzgecVar) && (
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("{n} sipariş", { n: liste.length })}</span>
+          )}
+          {/* Satırlar tek çerçevede, sıra sıra renkli (lib/listeStili.ts) —
+              müşteri ve bağlantı listesiyle aynı çizgi. */}
+          <div style={listeCercevesi(c)}>
+            {liste.slice(0, gosterilen).map((s, i) => (
+              <div key={s.id} style={listeSatiri(c, i)}>
+                <SiparisKarti
+                  siparis={s}
+                  // Liste zaten sunucunun izin verdiği siparişler: yönetici hepsine,
+                  // çalışan yalnızca kendi müşterilerine yazar.
+                  yazabilir
+                  musteriAdiGoster
+                  sorumluGoster={yonetici}
+                  cerceveli
+                  onDegisti={degisti}
+                  onSilindi={(id) => setSiparisler((l) => (l ?? []).filter((x) => x.id !== id))}
+                  secili={secili.has(s.id)}
+                  onSec={(v) =>
+                    setSecili((x) => {
+                      const y = new Set(x);
+                      if (v) y.add(s.id);
+                      else y.delete(s.id);
+                      return y;
+                    })
+                  }
+                />
+              </div>
+            ))}
+          </div>
           {liste.length > gosterilen && (
             <button onClick={() => setGosterilen((n) => n + SAYFA)} style={{ ...baglanti, alignSelf: "center" }}>
               {t("Daha fazla göster ({n} kaldı)", { n: liste.length - gosterilen })}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Toplu işler en altta ve sade (Bağlantılar'daki "Excel ile toplu
+          ekle" gibi): her gün kullanılan düğmeler değil. */}
+      {yonetici && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 4 }}>
+          {organizationId && (
+            <button onClick={() => setExcel(true)} style={sadeDugme}>
+              <IconUpload size={13} /> {t("Excel'den sipariş aktar")}
+            </button>
+          )}
+          <button onClick={() => setPanel(panel === "kanallar" ? null : "kanallar")} style={sadeDugme}>
+            {t("Satış kanalları")}
+          </button>
+          <span style={{ flex: "1 1 200px", fontSize: 11, color: c.textSecondary }}>
+            {t("Kargo ya da sipariş dökümünü yükleyin; önizlemede ürünleri, kanalları ve müşteri eşleşmelerini kontrol edip aktarın.")}
+          </span>
         </div>
       )}
 
@@ -524,6 +649,13 @@ export default function TahsilatTakibi({
       )}
 
       {yonetici && rapor.length > 0 && <Rapor rapor={rapor} onIndir={raporuIndir} />}
+      </div>
+      {yanSutun && (
+        <aside style={{ width: 160, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          {ozetKutulari(true)}
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
@@ -531,18 +663,7 @@ export default function TahsilatTakibi({
 function Kutu({ etiket, deger, renk }: { etiket: string; deger: string; renk?: string }) {
   const c = useThemeColors();
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-        padding: "6px 12px",
-        borderRadius: 8,
-        background: c.background,
-        border: `1px solid ${c.border}`,
-        minWidth: 96,
-      }}
-    >
+    <div style={ozetKutusu(c)}>
       <span style={{ fontSize: 11, color: c.textSecondary }}>{etiket}</span>
       <span style={{ fontSize: 15, fontWeight: 500, color: renk ?? c.textPrimary }}>{deger}</span>
     </div>
@@ -571,7 +692,7 @@ function Rapor({ rapor, onIndir }: { rapor: TahsilatRaporSatiri[]; onIndir: () =
           <thead>
             <tr style={{ borderBottom: `1px solid ${c.border}` }}>
               <th style={{ ...th, textAlign: "left" }}>{t("Çalışan")}</th>
-              <th style={{ ...th, textAlign: "left" }}>{t("Vade ayı")}</th>
+              <th style={{ ...th, textAlign: "left" }}>{t("Sipariş ayı")}</th>
               <th style={th}>{t("Sipariş")}</th>
               <th style={th}>{t("Beklenen")}</th>
               <th style={th}>{t("Tahsil edilen")}</th>

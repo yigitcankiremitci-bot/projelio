@@ -4793,11 +4793,11 @@ export interface SiparisAktarimSonucu {
   acilanKanal?: number;
 }
 
-/** Yönetici raporunun bir satırı: sorumlu × vade ayı × para birimi. */
+/** Yönetici raporunun bir satırı: sorumlu × ay × para birimi (ay ekseni: tahsilatRaporu). */
 export interface TahsilatRaporSatiri {
   sorumluId: string | null;
   sorumluAdi?: string;
-  /** Vadenin düştüğü ay, YYYY-MM. */
+  /** YYYY-MM: vadenin ya da siparişin ayı (raporun eksenine göre). */
   ay: string;
   paraBirimi: string;
   siparisSayisi: number;

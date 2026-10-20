@@ -37,6 +37,7 @@ export default function SiparisKarti({
   onSilindi,
   secili,
   onSec,
+  cerceveli = false,
 }: {
   siparis: MusteriSiparisi;
   yazabilir: boolean;
@@ -46,6 +47,8 @@ export default function SiparisKarti({
   onSilindi: (id: string) => void;
   secili?: boolean;
   onSec?: (secili: boolean) => void;
+  /** Tek çerçeveli listenin satırı: zemin ve köşe satırdan (lib/listeStili.ts) gelir. */
+  cerceveli?: boolean;
 }) {
   const c = useThemeColors();
   const t = useT();
@@ -105,7 +108,7 @@ export default function SiparisKarti({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", background: c.background, borderRadius: 8 }}>
+    <div style={{ display: "flex", flexDirection: "column", ...(cerceveli ? {} : { background: c.background, borderRadius: 8 }) }}>
       <div style={{ display: "flex", alignItems: "center" }}>
       {onSec && (
         <input

@@ -117,3 +117,13 @@ describe("tahsilatRaporu", () => {
     assert.equal(rapor[0].sorumluId, null);
   });
 });
+
+describe("tahsilatRaporu ay ekseni", () => {
+  test("sipariş ekseninde ay siparişin ayı, gecikme yine vadeden", () => {
+    const x = s({ siparisTarihi: "2026-08-31", vadeGun: 30, vadeTarihi: "2026-09-30" });
+    assert.equal(tahsilatRaporu([x], "2026-10-05")[0].ay, "2026-09");
+    const r = tahsilatRaporu([x], "2026-10-05", "siparis");
+    assert.equal(r[0].ay, "2026-08");
+    assert.equal(r[0].geciken, 1000);
+  });
+});

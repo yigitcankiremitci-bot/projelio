@@ -9,6 +9,8 @@ import {
   kartvizitSosyalNormallestir,
   WEB_SITESI_IKON,
   MUSTERI_MODUL_KEY,
+  acilisSekmesiCoz,
+  modulSekmeleri,
   GORUSME_TURU_ETIKETI,
   GORUSME_TURU_SIMGESI,
   aramaDurumu,
@@ -46,15 +48,15 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconEdit, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
+import { IconEdit, IconHome, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
 import { timeAgo } from "../lib/dates";
 import { useIsWide } from "../lib/useIsDesktop";
-import { listeCercevesi, listeSatiri } from "../lib/listeStili";
+import { listeCercevesi, listeSatiri, ozetKutusu, sekmeStili } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
-import { partyApi } from "../api/party";
+import { acilisApi, partyApi } from "../api/party";
 import { filesApi } from "../api/files";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
@@ -279,7 +281,10 @@ export default function CustomersPanel({
   // Potansiyel müşterilerin kendi sekmesi var: Satış profilinin "lead"
   // varsayılanı artık bir filtre değil, panelin Potansiyel sekmesinde açılması.
   const varsayilanRol: PartyRole | "" = !baglantiModu && profile.defaultRole === "lead" ? "" : profile.defaultRole ?? "";
-  const ilkGorunum = !baglantiModu && profile.defaultRole === "lead" ? "potansiyel" : "musteriler";
+  // Açılış sekmesi kişinin tercihi (migration 169); seçmediyse modülün ilk
+  // sekmesi — Tahsilat takibi (kullanıcı isteği, 2026-10-20). Önceden
+  // Müşteriler'di, satış departmanında Potansiyel.
+  const ilkGorunum = acilisSekmesiCoz(MUSTERI_MODUL_KEY, undefined) as "musteriler" | "potansiyel" | "tahsilat";
   const [roleFilter, setRoleFilter] = useState<PartyRole | "">(varsayilanRol);
   const [onemFiltre, setOnemFiltre] = useState<BaglantiOnem | "">("");
   const [openPartyId, setOpenPartyId] = useState<string | null>(null);
@@ -292,6 +297,11 @@ export default function CustomersPanel({
   // Potansiyel: anlaşma yapılmamış kartlar (bkz. potansiyelMusteriMi). Aynı
   // tablo, aynı kart; "Müşteriye dönüştür" yalnızca rolü değiştirir.
   const [gorunum, setGorunum] = useState<"musteriler" | "potansiyel" | "tahsilat">(ilkGorunum);
+  // Kişinin kaydettiği açılış sekmesi (null: kaydetmemiş, varsayılan geçerli).
+  // Tercih gelene kadar içerik çizilmez: önce varsayılan sekme açılıp sonra
+  // tercihe atlasaydı tahsilat listesi boşuna yüklenir, ekran sıçrardı.
+  const [kayitliAcilis, setKayitliAcilis] = useState<string | null>(null);
+  const [acilisHazir, setAcilisHazir] = useState(baglantiModu);
   const [sorumluFiltre, setSorumluFiltre] = useState("");
   const [ekip, setEkip] = useState<{ id: string; ad: string }[]>([]);
 
@@ -396,8 +406,36 @@ export default function CustomersPanel({
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => {
     setRoleFilter(varsayilanRol);
-    setGorunum(ilkGorunum);
   }, [profile.defaultRole]);
+
+  useEffect(() => {
+    if (baglantiModu) return;
+    let iptal = false;
+    setAcilisHazir(false);
+    acilisApi
+      .oku(kapsamYolu, MUSTERI_MODUL_KEY)
+      .then((r) => {
+        if (iptal) return;
+        setGorunum((r.sekme ?? ilkGorunum) as typeof gorunum);
+        setKayitliAcilis(r.kayitli ? r.sekme ?? null : null);
+      })
+      .catch(() => !iptal && setGorunum(ilkGorunum))
+      .finally(() => !iptal && setAcilisHazir(true));
+    return () => {
+      iptal = true;
+    };
+  }, [kapsamYolu, baglantiModu]);
+
+  const acilisYap = async (g: typeof gorunum, etiket: string) => {
+    if ((kayitliAcilis ?? ilkGorunum) === g) return;
+    if (!window.confirm(t("Modül her açılışta \"{sekme}\" sekmesinde açılsın mı?", { sekme: etiket }))) return;
+    try {
+      const r = await acilisApi.kaydet(kapsamYolu, MUSTERI_MODUL_KEY, g);
+      setKayitliAcilis(r.sekme);
+    } catch (err) {
+      setBildirim(err instanceof Error ? err.message : t("Kaydedilemedi"));
+    }
+  };
 
   const bugun = bugunYmd();
   const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum", "arama"];
@@ -1200,19 +1238,7 @@ export default function CustomersPanel({
   const ozetKutulari = (dikey: boolean) => (
     <div style={{ display: "flex", flexDirection: dikey ? "column" : "row", flexWrap: dikey ? "nowrap" : "wrap", gap: 8 }}>
       {stats.map((s) => (
-        <div
-          key={s.label}
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            padding: "6px 12px",
-            borderRadius: 8,
-            background: c.background,
-            border: `1px solid ${c.border}`,
-            minWidth: 84,
-          }}
-        >
+        <div key={s.label} style={ozetKutusu(c)}>
           <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
           <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
         </div>
@@ -1298,34 +1324,47 @@ export default function CustomersPanel({
       {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
           Bağlantılar'da sipariş yok; sekme de yok. */}
       {!baglantiModu && (
-      <div style={{ display: "flex", gap: 6 }}>
-        {(["musteriler", "potansiyel", "tahsilat"] as const).map((g) => (
-          <button
-            key={g}
-            onClick={() => setGorunum(g)}
-            style={{
-              fontSize: 13,
-              padding: "5px 12px",
-              borderRadius: 8,
-              border: `1px solid ${gorunum === g ? c.primary : c.border}`,
-              background: gorunum === g ? c.primary : "transparent",
-              color: gorunum === g ? c.onPrimary : c.textSecondary,
-              cursor: "pointer",
-            }}
-          >
-            {g === "musteriler"
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {(modulSekmeleri(MUSTERI_MODUL_KEY) as readonly (typeof gorunum)[]).map((g) => {
+          const aktif = gorunum === g;
+          const acilis = (kayitliAcilis ?? ilkGorunum) === g;
+          const etiket =
+            g === "musteriler"
               ? t("Müşteriler")
               : g === "potansiyel"
                 ? potansiyelSayisi
                   ? t("Potansiyel ({n})", { n: potansiyelSayisi })
                   : t("Potansiyel")
-                : t("Tahsilat takibi")}
-          </button>
-        ))}
+                : t("Tahsilat takibi");
+          const yazi = aktif ? c.onPrimary : c.textPrimary;
+          return (
+            // Hap: sekme adı + ev simgesi. Simge modülün kişisel açılış
+            // sekmesini seçer (dolu = açılış sekmesi). İç içe <button>
+            // geçersiz olduğu için hap bir kap, içinde iki ayrı düğme.
+            <span key={g} style={{ ...sekmeStili(c, aktif), display: "inline-flex", alignItems: "center", gap: 6, cursor: "default" }}>
+              <button
+                onClick={() => setGorunum(g)}
+                style={{ background: "transparent", border: "none", padding: 0, font: "inherit", color: yazi, cursor: "pointer" }}
+              >
+                {etiket}
+              </button>
+              <button
+                onClick={() => acilisYap(g, etiket)}
+                aria-label={acilis ? t("Açılış sekmesi") : t("Açılış sekmesi yap")}
+                title={acilis ? t("Modül bu sekmeyle açılıyor") : t("Modül bu sekmeyle açılsın")}
+                style={{ display: "inline-flex", background: "transparent", border: "none", padding: 0, cursor: acilis ? "default" : "pointer", opacity: acilis ? 1 : 0.55 }}
+              >
+                <IconHome size={13} color={yazi} filled={acilis} />
+              </button>
+            </span>
+          );
+        })}
       </div>
       )}
 
-      {gorunum === "tahsilat" && !baglantiModu ? (
+      {!acilisHazir ? (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+      ) : gorunum === "tahsilat" && !baglantiModu ? (
         <TahsilatTakibi
           kapsamYolu={kapsamYolu}
           departmentId={jobId ? undefined : departmentId}

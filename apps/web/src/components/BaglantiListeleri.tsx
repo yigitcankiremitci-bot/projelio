@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { sekmeStili } from "../lib/listeStili";
 import type { BaglantiListeKaydi } from "@projelio/shared";
 import { partyApi } from "../api/party";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -12,18 +13,6 @@ import { IconEdit } from "./icons";
  * tek listede birbirine karışıyordu (kullanıcı isteği, 2026-10-12). Liste bir
  * etiket: kart birden çok listede olabilir, liste silinince kartlar kalır.
  */
-
-const sekmeStili = (c: ReturnType<typeof useThemeColors>, aktif: boolean) =>
-  ({
-    fontSize: 13,
-    padding: "5px 12px",
-    borderRadius: 999,
-    border: `1px solid ${aktif ? c.primary : c.border}`,
-    background: aktif ? c.primary : c.surface,
-    color: aktif ? c.onPrimary : c.textPrimary,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  }) as const;
 
 /** Bağlantılar ekranının üstündeki liste sekmeleri: Tümü · listeler · + Yeni liste. */
 export function BaglantiListeSekmeleri({

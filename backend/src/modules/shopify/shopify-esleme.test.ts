@@ -11,6 +11,7 @@ import {
   siparisAlanlari,
   sorguImzasiGecerli,
   stokKoduUrunu,
+  shopifyKalemleri,
   webhookImzasiGecerli,
   yerelGun,
   type ShopifySiparisi,
@@ -119,8 +120,6 @@ describe("siparisAlanlari", () => {
     assert.deepEqual(r.alanlar, {
       siparis_no: "#1001",
       aciklama: "2× Tişört, 1× Kupa",
-      miktar: 3,
-      birim: "adet",
       tutar: 1250.5,
       para_birimi: "TRY",
       siparis_tarihi: "2026-09-24",
@@ -236,5 +235,41 @@ describe("stokKoduUrunu", () => {
 
   test("sorgu için stok kodları tekilleştirilir, boşlar atılır", () => {
     assert.deepEqual(kalemStokKodlari(siparis([{ sku: "A" }, { sku: " A " }, { sku: "" }, { sku: "B", quantity: 0 }])), ["A"]);
+  });
+});
+
+describe("shopifyKalemleri", () => {
+  const URUNLER2 = [
+    { id: "tisort", sku: "TSH-01" },
+    { id: "kupa", sku: "KUP-01" },
+  ];
+  test("kalem başına bir satır; toplam sipariş tutarına eşit (kargo/indirim dağıtılır)", () => {
+    const o = {
+      ...ornek,
+      line_items: [
+        { title: "Tişört", quantity: 2, sku: "TSH-01", price: "400.00" },
+        { title: "Kupa", quantity: 1, sku: "kup-01", price: "200.00" },
+        { title: "Hediye paketi", quantity: 1, sku: null, price: "0.00" },
+      ],
+    };
+    const k = shopifyKalemleri(o, URUNLER2, 1050);
+    assert.deepEqual(
+      k.map((x) => [x.product_id, x.aciklama, x.miktar]),
+      [
+        ["tisort", null, 2],
+        ["kupa", null, 1],
+        [null, "Hediye paketi", 1],
+      ]
+    );
+    assert.equal(Math.round(k.reduce((t, x) => t + x.tutar, 0) * 100) / 100, 1050);
+    // Bedava kalem pay almaz.
+    assert.equal(k[2].tutar, 0);
+    assert.equal(k[0].tutar, 840);
+    assert.ok(k.every((x) => x.liste_birim_fiyat === null));
+  });
+  test("kalemi olmayan sipariş tek açıklamalı kalem", () => {
+    const k = shopifyKalemleri({ ...ornek, line_items: [] }, URUNLER2, 99);
+    assert.equal(k.length, 1);
+    assert.equal(k[0].tutar, 99);
   });
 });

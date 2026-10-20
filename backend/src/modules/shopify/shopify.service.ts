@@ -17,7 +17,7 @@ import {
   musteriKimligi,
   shopifyTahsilEdilen,
   siparisAlanlari,
-  stokKoduUrunu,
+  shopifyKalemleri,
   kalemStokKodlari,
   sorguImzasiGecerli,
   yerelGun,
@@ -650,14 +650,14 @@ export class ShopifyService {
     }
 
     const party = await this.musteriKarti(magaza, o);
-    const urunId = await this.katalogUrunu(magaza.organization_id, o);
+    const urunler = await this.katalogUrunleri(magaza.organization_id, o);
     const { siparis } = await this.siparisService.entegrasyonSiparisiYaz({
       party,
       kaynak: "shopify",
       disKimlik: String(o.id),
       shopifyMagazaId: magaza.id,
       alanlar: { ...r.alanlar, notlar: `Shopify · ${magaza.magaza_adi || magaza.shop_domain}` },
-      urunId,
+      kalemler: shopifyKalemleri(o, urunler, r.alanlar.tutar),
       aktorId,
     });
 
@@ -683,14 +683,14 @@ export class ShopifyService {
   }
 
   /**
-   * Stok kodundan katalog ürünü (bkz. stokKoduUrunu — yalnızca tek ürünlü
-   * sipariş). Sorgu kodun AYNEN yazılışıyla yapılır, eşleme ise harf
-   * farkını yok sayar; bu yüzden büyük/küçük harf varyantları da sorguya
-   * eklenir. Bulunamazsa sipariş ürünsüz yazılır, bu bir hata değil.
+   * Siparişin stok kodlarına denk gelen katalog ürünleri (eşleme
+   * shopifyKalemleri'nde). Sorgu kodun AYNEN yazılışıyla yapılır, eşleme ise
+   * harf farkını yok sayar; bu yüzden büyük/küçük harf varyantları da
+   * sorguya eklenir. Bulunamazsa kalem ürünsüz yazılır, bu bir hata değil.
    */
-  private async katalogUrunu(organizationId: string, o: ShopifySiparisi): Promise<string | null> {
+  private async katalogUrunleri(organizationId: string, o: ShopifySiparisi): Promise<Array<{ id: string; sku: string | null }>> {
     const kodlar = kalemStokKodlari(o);
-    if (kodlar.length === 0) return null;
+    if (kodlar.length === 0) return [];
     const varyantlar = [...new Set(kodlar.flatMap((k) => [k, k.toUpperCase(), k.toLowerCase()]))];
     const { data, error } = await this.supabase.client
       .from("products")
@@ -700,9 +700,9 @@ export class ShopifyService {
       .in("sku", varyantlar);
     if (error) {
       this.logger.warn(`Shopify siparişi için ürün aranamadı: ${error.message}`);
-      return null;
+      return [];
     }
-    return stokKoduUrunu(o, data ?? []);
+    return data ?? [];
   }
 
   /**

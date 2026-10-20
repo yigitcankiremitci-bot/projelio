@@ -6,6 +6,8 @@ import { PartyController } from "./party.controller";
 import { PartyService } from "./party.service";
 import { SiparisService } from "./siparis.service";
 import { BaglantiListeleriService } from "./baglanti-listeleri.service";
+import { SatisKanallariService } from "./satis-kanallari.service";
+import { SiparisAktarimService } from "./siparis-aktarim.service";
 
 @Module({
   // Müşteri kaydının yetkisi crm_musteri modülünün yetkisidir; kural
@@ -14,7 +16,7 @@ import { BaglantiListeleriService } from "./baglanti-listeleri.service";
   // ModuleRecordsModule: rol aktarımı rakip analizi / ortaklık modülünde kayıt açar.
   imports: [ModuleMembersModule, FilesModule, ModuleRecordsModule],
   controllers: [PartyController],
-  providers: [PartyService, SiparisService, BaglantiListeleriService],
+  providers: [PartyService, SiparisService, BaglantiListeleriService, SatisKanallariService, SiparisAktarimService],
   // Diğer modüller (fatura, destek talebi) party_activity'ye yazacak.
   // SiparisService: Shopify webhook'ları siparişi ve tahsilatı aynı kapıdan yazar.
   exports: [PartyService, SiparisService],

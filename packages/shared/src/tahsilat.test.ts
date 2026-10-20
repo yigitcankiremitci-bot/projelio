@@ -24,6 +24,7 @@ function s(over: Partial<MusteriSiparisi>): MusteriSiparisi {
     vadeGun: 30,
     vadeTarihi: "2026-10-01",
     odemeYontemi: "havale",
+    kalemler: [],
     tahsilatlar: [],
     createdAt: "2026-09-01T00:00:00Z",
     ...over,

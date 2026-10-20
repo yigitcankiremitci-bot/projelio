@@ -4619,27 +4619,66 @@ export interface MusteriTahsilati {
   createdAt: string;
 }
 
+export type SatisKanaliTuru = "pazaryeri" | "web" | "eczane" | "doktor" | "bayi" | "diger";
+
+/**
+ * Siparişin geldiği yer (migration 168). Tek seferlik alıcının siparişi
+ * müşteri kartı yerine kanala toplanır; vade ve ödeme yöntemi kanaldan gelir.
+ */
+export interface SatisKanali {
+  id: string;
+  organizationId?: string;
+  jobId?: string;
+  ad: string;
+  tur: SatisKanaliTuru;
+  varsayilanVadeGun: number;
+  varsayilanOdemeYontemi: OdemeYontemi;
+  /** Müşterisiz siparişlerin sorumlusu (yetki + rapor kırılımı). */
+  sorumluUserId?: string;
+  sorumluAdi?: string;
+  aktif: boolean;
+  sira: number;
+}
+
+/** Siparişin bir satırı. Siparişin tutarı kalem toplamıdır. */
+export interface SiparisKalemi {
+  id?: string;
+  productId?: string;
+  productName?: string;
+  aciklama?: string;
+  miktar: number;
+  birim?: string;
+  birimFiyat: number;
+  /** Satış anındaki KDV dahil katalog fiyatı — sapma oranı buradan. */
+  listeBirimFiyat?: number;
+  tutar: number;
+}
+
 export interface MusteriSiparisi {
   id: string;
-  partyId: string;
+  /** Boşsa sipariş bir kanalın tek seferlik alıcısına aittir (kanalId dolu). */
+  partyId?: string;
   partyName?: string;
+  kanalId?: string;
+  kanalAdi?: string;
+  /** Müşteri kartı olmayan alıcı (kargo adı, il, ilçe). */
+  alici?: { ad?: string; il?: string; ilce?: string };
   organizationId?: string;
   jobId?: string;
   siparisNo?: string;
   aciklama?: string;
   /**
-   * Katalogdaki ürün/hizmet (isteğe bağlı, migration 165). Bağlıysa ürün
-   * kartının "Satışlar" sekmesinde görünür; `aciklama` yine serbest kalır.
+   * Siparişin satırları (migration 168). Her kalem isteğe bağlı olarak
+   * katalogdaki ürüne bağlıdır; bağlı kalemler ürün kartının "Satışlar"
+   * sekmesinde görünür.
    */
-  productId?: string;
-  productName?: string;
+  kalemler: SiparisKalemi[];
   /**
    * Siparişin faturası: Faturalar modülünün kaydı (fm_fatura, migration 166).
    * Belgesi o kayda bağlı, ay klasöründe ve ay sonu arşivinde.
    */
   fatura?: { id: string; faturaNo?: string; tarih?: string };
-  miktar?: number;
-  birim?: string;
+  kaynak?: "elle" | "shopify" | "excel";
   tutar: number;
   paraBirimi: string;
   siparisTarihi: string;
@@ -4652,7 +4691,8 @@ export interface MusteriSiparisi {
   notlar?: string;
   /**
    * Müşterinin ŞU ANKİ sorumlusu. Sipariş kendi sorumlusunu tutmaz: müşteri
-   * başka çalışana devredilince açık alacak da onunla gider.
+   * başka çalışana devredilince açık alacak da onunla gider. Müşterisiz
+   * siparişte kanalın sorumlusu.
    */
   sorumluId?: string;
   sorumluAdi?: string;
@@ -4668,6 +4708,89 @@ export interface MusteriSiparisListesi {
    */
   yonetici: boolean;
   siparisler: MusteriSiparisi[];
+}
+
+// ------------------------------------------------------------ Sipariş içe aktarma
+//
+// İki adım (müşteri içe aktarmayla aynı): önizleme hiçbir şey yazmaz,
+// kullanıcı eşleşmeleri düzeltir, aynı dosya düzeltmelerle yeniden
+// gönderilince yazılır. Düzeltmeler dosyadaki BAŞLIK ve ALICI ANAHTARI ile
+// adreslenir, satır numarasıyla değil: aynı kişinin bütün siparişleri aynı
+// yere gitsin.
+
+/** Alıcının siparişleri nereye yazılacak. */
+export type AliciKarari = "mevcut" | "yeni" | "kanal" | "atla";
+
+export interface SiparisAktarimDuzeltmeleri {
+  /** Bu tarihten (dahil, YYYY-MM-DD) önceki satırlar alınmaz. */
+  baslangic?: string;
+  /** Ürün sütunu başlığı → katalog ürünü (null = bu sütunu alma). */
+  urunSutunlari?: Record<string, string | null>;
+  /** Alıcı anahtarı → karar (yeni kartta `ad` açılacak kartın adı). */
+  alicilar?: Record<string, { karar: AliciKarari; partyId?: string; ad?: string }>;
+  /** Dosyadaki kanal adı → yeni açılacak kanalın ayarı. */
+  kanallar?: Record<string, { tur?: SatisKanaliTuru; vadeGun?: number; odemeYontemi?: OdemeYontemi }>;
+}
+
+export interface SiparisAktarimUrunSutunu {
+  baslik: string;
+  productId?: string;
+  productName?: string;
+  /** Otomatik eşleşme kesin değilse adaylar (kullanıcı seçer). */
+  adaylar: { id: string; name: string }[];
+  /** Dosyada bu sütunda toplam adet. */
+  adet: number;
+}
+
+export interface SiparisAktarimKanali {
+  ad: string;
+  kanalId?: string;
+  yeni: boolean;
+  tur: SatisKanaliTuru;
+  vadeGun: number;
+  odemeYontemi: OdemeYontemi;
+  siparisSayisi: number;
+  tutar: number;
+}
+
+export interface SiparisAktarimAlicisi {
+  anahtar: string;
+  /** Dosyada yazıldığı gibi (ad + soyad). */
+  ad: string;
+  kanallar: string[];
+  il?: string;
+  siparisSayisi: number;
+  tutar: number;
+  karar: AliciKarari;
+  partyId?: string;
+  partyAdi?: string;
+  /** Mevcut karta eşleşmenin gücü: kesin (eczane adı birebir) · olasi · belirsiz (birden çok aday). */
+  guven?: "kesin" | "olasi" | "belirsiz";
+  adaylar?: { id: string; ad: string }[];
+  /** "yeni" kararında açılacak kartın adı. */
+  yeniKartAdi?: string;
+}
+
+export interface SiparisAktarimSonucu {
+  onizleme: boolean;
+  dosyaSatiri: number;
+  siparisSayisi: number;
+  kalemSayisi: number;
+  /** Para birimi başına toplam (dosya tek para birimli: TRY). */
+  toplamTutar: number;
+  ilkTarih?: string;
+  sonTarih?: string;
+  urunSutunlari: SiparisAktarimUrunSutunu[];
+  kanallar: SiparisAktarimKanali[];
+  alicilar: SiparisAktarimAlicisi[];
+  atlanan: { satir: number; neden: string; ozet: string }[];
+  /** Başlangıç tarihinden önce kalan satır sayısı. */
+  oncekiSatir: number;
+  /** Uygulama adımında. */
+  yazilan?: number;
+  zatenVar?: number;
+  acilanKart?: number;
+  acilanKanal?: number;
 }
 
 /** Yönetici raporunun bir satırı: sorumlu × vade ayı × para birimi. */

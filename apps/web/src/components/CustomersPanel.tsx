@@ -1326,7 +1326,11 @@ export default function CustomersPanel({
       )}
 
       {gorunum === "tahsilat" && !baglantiModu ? (
-        <TahsilatTakibi kapsamYolu={kapsamYolu} departmentId={jobId ? undefined : departmentId} />
+        <TahsilatTakibi
+          kapsamYolu={kapsamYolu}
+          departmentId={jobId ? undefined : departmentId}
+          sorumluSecenekleri={sorumluSecenekleri}
+        />
       ) : (
       <>
       {!loading && !yonetici && !baglantiModu && parties.length > 0 && (

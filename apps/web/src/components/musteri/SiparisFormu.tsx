@@ -1,45 +1,68 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ODEME_YONTEMI_ETIKET,
   ODEME_YONTEMLERI,
   PRODUCT_UNIT_LABEL,
   evrakliMi,
+  kalemTutari,
+  kdvDahilFiyat,
   tahsilEdilen,
   vadeTarihiHesapla,
   type MusteriSiparisi,
   type OdemeYontemi,
   type Product,
+  type SatisKanali,
 } from "@projelio/shared";
 import { api } from "../../api/client";
-import { siparisApi, type SiparisGovdesi } from "../../api/party";
+import { kanalApi, siparisApi, type KalemGovdesi, type SiparisGovdesi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
-import { PARA_BIRIMLERI, fmtTarih } from "../butce/butceBicim";
+import { PARA_BIRIMLERI, fmtPara, fmtTarih } from "../butce/butceBicim";
 import { Alan, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
 
 /** Sık kullanılan vadeler; listede olmayan gün sayısı elle yazılır. */
 const HAZIR_VADELER = [0, 15, 30, 45, 60, 90, 120];
 
+interface KalemSatiri {
+  productId: string;
+  aciklama: string;
+  miktar: string;
+  birimFiyat: string;
+}
+
+function sayi(s: string): number {
+  return Number(s.replace(/\s/g, "").replace(",", "."));
+}
+
 /**
  * Sipariş ekleme / düzenleme formu.
  *
- * Vade GÜN olarak girilir, tarih hesaplanıp önizlenir: satışta konuşulan dil
- * "60 gün vade", takvim tarihi değil. Veritabanı da aynı hesabı kendi yapıyor
- * (vade_tarihi hesaplanan sütun) — burada yalnızca gösteriliyor.
+ * Sipariş KALEMLİDİR (migration 168): her satır katalogdan bir ürün ya da
+ * serbest bir açıklama. Ürün seçilince birim fiyat alanına KDV dahil katalog
+ * fiyatı ipucu olarak düşer; boş bırakılırsa o fiyat kullanılır, yazılırsa
+ * pazarlık edilmiş fiyat. Sipariş tutarı da yazılabilir ("toplam 2.427,30,
+ * ürünler şunlar"): o zaman fiyatı boş kalemler kalanı katalog oranında
+ * paylaşır — hesap sunucuda (SiparisService.kalemleriHazirla).
  *
- * Ürün seçimi isteğe bağlı ve yalnızca şirket müşterisinde var: katalog
- * şirketindir, iş kapsamındaki müşterinin seçebileceği bir katalog yok.
- * Seçilen ürün BOŞ alanları doldurur (ad, birim, fiyat), yazılmış olanın
- * üstüne yazmaz — satışçı "özel fiyat" girdiyse ürün seçmek onu silmesin.
+ * Vade GÜN olarak girilir, tarih hesaplanıp önizlenir: satışta konuşulan dil
+ * "60 gün vade", takvim tarihi değil. Kanal seçilince vade ve ödeme yöntemi
+ * kanaldan gelir (kullanıcı daha önce değiştirmediyse).
+ *
+ * İki kapı: müşteri kartından (`partyId`) ya da Tahsilat ekranından
+ * (`kapsamYolu`) — orada müşteri yoksa sipariş kanalın tek seferlik
+ * alıcısına yazılır ve alıcı adı istenir.
  */
 export default function SiparisFormu({
   partyId,
+  kapsamYolu,
   organizationId,
   mevcut,
   onKaydedildi,
   onVazgec,
 }: {
-  partyId: string;
+  partyId?: string;
+  /** Müşterisiz (kanal) sipariş için: /organizations/:id ya da /jobs/:id */
+  kapsamYolu?: string;
   organizationId?: string;
   mevcut?: MusteriSiparisi;
   onKaydedildi: (s: MusteriSiparisi) => void;
@@ -47,13 +70,11 @@ export default function SiparisFormu({
 }) {
   const c = useThemeColors();
   const t = useT();
+  const musterisiz = mevcut ? !mevcut.partyId : !partyId;
   const [f, setF] = useState(() => ({
     siparisNo: mevcut?.siparisNo ?? "",
-    productId: mevcut?.productId ?? "",
     aciklama: mevcut?.aciklama ?? "",
-    miktar: mevcut?.miktar !== undefined ? String(mevcut.miktar) : "",
-    birim: mevcut?.birim ?? "",
-    tutar: mevcut ? String(mevcut.tutar) : "",
+    tutar: "",
     paraBirimi: mevcut?.paraBirimi ?? "TRY",
     siparisTarihi: mevcut?.siparisTarihi ?? bugunYerel(),
     vadeGun: String(mevcut?.vadeGun ?? 30),
@@ -61,12 +82,29 @@ export default function SiparisFormu({
     evrakNo: mevcut?.evrakNo ?? "",
     evrakVadesi: mevcut?.evrakVadesi ?? "",
     notlar: mevcut?.notlar ?? "",
+    kanalId: mevcut?.kanalId ?? "",
+    aliciAdi: mevcut?.alici?.ad ?? "",
+    aliciIl: mevcut?.alici?.il ?? "",
+    aliciIlce: mevcut?.alici?.ilce ?? "",
   }));
+  const [kalemler, setKalemler] = useState<KalemSatiri[]>(() =>
+    mevcut?.kalemler.length
+      ? mevcut.kalemler.map((k) => ({
+          productId: k.productId ?? "",
+          aciklama: k.aciklama ?? "",
+          miktar: String(k.miktar),
+          birimFiyat: String(k.birimFiyat),
+        }))
+      : [{ productId: "", aciklama: "", miktar: "1", birimFiyat: "" }]
+  );
+  // Vade ve yöntem kullanıcı tarafından değiştirildiyse kanal seçimi onları ezmesin.
+  const [vadeElle, setVadeElle] = useState(!!mevcut);
   const [hata, setHata] = useState("");
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
-  // Katalog okunamazsa (taşeron, yetki) seçici gizlenir; sipariş metinle girilir.
+  // Katalog okunamazsa (taşeron, yetki) seçici gizlenir; kalem açıklamayla girilir.
   const [urunler, setUrunler] = useState<Product[] | null>(null);
+  const [kanallar, setKanallar] = useState<SatisKanali[]>([]);
   useEffect(() => {
     if (!organizationId) return;
     let iptal = false;
@@ -74,6 +112,10 @@ export default function SiparisFormu({
       .get<Product[]>(`/organizations/${organizationId}/products`)
       .then((l) => !iptal && setUrunler(l))
       .catch(() => !iptal && setUrunler([]));
+    kanalApi
+      .liste(`/organizations/${organizationId}`)
+      .then((l) => !iptal && setKanallar(l))
+      .catch(() => !iptal && setKanallar([]));
     return () => {
       iptal = true;
     };
@@ -83,48 +125,94 @@ export default function SiparisFormu({
   const vadeGun = Math.max(0, Math.floor(Number(f.vadeGun) || 0));
   const tahsilatVar = !!mevcut && tahsilEdilen(mevcut) > 0;
 
-  const urunSec = (id: string) => {
-    const u = urunler?.find((x) => x.id === id);
+  const urunOf = useMemo(() => new Map((urunler ?? []).map((u) => [u.id, u])), [urunler]);
+  const katalogFiyati = (k: KalemSatiri) => {
+    const u = k.productId ? urunOf.get(k.productId) : undefined;
+    return u ? kdvDahilFiyat(u.price, u.taxRate) : undefined;
+  };
+
+  // Mevcut bağ arşivlenmiş bir ürünse listede yok; seçenek olarak yine görünsün
+  // ki kaydetmek bağı sessizce koparmasın.
+  const urunSecenekleri = useMemo(() => {
+    const l = [...(urunler ?? [])];
+    for (const k of mevcut?.kalemler ?? []) {
+      if (k.productId && !l.some((u) => u.id === k.productId)) {
+        l.push({ id: k.productId, name: k.productName ?? t("Arşivdeki ürün") } as Product);
+      }
+    }
+    return l;
+  }, [urunler, mevcut]);
+
+  const kanalSec = (id: string) => {
     setF((x) => {
-      const y = { ...x, productId: id };
-      if (!u) return y;
-      if (!x.aciklama.trim()) y.aciklama = u.name;
-      if (!x.birim.trim() && u.unit) y.birim = t(PRODUCT_UNIT_LABEL[u.unit]);
-      if (!x.tutar.trim() && u.price) {
-        const miktar = Number(x.miktar.replace(",", ".")) || 1;
-        y.tutar = String(Math.round(u.price * miktar * 100) / 100);
-        if (u.currency && !tahsilatVar) y.paraBirimi = u.currency;
+      const y = { ...x, kanalId: id };
+      const k = kanallar.find((z) => z.id === id);
+      if (k && !vadeElle) {
+        y.vadeGun = String(k.varsayilanVadeGun);
+        y.odemeYontemi = k.varsayilanOdemeYontemi;
       }
       return y;
     });
   };
 
-  // Mevcut bağ arşivlenmiş bir ürünse listede yok; seçenek olarak yine görünsün
-  // ki kaydetmek bağı sessizce koparmasın.
-  const urunSecenekleri =
-    urunler && mevcut?.productId && !urunler.some((u) => u.id === mevcut.productId)
-      ? [...urunler, { id: mevcut.productId, name: mevcut.productName ?? t("Arşivdeki ürün") } as Product]
-      : urunler ?? [];
+  const kalemDegis = (i: number, alan: keyof KalemSatiri, v: string) =>
+    setKalemler((l) => l.map((k, j) => (j === i ? { ...k, [alan]: v } : k)));
+
+  // Formdaki toplam: fiyatı yazılmış ya da katalogda olan kalemlerden.
+  // Sipariş tutarı elle yazıldıysa o geçerli, burada yalnızca karşılaştırılır.
+  const kalemToplam = kalemler.reduce((t, k) => {
+    const fiyat = k.birimFiyat.trim() ? sayi(k.birimFiyat) : katalogFiyati(k);
+    const miktar = sayi(k.miktar || "1");
+    return Number.isFinite(fiyat) && fiyat !== undefined && Number.isFinite(miktar) ? t + kalemTutari({ miktar, birimFiyat: fiyat }) : t;
+  }, 0);
+  const elleTutar = f.tutar.trim() ? sayi(f.tutar) : undefined;
 
   const kaydet = async () => {
-    const tutar = Number(f.tutar.replace(",", "."));
-    if (!Number.isFinite(tutar) || tutar <= 0) {
+    const govdeKalemler: KalemGovdesi[] = [];
+    for (const k of kalemler) {
+      if (!k.productId && !k.aciklama.trim() && !k.birimFiyat.trim()) continue;
+      const miktar = sayi(k.miktar || "1");
+      if (!Number.isFinite(miktar) || miktar <= 0) {
+        setHata(t("Miktar geçerli bir sayı olmalı"));
+        return;
+      }
+      if (!k.productId && !k.aciklama.trim()) {
+        setHata(t("Ürünü seçilmeyen kalemin açıklaması olmalı"));
+        return;
+      }
+      const birimFiyat = k.birimFiyat.trim() ? sayi(k.birimFiyat) : undefined;
+      if (birimFiyat !== undefined && (!Number.isFinite(birimFiyat) || birimFiyat < 0)) {
+        setHata(t("Birim fiyat geçerli bir sayı olmalı"));
+        return;
+      }
+      govdeKalemler.push({
+        productId: k.productId || null,
+        aciklama: k.aciklama.trim() || undefined,
+        miktar,
+        birimFiyat,
+      });
+    }
+    if (govdeKalemler.length === 0) {
+      setHata(t("Siparişte en az bir kalem olmalı"));
+      return;
+    }
+    if (elleTutar !== undefined && (!Number.isFinite(elleTutar) || elleTutar <= 0)) {
       setHata(t("Tutar sıfırdan büyük olmalı"));
       return;
     }
-    const miktar = f.miktar.trim() === "" ? null : Number(f.miktar.replace(",", "."));
-    if (miktar !== null && (!Number.isFinite(miktar) || miktar < 0)) {
-      setHata(t("Miktar geçerli bir sayı olmalı"));
+    if (musterisiz && !f.kanalId) {
+      setHata(t("Müşterisi olmayan sipariş için satış kanalı seçilmeli"));
+      return;
+    }
+    if (musterisiz && !f.aliciAdi.trim()) {
+      setHata(t("Alıcının adı gerekli"));
       return;
     }
     const govde: SiparisGovdesi = {
       siparisNo: f.siparisNo,
-      // Katalog hiç yüklenmediyse alan gönderilmez: mevcut bağ korunur.
-      ...(urunler && urunler.length > 0 ? { productId: f.productId || null } : {}),
       aciklama: f.aciklama,
-      miktar,
-      birim: f.birim,
-      tutar,
+      kalemler: govdeKalemler,
+      tutar: elleTutar,
       paraBirimi: f.paraBirimi,
       siparisTarihi: f.siparisTarihi,
       vadeGun,
@@ -132,11 +220,17 @@ export default function SiparisFormu({
       evrakNo: f.evrakNo,
       evrakVadesi: f.evrakVadesi || undefined,
       notlar: f.notlar,
+      kanalId: f.kanalId || null,
+      alici: { ad: f.aliciAdi, il: f.aliciIl, ilce: f.aliciIlce },
     };
     setHata("");
     setKaydediliyor(true);
     try {
-      const s = mevcut ? await siparisApi.guncelle(mevcut.id, govde) : await siparisApi.ekle(partyId, govde);
+      const s = mevcut
+        ? await siparisApi.guncelle(mevcut.id, govde)
+        : partyId
+          ? await siparisApi.ekle(partyId, govde)
+          : await siparisApi.kapsamdaEkle(kapsamYolu!, govde);
       onKaydedildi(s);
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
@@ -145,49 +239,126 @@ export default function SiparisFormu({
     }
   };
 
+  const kucukDugme: React.CSSProperties = {
+    fontSize: 12,
+    color: c.primary,
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
-      {urunSecenekleri.length > 0 && (
-        <Alan label={t("Ürün / hizmet")}>
-          <select value={f.productId} onChange={(e) => urunSec(e.target.value)} style={TAM_GENISLIK}>
-            <option value="">{t("Katalogdan seçilmedi")}</option>
-            {urunSecenekleri.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.sku ? `${u.name} (${u.sku})` : u.name}
-              </option>
-            ))}
+      {kanallar.length > 0 && (
+        <Alan label={musterisiz ? t("Satış kanalı *") : t("Satış kanalı")}>
+          <select value={f.kanalId} onChange={(e) => kanalSec(e.target.value)} style={TAM_GENISLIK}>
+            <option value="">{musterisiz ? t("Kanal seç") : t("Belirtilmedi")}</option>
+            {kanallar
+              .filter((k) => k.aktif || k.id === f.kanalId)
+              .map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.ad}
+                </option>
+              ))}
           </select>
         </Alan>
       )}
-      <Alan label={t("Ne satıldı")}>
-        <input
-          value={f.aciklama}
-          onChange={(e) => set("aciklama", e.target.value)}
-          placeholder={t("Örn. 200 koli A4 kağıt")}
-          style={TAM_GENISLIK}
-        />
+      {musterisiz && kanallar.length === 0 && (
+        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
+          {t("Müşterisi olmayan sipariş bir satış kanalına yazılır. Önce Kanallar sekmesinden bir kanal ekle.")}
+        </p>
+      )}
+      {(musterisiz || f.aliciAdi) && (
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Alan label={musterisiz ? t("Alıcı *") : t("Alıcı")} style={{ flex: "2 1 160px" }}>
+            <input value={f.aliciAdi} onChange={(e) => set("aliciAdi", e.target.value)} placeholder={t("Ad soyad")} style={TAM_GENISLIK} />
+          </Alan>
+          <Alan label={t("İl")} style={{ flex: "1 1 90px" }}>
+            <input value={f.aliciIl} onChange={(e) => set("aliciIl", e.target.value)} style={TAM_GENISLIK} />
+          </Alan>
+          <Alan label={t("İlçe")} style={{ flex: "1 1 90px" }}>
+            <input value={f.aliciIlce} onChange={(e) => set("aliciIlce", e.target.value)} style={TAM_GENISLIK} />
+          </Alan>
+        </div>
+      )}
+
+      <Alan label={t("Kalemler")}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {kalemler.map((k, i) => {
+            const liste = katalogFiyati(k);
+            const u = k.productId ? urunOf.get(k.productId) : undefined;
+            return (
+              <div key={i} style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {urunSecenekleri.length > 0 && (
+                  <select
+                    value={k.productId}
+                    onChange={(e) => kalemDegis(i, "productId", e.target.value)}
+                    style={{ flex: "3 1 180px", minWidth: 0 }}
+                  >
+                    <option value="">{t("Katalogdan seçilmedi")}</option>
+                    {urunSecenekleri.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.sku ? `${x.name} (${x.sku})` : x.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!k.productId && (
+                  <input
+                    value={k.aciklama}
+                    onChange={(e) => kalemDegis(i, "aciklama", e.target.value)}
+                    placeholder={t("Örn. 200 koli A4 kağıt")}
+                    style={{ flex: "3 1 160px", minWidth: 0 }}
+                  />
+                )}
+                <input
+                  inputMode="decimal"
+                  value={k.miktar}
+                  onChange={(e) => kalemDegis(i, "miktar", e.target.value)}
+                  aria-label={t("Miktar")}
+                  title={u?.unit ? t(PRODUCT_UNIT_LABEL[u.unit]) : t("Miktar")}
+                  style={{ flex: "0 1 60px", minWidth: 0 }}
+                />
+                <input
+                  inputMode="decimal"
+                  value={k.birimFiyat}
+                  onChange={(e) => kalemDegis(i, "birimFiyat", e.target.value)}
+                  aria-label={t("Birim fiyat")}
+                  placeholder={liste !== undefined ? String(liste) : t("Birim fiyat")}
+                  title={liste !== undefined ? t("Katalog fiyatı (KDV dahil): {fiyat}", { fiyat: fmtPara(liste, f.paraBirimi) }) : undefined}
+                  style={{ flex: "1 1 90px", minWidth: 0 }}
+                />
+                {kalemler.length > 1 && (
+                  <button
+                    onClick={() => setKalemler((l) => l.filter((_, j) => j !== i))}
+                    aria-label={t("Kalemi kaldır")}
+                    style={{ ...kucukDugme, color: c.textSecondary, fontSize: 16 }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          <button
+            onClick={() => setKalemler((l) => [...l, { productId: "", aciklama: "", miktar: "1", birimFiyat: "" }])}
+            style={{ ...kucukDugme, alignSelf: "flex-start" }}
+          >
+            {t("+ Kalem ekle")}
+          </button>
+        </div>
       </Alan>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Alan label={t("Sipariş no")} style={{ flex: "1 1 120px" }}>
-          <input value={f.siparisNo} onChange={(e) => set("siparisNo", e.target.value)} style={TAM_GENISLIK} />
-        </Alan>
-        <Alan label={t("Miktar")} style={{ flex: "1 1 80px" }}>
-          <input inputMode="decimal" value={f.miktar} onChange={(e) => set("miktar", e.target.value)} style={TAM_GENISLIK} />
-        </Alan>
-        <Alan label={t("Birim")} style={{ flex: "1 1 80px" }}>
+        <Alan label={t("Sipariş tutarı")} style={{ flex: "2 1 140px" }}>
           <input
-            value={f.birim}
-            onChange={(e) => set("birim", e.target.value)}
-            placeholder={t("adet, kg, koli")}
+            inputMode="decimal"
+            value={f.tutar}
+            onChange={(e) => set("tutar", e.target.value)}
+            placeholder={kalemToplam > 0 ? String(Math.round(kalemToplam * 100) / 100) : t("Kalem toplamı")}
             style={TAM_GENISLIK}
           />
-        </Alan>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Alan label={t("Tutar *")} style={{ flex: "2 1 140px" }}>
-          <input inputMode="decimal" value={f.tutar} onChange={(e) => set("tutar", e.target.value)} style={TAM_GENISLIK} />
         </Alan>
         <Alan label={t("Para birimi")} style={{ flex: "1 1 90px" }}>
           <select
@@ -205,8 +376,16 @@ export default function SiparisFormu({
           </select>
         </Alan>
       </div>
+      <span style={{ fontSize: 12, color: c.textSecondary, marginTop: -4 }}>
+        {elleTutar !== undefined
+          ? t("Fiyatı boş kalemler tutarın kalanını katalog fiyatı oranında paylaşır.")
+          : t("Boş bırakılırsa kalem toplamı: {tutar}", { tutar: fmtPara(kalemToplam, f.paraBirimi) })}
+      </span>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <Alan label={t("Sipariş no")} style={{ flex: "1 1 120px" }}>
+          <input value={f.siparisNo} onChange={(e) => set("siparisNo", e.target.value)} style={TAM_GENISLIK} />
+        </Alan>
         <Alan label={t("Sipariş tarihi")} style={{ flex: "1 1 140px" }}>
           <input type="date" value={f.siparisTarihi} onChange={(e) => set("siparisTarihi", e.target.value)} style={TAM_GENISLIK} />
         </Alan>
@@ -216,7 +395,10 @@ export default function SiparisFormu({
             min={0}
             list="projelio-hazir-vadeler"
             value={f.vadeGun}
-            onChange={(e) => set("vadeGun", e.target.value)}
+            onChange={(e) => {
+              setVadeElle(true);
+              set("vadeGun", e.target.value);
+            }}
             style={TAM_GENISLIK}
           />
           <datalist id="projelio-hazir-vadeler">
@@ -235,7 +417,10 @@ export default function SiparisFormu({
       <Alan label={t("Ödeme yöntemi")}>
         <select
           value={f.odemeYontemi}
-          onChange={(e) => set("odemeYontemi", e.target.value as OdemeYontemi)}
+          onChange={(e) => {
+            setVadeElle(true);
+            set("odemeYontemi", e.target.value as OdemeYontemi);
+          }}
           style={TAM_GENISLIK}
         >
           {ODEME_YONTEMLERI.map((y) => (

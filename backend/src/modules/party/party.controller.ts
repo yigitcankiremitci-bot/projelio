@@ -27,9 +27,13 @@ import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, TEDAR
 import { istemciDili, tarayiciDili } from "../../common/i18n/index";
 import type { PartyScope } from "./party.service";
 import { SiparisService, type SiparisGirdisi, type TahsilatGirdisi } from "./siparis.service";
+import { SatisKanallariService, type SatisKanaliGirdisi } from "./satis-kanallari.service";
+import { SiparisAktarimService } from "./siparis-aktarim.service";
 
 /** Şablon dosyası: 1000 satırlık dolu bir xlsx bile 1 MB'ı bulmuyor, 5 MB bol. */
 const SABLON_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+/** Sipariş listesi: bir yılın kargo dökümü binlerce satır; 300 KB CSV tipik, xlsx daha büyük. */
+const SIPARIS_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 /** Kartvizit: telefon fotoğrafı birkaç MB; doğrudan yükleme tavanı (8 MB) zaten bunu taşır. */
 const KARTVIZIT_YUKLEME = FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 import { AccessService } from "../../common/access/access.service";
@@ -49,6 +53,8 @@ export class PartyController {
     private partyService: PartyService,
     private access: AccessService,
     private siparisService: SiparisService,
+    private kanallar: SatisKanallariService,
+    private siparisAktarim: SiparisAktarimService,
     private listeler: BaglantiListeleriService
   ) {}
 
@@ -568,5 +574,110 @@ export class PartyController {
   async tahsilatiGeriAl(@Param("id") id: string, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
     return this.siparisService.tahsilatiGeriAl(id, req.user.userId);
+  }
+
+  /** Muhasebenin toplu "tahsil edildi"si: seçilen siparişlerin kalanı. */
+  @Post("siparisler/toplu-tahsilat")
+  async topluTahsilat(
+    @Body() body: { ids?: string[]; tarih?: string; odemeYontemi?: any; notlar?: string },
+    @Req() req: any
+  ) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.siparisService.topluTahsilEt(body?.ids, body ?? {}, req.user.userId);
+  }
+
+  /**
+   * Tahsilat ekranından sipariş: müşteri seçildiyse ona, seçilmediyse
+   * kanala (tek seferlik alıcı, migration 168).
+   */
+  @Post("organizations/:organizationId/siparisler")
+  async kapsamdaSiparis(
+    @Param("organizationId") organizationId: string,
+    @Body() body: SiparisGirdisi & { partyId?: string },
+    @Req() req: any
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.siparisService.kapsamdaOlustur({ organizationId }, body ?? {}, req.user.userId);
+  }
+
+  @Post("jobs/:jobId/siparisler")
+  async kapsamdaSiparisJob(@Param("jobId") jobId: string, @Body() body: SiparisGirdisi & { partyId?: string }, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.siparisService.kapsamdaOlustur({ jobId }, body ?? {}, req.user.userId);
+  }
+
+  // ============================================================ Satış kanalları (migration 168)
+
+  @Get("organizations/:organizationId/satis-kanallari")
+  async kanallarOrg(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.kanallar.liste({ organizationId }, req.user.userId);
+  }
+
+  @Get("jobs/:jobId/satis-kanallari")
+  async kanallarJob(@Param("jobId") jobId: string, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.kanallar.liste({ jobId }, req.user.userId);
+  }
+
+  @Post("organizations/:organizationId/satis-kanallari")
+  async kanalEkleOrg(@Param("organizationId") organizationId: string, @Body() body: SatisKanaliGirdisi, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.kanallar.olustur({ organizationId }, body ?? {}, req.user.userId);
+  }
+
+  @Post("jobs/:jobId/satis-kanallari")
+  async kanalEkleJob(@Param("jobId") jobId: string, @Body() body: SatisKanaliGirdisi, @Req() req: any) {
+    await this.access.assertCanViewJob(jobId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.kanallar.olustur({ jobId }, body ?? {}, req.user.userId);
+  }
+
+  @Patch("satis-kanallari/:id")
+  async kanalGuncelle(@Param("id") id: string, @Body() body: SatisKanaliGirdisi, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.kanallar.guncelle(id, body ?? {}, req.user.userId);
+  }
+
+  // ============================================================ Sipariş içe aktarma
+  //
+  // Müşteri içe aktarmayla aynı durumsuz iki adım: önce önizleme
+  // (onizleme=1, hiçbir şey yazılmaz), sonra aynı dosya + önizlemede yapılan
+  // düzeltmeler (`duzeltmeler` alanı, JSON) ile onizleme=0.
+
+  @Post("organizations/:organizationId/siparisler/import")
+  @UseGuards(UploadRateLimitGuard)
+  @UseInterceptors(SIPARIS_YUKLEME)
+  async siparisImport(
+    @Param("organizationId") organizationId: string,
+    @Query("onizleme") onizleme: string | undefined,
+    @Body("duzeltmeler") duzeltmeler: string | undefined,
+    @Req() req: any,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    if (!file) throw new BadRequestException("Dosya yüklenmedi");
+    let d: unknown = {};
+    if (duzeltmeler) {
+      try {
+        d = JSON.parse(duzeltmeler);
+      } catch {
+        throw new BadRequestException("Düzeltmeler okunamadı");
+      }
+    }
+    return this.siparisAktarim.iceAktar(
+      { organizationId },
+      // multer dosya adını latin1 okuyor (bkz. iceAktar).
+      { ad: Buffer.from(file.originalname, "latin1").toString("utf8"), tampon: file.buffer },
+      d as any,
+      onizleme !== "0",
+      req.user.userId
+    );
   }
 }

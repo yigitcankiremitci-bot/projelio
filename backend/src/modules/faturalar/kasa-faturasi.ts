@@ -56,7 +56,9 @@ export function faturaVerisi(satir: KasaSatiri): FaturaVerisi {
  */
 export function siparisFaturaVerisi(
   siparis: {
-    partyId: string;
+    partyId?: string;
+    kanalAdi?: string;
+    alici?: { ad?: string };
     tutar: number;
     paraBirimi: string;
     siparisTarihi: string;
@@ -77,7 +79,10 @@ export function siparisFaturaVerisi(
     issueDate: tarih,
     status: tahsil >= siparis.tutar ? "paid" : "pending",
     // entity_ref alanı party kimliğini kabul ediyor (bkz. faturaVerisi).
-    counterpartyName: siparis.partyId,
+    // Müşterisiz (kanal) siparişte karşı taraf alıcının adı, düz metin.
+    counterpartyName:
+      siparis.partyId ??
+      ([siparis.alici?.ad, siparis.kanalAdi ? `(${siparis.kanalAdi})` : undefined].filter(Boolean).join(" ") || undefined),
   };
   const no = girdi.faturaNo?.trim();
   if (no) data.invoiceNo = no;

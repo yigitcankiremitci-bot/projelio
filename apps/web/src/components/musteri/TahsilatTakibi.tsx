@@ -1,18 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ODEME_YONTEMI_ETIKET,
+  ODEME_YONTEMLERI,
+  kalanTutar,
   siparisDurumu,
   tahsilatRaporu,
+  tahsilEdilen,
   type MusteriSiparisi,
+  type OdemeYontemi,
   type TahsilatRaporSatiri,
 } from "@projelio/shared";
 import { siparisApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { fmtPara } from "../butce/butceBicim";
+import SiparisFormu from "./SiparisFormu";
 import SiparisKarti from "./SiparisKarti";
+import SatisKanallari from "./SatisKanallari";
+import SiparisExcelModal from "./SiparisExcelModal";
 import { ayEtiketi, bugunYerel } from "./siparisOrtak";
 
 type DurumSuzgeci = "acik" | "gecikti" | "tahsil_edildi" | "hepsi";
+
+/** Uzun listede (bir yılın siparişleri) tek seferde çizilen kart sayısı. */
+const SAYFA = 100;
+/** Kanal süzgecinde "kanalı yok" seçeneği. */
+const KANALSIZ = "\u0000";
 
 /**
  * Tahsilat takibi — Müşteriler ekranının ikinci görünümü.
@@ -25,8 +38,21 @@ type DurumSuzgeci = "acik" | "gecikti" | "tahsil_edildi" | "hepsi";
  * Ay, VADE ayıdır: "Ekim'de ne gelmeliydi, ne geldi". Tahsilat raporuyla
  * (tahsilatRaporu) aynı eksen — ikisi farklı ay tanımı kullansaydı liste ile
  * rapor aynı ay için farklı rakam gösterirdi.
+ *
+ * Satış kanalı (migration 168): süzgeç + yönetici için kanal kırılımı.
+ * Muhasebe pazaryerinin ödemesini görünce o kanalın siparişlerini seçip
+ * toplu "tahsil edildi" der; her biri kasaya ayrı gelir satırı yazar.
  */
-export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYolu: string; departmentId?: string }) {
+export default function TahsilatTakibi({
+  kapsamYolu,
+  departmentId,
+  sorumluSecenekleri = [],
+}: {
+  kapsamYolu: string;
+  departmentId?: string;
+  /** Kanal sorumlusu seçicisi (müşteri kartının sorumlu listesiyle aynı). */
+  sorumluSecenekleri?: { id: string; ad: string }[];
+}) {
   const c = useThemeColors();
   const t = useT();
   const bugun = bugunYerel();
@@ -38,6 +64,16 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
   const [ay, setAy] = useState(buAy);
   const [durum, setDurum] = useState<DurumSuzgeci>("acik");
   const [sorumlu, setSorumlu] = useState("");
+  const [kanal, setKanal] = useState("");
+  const [gosterilen, setGosterilen] = useState(SAYFA);
+  const [secili, setSecili] = useState<Set<string>>(new Set());
+  const [toplu, setToplu] = useState<{ tarih: string; yontem: OdemeYontemi | "" } | null>(null);
+  const [topluSonuc, setTopluSonuc] = useState("");
+  const [isleniyor, setIsleniyor] = useState(false);
+  const [panel, setPanel] = useState<"yeni" | "kanallar" | null>(null);
+  const [excel, setExcel] = useState(false);
+  const [yenile, setYenile] = useState(0);
+  const organizationId = /^\/organizations\/([^/]+)/.exec(kapsamYolu)?.[1];
 
   useEffect(() => {
     let iptal = false;
@@ -57,7 +93,7 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
     return () => {
       iptal = true;
     };
-  }, [kapsamYolu, departmentId]);
+  }, [kapsamYolu, departmentId, yenile]);
 
   const tumu = siparisler ?? [];
 
@@ -65,6 +101,12 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
     const set = new Set<string>([buAy]);
     for (const s of tumu) set.add(s.vadeTarihi.slice(0, 7));
     return Array.from(set).sort().reverse();
+  }, [siparisler]);
+
+  const kanalAdlari = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of tumu) set.add(s.kanalAdi ?? KANALSIZ);
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
   }, [siparisler]);
 
   const sorumlular = useMemo(() => {
@@ -79,9 +121,12 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
   const kapsamda = useMemo(
     () =>
       tumu.filter(
-        (s) => (!ay || s.vadeTarihi.startsWith(ay)) && (!sorumlu || (s.sorumluId ?? "") === sorumlu)
+        (s) =>
+          (!ay || s.vadeTarihi.startsWith(ay)) &&
+          (!sorumlu || (s.sorumluId ?? "") === sorumlu) &&
+          (!kanal || (s.kanalAdi ?? KANALSIZ) === kanal)
       ),
-    [siparisler, ay, sorumlu]
+    [siparisler, ay, sorumlu, kanal]
   );
 
   const liste = useMemo(
@@ -96,6 +141,29 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
   );
 
   const rapor = useMemo(() => tahsilatRaporu(kapsamda, bugun), [kapsamda]);
+
+  // Kanal kırılımı (yönetici): kanal × para birimi. Kur dönüşümü yok.
+  const kanalRaporu = useMemo(() => {
+    const m = new Map<string, { kanal: string; para: string; sayi: number; beklenen: number; tahsil: number; kalan: number }>();
+    for (const s of kapsamda) {
+      const ad = s.kanalAdi ?? KANALSIZ;
+      const anahtar = `${ad}|${s.paraBirimi}`;
+      const k = m.get(anahtar) ?? { kanal: ad, para: s.paraBirimi, sayi: 0, beklenen: 0, tahsil: 0, kalan: 0 };
+      k.sayi += 1;
+      k.beklenen += Number(s.tutar);
+      k.tahsil += tahsilEdilen(s);
+      k.kalan += kalanTutar(s);
+      m.set(anahtar, k);
+    }
+    return Array.from(m.values()).sort((a, b) => b.beklenen - a.beklenen);
+  }, [kapsamda]);
+
+  // Süzgeç değişince sayfa başa döner, görünmeyen seçim bırakılır: listede
+  // görünmeyen bir siparişi "tahsil edildi" yapmak sürpriz olurdu.
+  useEffect(() => {
+    setGosterilen(SAYFA);
+    setSecili(new Set());
+  }, [ay, durum, sorumlu, kanal]);
 
   // Özet şeridi: para birimi başına (kur dönüşümü yok).
   const ozet = useMemo(() => {
@@ -128,6 +196,43 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
 
   const degisti = (s: MusteriSiparisi) => setSiparisler((l) => (l ?? []).map((x) => (x.id === s.id ? s : x)));
 
+  const acikListede = liste.filter((s) => kalanTutar(s) > 0);
+  const seciliToplam = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of tumu) if (secili.has(s.id)) m.set(s.paraBirimi, (m.get(s.paraBirimi) ?? 0) + kalanTutar(s));
+    return Array.from(m.entries());
+  }, [secili, siparisler]);
+
+  const topluTahsilEt = async () => {
+    if (!toplu || secili.size === 0) return;
+    const metin = seciliToplam.map(([p, v]) => fmtPara(v, p)).join(" + ");
+    if (!window.confirm(t("{n} sipariş tahsil edildi olarak işaretlensin mi? Kasaya {tutar} gelir yazılır.", { n: secili.size, tutar: metin }))) return;
+    setIsleniyor(true);
+    setTopluSonuc("");
+    try {
+      const r = await siparisApi.topluTahsilEt(Array.from(secili), {
+        tarih: toplu.tarih,
+        odemeYontemi: toplu.yontem || undefined,
+      });
+      setTopluSonuc(
+        r.atlanan.length > 0
+          ? t("{n} sipariş işlendi, {m} sipariş işlenemedi: {neden}", {
+              n: r.islenen,
+              m: r.atlanan.length,
+              neden: Array.from(new Set(r.atlanan.map((a) => a.neden))).join("; "),
+            })
+          : t("{n} sipariş tahsil edildi olarak işaretlendi.", { n: r.islenen })
+      );
+      setSecili(new Set());
+      setToplu(null);
+      setYenile((x) => x + 1);
+    } catch (err) {
+      setTopluSonuc(err instanceof Error ? err.message : t("İşlem başarısız"));
+    } finally {
+      setIsleniyor(false);
+    }
+  };
+
   const raporuIndir = () => {
     const baslik = [t("Çalışan"), t("Vade ayı"), t("Para birimi"), t("Sipariş"), t("Beklenen"), t("Tahsil edilen"), t("Kalan"), t("Geciken")];
     const satirlar = rapor.map((r) => [
@@ -157,6 +262,9 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
   if (!siparisler) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   const secim: React.CSSProperties = { fontSize: 13, padding: "5px 6px" };
+  const baglanti: React.CSSProperties = { fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 };
+  const thK: React.CSSProperties = { textAlign: "right", fontWeight: 500, color: c.textSecondary, padding: "4px 6px", whiteSpace: "nowrap" };
+  const tdK: React.CSSProperties = { textAlign: "right", padding: "4px 6px", whiteSpace: "nowrap", color: c.textPrimary };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -175,6 +283,16 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
           <option value="tahsil_edildi">{t("Tahsil edilenler")}</option>
           <option value="hepsi">{t("Hepsi")}</option>
         </select>
+        {kanalAdlari.length > 1 && (
+          <select value={kanal} onChange={(e) => setKanal(e.target.value)} style={secim} aria-label={t("Satış kanalı")}>
+            <option value="">{t("Tüm kanallar")}</option>
+            {kanalAdlari.map((k) => (
+              <option key={k} value={k}>
+                {k === KANALSIZ ? t("Kanalı belirtilmemiş") : k}
+              </option>
+            ))}
+          </select>
+        )}
         {yonetici && sorumlular.length > 1 && (
           <select value={sorumlu} onChange={(e) => setSorumlu(e.target.value)} style={secim} aria-label={t("Sorumlu")}>
             <option value="">{t("Tüm çalışanlar")}</option>
@@ -186,6 +304,43 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
           </select>
         )}
       </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+        {organizationId && (
+          <button onClick={() => setPanel(panel === "yeni" ? null : "yeni")} style={baglanti}>
+            {t("+ Müşterisiz sipariş")}
+          </button>
+        )}
+        {yonetici && organizationId && (
+          <button onClick={() => setExcel(true)} style={baglanti}>
+            {t("Excel'den sipariş aktar")}
+          </button>
+        )}
+        {yonetici && (
+          <button onClick={() => setPanel(panel === "kanallar" ? null : "kanallar")} style={baglanti}>
+            {t("Satış kanalları")}
+          </button>
+        )}
+      </div>
+      {panel === "yeni" && organizationId && (
+        <SiparisFormu
+          kapsamYolu={kapsamYolu}
+          organizationId={organizationId}
+          onKaydedildi={(s) => {
+            setPanel(null);
+            setSiparisler((l) => [s, ...(l ?? [])]);
+          }}
+          onVazgec={() => setPanel(null)}
+        />
+      )}
+      {panel === "kanallar" && <SatisKanallari kapsamYolu={kapsamYolu} sorumluSecenekleri={sorumluSecenekleri} onDegisti={() => setYenile((x) => x + 1)} />}
+      {excel && organizationId && (
+        <SiparisExcelModal
+          organizationId={organizationId}
+          onKapat={() => setExcel(false)}
+          onAktarildi={() => setYenile((x) => x + 1)}
+        />
+      )}
 
       {!yonetici && (
         <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Yalnızca sana atanmış müşterilerin siparişleri görünüyor.")}</span>
@@ -227,6 +382,67 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
 
       {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
 
+      {acikListede.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", fontSize: 12 }}>
+          <button
+            onClick={() =>
+              setSecili((x) => (x.size === acikListede.length ? new Set() : new Set(acikListede.map((s) => s.id))))
+            }
+            style={baglanti}
+          >
+            {secili.size === acikListede.length
+              ? t("Seçimi kaldır")
+              : t("Listedeki {n} açık siparişi seç", { n: acikListede.length })}
+          </button>
+          {secili.size > 0 && (
+            <>
+              <span style={{ color: c.textSecondary }}>
+                {t("{n} seçili", { n: secili.size })} · {seciliToplam.map(([p, v]) => fmtPara(v, p)).join(" + ")}
+              </span>
+              {toplu ? (
+                <>
+                  <input
+                    type="date"
+                    value={toplu.tarih}
+                    onChange={(e) => setToplu({ ...toplu, tarih: e.target.value })}
+                    aria-label={t("Tahsilat tarihi")}
+                    style={secim}
+                  />
+                  <select
+                    value={toplu.yontem}
+                    onChange={(e) => setToplu({ ...toplu, yontem: e.target.value as OdemeYontemi | "" })}
+                    aria-label={t("Ödeme yöntemi")}
+                    style={secim}
+                  >
+                    <option value="">{t("Siparişteki yöntem")}</option>
+                    {ODEME_YONTEMLERI.map((y) => (
+                      <option key={y} value={y}>
+                        {t(ODEME_YONTEMI_ETIKET[y])}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={topluTahsilEt}
+                    disabled={isleniyor}
+                    style={{ fontSize: 12, padding: "5px 10px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+                  >
+                    {isleniyor ? t("İşleniyor…") : t("Tahsil edildi işaretle")}
+                  </button>
+                  <button onClick={() => setToplu(null)} style={{ ...baglanti, color: c.textSecondary }}>
+                    {t("Vazgeç")}
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setToplu({ tarih: bugun, yontem: "" })} style={baglanti}>
+                  {t("Tahsil edildi olarak işaretle…")}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+      {topluSonuc && <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{topluSonuc}</p>}
+
       {liste.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {tumu.length === 0
@@ -235,7 +451,7 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {liste.map((s) => (
+          {liste.slice(0, gosterilen).map((s) => (
             <SiparisKarti
               key={s.id}
               siparis={s}
@@ -246,9 +462,53 @@ export default function TahsilatTakibi({ kapsamYolu, departmentId }: { kapsamYol
               sorumluGoster={yonetici}
               onDegisti={degisti}
               onSilindi={(id) => setSiparisler((l) => (l ?? []).filter((x) => x.id !== id))}
+              secili={secili.has(s.id)}
+              onSec={(v) =>
+                setSecili((x) => {
+                  const y = new Set(x);
+                  if (v) y.add(s.id);
+                  else y.delete(s.id);
+                  return y;
+                })
+              }
             />
           ))}
+          {liste.length > gosterilen && (
+            <button onClick={() => setGosterilen((n) => n + SAYFA)} style={{ ...baglanti, alignSelf: "center" }}>
+              {t("Daha fazla göster ({n} kaldı)", { n: liste.length - gosterilen })}
+            </button>
+          )}
         </div>
+      )}
+
+      {yonetici && kanalRaporu.length > 1 && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+          <h6 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Kanal bazında")}</h6>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${c.border}` }}>
+                  <th style={{ ...thK, textAlign: "left" }}>{t("Kanal")}</th>
+                  <th style={thK}>{t("Sipariş")}</th>
+                  <th style={thK}>{t("Beklenen")}</th>
+                  <th style={thK}>{t("Tahsil edilen")}</th>
+                  <th style={thK}>{t("Kalan")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {kanalRaporu.map((k) => (
+                  <tr key={`${k.kanal}|${k.para}`} style={{ borderBottom: `1px solid ${c.border}` }}>
+                    <td style={{ ...tdK, textAlign: "left" }}>{k.kanal === KANALSIZ ? t("Kanalı belirtilmemiş") : k.kanal}</td>
+                    <td style={tdK}>{k.sayi}</td>
+                    <td style={tdK}>{fmtPara(k.beklenen, k.para)}</td>
+                    <td style={{ ...tdK, color: c.success }}>{fmtPara(k.tahsil, k.para)}</td>
+                    <td style={tdK}>{fmtPara(k.kalan, k.para)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {yonetici && rapor.length > 0 && <Rapor rapor={rapor} onIndir={raporuIndir} />}

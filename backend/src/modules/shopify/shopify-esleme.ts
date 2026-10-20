@@ -1,4 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { kalemleriOrantila } from "@projelio/shared";
+import type { KalemSatiri } from "../party/siparis.service";
 
 /**
  * Shopify ↔ Projelio dönüşümlerinin saf (yan etkisiz) hâli.
@@ -113,7 +115,7 @@ export interface ShopifySiparisi {
   cancelled_at?: string | null;
   test?: boolean;
   payment_gateway_names?: string[];
-  line_items?: Array<{ title?: string; name?: string; quantity?: number; sku?: string | null }>;
+  line_items?: Array<{ title?: string; name?: string; quantity?: number; sku?: string | null; price?: string | number }>;
   customer?: {
     id?: number | string;
     email?: string | null;
@@ -176,8 +178,6 @@ export function yerelGun(damga: string | null | undefined): string | null {
 export interface SiparisAlanlari {
   siparis_no: string | null;
   aciklama: string | null;
-  miktar: number | null;
-  birim: string | null;
   tutar: number;
   para_birimi: string;
   siparis_tarihi: string;
@@ -208,7 +208,6 @@ export function siparisAlanlari(o: ShopifySiparisi, bugun: string): { alanlar: S
   if (!/^[A-Z]{3}$/.test(para)) return { atla: "Para birimi okunamadı" };
 
   const kalemler = (o.line_items ?? []).filter((k) => (k.quantity ?? 0) > 0);
-  const miktar = kalemler.reduce((t, k) => t + (k.quantity ?? 0), 0);
   let aciklama = kalemler.map((k) => `${k.quantity}× ${k.title || k.name || "Ürün"}`).join(", ");
   if (aciklama.length > 250) aciklama = `${aciklama.slice(0, 247)}…`;
 
@@ -216,8 +215,6 @@ export function siparisAlanlari(o: ShopifySiparisi, bugun: string): { alanlar: S
     alanlar: {
       siparis_no: o.name?.trim() || String(o.id),
       aciklama: aciklama || null,
-      miktar: miktar > 0 ? miktar : null,
-      birim: miktar > 0 ? "adet" : null,
       tutar,
       para_birimi: para,
       siparis_tarihi: yerelGun(o.created_at) ?? bugun,
@@ -280,6 +277,51 @@ export function stokKoduUrunu(
     bulunan = adaylar[0];
   }
   return bulunan;
+}
+
+/**
+ * Siparişin kalemleri (migration 168). Her Shopify kalemi bir kalem olur;
+ * stok kodu katalogda TEK ürüne denk geliyorsa ona bağlanır (aynı kural:
+ * stokKoduUrunu). Siparişin tutarı `total_price` — kargo, indirim ve vergi
+ * dahil — kalem fiyatları oranında dağıtılır: kalem toplamı sipariş
+ * tutarına eşit olmalı (bkz. siparisKalemleri.ts).
+ *
+ * Mağaza fiyatı katalog fiyatı DEĞİL: liste_birim_fiyat boş bırakılır,
+ * "katalogdan sapma" mağaza satışında anlamsız bir oran gösterirdi.
+ */
+export function shopifyKalemleri(
+  o: ShopifySiparisi,
+  urunler: Array<{ id: string; sku?: string | null }>,
+  tutar: number
+): KalemSatiri[] {
+  const sade = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
+  const koda = new Map<string, string[]>();
+  for (const u of urunler) {
+    const kod = sade(u.sku);
+    if (kod) koda.set(kod, [...(koda.get(kod) ?? []), u.id]);
+  }
+  const kalemler = (o.line_items ?? []).filter((k) => (k.quantity ?? 0) > 0);
+  if (kalemler.length === 0) {
+    return [{ product_id: null, aciklama: "Shopify siparişi", miktar: 1, birim: "adet", birim_fiyat: tutar, liste_birim_fiyat: null, tutar, sira: 0 }];
+  }
+  const pay = kalemleriOrantila(
+    kalemler.map((k) => ({ miktar: k.quantity ?? 1, listeBirimFiyat: k.price === undefined ? undefined : sayi(k.price) })),
+    tutar
+  );
+  return kalemler.map((k, i) => {
+    const adaylar = koda.get(sade(k.sku));
+    const urun = adaylar && adaylar.length === 1 ? adaylar[0] : null;
+    return {
+      product_id: urun,
+      aciklama: urun ? null : (k.title || k.name || "Ürün").slice(0, 250),
+      miktar: k.quantity ?? 1,
+      birim: "adet",
+      birim_fiyat: pay[i].birimFiyat,
+      liste_birim_fiyat: null,
+      tutar: pay[i].tutar,
+      sira: i,
+    };
+  });
 }
 
 /**

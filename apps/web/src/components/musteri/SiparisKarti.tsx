@@ -4,6 +4,7 @@ import {
   ODEME_YONTEMLERI,
   evrakliMi,
   kalanTutar,
+  katalogSapmasi,
   siparisDurumu,
   tahsilatTutariHatasi,
   tahsilEdilen,
@@ -23,7 +24,9 @@ import { Alan, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
  * Tek sipariş: özet satırı + açılınca tahsilatlar, "tahsil et", düzenle, sil.
  *
  * Hem müşteri kartındaki Siparişler sekmesi hem Tahsilat takibi görünümü
- * bunu kullanır; `musteriAdiGoster` ikincisinde satırın kime ait olduğunu yazar.
+ * bunu kullanır; `musteriAdiGoster` ikincisinde satırın kime ait olduğunu yazar
+ * (müşterisiz siparişte alıcı + kanal). `onSec` verilirse satırın başında
+ * toplu "tahsil edildi" için seçim kutusu çıkar.
  */
 export default function SiparisKarti({
   siparis,
@@ -32,6 +35,8 @@ export default function SiparisKarti({
   sorumluGoster = false,
   onDegisti,
   onSilindi,
+  secili,
+  onSec,
 }: {
   siparis: MusteriSiparisi;
   yazabilir: boolean;
@@ -39,6 +44,8 @@ export default function SiparisKarti({
   sorumluGoster?: boolean;
   onDegisti: (s: MusteriSiparisi) => void;
   onSilindi: (id: string) => void;
+  secili?: boolean;
+  onSec?: (secili: boolean) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
@@ -52,12 +59,19 @@ export default function SiparisKarti({
   const odenen = tahsilEdilen(siparis);
   const para = siparis.paraBirimi;
 
+  // Kalem özeti: "Vacrol Sprey 30 ML +2" — ilk kalem ve kaç kalem daha.
+  const ilk = siparis.kalemler[0];
+  const kalemOzeti = ilk
+    ? `${ilk.productName ?? ilk.aciklama ?? t("Ürün")}${siparis.kalemler.length > 1 ? ` +${siparis.kalemler.length - 1}` : ""}`
+    : undefined;
+  const kime = siparis.partyName ?? (siparis.alici?.ad ? siparis.alici.ad : undefined);
   const baslik = [
-    musteriAdiGoster ? siparis.partyName : undefined,
-    siparis.aciklama || siparis.productName || (siparis.siparisNo ? `#${siparis.siparisNo}` : undefined),
+    musteriAdiGoster ? kime : undefined,
+    siparis.aciklama || kalemOzeti || (siparis.siparisNo ? `#${siparis.siparisNo}` : undefined),
   ]
     .filter(Boolean)
     .join(" · ");
+  const sapma = katalogSapmasi(siparis.kalemler);
 
   const geriAl = async (tahsilatId: string) => {
     if (!window.confirm(t("Bu tahsilat geri alınsın mı? Kasadaki gelir kaydı da silinir."))) return;
@@ -92,6 +106,17 @@ export default function SiparisKarti({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", background: c.background, borderRadius: 8 }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+      {onSec && (
+        <input
+          type="checkbox"
+          checked={!!secili}
+          disabled={kalan <= 0}
+          onChange={(e) => onSec(e.target.checked)}
+          aria-label={t("Siparişi seç")}
+          style={{ marginLeft: 10 }}
+        />
+      )}
       <button
         type="button"
         onClick={() => setAcik((x) => !x)}
@@ -117,7 +142,7 @@ export default function SiparisKarti({
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
             {[
               t("Vade {tarih}", { tarih: fmtTarih(siparis.vadeTarihi) }),
-              siparis.miktar !== undefined ? `${siparis.miktar}${siparis.birim ? ` ${siparis.birim}` : ""}` : undefined,
+              siparis.kanalAdi,
               t(ODEME_YONTEMI_ETIKET[siparis.odemeYontemi]),
               siparis.fatura ? (siparis.fatura.faturaNo ? t("Fatura #{no}", { no: siparis.fatura.faturaNo }) : t("Faturalı")) : undefined,
               sorumluGoster ? siparis.sorumluAdi ?? t("Sorumlu yok") : undefined,
@@ -135,6 +160,7 @@ export default function SiparisKarti({
           )}
         </div>
       </button>
+      </div>
 
       {acik && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 10px 10px" }}>
@@ -150,6 +176,35 @@ export default function SiparisKarti({
               </span>
             )}
           </div>
+          {siparis.alici && (siparis.partyId || siparis.alici.il) && (
+            <div style={{ fontSize: 12, color: c.textSecondary }}>
+              {t("Alıcı: {ad}", {
+                ad: [siparis.alici.ad, [siparis.alici.ilce, siparis.alici.il].filter(Boolean).join(" / ")].filter(Boolean).join(" · "),
+              })}
+            </div>
+          )}
+          {siparis.kalemler.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {siparis.kalemler.map((k, i) => (
+                <div key={k.id ?? i} style={{ display: "flex", gap: 8, fontSize: 12, color: c.textPrimary }}>
+                  <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {k.productName ?? k.aciklama ?? t("Ürün")}
+                  </span>
+                  <span style={{ color: c.textSecondary, whiteSpace: "nowrap" }}>
+                    {k.miktar} × {fmtPara(k.birimFiyat, para)}
+                  </span>
+                  <span style={{ whiteSpace: "nowrap" }}>{fmtPara(k.tutar, para)}</span>
+                </div>
+              ))}
+              {sapma !== undefined && Math.abs(sapma) >= 0.01 && (
+                <span style={{ fontSize: 11, color: c.textSecondary }}>
+                  {sapma < 0
+                    ? t("Katalog fiyatından %{oran} indirimli", { oran: Math.round(-sapma * 100) })
+                    : t("Katalog fiyatından %{oran} yüksek", { oran: Math.round(sapma * 100) })}
+                </span>
+              )}
+            </div>
+          )}
           {siparis.notlar && <div style={{ fontSize: 12, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{siparis.notlar}</div>}
 
           {siparis.tahsilatlar.length > 0 && (

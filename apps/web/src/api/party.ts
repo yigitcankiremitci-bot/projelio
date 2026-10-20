@@ -11,6 +11,10 @@ import type {
   PartyDosyaRolu,
   PartyGorevi,
   ProjectFile,
+  SatisKanali,
+  SatisKanaliTuru,
+  SiparisAktarimDuzeltmeleri,
+  SiparisAktarimSonucu,
 } from "@projelio/shared";
 import { api, API_URL } from "./client";
 import { TOKEN_KEY } from "../lib/session";
@@ -92,15 +96,23 @@ export const partyApi = {
     ),
 };
 
+/** Siparişin bir kalemi — sunucu tarafı: party/siparis.service.ts KalemGirdisi. */
+export interface KalemGovdesi {
+  productId?: string | null;
+  aciklama?: string;
+  miktar: number;
+  birim?: string;
+  /** Boşsa katalog fiyatı; sipariş tutarı da verilmişse kalana orantılanır. */
+  birimFiyat?: number;
+}
+
 /** Sipariş formunun gövdesi — sunucu tarafı: party/siparis.service.ts SiparisGirdisi. */
 export interface SiparisGovdesi {
   siparisNo?: string;
   aciklama?: string;
-  /** Katalogdaki ürün; null bağı kaldırır. */
-  productId?: string | null;
-  miktar?: number | null;
-  birim?: string;
-  tutar: number;
+  kalemler: KalemGovdesi[];
+  /** Verilirse kalemlere orantılanır (pazarlıklı toplam); verilmezse kalem toplamı. */
+  tutar?: number;
   paraBirimi: string;
   siparisTarihi: string;
   vadeGun: number;
@@ -108,6 +120,8 @@ export interface SiparisGovdesi {
   evrakNo?: string;
   evrakVadesi?: string;
   notlar?: string;
+  kanalId?: string | null;
+  alici?: { ad?: string; il?: string; ilce?: string };
 }
 
 export interface TahsilatGovdesi {
@@ -134,4 +148,36 @@ export const siparisApi = {
   tahsilEt: (siparisId: string, govde: TahsilatGovdesi) =>
     api.post<MusteriSiparisi>(`/siparisler/${siparisId}/tahsilatlar`, govde),
   tahsilatiGeriAl: (tahsilatId: string) => api.delete<MusteriSiparisi>(`/tahsilatlar/${tahsilatId}`),
+  /** Tahsilat ekranından: müşteri seçilmediyse kanala (tek seferlik alıcı). */
+  kapsamdaEkle: (kapsamYolu: string, govde: SiparisGovdesi & { partyId?: string }) =>
+    api.post<MusteriSiparisi>(`${kapsamYolu}/siparisler`, govde),
+  /** Seçilen siparişlerin kalanını tek seferde "tahsil edildi" yapar. */
+  topluTahsilEt: (ids: string[], govde: { tarih: string; odemeYontemi?: OdemeYontemi; notlar?: string }) =>
+    api.post<{ islenen: number; atlanan: { id: string; neden: string }[] }>(`/siparisler/toplu-tahsilat`, { ids, ...govde }),
+  /** Sipariş listesi içe aktarma; onizleme=true iken sunucu hiçbir şey yazmaz. */
+  iceAktar: (organizationId: string, dosya: File, duzeltmeler: SiparisAktarimDuzeltmeleri, onizleme: boolean) => {
+    const fd = new FormData();
+    fd.append("file", dosya);
+    fd.append("duzeltmeler", JSON.stringify(duzeltmeler));
+    return api.uploadFile<SiparisAktarimSonucu>(
+      `/organizations/${organizationId}/siparisler/import?onizleme=${onizleme ? "1" : "0"}`,
+      fd
+    );
+  },
+};
+
+export interface SatisKanaliGovdesi {
+  ad?: string;
+  tur?: SatisKanaliTuru;
+  varsayilanVadeGun?: number;
+  varsayilanOdemeYontemi?: OdemeYontemi;
+  sorumluUserId?: string | null;
+  aktif?: boolean;
+}
+
+export const kanalApi = {
+  /** `kapsamYolu` = /organizations/:id ya da /jobs/:id */
+  liste: (kapsamYolu: string) => api.get<SatisKanali[]>(`${kapsamYolu}/satis-kanallari`),
+  ekle: (kapsamYolu: string, govde: SatisKanaliGovdesi) => api.post<SatisKanali>(`${kapsamYolu}/satis-kanallari`, govde),
+  guncelle: (id: string, govde: SatisKanaliGovdesi) => api.patch<SatisKanali>(`/satis-kanallari/${id}`, govde),
 };

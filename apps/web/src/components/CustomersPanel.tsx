@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
@@ -62,7 +62,9 @@ import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
 import MusteriKunyesi from "./musteri/MusteriKunyesi";
-import MusteriHaritasi from "./musteri/MusteriHaritasi";
+// Harita ancak "Haritada göster"e basılınca yüklenir: il sınırlarının verisi
+// (~110 KB) Müşteriler ekranını her açanın paketine girmesin.
+const MusteriHaritasi = lazy(() => import("./musteri/MusteriHaritasi"));
 import GorusmeNotlari from "./musteri/GorusmeNotlari";
 import { BaglantiListeSekmeleri, KartListeleri } from "./BaglantiListeleri";
 import TaskFromRecordModal from "./TaskFromRecordModal";
@@ -405,6 +407,8 @@ export default function CustomersPanel({
   // Şablon indirme ve doldurulmuş dosyayı yükleme aynı pencerede (bkz. MusteriExcelModal).
   const [excelAcik, setExcelAcik] = useState(false);
   const [haritaAcik, setHaritaAcik] = useState(false);
+  // Haritanın yan listesinden açılan kart (harita penceresinin üstünde).
+  const [haritaKartiId, setHaritaKartiId] = useState<string | null>(null);
 
   // Departman değişince o departmanın varsayılan rol filtresi uygulanır.
   useEffect(() => {
@@ -1395,7 +1399,33 @@ export default function CustomersPanel({
         <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
       )}
 
-      {haritaAcik && <MusteriHaritasi musteriler={visible} onKapat={() => setHaritaAcik(false)} />}
+      {haritaAcik && (
+        <Suspense fallback={null}>
+          <MusteriHaritasi musteriler={visible} onKapat={() => setHaritaAcik(false)} onMusteriAc={(p) => setHaritaKartiId(p.id)} />
+        </Suspense>
+      )}
+      {(() => {
+        // Kart, listedeki güncel kayıttan: kartta yapılan değişiklik (load) pencereye de yansısın.
+        const p = haritaKartiId ? parties.find((x) => x.id === haritaKartiId) : undefined;
+        if (!p) return null;
+        return (
+          <Modal title={p.displayName} onClose={() => setHaritaKartiId(null)} maxWidth={760} mobileFullScreen>
+            <PartyDetail
+              party={p}
+              baglantiModu={baglantiModu}
+              baglantiYazar={baglantiYazar}
+              departmentId={jobId ? undefined : departmentId}
+              onDegisti={() => load()}
+              canWrite={canWrite}
+              siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
+              profile={profile.primaryActionLabel}
+              organizationId={baglantiModu ? undefined : organizationId}
+              sirketId={jobId ? undefined : organizationId}
+              listeler={baglantiModu ? listeler : undefined}
+            />
+          </Modal>
+        );
+      })()}
 
       {excelAcik && (
         <MusteriExcelModal

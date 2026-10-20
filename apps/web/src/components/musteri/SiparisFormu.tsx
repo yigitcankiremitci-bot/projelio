@@ -48,19 +48,27 @@ function sayi(s: string): number {
  * "60 gün vade", takvim tarihi değil. Kanal seçilince vade ve ödeme yöntemi
  * kanaldan gelir (kullanıcı daha önce değiştirmediyse).
  *
- * İki kapı: müşteri kartından (`partyId`) ya da Tahsilat ekranından
- * (`kapsamYolu`) — orada müşteri yoksa sipariş kanalın tek seferlik
- * alıcısına yazılır ve alıcı adı istenir.
+ * İki kapı: müşteri kartından (`partyId`) ya da Tahsilat ekranının "+"
+ * düğmesinden (`kapsamYolu` + `musteriSecenekleri`). İkincisinde formun
+ * başında müşteri seçilir; "Müşterisiz" seçilirse sipariş kanalın tek
+ * seferlik alıcısına yazılır ve alıcı adı istenir (kullanıcı isteği,
+ * 2026-10-20 — ayrı "Müşterisiz sipariş" düğmesi kalktı).
  */
+
+/** Müşteri seçicisinde "müşterisiz (kanala)" seçeneğinin değeri; party kimlikleri UUID, çakışmaz. */
+const MUSTERISIZ = "__musterisiz";
 export default function SiparisFormu({
   partyId,
   kapsamYolu,
   organizationId,
+  musteriSecenekleri,
   mevcut,
   onKaydedildi,
   onVazgec,
 }: {
   partyId?: string;
+  /** Verilirse formun başında müşteri seçilir (Tahsilat ekranından yeni sipariş). */
+  musteriSecenekleri?: { id: string; ad: string }[];
   /** Müşterisiz (kanal) sipariş için: /organizations/:id ya da /jobs/:id */
   kapsamYolu?: string;
   organizationId?: string;
@@ -70,7 +78,9 @@ export default function SiparisFormu({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const musterisiz = mevcut ? !mevcut.partyId : !partyId;
+  const secimli = !mevcut && !partyId && !!musteriSecenekleri;
+  const [musteriSecimi, setMusteriSecimi] = useState("");
+  const musterisiz = mevcut ? !mevcut.partyId : secimli ? musteriSecimi === MUSTERISIZ : !partyId;
   const [f, setF] = useState(() => ({
     siparisNo: mevcut?.siparisNo ?? "",
     aciklama: mevcut?.aciklama ?? "",
@@ -200,6 +210,10 @@ export default function SiparisFormu({
       setHata(t("Tutar sıfırdan büyük olmalı"));
       return;
     }
+    if (secimli && !musteriSecimi) {
+      setHata(t("Müşteri seçilmeli ya da müşterisiz sipariş seçilmeli"));
+      return;
+    }
     if (musterisiz && !f.kanalId) {
       setHata(t("Müşterisi olmayan sipariş için satış kanalı seçilmeli"));
       return;
@@ -226,11 +240,12 @@ export default function SiparisFormu({
     setHata("");
     setKaydediliyor(true);
     try {
+      const secilenParty = secimli && musteriSecimi !== MUSTERISIZ ? musteriSecimi : undefined;
       const s = mevcut
         ? await siparisApi.guncelle(mevcut.id, govde)
         : partyId
           ? await siparisApi.ekle(partyId, govde)
-          : await siparisApi.kapsamdaEkle(kapsamYolu!, govde);
+          : await siparisApi.kapsamdaEkle(kapsamYolu!, secilenParty ? { ...govde, partyId: secilenParty } : govde);
       onKaydedildi(s);
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
@@ -250,6 +265,19 @@ export default function SiparisFormu({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
+      {secimli && (
+        <Alan label={t("Müşteri *")}>
+          <select value={musteriSecimi} onChange={(e) => setMusteriSecimi(e.target.value)} style={TAM_GENISLIK}>
+            <option value="">{t("Müşteri seç")}</option>
+            <option value={MUSTERISIZ}>{t("Müşterisiz (tek seferlik alıcı, kanala yazılır)")}</option>
+            {musteriSecenekleri!.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.ad}
+              </option>
+            ))}
+          </select>
+        </Alan>
+      )}
       {kanallar.length > 0 && (
         <Alan label={musterisiz ? t("Satış kanalı *") : t("Satış kanalı")}>
           <select value={f.kanalId} onChange={(e) => kanalSec(e.target.value)} style={TAM_GENISLIK}>
@@ -264,7 +292,7 @@ export default function SiparisFormu({
           </select>
         </Alan>
       )}
-      {musterisiz && kanallar.length === 0 && (
+      {musterisiz && kanallar.length === 0 && (!secimli || musteriSecimi === MUSTERISIZ) && (
         <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
           {t("Müşterisi olmayan sipariş bir satış kanalına yazılır. Önce Kanallar sekmesinden bir kanal ekle.")}
         </p>

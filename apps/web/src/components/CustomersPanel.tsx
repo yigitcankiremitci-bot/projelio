@@ -610,13 +610,23 @@ export default function CustomersPanel({
   // Ekleme sayfanın "+" düğmesinden. Panelin başlığındaki ikinci düğme kalktı;
   // modal içinde (bkz. Modal.tsx) "+" ulaşılamadığı için orada geri gelir.
   const fabAvailable = useFabAvailable();
+  // Sekmeye göre: Tahsilat'ta yeni sipariş (müşteri formun içinde seçilir,
+  // müşterisiz de oradan), Müşteriler'de müşteri, Potansiyel'de potansiyel.
+  const [yeniSiparisIstegi, setYeniSiparisIstegi] = useState(0);
+  const tahsilatSekmesi = !baglantiModu && gorunum === "tahsilat";
   const ekleEtiketi = baglantiModu
     ? t("Bağlantı ekle")
-    : gorunum === "potansiyel"
-      ? t("Potansiyel müşteri ekle")
-      : t("Müşteri ekle");
+    : tahsilatSekmesi
+      ? t("Sipariş ekle")
+      : gorunum === "potansiyel"
+        ? t("Potansiyel müşteri ekle")
+        : t("Müşteri ekle");
+  // Sipariş hakkı müşteriden ya da kanaldan gelir (sunucu doğrular); salt
+  // okur çalışan da kendisine atanan müşteriye sipariş girer — "+" onda da çıkar.
   useProjectFabAction(
-    canWrite && fabAvailable ? { label: ekleEtiketi, onClick: openCreate } : null,
+    fabAvailable && (canWrite || tahsilatSekmesi)
+      ? { label: ekleEtiketi, onClick: tahsilatSekmesi ? () => setYeniSiparisIstegi((n) => n + 1) : openCreate }
+      : null,
     [canWrite, fabAvailable, organizationId, departmentId, jobId, baglantiModu, gorunum],
     FAB_PRIORITY.panel
   );
@@ -1369,6 +1379,12 @@ export default function CustomersPanel({
           kapsamYolu={kapsamYolu}
           departmentId={jobId ? undefined : departmentId}
           sorumluSecenekleri={sorumluSecenekleri}
+          musteriSecenekleri={parties
+            .filter((p) => !p.archivedAt)
+            .map((p) => ({ id: p.id, ad: p.displayName }))
+            .sort((a, b) => a.ad.localeCompare(b.ad, "tr"))}
+          yeniSiparisIstegi={yeniSiparisIstegi}
+          fabVar={fabAvailable}
         />
       ) : (
       <>

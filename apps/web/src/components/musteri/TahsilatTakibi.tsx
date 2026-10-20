@@ -18,6 +18,7 @@ import { fmtPara } from "../butce/butceBicim";
 import { IconUpload } from "../icons";
 import { listeCercevesi, listeSatiri, ozetKutusu } from "../../lib/listeStili";
 import { useIsWide } from "../../lib/useIsDesktop";
+import Modal from "../Modal";
 import SiparisFormu from "./SiparisFormu";
 import SiparisKarti from "./SiparisKarti";
 import SatisKanallari from "./SatisKanallari";
@@ -80,9 +81,22 @@ export default function TahsilatTakibi({
   kapsamYolu,
   departmentId,
   sorumluSecenekleri = [],
+  musteriSecenekleri = [],
+  yeniSiparisIstegi = 0,
+  fabVar = false,
 }: {
   kapsamYolu: string;
   departmentId?: string;
+  /** Yeni siparişin müşteri seçicisi (müşteri defteri; çalışana kendi müşterileri). */
+  musteriSecenekleri?: { id: string; ad: string }[];
+  /**
+   * Sayfanın "+" düğmesi bu sekmede yeni sipariş açar: her basışta sayaç
+   * artar (CustomersPanel). Sayaç olmasının nedeni: aynı değerle iki basış
+   * da formu açabilsin.
+   */
+  yeniSiparisIstegi?: number;
+  /** Sayfada "+" yoksa (modal içi vb.) form için yedek düğme gösterilir. */
+  fabVar?: boolean;
   /** Kanal sorumlusu seçicisi (müşteri kartının sorumlu listesiyle aynı). */
   sorumluSecenekleri?: { id: string; ad: string }[];
 }) {
@@ -118,6 +132,9 @@ export default function TahsilatTakibi({
   const [excel, setExcel] = useState(false);
   const [yenile, setYenile] = useState(0);
   const organizationId = /^\/organizations\/([^/]+)/.exec(kapsamYolu)?.[1];
+  useEffect(() => {
+    if (yeniSiparisIstegi > 0) setPanel("yeni");
+  }, [yeniSiparisIstegi]);
 
   // Liste yalnızca KAPSAM değişince boşaltılır. Tazelemede (kanal düzenlendi,
   // toplu tahsilat, içe aktarma) boşaltılsaydı ekran "Yükleniyor"a düşer, açık
@@ -367,16 +384,19 @@ export default function TahsilatTakibi({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {panel === "yeni" && organizationId && (
-        <SiparisFormu
-          kapsamYolu={kapsamYolu}
-          organizationId={organizationId}
-          onKaydedildi={(s) => {
-            setPanel(null);
-            setSiparisler((l) => [s, ...(l ?? [])]);
-          }}
-          onVazgec={() => setPanel(null)}
-        />
+      {panel === "yeni" && (
+        <Modal title={t("Sipariş ekle")} onClose={() => setPanel(null)} maxWidth={640} mobileFullScreen>
+          <SiparisFormu
+            kapsamYolu={kapsamYolu}
+            organizationId={organizationId}
+            musteriSecenekleri={musteriSecenekleri}
+            onKaydedildi={(s) => {
+              setPanel(null);
+              setSiparisler((l) => [s, ...(l ?? [])]);
+            }}
+            onVazgec={() => setPanel(null)}
+          />
+        </Modal>
       )}
       {panel === "kanallar" && <SatisKanallari kapsamYolu={kapsamYolu} sorumluSecenekleri={sorumluSecenekleri} onDegisti={() => setYenile((x) => x + 1)} />}
       {excel && organizationId && (
@@ -460,9 +480,10 @@ export default function TahsilatTakibi({
             {t("Temizle")}
           </button>
         )}
-        {organizationId && (
-          <button onClick={() => setPanel(panel === "yeni" ? null : "yeni")} style={{ ...baglanti, marginLeft: "auto", fontSize: 13 }}>
-            {panel === "yeni" ? t("Vazgeç") : t("+ Müşterisiz sipariş")}
+        {/* Yeni sipariş sayfanın "+" düğmesinden; "+" olmayan yerde (modal içi) yedek düğme. */}
+        {!fabVar && (
+          <button onClick={() => setPanel("yeni")} style={{ ...baglanti, marginLeft: "auto", fontSize: 13 }}>
+            {t("+ Sipariş ekle")}
           </button>
         )}
       </div>
@@ -554,7 +575,7 @@ export default function TahsilatTakibi({
       {liste.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {tumu.length === 0
-            ? t("Henüz sipariş yok. Siparişler müşteri kartındaki Siparişler sekmesinden eklenir.")
+            ? t("Henüz sipariş yok. Yeni sipariş sayfadaki \"+\" düğmesiyle ya da müşteri kartının Siparişler sekmesinden eklenir.")
             : arama.trim()
               ? t("Aramanla eşleşen sipariş yok.")
               : t("Bu süzgeçle eşleşen sipariş yok.")}

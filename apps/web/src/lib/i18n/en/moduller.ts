@@ -1098,7 +1098,6 @@ export const moduller: TranslationDict = {
   "Gecikenler": "Overdue",
   "Gelen tutar ({para})": "Amount received ({para})",
   "Henüz sipariş yok.": "No orders yet.",
-  "Henüz sipariş yok. Siparişler müşteri kartındaki Siparişler sekmesinden eklenir.": "No orders yet. Orders are added from the Orders tab on a customer card.",
   "Hepsi": "All",
   "Kalan {tutar}": "Remaining {tutar}",
   "Kasaya gelir olarak işlenir. Kalan: {tutar}": "Recorded as income in the ledger. Remaining: {tutar}",
@@ -1187,7 +1186,6 @@ export const moduller: TranslationDict = {
   "Ürünler şirket kapsamında tutulur.": "Products are kept at the company level.",
   // Satış kanalları, çok kalemli sipariş, sipariş içe aktarma (migration 168)
   "+ Kalem ekle": "+ Add line item",
-  "+ Müşterisiz sipariş": "+ Order without a customer",
   "Alma": "Skip",
   "Alıcı": "Recipient",
   "Alıcı *": "Recipient *",
@@ -1307,4 +1305,10 @@ export const moduller: TranslationDict = {
   "Tutar (büyükten)": "Amount (largest)",
   "Vade tarihi (yakın)": "Due date (soonest)",
   "Sıralama": "Sort",
+  "Henüz sipariş yok. Yeni sipariş sayfadaki \"+\" düğmesiyle ya da müşteri kartının Siparişler sekmesinden eklenir.": "No orders yet. Add one with the \"+\" button on the page or from the Orders tab of a customer card.",
+  "Müşteri *": "Customer *",
+  "Müşteri seç": "Pick a customer",
+  "Müşteri seçilmeli ya da müşterisiz sipariş seçilmeli": "Pick a customer or choose an order without a customer",
+  "Müşterisiz (tek seferlik alıcı, kanala yazılır)": "No customer (one-off recipient, written to a channel)",
+  "Sipariş ekle": "Add order",
 };

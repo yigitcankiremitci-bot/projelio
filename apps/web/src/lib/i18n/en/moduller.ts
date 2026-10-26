@@ -1342,4 +1342,22 @@ export const moduller: TranslationDict = {
   "İlçeler": "Districts",
   "← Türkiye": "← Türkiye",
   "Kartı aç": "Open card",
+
+  // Müşteri listeleri, sürükle-bırak ve özel sıra (migration 170)
+  "\"{ad}\" listesi silinsin mi? İçindeki kartlar silinmez, Tümü'nde kalır.": "Delete the \"{ad}\" list? Its cards aren't deleted; they stay in All.",
+  "Şu an listede görünen {n} kartı bu listeye ekle": "Add the {n} cards currently shown to this list",
+  "İpucu: bir kartı tutup liste sekmesinin üstüne bırakınca o listeye taşınır; listede sürükleyerek sırasını değiştirebilirsin.":
+    "Tip: drag a card onto a list tab to move it there; drag within the list to reorder.",
+  "{ad}, \"{liste}\" listesine taşındı.": "{ad} moved to \"{liste}\".",
+  "{ad}, \"{liste}\" listesinden çıkarıldı.": "{ad} removed from \"{liste}\".",
+  "Kart": "Card",
+  "Bu listede bu sekmeye ait kart yok. Kartı tutup liste sekmesinin üstüne bırakabilir ya da kartın içinden listeye ekleyebilirsin.":
+    "This list has no cards for this tab. Drag a card onto the list tab, or add it to the list from inside the card.",
+  "Özel sıra": "Custom order",
+  "Sıra kaydedilemedi": "Couldn't save the order",
+  "Tutup sürükle": "Drag to move",
+  "Listedekileri il il haritada göster": "Show the listed cards on a map by province",
+  "+ Projelio'dan seç": "+ Pick from Projelio",
+  "Projelio'dan dosya seç": "Pick a file from Projelio",
+  "Dosya yerinde kalır; karta da bağlanır.": "The file stays where it is and is also linked to the card.",
 };

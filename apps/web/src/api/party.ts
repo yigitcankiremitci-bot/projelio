@@ -10,6 +10,7 @@ import type {
   PartyAktarimSecenegi,
   PartyDosyaRolu,
   PartyGorevi,
+  PartyListeModulu,
   ProjectFile,
   SatisKanali,
   SatisKanaliTuru,
@@ -55,14 +56,17 @@ export const partyApi = {
     ),
 
   /** Bağlantı listeleri (migration 163): oynatma listesi gibi, kart birden çok listede olabilir. */
-  listeAc: (kapsamYolu: string, ad: string, partyIdler: string[] = []) =>
-    api.post<BaglantiListeKaydi>(`${kapsamYolu}/baglanti-listeleri`, { ad, partyIdler }),
+  listeAc: (kapsamYolu: string, ad: string, partyIdler: string[] = [], modul?: PartyListeModulu) =>
+    api.post<BaglantiListeKaydi>(`${kapsamYolu}/baglanti-listeleri`, { ad, partyIdler, modul }),
   listeAdlandir: (listeId: string, ad: string) => api.patch(`/baglanti-listeleri/${listeId}`, { ad }),
   listeSil: (listeId: string) => api.delete(`/baglanti-listeleri/${listeId}`),
   listeyeEkle: (listeId: string, partyIdler: string[]) =>
     api.post<{ eklenen: number }>(`/baglanti-listeleri/${listeId}/uyeler`, { partyIdler }),
   listedenCikar: (listeId: string, partyIdler: string[]) =>
     api.post(`/baglanti-listeleri/${listeId}/uyeler/cikar`, { partyIdler }),
+  /** Sürükle-bırakla verilen özel sıra (migration 170); anahtar bkz. shared ozelSiraAnahtari. */
+  siraKaydet: (kapsamYolu: string, modul: PartyListeModulu, anahtar: string, sira: string[]) =>
+    api.patch(`${kapsamYolu}/party-siralari`, { modul, anahtar, sira }),
 
   /** "Müşteri yap" / "Bağlantılara ekle": kart bir deftere daha girer. */
   deftereEkle: (partyId: string, modul: string) => api.post<Party>(`/party/${partyId}/defter`, { modul }),
@@ -77,6 +81,20 @@ export const partyApi = {
     return api.uploadFile<ProjectFile>(`/party/${partyId}/dosyalar?${q}`, fd);
   },
   dosyaKaldir: (partyId: string, fileId: string) => api.delete(`/party/${partyId}/dosyalar/${fileId}`),
+  /** "Projelio'dan seç": kaynak yoksa kök (şirket + departmanlar; iş kartında işin ağacı). */
+  dosyaGez: (partyId: string, kaynak?: string, folderId?: string) => {
+    const q = new URLSearchParams();
+    if (kaynak) q.set("kaynak", kaynak);
+    if (folderId) q.set("folderId", folderId);
+    return api.get<{
+      kaynaklar: { anahtar: string; ad: string }[];
+      folders: { id: string; name: string }[];
+      files: ProjectFile[];
+      breadcrumb: { id: string; name: string }[];
+    }>(`/party/${partyId}/dosya-gez${q.toString() ? `?${q}` : ""}`);
+  },
+  dosyalariBagla: (partyId: string, fileIds: string[]) =>
+    api.post<{ baglanan: number }>(`/party/${partyId}/dosyalar/bagla`, { fileIds }),
 
   /** Rol aktarımı: seçenekler ve aktarım (müşteri, tedarikçi, rakip analizi, ortaklık). */
   aktarimSecenekleri: (partyId: string) => api.get<PartyAktarimSecenegi[]>(`/party/${partyId}/aktarim`),

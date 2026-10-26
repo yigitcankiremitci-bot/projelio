@@ -943,6 +943,9 @@ export interface MusteriListesi {
   /** Kart bilgisini (ad, iletişim) değiştirebilir mi. */
   kartYazar: boolean;
   musteriler: Party[];
+  /** Müşteri listeleri (migration 170) — üç sekmede ortak; üyelik `Party.listeIdleri`. */
+  listeler?: BaglantiListeKaydi[];
+  ozelSiralar?: PartyOzelSiralar;
 }
 
 /** Bağlantı kartının aktarılabileceği hedefler (bkz. backend party/aktarim.ts). */
@@ -987,6 +990,22 @@ export interface BaglantiListesi {
   baglantilar: Party[];
   /** Kapsamdaki bağlantı listeleri (sekmeler); kartların hangisinde olduğu `Party.listeIdleri`. */
   listeler?: BaglantiListeKaydi[];
+  /** Sürükle-bırakla verilmiş özel sıralar (migration 170), bkz. `PartyOzelSiralar`. */
+  ozelSiralar?: PartyOzelSiralar;
+}
+
+/** Listeleri olan defterler (migration 170): Bağlantılar ve Müşteriler. */
+export type PartyListeModulu = typeof BAGLANTI_MODUL_KEY | typeof MUSTERI_MODUL_KEY;
+
+/**
+ * Özel sıralar: anahtar "<sekme>:<liste kimliği | tumu>" (ör. "musteriler:tumu"),
+ * değer kart kimlikleri sırasıyla. Ekibin ortak görünümü.
+ */
+export type PartyOzelSiralar = Record<string, string[]>;
+
+/** Özel sıra anahtarı. Sunucu da aynı biçimi doğrular. */
+export function ozelSiraAnahtari(sekme: string, listeId?: string): string {
+  return `${sekme}:${listeId || "tumu"}`;
 }
 
 export interface PartyDuplicate {

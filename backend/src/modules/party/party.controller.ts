@@ -20,7 +20,7 @@ import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guar
 import type { Response } from "express";
 import { AuthGuard } from "@nestjs/passport";
 import type { Party, PartyActivity, PartyContact, PartyRole } from "@projelio/shared";
-import { BaglantiListeleriService } from "./baglanti-listeleri.service";
+import { BaglantiListeleriService, listeModulu } from "./baglanti-listeleri.service";
 import { PartyService } from "./party.service";
 import { musteriSablonuOlustur, musteriSayfasiniSec, sablonDosyaAdi, tabloyuOku } from "./musteri-sablonu";
 import { BAGLANTI_MODUL_KEY, isLocale, isPartyModulKey, MUSTERI_MODUL_KEY, TEDARIK_MODUL_KEY, type PartyModulKey } from "@projelio/shared";
@@ -208,7 +208,8 @@ export class PartyController {
   ) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.musterilerim({ organizationId, departmentId }, req.user.userId);
+    const yanit = await this.partyService.musterilerim({ organizationId, departmentId }, req.user.userId);
+    return { ...yanit, ...(await this.listeler.kartlaraEkle(yanit.musteriler, { organizationId }, MUSTERI_MODUL_KEY)) };
   }
 
   /** Bağlantı ve İlişkiler ekranının listesi (bağlantı alanlarıyla). */
@@ -280,7 +281,8 @@ export class PartyController {
   async musterilerimJob(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.partyService.musterilerim({ jobId }, req.user.userId);
+    const yanit = await this.partyService.musterilerim({ jobId }, req.user.userId);
+    return { ...yanit, ...(await this.listeler.kartlaraEkle(yanit.musteriler, { jobId }, MUSTERI_MODUL_KEY)) };
   }
 
   @Get("jobs/:jobId/baglantilar")
@@ -291,34 +293,58 @@ export class PartyController {
     return this.listeler.yanitaEkle(yanit, { jobId });
   }
 
-  // ============================================================ Bağlantı listeleri (migration 163)
+  // ============================================================ Bağlantı / müşteri listeleri (migration 163, 170)
+  // `modul` verilmezse Bağlantılar (eski istemciler); crm_musteri müşteri listeleri.
 
   @Get("organizations/:organizationId/baglanti-listeleri")
-  async listelerOrg(@Param("organizationId") organizationId: string, @Req() req: any) {
+  async listelerOrg(@Param("organizationId") organizationId: string, @Query("modul") modul: string | undefined, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.listeler.listele({ organizationId }, req.user.userId);
+    return this.listeler.listele({ organizationId }, req.user.userId, listeModulu(modul));
   }
 
   @Post("organizations/:organizationId/baglanti-listeleri")
   async listeAcOrg(
     @Param("organizationId") organizationId: string,
-    @Body() body: { ad?: string; partyIdler?: string[] },
+    @Body() body: { ad?: string; partyIdler?: string[]; modul?: string },
     @Req() req: any
   ) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.listeler.olustur({ organizationId }, body.ad, req.user.userId, body.partyIdler);
+    return this.listeler.olustur({ organizationId }, body.ad, req.user.userId, body.partyIdler, listeModulu(body.modul));
   }
 
   @Get("jobs/:jobId/baglanti-listeleri")
-  async listelerJob(@Param("jobId") jobId: string, @Req() req: any) {
+  async listelerJob(@Param("jobId") jobId: string, @Query("modul") modul: string | undefined, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.listeler.listele({ jobId }, req.user.userId);
+    return this.listeler.listele({ jobId }, req.user.userId, listeModulu(modul));
   }
 
   @Post("jobs/:jobId/baglanti-listeleri")
-  async listeAcJob(@Param("jobId") jobId: string, @Body() body: { ad?: string; partyIdler?: string[] }, @Req() req: any) {
+  async listeAcJob(
+    @Param("jobId") jobId: string,
+    @Body() body: { ad?: string; partyIdler?: string[]; modul?: string },
+    @Req() req: any
+  ) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");
-    return this.listeler.olustur({ jobId }, body.ad, req.user.userId, body.partyIdler);
+    return this.listeler.olustur({ jobId }, body.ad, req.user.userId, body.partyIdler, listeModulu(body.modul));
+  }
+
+  /** Sürükle-bırakla verilen özel sıra (migration 170): ekibin ortak görünümü. */
+  @Patch("organizations/:organizationId/party-siralari")
+  async siraKaydetOrg(
+    @Param("organizationId") organizationId: string,
+    @Body() body: { modul?: string; anahtar?: string; sira?: string[] },
+    @Req() req: any
+  ) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.listeler.siraKaydet({ organizationId }, listeModulu(body.modul), body.anahtar, body.sira, req.user.userId);
+    return { ok: true };
+  }
+
+  @Patch("jobs/:jobId/party-siralari")
+  async siraKaydetJob(@Param("jobId") jobId: string, @Body() body: { modul?: string; anahtar?: string; sira?: string[] }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    await this.listeler.siraKaydet({ jobId }, listeModulu(body.modul), body.anahtar, body.sira, req.user.userId);
+    return { ok: true };
   }
 
   @Patch("baglanti-listeleri/:listeId")
@@ -435,6 +461,25 @@ export class PartyController {
     file.originalname = Buffer.from(file.originalname, "latin1").toString("utf8");
     if (rol !== undefined && rol !== "kartvizit" && rol !== "ek") throw new BadRequestException("Geçersiz dosya rolü");
     return this.partyService.dosyaEkle(id, file, req.user.userId, { departmentId, rol: rol === "ek" ? "ek" : "kartvizit" });
+  }
+
+  /** "Projelio'dan seç": karta bağlanacak dosyayı şirketin/işin klasörlerinde gezmek. */
+  @Get("party/:id/dosya-gez")
+  async dosyaGez(
+    @Param("id") id: string,
+    @Query("kaynak") kaynak: string | undefined,
+    @Query("folderId") folderId: string | undefined,
+    @Req() req: any
+  ) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.dosyaGez(id, req.user.userId, kaynak || undefined, folderId || undefined);
+  }
+
+  /** Projelio'daki dosyaları karta ek dosya olarak bağlar (dosya yerinde kalır). */
+  @Post("party/:id/dosyalar/bagla")
+  async dosyalariBagla(@Param("id") id: string, @Body() body: { fileIds?: string[] }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.dosyalariBagla(id, body.fileIds, req.user.userId);
   }
 
   @Get("party/:id/dosyalar")

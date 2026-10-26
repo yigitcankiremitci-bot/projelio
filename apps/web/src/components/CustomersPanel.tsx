@@ -15,6 +15,7 @@ import {
   GORUSME_TURU_SIMGESI,
   aramaDurumu,
   potansiyelMusteriMi,
+  ozelSiraAnahtari,
   safeExternalUrl,
   type BaglantiListeKaydi,
   type KartvizitSosyal,
@@ -34,6 +35,7 @@ import {
   type PartyGorevi,
   type ProjectFile,
   type PartyRole,
+  type PartyOzelSiralar,
 } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -48,7 +50,7 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconEdit, IconHome, IconIdCard, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
+import { IconEdit, IconHome, IconIdCard, IconMap, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
@@ -66,7 +68,8 @@ import MusteriKunyesi from "./musteri/MusteriKunyesi";
 // (~110 KB) Müşteriler ekranını her açanın paketine girmesin.
 const MusteriHaritasi = lazy(() => import("./musteri/MusteriHaritasi"));
 import GorusmeNotlari from "./musteri/GorusmeNotlari";
-import { BaglantiListeSekmeleri, KartListeleri } from "./BaglantiListeleri";
+import KartDosyaSecici from "./musteri/KartDosyaSecici";
+import { BaglantiListeSekmeleri, KartListeleri, PARTY_SURUKLE } from "./BaglantiListeleri";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
 import Modal from "./Modal";
@@ -117,9 +120,10 @@ function emptyForm() {
 
 const ONEM_SIRASI: Record<BaglantiOnem, number> = { yuksek: 0, orta: 1, dusuk: 2 };
 
-type Siralama = "onem" | "ad" | "yeni" | "temas" | "kurum" | "arama";
+type Siralama = "onem" | "ad" | "yeni" | "temas" | "kurum" | "arama" | "ozel";
 // dil:anahtar-baslangic
 const SIRALAMA_ETIKETI: Record<Siralama, string> = {
+  ozel: "Özel sıra",
   onem: "Önem",
   ad: "Ad (A–Z)",
   yeni: "Son eklenen",
@@ -139,10 +143,20 @@ function siralamaOku(anahtar: string, varsayilan: Siralama, gecerli: Siralama[])
   }
 }
 
-function sirala(liste: Party[], s: Siralama): Party[] {
+/**
+ * Özel sıra: kart sürüklenerek dizildiğinde kaydedilen kimlik sırası
+ * (migration 170). Sırada olmayan kart (sonradan eklenen) sona, ada göre.
+ */
+function sirala(liste: Party[], s: Siralama, ozel?: string[]): Party[] {
   const ad = (a: Party, b: Party) => a.displayName.localeCompare(b.displayName, "tr");
+  const yer = s === "ozel" ? new Map((ozel ?? []).map((id, i) => [id, i])) : undefined;
   return [...liste].sort((a, b) => {
     switch (s) {
+      case "ozel": {
+        const ya = yer!.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const yb = yer!.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return ya !== yb ? ya - yb : ad(a, b);
+      }
       case "ad":
         return ad(a, b);
       case "yeni":
@@ -314,8 +328,11 @@ export default function CustomersPanel({
 
   // Bağlantı listeleri (oynatma listesi gibi sekmeler, bkz. BaglantiListeleri).
   // Açık sekme bu tarayıcıda kapsam başına hatırlanır (kaybolsa da olur).
+  // Migration 170'ten beri Müşteriler'de de: listeler üç sekmede ortak.
   const [listeler, setListeler] = useState<BaglantiListeKaydi[]>([]);
-  const listeAnahtari = `projelio_baglanti_listesi_${kapsamYolu}`;
+  const [ozelSiralar, setOzelSiralar] = useState<PartyOzelSiralar>({});
+  const listeModulu = baglantiModu ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY;
+  const listeAnahtari = `projelio_${baglantiModu ? "baglanti" : "musteri"}_listesi_${kapsamYolu}`;
   const [seciliListe, setSeciliListeHam] = useState<string>(() => {
     try {
       return localStorage.getItem(listeAnahtari) ?? "";
@@ -342,9 +359,14 @@ export default function CustomersPanel({
     const istek = baglantiModu
       ? partyApi.baglantilarim(kapsamYolu, jobId ? undefined : departmentId).then((r) => {
           setListeler(r.listeler ?? []);
+          setOzelSiralar(r.ozelSiralar ?? {});
           return { kartlar: r.baglantilar, yonetici: r.yonetici };
         })
-      : partyApi.musterilerim(scopePath, jobId ? undefined : departmentId).then((r) => ({ kartlar: r.musteriler, yonetici: r.yonetici }));
+      : partyApi.musterilerim(scopePath, jobId ? undefined : departmentId).then((r) => {
+          setListeler(r.listeler ?? []);
+          setOzelSiralar(r.ozelSiralar ?? {});
+          return { kartlar: r.musteriler, yonetici: r.yonetici };
+        });
     istek
       .then((r) => {
         setParties(r.kartlar);
@@ -445,7 +467,10 @@ export default function CustomersPanel({
   };
 
   const bugun = bugunYmd();
-  const siralamaSecenekleri: Siralama[] = baglantiModu ? ["onem", "ad", "yeni", "temas", "kurum"] : ["ad", "yeni", "kurum", "arama"];
+  // "Özel sıra" kart sürüklenince kendiliğinden seçilir; elle de seçilebilir.
+  const siralamaSecenekleri: Siralama[] = baglantiModu
+    ? ["onem", "ad", "yeni", "temas", "kurum", "ozel"]
+    : ["ad", "yeni", "kurum", "arama", "ozel"];
   const siralamaAnahtari = `projelio_party_siralama_${baglantiModu ? "baglantilar" : "musteri"}`;
   const [siralama, setSiralama] = useState<Siralama>(() =>
     siralamaOku(siralamaAnahtari, baglantiModu ? "onem" : "ad", siralamaSecenekleri)
@@ -478,16 +503,31 @@ export default function CustomersPanel({
     (k) => VARSAYILAN_SOSYAL.includes(k) || ekSosyal.includes(k) || !!form.sosyal[k]
   );
 
-  // Açık sekmenin kartları. Bağlantılar'da sekme yok, hepsi.
-  const sekmeKartlari = useMemo(
+  // Açık sekmenin kartları (liste süzgecinden önce). Bağlantılar'da sekme
+  // yok, hepsi; Tahsilat takibinde liste sayıları bütün kartlardan.
+  const sekmeTabani = useMemo(
     () =>
-      baglantiModu
-        ? etkinListe
-          ? parties.filter((p) => p.listeIdleri?.includes(etkinListe))
-          : parties
+      baglantiModu || gorunum === "tahsilat"
+        ? parties
         : parties.filter((p) => (gorunum === "potansiyel") === potansiyelMusteriMi(p)),
-    [parties, baglantiModu, gorunum, etkinListe]
+    [parties, baglantiModu, gorunum]
   );
+  const sekmeKartlari = useMemo(
+    () => (etkinListe ? sekmeTabani.filter((p) => p.listeIdleri?.includes(etkinListe)) : sekmeTabani),
+    [sekmeTabani, etkinListe]
+  );
+  // Liste sekmelerindeki sayılar açık sekmeye göre: "Fuar 2026" Potansiyel'de 12, Müşteriler'de 3.
+  const listeSayilari = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const p of sekmeTabani) for (const id of p.listeIdleri ?? []) m[id] = (m[id] ?? 0) + 1;
+    return m;
+  }, [sekmeTabani]);
+  // Tahsilat takibi seçili listenin müşterilerinin siparişlerine daralır.
+  const tahsilatSuzgeci = useMemo(
+    () => (etkinListe ? new Set(sekmeKartlari.map((p) => p.id)) : undefined),
+    [etkinListe, sekmeKartlari]
+  );
+  const ozelAnahtar = ozelSiraAnahtari(baglantiModu ? "baglantilar" : gorunum, etkinListe);
   const potansiyelSayisi = useMemo(() => parties.filter(potansiyelMusteriMi).length, [parties]);
   // Müşteriler sekmesinin rol seçicisinde "Potansiyel" yok: o kartlar kendi sekmesinde.
   const filtreRolleri = baglantiModu ? rolSecenekleri : rolSecenekleri.filter((r) => r !== "lead");
@@ -508,8 +548,67 @@ export default function CustomersPanel({
         .toLocaleLowerCase("tr")
         .includes(q);
     });
-    return sirala(suzulen, siralama);
-  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama, gorunum]);
+    return sirala(suzulen, siralama, ozelSiralar[ozelAnahtar]);
+  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama, gorunum, ozelSiralar, ozelAnahtar]);
+
+  // Harita listedekileri gösterir (süzgeçler uygulanmış hâliyle); Tahsilat
+  // takibinde seçili listenin müşterilerini.
+  const haritaKartlari = gorunum === "tahsilat" && !baglantiModu ? sekmeKartlari.filter((p) => !p.archivedAt) : visible;
+
+  // ---------------------------------------------------------------- Sürükle-bırak
+  // Kart satırı: (1) başka bir satırın üstüne bırakılınca sıra değişir ve
+  // "Özel sıra"ya geçilir, sıra kaydedilir; (2) liste sekmesinin üstüne
+  // bırakılınca o listeye taşınır (kullanıcı isteği, 2026-10-26). Dokunmatik
+  // ekranda HTML sürükleme yok: orada kartın içindeki liste düğmeleri kalır.
+  const surukleVar = canWrite;
+  const [suruklenen, setSuruklenen] = useState<string | null>(null);
+  const [birakmaYeri, setBirakmaYeri] = useState<{ id: string; once: boolean } | null>(null);
+
+  const siraTasi = (id: string, hedefId: string, once: boolean) => {
+    if (id === hedefId) return;
+    // Taban, ekrandaki sıranın SÜZGEÇSİZ hâli: arama açıkken sürüklemek
+    // görünmeyen kartları sıradan düşürmesin.
+    const taban = sirala(sekmeKartlari, siralama, ozelSiralar[ozelAnahtar]).map((p) => p.id);
+    const kalan = taban.filter((x) => x !== id);
+    let i = kalan.indexOf(hedefId);
+    if (i < 0) return;
+    if (!once) i++;
+    kalan.splice(i, 0, id);
+    setOzelSiralar((o) => ({ ...o, [ozelAnahtar]: kalan }));
+    siralamaSec("ozel");
+    partyApi
+      .siraKaydet(kapsamYolu, listeModulu, ozelAnahtar, kalan)
+      .catch((err) => setBildirim(err instanceof Error ? err.message : t("Sıra kaydedilemedi")));
+  };
+
+  /** Liste sekmesine bırakılan kart: açık listeden çıkıp hedefe geçer ("" = Tümü: yalnızca çıkar). */
+  const listeyeBirak = async (hedef: string, partyId: string) => {
+    const kaynak = etkinListe;
+    if (hedef === kaynak) return;
+    const p = parties.find((x) => x.id === partyId);
+    const ad = (id: string) => listeler.find((l) => l.id === id)?.ad ?? "";
+    // Önce ekranda: sunucu yanıtını beklemeden kart yerini değiştirsin.
+    setParties((liste) =>
+      liste.map((x) =>
+        x.id !== partyId
+          ? x
+          : { ...x, listeIdleri: [...new Set([...(x.listeIdleri ?? []).filter((l) => l !== kaynak), ...(hedef ? [hedef] : [])])] }
+      )
+    );
+    try {
+      if (hedef) await partyApi.listeyeEkle(hedef, [partyId]);
+      if (kaynak) await partyApi.listedenCikar(kaynak, [partyId]);
+      const kart = p?.displayName ?? t("Kart");
+      setBildirim(
+        hedef
+          ? t("{ad}, \"{liste}\" listesine taşındı.", { ad: kart, liste: ad(hedef) })
+          : t("{ad}, \"{liste}\" listesinden çıkarıldı.", { ad: kart, liste: ad(kaynak) })
+      );
+    } catch (err) {
+      setBildirim(err instanceof Error ? err.message : t("Kaydedilemedi"));
+    }
+    load();
+  };
 
   const hasActiveFilter =
     search.trim() !== "" || roleFilter !== varsayilanRol || sorumluFiltre !== "" || onemFiltre !== "";
@@ -1204,26 +1303,25 @@ export default function CustomersPanel({
             </div>
           )}
 
-          {baglantiModu && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <Field label={t("Kartvizit (fotoğraf ya da PDF)")} style={{ flex: "1 1 200px" }}>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => setKartvizit(e.target.files?.[0] ?? null)}
-                  style={{ fontSize: 12 }}
-                />
-              </Field>
-              <Field label={t("Ek dosyalar (teklif, katalog…)")} style={{ flex: "1 1 200px" }}>
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setEkDosyalar(Array.from(e.target.files ?? []))}
-                  style={{ fontSize: 12 }}
-                />
-              </Field>
-            </div>
-          )}
+          {/* Dosyalar müşteri ve potansiyel kartında da (kullanıcı isteği, 2026-10-26). */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Field label={t("Kartvizit (fotoğraf ya da PDF)")} style={{ flex: "1 1 200px" }}>
+              <input
+                type="file"
+                accept="image/*,application/pdf"
+                onChange={(e) => setKartvizit(e.target.files?.[0] ?? null)}
+                style={{ fontSize: 12 }}
+              />
+            </Field>
+            <Field label={t("Ek dosyalar (teklif, katalog…)")} style={{ flex: "1 1 200px" }}>
+              <input
+                type="file"
+                multiple
+                onChange={(e) => setEkDosyalar(Array.from(e.target.files ?? []))}
+                style={{ fontSize: 12 }}
+              />
+            </Field>
+          </div>
 
           {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
           {/* Vazgeçme yolu formun İÇİNDE: eskiden başlıktaki ekleme düğmesi
@@ -1325,19 +1423,6 @@ export default function CustomersPanel({
       {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
       {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
 
-      {baglantiModu && (
-        <BaglantiListeSekmeleri
-          listeler={listeler}
-          secili={etkinListe}
-          onSec={setSeciliListe}
-          toplam={parties.length}
-          gorunenIdler={visible.map((p) => p.id)}
-          kapsamYolu={kapsamYolu}
-          canWrite={canWrite}
-          onDegisti={() => load()}
-        />
-      )}
-
       {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
           Bağlantılar'da sipariş yok; sekme de yok. */}
       {!baglantiModu && (
@@ -1379,29 +1464,54 @@ export default function CustomersPanel({
       </div>
       )}
 
-      {!acilisHazir ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
-      ) : gorunum === "tahsilat" && !baglantiModu ? (
-        <TahsilatTakibi
+      {/* Listeler (gruplar): Bağlantılar'da ve Müşteriler'in üç sekmesinde
+          ortak. Haritada göster sekmelerin sağında, her sekmede (kullanıcı
+          isteği, 2026-10-26 — araç çubuğunun içindeydi; 8'den az kartta araç
+          çubuğu çıkmadığı için bazı hesaplarda hiç görünmüyordu). */}
+      {(baglantiModu || acilisHazir) && (
+        <BaglantiListeSekmeleri
+          listeler={listeler}
+          secili={etkinListe}
+          onSec={setSeciliListe}
+          toplam={sekmeTabani.length}
+          sayilar={listeSayilari}
+          gorunenIdler={gorunum === "tahsilat" && !baglantiModu ? sekmeKartlari.map((p) => p.id) : visible.map((p) => p.id)}
           kapsamYolu={kapsamYolu}
-          departmentId={jobId ? undefined : departmentId}
-          sorumluSecenekleri={sorumluSecenekleri}
-          musteriSecenekleri={parties
-            .filter((p) => !p.archivedAt)
-            .map((p) => ({ id: p.id, ad: p.displayName }))
-            .sort((a, b) => a.ad.localeCompare(b.ad, "tr"))}
-          yeniSiparisIstegi={yeniSiparisIstegi}
-          fabVar={fabAvailable}
+          canWrite={canWrite}
+          onDegisti={() => load()}
+          modul={listeModulu}
+          onBirak={surukleVar ? listeyeBirak : undefined}
+          sag={
+            haritaKartlari.length > 0 && (
+              <button
+                onClick={() => setHaritaAcik(true)}
+                title={t("Listedekileri il il haritada göster")}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 7,
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: c.primary,
+                  color: c.onPrimary,
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <IconMap size={17} color={c.onPrimary} />
+                {t("Haritada göster")}
+              </button>
+            )
+          }
         />
-      ) : (
-      <>
-      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
       )}
 
       {haritaAcik && (
         <Suspense fallback={null}>
-          <MusteriHaritasi musteriler={visible} onKapat={() => setHaritaAcik(false)} onMusteriAc={(p) => setHaritaKartiId(p.id)} />
+          <MusteriHaritasi musteriler={haritaKartlari} onKapat={() => setHaritaAcik(false)} onMusteriAc={(p) => setHaritaKartiId(p.id)} />
         </Suspense>
       )}
       {(() => {
@@ -1421,11 +1531,33 @@ export default function CustomersPanel({
               profile={profile.primaryActionLabel}
               organizationId={baglantiModu ? undefined : organizationId}
               sirketId={jobId ? undefined : organizationId}
-              listeler={baglantiModu ? listeler : undefined}
+              listeler={listeler}
             />
           </Modal>
         );
       })()}
+
+      {!acilisHazir ? (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+      ) : gorunum === "tahsilat" && !baglantiModu ? (
+        <TahsilatTakibi
+          kapsamYolu={kapsamYolu}
+          departmentId={jobId ? undefined : departmentId}
+          sorumluSecenekleri={sorumluSecenekleri}
+          musteriSecenekleri={parties
+            .filter((p) => !p.archivedAt)
+            .map((p) => ({ id: p.id, ad: p.displayName }))
+            .sort((a, b) => a.ad.localeCompare(b.ad, "tr"))}
+          yeniSiparisIstegi={yeniSiparisIstegi}
+          fabVar={fabAvailable}
+          partySuzgeci={tahsilatSuzgeci}
+          surukle={surukleVar && listeler.length > 0}
+        />
+      ) : (
+      <>
+      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
+      )}
 
       {excelAcik && (
         <MusteriExcelModal
@@ -1520,12 +1652,6 @@ export default function CustomersPanel({
           )}
           {/* Sıralama filtrelerin yanında; filtre satırı yoksa listenin üstünde. */}
           {visible.length > 1 && siralamaSecici(false)}
-          {/* Harita listedekileri gösterir (süzgeçler uygulanmış hâliyle). */}
-          {!baglantiModu && visible.length > 0 && (
-            <button onClick={() => setHaritaAcik(true)} style={sekmeStili(c, false)}>
-              {t("Haritada göster")}
-            </button>
-          )}
         </div>
       )}
 
@@ -1556,6 +1682,10 @@ export default function CustomersPanel({
             ? t("Henüz bağlantı yok. Fuarda, toplantıda tanıştığın kişileri buraya ekle; müşteri listesine karışmazlar.")
             : t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
           {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
+        </p>
+      ) : sekmeKartlari.length === 0 && etkinListe ? (
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+          {t("Bu listede bu sekmeye ait kart yok. Kartı tutup liste sekmesinin üstüne bırakabilir ya da kartın içinden listeye ekleyebilirsin.")}
         </p>
       ) : sekmeKartlari.length === 0 ? (
         <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
@@ -1591,15 +1721,61 @@ export default function CustomersPanel({
               karışıyordu, göz satırı takip edemiyordu. Renkler paletten. */}
           <div style={listeCercevesi(c)}>
           {visible.map((p, i) => (
-            <div key={p.id} style={{ display: "flex", flexDirection: "column", ...listeSatiri(c, i) }}>
+            <div
+              key={p.id}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                ...listeSatiri(c, i),
+                opacity: suruklenen === p.id ? 0.45 : 1,
+                // Bırakılacak yer: satırın üst ya da alt kenarında vurgu çizgisi.
+                boxShadow:
+                  birakmaYeri?.id === p.id && suruklenen && suruklenen !== p.id
+                    ? `inset 0 ${birakmaYeri.once ? 3 : -3}px 0 ${c.primary}`
+                    : undefined,
+              }}
+            >
+              {/* Yalnızca başlık satırı sürüklenir: açık kartın içindeki alanlarda
+                  metin seçmek sürüklemeye dönüşmesin. */}
               <div
+                draggable={surukleVar}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(PARTY_SURUKLE, p.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setSuruklenen(p.id);
+                }}
+                onDragEnd={() => {
+                  setSuruklenen(null);
+                  setBirakmaYeri(null);
+                }}
+                onDragOver={(e) => {
+                  if (!suruklenen || !e.dataTransfer.types.includes(PARTY_SURUKLE)) return;
+                  e.preventDefault();
+                  const kutu = e.currentTarget.getBoundingClientRect();
+                  const once = e.clientY < kutu.top + kutu.height / 2;
+                  if (birakmaYeri?.id !== p.id || birakmaYeri.once !== once) setBirakmaYeri({ id: p.id, once });
+                }}
+                onDrop={(e) => {
+                  const id = e.dataTransfer.getData(PARTY_SURUKLE);
+                  if (!id) return;
+                  e.preventDefault();
+                  siraTasi(id, p.id, birakmaYeri?.id === p.id ? birakmaYeri.once : true);
+                  setSuruklenen(null);
+                  setBirakmaYeri(null);
+                }}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 8,
                   padding: "8px 10px",
+                  cursor: surukleVar ? "grab" : undefined,
                 }}
               >
+                {surukleVar && (
+                  <span aria-hidden title={t("Tutup sürükle")} style={{ color: c.textSecondary, fontSize: 13, lineHeight: 1, marginRight: -2, userSelect: "none" }}>
+                    ⋮⋮
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -1722,7 +1898,7 @@ export default function CustomersPanel({
                   // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
                   organizationId={baglantiModu ? undefined : organizationId}
                   sirketId={jobId ? undefined : organizationId}
-                  listeler={baglantiModu ? listeler : undefined}
+                  listeler={listeler}
                 />}
             </div>
           ))}
@@ -1876,7 +2052,7 @@ function PartyDetail({
   listeler,
 }: {
   party: Party;
-  /** Yalnızca Bağlantılar: kapsamdaki bağlantı listeleri (kartın içinden ekle / çıkar). */
+  /** Kapsamdaki listeler (kartın içinden ekle / çıkar — dokunmatik ekranda sürüklemenin yerine). */
   listeler?: BaglantiListeKaydi[];
   /** Takip görevinin açılabileceği şirket (departman seçimi görev penceresinde). */
   sirketId?: string;
@@ -1894,7 +2070,7 @@ function PartyDetail({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "iliski" | "gorevler">(
+  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "iliski" | "gorevler" | "dosyalar">(
     ilkSekme ?? (baglantiModu ? "iliski" : "siparisler")
   );
   const [gorevler, setGorevler] = useState<PartyGorevi[]>([]);
@@ -2019,9 +2195,16 @@ function PartyDetail({
             </button>
           </>
         ) : (
-          <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
-            {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
-          </button>
+          <>
+            <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
+              {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
+            </button>
+            {/* Bağlantılar'da dosyalar İlişki sekmesinde; müşteride kendi sekmesi
+                (kullanıcı isteği, 2026-10-26 — müşteriye dosya eklenemiyordu). */}
+            <button onClick={() => setTab("dosyalar")} style={tabStyle(tab === "dosyalar")}>
+              {t("Dosyalar")} {(party.ekSayisi ?? 0) + (party.kartvizitSayisi ?? 0) > 0 && `(${(party.ekSayisi ?? 0) + (party.kartvizitSayisi ?? 0)})`}
+            </button>
+          </>
         )}
         <button onClick={() => setTab("activity")} style={tabStyle(tab === "activity")}>
           {t("Geçmiş")} {activities.length > 0 && `(${activities.length})`}
@@ -2082,7 +2265,7 @@ function PartyDetail({
         </div>
       )}
 
-      {baglantiModu && listeler && (
+      {listeler && (
         <KartListeleri
           partyId={party.id}
           listeler={listeler}
@@ -2136,6 +2319,8 @@ function PartyDetail({
           <IliskiOzeti baglanti={party.baglanti} />
           <KartDosyalari party={party} canWrite={canWrite} departmentId={departmentId} onDegisti={onDegisti} />
         </>
+      ) : tab === "dosyalar" ? (
+        <KartDosyalari party={party} canWrite={canWrite} departmentId={departmentId} onDegisti={onDegisti} />
       ) : tab === "gorevler" ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {canWrite && (departmentId || sirketId) && (
@@ -2416,6 +2601,7 @@ function DosyaBolumu({
   const t = useT();
   const [yukleniyor, setYukleniyor] = useState(false);
   const [hata, setHata] = useState("");
+  const [seciciAcik, setSeciciAcik] = useState(false);
   const girdi = useRef<HTMLInputElement>(null);
 
   const ekle = async (secilen: FileList | null) => {
@@ -2455,6 +2641,16 @@ function DosyaBolumu({
             {yukleniyor ? t("Yükleniyor…") : ekleMetni}
           </button>
         )}
+        {/* Ek dosya Projelio'da zaten duruyorsa yeniden yüklenmez, yerinden bağlanır. */}
+        {canWrite && rol === "ek" && (
+          <button
+            onClick={() => setSeciciAcik(true)}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {t("+ Projelio'dan seç")}
+          </button>
+        )}
+        {seciciAcik && <KartDosyaSecici partyId={party.id} onClose={() => setSeciciAcik(false)} onBaglandi={onDegisti} />}
         <input
           ref={girdi}
           type="file"

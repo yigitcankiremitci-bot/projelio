@@ -626,3 +626,13 @@ export function IconQr({ size = 18, color = "currentColor" }: IconProps) {
     </svg>
   );
 }
+
+// Müşteri haritası: Müşteriler / Potansiyel / Tahsilat / Bağlantılar'daki "Haritada göster".
+export function IconMap({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z" />
+      <path d="M9 4v13.5M15 6.5V20" />
+    </svg>
+  );
+}

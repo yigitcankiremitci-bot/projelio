@@ -23,6 +23,7 @@ import SiparisFormu from "./SiparisFormu";
 import SiparisKarti from "./SiparisKarti";
 import SatisKanallari from "./SatisKanallari";
 import SiparisExcelModal from "./SiparisExcelModal";
+import { PARTY_SURUKLE } from "../BaglantiListeleri";
 import { ayEtiketi, bugunYerel } from "./siparisOrtak";
 
 type DurumSuzgeci = "acik" | "gecikti" | "tahsil_edildi" | "hepsi";
@@ -84,7 +85,17 @@ export default function TahsilatTakibi({
   musteriSecenekleri = [],
   yeniSiparisIstegi = 0,
   fabVar = false,
+  partySuzgeci,
+  surukle = false,
 }: {
+  /**
+   * Seçili müşteri listesinin (migration 170) kartları: verilirse yalnızca
+   * onların siparişleri — rapor ve özet de o listeye göre. Müşterisiz
+   * (kanal alıcısı) siparişler bir listeye ait olmadığı için düşer.
+   */
+  partySuzgeci?: Set<string>;
+  /** Satır liste sekmesine sürüklenebilir (siparişin müşterisi taşınır). */
+  surukle?: boolean;
   kapsamYolu: string;
   departmentId?: string;
   /** Yeni siparişin müşteri seçicisi (müşteri defteri; çalışana kendi müşterileri). */
@@ -165,25 +176,28 @@ export default function TahsilatTakibi({
     };
   }, [kapsamYolu, departmentId, yenile]);
 
-  const tumu = siparisler ?? [];
+  const tumu = useMemo(
+    () => (partySuzgeci ? (siparisler ?? []).filter((s) => !!s.partyId && partySuzgeci.has(s.partyId)) : siparisler ?? []),
+    [siparisler, partySuzgeci]
+  );
 
   const aylar = useMemo(() => {
     const set = new Set<string>([buAy]);
     for (const s of tumu) set.add(siparisAyi(s, "siparis"));
     return Array.from(set).sort().reverse();
-  }, [siparisler]);
+  }, [tumu]);
 
   const kanalAdlari = useMemo(() => {
     const set = new Set<string>();
     for (const s of tumu) set.add(s.kanalAdi ?? KANALSIZ);
     return Array.from(set).sort((a, b) => a.localeCompare(b, "tr"));
-  }, [siparisler]);
+  }, [tumu]);
 
   const sorumlular = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of tumu) m.set(s.sorumluId ?? "", s.sorumluAdi ?? t("Sorumlu yok"));
     return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1], "tr"));
-  }, [siparisler]);
+  }, [tumu]);
 
   // Ay + sorumlu süzgeci: rapor ve özet bunun üzerinden, durum süzgecinden
   // BAĞIMSIZ — "yalnızca açıkları göster" demek raporun tahsil edilen
@@ -196,7 +210,7 @@ export default function TahsilatTakibi({
           (!sorumlu || (s.sorumluId ?? "") === sorumlu) &&
           (!kanal || (s.kanalAdi ?? KANALSIZ) === kanal)
       ),
-    [siparisler, ay, sorumlu, kanal]
+    [tumu, ay, sorumlu, kanal]
   );
 
   // Arama: alıcı / müşteri, kanal, sipariş no, ürün. Özeti ve raporu
@@ -283,7 +297,7 @@ export default function TahsilatTakibi({
               siparisDurumu(s, bugun) === "gecikti"
           ).length
         : 0,
-    [siparisler, ay, sorumlu]
+    [tumu, ay, sorumlu]
   );
 
   const degisti = (s: MusteriSiparisi) => setSiparisler((l) => (l ?? []).map((x) => (x.id === s.id ? s : x)));
@@ -293,7 +307,7 @@ export default function TahsilatTakibi({
     const m = new Map<string, number>();
     for (const s of tumu) if (secili.has(s.id)) m.set(s.paraBirimi, (m.get(s.paraBirimi) ?? 0) + kalanTutar(s));
     return Array.from(m.entries());
-  }, [secili, siparisler]);
+  }, [secili, tumu]);
 
   const topluTahsilEt = async () => {
     if (!toplu || secili.size === 0) return;
@@ -591,7 +605,17 @@ export default function TahsilatTakibi({
               müşteri ve bağlantı listesiyle aynı çizgi. */}
           <div style={listeCercevesi(c)}>
             {liste.slice(0, gosterilen).map((s, i) => (
-              <div key={s.id} style={listeSatiri(c, i)}>
+              <div
+                key={s.id}
+                style={listeSatiri(c, i)}
+                // Siparişin müşterisi liste sekmesine taşınır (bkz. CustomersPanel listeyeBirak).
+                draggable={surukle && !!s.partyId}
+                onDragStart={(e) => {
+                  if (!s.partyId) return;
+                  e.dataTransfer.setData(PARTY_SURUKLE, s.partyId);
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+              >
                 <SiparisKarti
                   siparis={s}
                   // Liste zaten sunucunun izin verdiği siparişler: yönetici hepsine,

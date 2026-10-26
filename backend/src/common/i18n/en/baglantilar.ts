@@ -59,4 +59,12 @@ export const baglantilar: TranslationDict = {
   "Bu adla bir liste zaten var": "A list with this name already exists",
   "Liste adı gerekli": "List name is required",
   "Liste bulunamadı": "List not found",
+
+  // Müşteri listeleri ve özel sıra (migration 170)
+  "Müşteri listelerini değiştirme yetkin yok": "You don't have permission to change customer lists",
+  "Müşterileri görme yetkin yok": "You don't have permission to view customers",
+  "Bir seferde çok fazla kart gönderildi": "Too many cards were sent at once",
+  "Geçersiz sıra anahtarı": "Invalid order key",
+  "Bu kaynak kartın şirketine ait değil": "This source doesn't belong to the card's company",
+  "Dosya seçilmedi": "No file selected",
 };

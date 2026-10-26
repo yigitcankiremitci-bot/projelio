@@ -375,7 +375,8 @@ export class PartyService {
     const hepsi = await this.findAll(scope);
     const yonetici = a.canManageTeam;
     const musteriler = yonetici ? hepsi : hepsi.filter((p) => musteriYetkisi(a, p.ownerUserId, userId).okur);
-    await Promise.all([this.kisiSayilariniEkle(musteriler), this.temasOzetleriniEkle(musteriler)]);
+    // Dosya simgeleri (kartvizit, ek) Bağlantılar'daki gibi müşteri satırında da.
+    await Promise.all([this.kisiSayilariniEkle(musteriler), this.temasOzetleriniEkle(musteriler), this.dosyaOzetleriniEkle(musteriler)]);
     return { yonetici, kartYazar: a.canWrite, musteriler };
   }
 
@@ -1414,6 +1415,94 @@ export class PartyService {
       .from("file_links")
       .insert({ file_id: fileId, target_kind: "party", target_id: partyId, created_by: userId, party_rol: rol });
     if (error && (error as any).code !== "23505") throw error;
+  }
+
+  /**
+   * "Projelio'dan seç": karta bağlanacak dosyayı Projelio'daki klasörlerde
+   * gezmek (kullanıcı isteği, 2026-10-26). Şirket kartında kök, şirketin
+   * dosyaları + kişinin görebildiği departmanlar; iş kartında işin ağacı.
+   *
+   * Gezilecek kaynak istemciden gelir ama KARTIN şirketine ait olmak zorunda:
+   * başka şirketin departman kimliği verilirse reddedilir. Klasörlerin ve
+   * dosyaların görünürlüğü FilesService'in kendi kapısından geçer.
+   */
+  async dosyaGez(
+    partyId: string,
+    userId: string,
+    kaynak?: string,
+    folderId?: string
+  ): Promise<{
+    kaynaklar: { anahtar: string; ad: string }[];
+    folders: { id: string; name: string }[];
+    files: ProjectFile[];
+    breadcrumb: { id: string; name: string }[];
+  }> {
+    const party = await this.findOne(partyId);
+    await this.assertKayitYazilir(party, userId);
+    const bos = { kaynaklar: [], folders: [], files: [], breadcrumb: [] };
+
+    let owner: { kind: "job" | "department" | "organization"; id: string } | undefined;
+    if (party.jobId) owner = { kind: "job", id: party.jobId };
+    else if (kaynak) {
+      const [tur, id] = kaynak.split(":");
+      if (tur === "organization" && id === party.organizationId) owner = { kind: "organization", id };
+      else if (tur === "department" && id) {
+        const { data: dept } = await this.supabase.client.from("departments").select("organization_id").eq("id", id).maybeSingle();
+        if (dept?.organization_id !== party.organizationId) throw new ForbiddenException("Bu kaynak kartın şirketine ait değil");
+        owner = { kind: "department", id };
+      } else throw new ForbiddenException("Bu kaynak kartın şirketine ait değil");
+    }
+
+    if (!owner) {
+      // Kök: şirket + departmanlar. Görülemeyen kaynak listelenmez (her biri
+      // dosya ekranının erişim kuralından geçer).
+      const orgId = party.organizationId!;
+      const [{ data: org }, { data: depts }] = await Promise.all([
+        this.supabase.client.from("organizations").select("name").eq("id", orgId).maybeSingle(),
+        this.supabase.client.from("departments").select("id, name").eq("organization_id", orgId).order("name").limit(LISTE_TAVANI),
+      ]);
+      const adaylar = [
+        { anahtar: `organization:${orgId}`, ad: org?.name ?? "Şirket", scope: { kind: "organization" as const, id: orgId } },
+        ...((depts ?? []) as any[]).map((d) => ({ anahtar: `department:${d.id}`, ad: d.name, scope: { kind: "department" as const, id: d.id } })),
+      ];
+      const gorulen = await Promise.all(
+        adaylar.map((a) =>
+          this.files
+            .assertFlatAccess(a.scope, userId)
+            .then(() => ({ anahtar: a.anahtar, ad: a.ad }))
+            .catch(() => null)
+        )
+      );
+      return { ...bos, kaynaklar: gorulen.filter((k): k is { anahtar: string; ad: string } => k !== null) };
+    }
+
+    const [folders, files, breadcrumb] = await Promise.all([
+      this.files.listFolders(owner, userId, folderId).catch(() => []),
+      owner.kind === "job"
+        ? this.files.listByJob(owner.id, userId, { scope: "all", folderId, atRoot: !folderId })
+        : this.files.listByFlat({ kind: owner.kind, id: owner.id }, userId, folderId),
+      folderId ? this.files.folderPath(folderId, userId).catch(() => []) : Promise.resolve([]),
+    ]);
+    return {
+      kaynaklar: [],
+      folders: folders.map((f) => ({ id: f.id, name: f.name })),
+      files,
+      breadcrumb: breadcrumb.map((f) => ({ id: f.id, name: f.name })),
+    };
+  }
+
+  /** Projelio'dan seçilen dosyaları karta ek dosya olarak bağlar; dosya yerinde kalır. */
+  async dosyalariBagla(partyId: string, fileIds: unknown, userId: string): Promise<{ baglanan: number }> {
+    const idler = Array.isArray(fileIds) ? [...new Set(fileIds.filter((x): x is string => typeof x === "string"))].slice(0, 50) : [];
+    if (!idler.length) throw new BadRequestException("Dosya seçilmedi");
+    const adlar: string[] = [];
+    for (const id of idler) {
+      await this.dosyaBagla(partyId, id, userId, "ek");
+      const { file } = await this.files.findById(id, userId);
+      adlar.push(file.name);
+    }
+    await this.logActivity(partyId, "sistem", `Dosya bağlandı: ${adlar.join(", ")}`, userId);
+    return { baglanan: idler.length };
   }
 
   /** Bağı koparır; dosya klasörde kalır (silmek Dosyalar ekranının işi). */

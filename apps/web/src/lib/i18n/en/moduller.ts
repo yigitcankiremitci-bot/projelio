@@ -1351,6 +1351,13 @@ export const moduller: TranslationDict = {
   "{ad}, \"{liste}\" listesine taşındı.": "{ad} moved to \"{liste}\".",
   "{ad}, \"{liste}\" listesinden çıkarıldı.": "{ad} removed from \"{liste}\".",
   "Kart": "Card",
+  "+ Yeni liste…": "+ New list…",
+  "Başka listeye taşı…": "Move to another list…",
+  "Bir listeye daha ekle…": "Also add to a list…",
+  "Liste:": "List:",
+  "Listede değil": "Not in a list",
+  "Listeler": "Lists",
+  "Listeye koy…": "Put in a list…",
   "Bu listede bu sekmeye ait kart yok. Kartı tutup liste sekmesinin üstüne bırakabilir ya da kartın içinden listeye ekleyebilirsin.":
     "This list has no cards for this tab. Drag a card onto the list tab, or add it to the list from inside the card.",
   "Özel sıra": "Custom order",

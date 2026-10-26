@@ -304,12 +304,12 @@ export default function GorusmeNotlari({
             return (
               <div
                 key={a.id}
+                // Not kutusuz: yalnızca türün renginde sol çizgi. Her not ayrı
+                // beyaz kutudayken açılan kart üst üste aynı renkli şeritlere
+                // dönüyordu (kullanıcı şikâyeti, 2026-10-27).
                 style={{
-                  background: c.surface,
-                  border: `1px solid ${c.border}`,
                   borderLeft: `3px solid ${renk}`,
-                  borderRadius: 8,
-                  padding: "8px 10px",
+                  padding: "4px 10px",
                   display: "flex",
                   flexDirection: "column",
                   gap: 4,

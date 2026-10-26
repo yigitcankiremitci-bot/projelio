@@ -69,6 +69,7 @@ import MusteriKunyesi from "./musteri/MusteriKunyesi";
 const MusteriHaritasi = lazy(() => import("./musteri/MusteriHaritasi"));
 import GorusmeNotlari from "./musteri/GorusmeNotlari";
 import KartDosyaSecici from "./musteri/KartDosyaSecici";
+import KartDosyaOnizleme from "./musteri/KartDosyaOnizleme";
 import { BaglantiListeSekmeleri, KartListeleri, PARTY_SURUKLE } from "./BaglantiListeleri";
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
@@ -115,6 +116,8 @@ function emptyForm() {
     tanismaTarihi: "",
     sonrakiTemas: "",
     iliskiNotu: "",
+    // Kartın girdiği listeler (migration 163/170); kaydedince fark uygulanır.
+    listeIdleri: [] as string[],
   };
 }
 
@@ -648,6 +651,8 @@ export default function CustomersPanel({
       // En son girilen yer ve tarih hazır gelir; değiştirmek tek tık.
       tanismaYeri: oneriler[0]?.yer ?? "",
       tanismaTarihi: oneriler[0]?.tarih ?? "",
+      // Bir liste açıkken eklenen kart o listeye girer (formda değiştirilebilir).
+      listeIdleri: etkinListe ? [etkinListe] : [],
     });
     setEkSosyal([]);
     setKartvizit(null);
@@ -679,6 +684,7 @@ export default function CustomersPanel({
       sonrakiTemas: p.baglanti?.sonrakiTemas ?? "",
       iliskiNotu: p.baglanti?.iliskiNotu ?? "",
       yetkililer: [],
+      listeIdleri: p.listeIdleri ?? [],
     });
     setDuplicates([]);
     setError("");
@@ -821,9 +827,15 @@ export default function CustomersPanel({
       } else {
         const yeni = await api.post<Party>(scopePath, payload);
         partyId = yeni.id;
-        // Bir liste açıkken eklenen kart o listeye de girer; yoksa eklendiği
-        // anda açık sekmeden kaybolurdu.
-        if (baglantiModu && etkinListe) await partyApi.listeyeEkle(etkinListe, [yeni.id]).catch(() => {});
+      }
+      // Listeler: formdaki seçimle kartın mevcut üyelikleri arasındaki fark.
+      // Yeni kartta varsayılan açık liste — yoksa eklendiği anda açık
+      // sekmeden kaybolurdu.
+      if (partyId) {
+        const onceki = formMode?.kind === "edit" ? formMode.party.listeIdleri ?? [] : [];
+        const id = partyId;
+        for (const l of form.listeIdleri.filter((x) => !onceki.includes(x))) await partyApi.listeyeEkle(l, [id]).catch(() => {});
+        for (const l of onceki.filter((x) => !form.listeIdleri.includes(x))) await partyApi.listedenCikar(l, [id]).catch(() => {});
       }
       // Şirket/kurum kişileri: yeniler eklenir, kayıtlılar güncellenir,
       // formdan çıkarılanlar arşivlenir. İlk kişi yeni kartta birincil olur.
@@ -1303,6 +1315,41 @@ export default function CustomersPanel({
             </div>
           )}
 
+          {/* Liste seçimi düzenleme penceresinde de (kullanıcı isteği, 2026-10-27). */}
+          {listeler.length > 0 && (
+            <Field label={t("Listeler")}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {listeler.map((l) => {
+                  const secili = form.listeIdleri.includes(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          listeIdleri: secili ? f.listeIdleri.filter((x) => x !== l.id) : [...f.listeIdleri, l.id],
+                        }))
+                      }
+                      style={{
+                        fontSize: 12,
+                        padding: "3px 10px",
+                        borderRadius: 999,
+                        border: `1px ${secili ? "solid" : "dashed"} ${secili ? c.primary : c.border}`,
+                        background: secili ? `${c.primary}1A` : "transparent",
+                        color: secili ? c.primary : c.textSecondary,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {secili ? "✓ " : "+ "}
+                      {l.ad}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+
           {/* Dosyalar müşteri ve potansiyel kartında da (kullanıcı isteği, 2026-10-26). */}
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Field label={t("Kartvizit (fotoğraf ya da PDF)")} style={{ flex: "1 1 200px" }}>
@@ -1532,6 +1579,7 @@ export default function CustomersPanel({
               organizationId={baglantiModu ? undefined : organizationId}
               sirketId={jobId ? undefined : organizationId}
               listeler={listeler}
+              kapsamYolu={kapsamYolu}
             />
           </Modal>
         );
@@ -1899,6 +1947,7 @@ export default function CustomersPanel({
                   organizationId={baglantiModu ? undefined : organizationId}
                   sirketId={jobId ? undefined : organizationId}
                   listeler={listeler}
+                  kapsamYolu={kapsamYolu}
                 />}
             </div>
           ))}
@@ -2050,8 +2099,11 @@ function PartyDetail({
   organizationId,
   sirketId,
   listeler,
+  kapsamYolu,
 }: {
   party: Party;
+  /** Listeden yeni liste açmak için (`/organizations/:id` ya da `/jobs/:id`). */
+  kapsamYolu?: string;
   /** Kapsamdaki listeler (kartın içinden ekle / çıkar — dokunmatik ekranda sürüklemenin yerine). */
   listeler?: BaglantiListeKaydi[];
   /** Takip görevinin açılabileceği şirket (departman seçimi görev penceresinde). */
@@ -2142,15 +2194,22 @@ function PartyDetail({
     }
   };
 
+  // Sekmeler alt çizgili bir çubuk: önceden dolu renkli haplardı ve üstteki
+  // kutularla aynı görünüyordu; açılan alan üst üste binmiş aynı renkli
+  // şeritlere dönüyordu (kullanıcı şikâyeti, 2026-10-27).
   const tabStyle = (active: boolean) => ({
-    fontSize: 12,
-    padding: "3px 8px",
-    borderRadius: 6,
+    fontSize: 13,
+    padding: "6px 2px",
+    marginBottom: -1,
     border: "none",
+    borderBottom: `2px solid ${active ? c.primary : "transparent"}`,
     cursor: "pointer",
-    background: active ? c.primary : "transparent",
-    color: active ? "#fff" : c.textSecondary,
+    background: "transparent",
+    color: active ? c.primary : c.textSecondary,
+    fontWeight: active ? 600 : 400,
   });
+  // Künyenin altındaki bölümler kutu değil, ince bir çizgiyle ayrılır.
+  const bolum = { borderTop: `1px solid ${c.border}`, paddingTop: 10 } as const;
 
   return (
     <div
@@ -2167,24 +2226,42 @@ function PartyDetail({
         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
         display: "flex",
         flexDirection: "column",
-        gap: 10,
+        gap: 12,
       }}
     >
       {/* Künye: iletişim, adres, vergi ve sipariş özeti — önceden yalnızca
           düzenleme formunda görünüyordu (bkz. MusteriKunyesi). */}
       <MusteriKunyesi party={party} siparisOzetiGoster={!baglantiModu} />
+      {/* Dosyalar özette küçük resimleriyle; tıklayınca önizleme. */}
+      <KartDosyaOnizleme party={party} onTumu={() => setTab(baglantiModu ? "iliski" : "dosyalar")} />
+      {/* Liste kartın tepesinde: hangi gruptaysa görünsün, buradan taşınsın. */}
+      {listeler && (
+        <KartListeleri
+          partyId={party.id}
+          listeler={listeler}
+          uyeOlduklari={party.listeIdleri ?? []}
+          canWrite={canWrite}
+          onDegisti={onDegisti}
+          kapsamYolu={kapsamYolu}
+          modul={baglantiModu ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY}
+        />
+      )}
       {/* Kartın genel notu Müşteriler'de yalnızca düzenleme formunda duruyordu;
           Bağlantılar'dan aktarılan ilişki notu da buraya yazıldığı için açık
           kartta görünmesi şart (kullanıcı şikâyeti, 2026-10-11). */}
       {!baglantiModu && party.notes?.trim() && (
-        <div style={{ fontSize: 13, padding: "8px 10px", borderRadius: 8, background: c.surface, border: `1px solid ${c.border}` }}>
+        <div style={{ fontSize: 13, ...bolum }}>
           <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Not")}</span>
           <p style={{ margin: "2px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap" }}>{party.notes}</p>
         </div>
       )}
       {/* Aramalar ve görüşmeler notun altına, yazanı ve tarihiyle (bkz. GorusmeNotlari). */}
-      {!baglantiModu && <GorusmeNotlari party={party} canWrite={canWrite} onDegisti={() => { onDegisti(); load(); }} />}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+      {!baglantiModu && (
+        <div style={bolum}>
+          <GorusmeNotlari party={party} canWrite={canWrite} onDegisti={() => { onDegisti(); load(); }} />
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", borderBottom: `1px solid ${c.border}`, marginTop: 4 }}>
         {baglantiModu ? (
           <>
             <button onClick={() => setTab("iliski")} style={tabStyle(tab === "iliski")}>
@@ -2263,16 +2340,6 @@ function PartyDetail({
             {t("Ekle")}
           </button>
         </div>
-      )}
-
-      {listeler && (
-        <KartListeleri
-          partyId={party.id}
-          listeler={listeler}
-          uyeOlduklari={party.listeIdleri ?? []}
-          canWrite={canWrite}
-          onDegisti={onDegisti}
-        />
       )}
 
       <KartBaglantilari party={party} />

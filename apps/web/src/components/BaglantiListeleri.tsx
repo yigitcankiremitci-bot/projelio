@@ -233,66 +233,168 @@ export function BaglantiListeSekmeleri({
   );
 }
 
-/** Kartın içinde: hangi listelerde olduğu; tıklayınca ekler / çıkarır. */
+/**
+ * Kartın içinde: hangi listelerde olduğu + listeyi değiştirme. "Taşı" kartı
+ * bulunduğu listelerden çıkarıp seçilene koyar; "Ekle" ikinci bir listeye de
+ * koyar; çipteki × listeden çıkarır (kullanıcı isteği, 2026-10-27 — kart
+ * açılınca listesi görünmüyor, değiştirilemiyordu). Dokunmatik ekranda
+ * sürüklemenin yerine de bu.
+ */
 export function KartListeleri({
   partyId,
   listeler,
   uyeOlduklari,
   canWrite,
   onDegisti,
+  kapsamYolu,
+  modul = BAGLANTI_MODUL_KEY,
 }: {
   partyId: string;
   listeler: BaglantiListeKaydi[];
   uyeOlduklari: string[];
   canWrite: boolean;
   onDegisti: () => void;
+  /** Verilirse kartın içinden yeni liste de açılır. */
+  kapsamYolu?: string;
+  modul?: PartyListeModulu;
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [hata, setHata] = useState("");
-  if (!listeler.length) return null;
+  // Yeni liste adı yazılırken: kart hangi yolla girecek (taşı / ekle).
+  const [yeni, setYeni] = useState<null | { tasi: boolean; ad: string }>(null);
+  const uyeler = listeler.filter((l) => uyeOlduklari.includes(l.id));
+  const digerleri = listeler.filter((l) => !uyeOlduklari.includes(l.id));
+  if (!listeler.length && (!canWrite || !kapsamYolu)) return null;
 
-  const degistir = async (l: BaglantiListeKaydi) => {
-    setBusy(l.id);
+  const calistir = async (is: () => Promise<unknown>) => {
+    setBusy(true);
     setHata("");
     try {
-      if (uyeOlduklari.includes(l.id)) await partyApi.listedenCikar(l.id, [partyId]);
-      else await partyApi.listeyeEkle(l.id, [partyId]);
+      await is();
       onDegisti();
     } catch (err) {
       setHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
+  /** Kart yalnızca hedef listede kalır. */
+  const tasi = (hedef: string) =>
+    calistir(async () => {
+      if (!uyeOlduklari.includes(hedef)) await partyApi.listeyeEkle(hedef, [partyId]);
+      for (const l of uyeOlduklari) if (l !== hedef) await partyApi.listedenCikar(l, [partyId]);
+    });
+  const ekle = (hedef: string) => calistir(() => partyApi.listeyeEkle(hedef, [partyId]));
+  const cikar = (l: string) => calistir(() => partyApi.listedenCikar(l, [partyId]));
+  const yeniListe = () => {
+    if (!yeni?.ad.trim() || !kapsamYolu) return;
+    const { tasi: tasinsin, ad } = yeni;
+    return calistir(async () => {
+      await partyApi.listeAc(kapsamYolu, ad.trim(), [partyId], modul);
+      if (tasinsin) for (const l of uyeOlduklari) await partyApi.listedenCikar(l, [partyId]);
+      setYeni(null);
+    });
+  };
+  const YENI = "\u0000yeni";
+  const secim = (tasimaMi: boolean, secenekler: BaglantiListeKaydi[], etiket: string) => (
+    <select
+      value=""
+      disabled={busy}
+      aria-label={etiket}
+      onChange={(e) => {
+        const v = e.target.value;
+        if (!v) return;
+        if (v === YENI) setYeni({ tasi: tasimaMi, ad: "" });
+        else if (tasimaMi) void tasi(v);
+        else void ekle(v);
+      }}
+      style={{ fontSize: 12, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+    >
+      <option value="">{etiket}</option>
+      {secenekler.map((l) => (
+        <option key={l.id} value={l.id}>
+          {l.ad}
+        </option>
+      ))}
+      {kapsamYolu && <option value={YENI}>{t("+ Yeni liste…")}</option>}
+    </select>
+  );
 
   return (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", fontSize: 12 }}>
-      <span style={{ color: c.textSecondary }}>{t("Listeler:")}</span>
-      {listeler.map((l) => {
-        const uye = uyeOlduklari.includes(l.id);
-        return (
-          <button
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ color: c.textSecondary }}>{uyeler.length > 1 ? t("Listeler:") : t("Liste:")}</span>
+        {uyeler.length === 0 && <span style={{ color: c.textSecondary, fontStyle: "italic" }}>{t("Listede değil")}</span>}
+        {uyeler.map((l) => (
+          <span
             key={l.id}
-            disabled={!canWrite || busy === l.id}
-            onClick={() => degistir(l)}
-            title={canWrite ? (uye ? t("Listeden çıkar") : t("Listeye ekle")) : undefined}
             style={{
-              fontSize: 11,
-              padding: "2px 8px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 12,
+              padding: "2px 4px 2px 9px",
               borderRadius: 999,
-              border: `1px ${uye ? "solid" : "dashed"} ${uye ? c.primary : c.border}`,
-              background: uye ? `${c.primary}1A` : "transparent",
-              color: uye ? c.primary : c.textSecondary,
-              cursor: canWrite ? "pointer" : "default",
+              border: `1px solid ${c.primary}`,
+              background: `${c.primary}1A`,
+              color: c.primary,
             }}
           >
-            {uye ? "✓ " : "+ "}
-            {l.ad}
+            ☰ {l.ad}
+            {canWrite && (
+              <button
+                onClick={() => cikar(l.id)}
+                disabled={busy}
+                title={t("Listeden çıkar")}
+                aria-label={t("Listeden çıkar")}
+                style={{ border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: "0 3px", fontSize: 13, lineHeight: 1 }}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+        {canWrite && (
+          <span style={{ display: "inline-flex", gap: 6, marginLeft: "auto", flexWrap: "wrap" }}>
+            {/* Taşı: listedeyse başka listeye; değilse zaten "listeye koy" demek. */}
+            {uyeler.length > 0
+              ? secim(true, listeler.filter((l) => !(uyeler.length === 1 && l.id === uyeler[0].id)), t("Başka listeye taşı…"))
+              : secim(true, listeler, t("Listeye koy…"))}
+            {uyeler.length > 0 && (digerleri.length > 0 || kapsamYolu) && secim(false, digerleri, t("Bir listeye daha ekle…"))}
+          </span>
+        )}
+      </div>
+      {yeni && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <input
+            autoFocus
+            value={yeni.ad}
+            maxLength={80}
+            onChange={(e) => setYeni({ ...yeni, ad: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void yeniListe();
+              if (e.key === "Escape") setYeni(null);
+            }}
+            placeholder={t("Liste adı, ör. İTS 2026 Fuarı")}
+            style={{ flex: 1, fontSize: 12, padding: "4px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+          />
+          <button onClick={() => void yeniListe()} disabled={busy || !yeni.ad.trim()} style={{ ...sekmeStili(c, true), fontSize: 12, padding: "3px 10px" }}>
+            {t("Oluştur")}
           </button>
-        );
-      })}
+          <button onClick={() => setYeni(null)} style={{ ...sekmeStili(c, false), fontSize: 12, padding: "3px 10px" }}>
+            {t("Vazgeç")}
+          </button>
+        </div>
+      )}
       {hata && <span style={{ color: c.danger }}>{hata}</span>}
     </div>
   );

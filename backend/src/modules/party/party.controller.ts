@@ -508,6 +508,13 @@ export class PartyController {
     return this.partyService.aktar(id, hedef, req.user.userId);
   }
 
+  /** Defter aktarımını (müşteri, potansiyel, tedarikçi) geri alır; kart Bağlantılar'da kalır. */
+  @Post("party/:id/aktar/geri-al")
+  async aktarimiGeriAl(@Param("id") id: string, @Body("hedef") hedef: string, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.partyService.aktarimiGeriAl(id, hedef, req.user.userId);
+  }
+
   /** Karttan açılmış takip görevleri (kullanıcının görebildikleri). */
   @Get("party/:id/gorevler")
   async gorevler(@Param("id") id: string, @Req() req: any) {

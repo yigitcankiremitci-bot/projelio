@@ -40,7 +40,7 @@ import { ModuleRecordsService } from "../module-records/module-records.service";
 import { AKTARIM_TANIMLARI, aktarimKaydiVerisi, aktarimTanimi, defterAktarimiYapildi, notaEkle } from "./aktarim";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { musteriYetkisi } from "./siparis-erisim";
-import { addRole, findDuplicates } from "./party-dedup";
+import { addRole, findDuplicates, removeRole } from "./party-dedup";
 import type { MevcutKart } from "./kartvizit-plani";
 import {
   baglantiAlaniOkunur,
@@ -1251,6 +1251,64 @@ export class PartyService {
       { type: "module_record", id: kayit.id }
     );
     return { party: await this.findOne(partyId, { baglanti: true }), kayitId: kayit.id };
+  }
+
+  /**
+   * Defter aktarımını (müşteri, potansiyel, tedarikçi) geri alır: aktarımın
+   * eklediği rol çıkar; kartın o defterde kalması için başka bir rolü yoksa
+   * defterden de çıkar. Kart Bağlantılar'da kalır. Önceden geri alma yoktu:
+   * yanlışlıkla "Müşteri yap" denmiş kart sonradan "Potansiyel yap" deyince
+   * müşteri rolünü taşıdığı için Potansiyel'de değil Müşteriler'de duruyordu
+   * ve düzeltilemiyordu (kullanıcı şikâyeti, 2026-10-28).
+   *
+   * Siparişi olan kart Müşteriler'den çıkarılmaz: siparişler ve tahsilatlar
+   * kasaya yazılmış gerçek kayıtlar, sahipsiz kalmamalı. Modül kaydı
+   * aktarımları (rakip, ortaklık) burada geri alınmaz; kayıt kendi modülünden silinir.
+   */
+  async aktarimiGeriAl(partyId: string, hedef: string, userId: string): Promise<Party> {
+    const t = aktarimTanimi(hedef);
+    if (!t || t.tur !== "defter") throw new BadRequestException("Bu aktarım buradan geri alınamaz");
+    const party = await this.findOne(partyId, { baglanti: true });
+    if (party.archivedAt) throw new BadRequestException("Arşivdeki kart değiştirilemez");
+    await this.assertKayitYazilir(party, userId);
+    if (!defterAktarimiYapildi(party, t)) throw new BadRequestException("Bu aktarım yapılmamış");
+    // Kart Bağlantılar'dan gelmiş olmalı: yoksa geri alma onu hiçbir listede bırakmazdı.
+    if (!party.modules.includes(BAGLANTI_MODUL_KEY)) throw new BadRequestException("Kart Bağlantılar'da değil; aktarım geri alınamaz");
+    const scope = this.scopeOf(party);
+    const modul = t.modul as PartyModulKey;
+    if (!(await this.access(scope, userId, modul)).canWrite) throw new ForbiddenException("Bu kaydı değiştirme yetkin yok");
+
+    const roller = removeRole(party.roles, t.rol);
+    const defterRolleri: PartyRole[] = modul === MUSTERI_MODUL_KEY ? ["customer", "lead"] : ["supplier"];
+    const defterdeKalir = roller.some((r) => defterRolleri.includes(r));
+    if (!defterdeKalir && modul === MUSTERI_MODUL_KEY) {
+      const { count, error } = await this.supabase.client
+        .from("musteri_siparisleri")
+        .select("id", { count: "exact", head: true })
+        .eq("party_id", partyId);
+      if (error) throw error;
+      if (count) throw new BadRequestException("Bu kartın siparişleri var; Müşteriler'den çıkarılamaz");
+    }
+    const patch: Record<string, unknown> = { roles: roller, updated_at: new Date().toISOString() };
+    if (!defterdeKalir) patch.modules = party.modules.filter((m) => m !== modul);
+    const { error } = await this.supabase.client.from("party").update(patch).eq("id", partyId);
+    if (error) throw error;
+    // Defterden çıkan kart o defterin listelerinden de çıkar (migration 170).
+    if (!defterdeKalir) {
+      const [sutun, deger] = scope.jobId ? ["job_id", scope.jobId] : ["organization_id", scope.organizationId!];
+      const { data: listeler } = await this.supabase.client.from("baglanti_listeleri").select("*").eq(sutun, deger);
+      const idler = ((listeler ?? []) as any[]).filter((l) => l.modul === modul).map((l) => l.id as string);
+      if (idler.length) {
+        await this.supabase.client.from("baglanti_liste_uyeleri").delete().eq("party_id", partyId).in("liste_id", idler);
+      }
+    }
+    await this.logActivity(
+      partyId,
+      "sistem",
+      t.hedef === "musteri" ? "Müşteri aktarımı geri alındı" : t.hedef === "potansiyel" ? "Potansiyel müşteri aktarımı geri alındı" : "Tedarikçi aktarımı geri alındı",
+      userId
+    );
+    return this.gorunur(await this.findOne(partyId, { baglanti: true }), await this.erisimler(party, userId));
   }
 
   // ============================================================ Dosyalar (kartvizit)

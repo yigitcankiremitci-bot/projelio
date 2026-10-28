@@ -65,6 +65,11 @@ export const baglantilar: TranslationDict = {
   "Geçersiz sıra anahtarı": "Invalid order key",
   "Bu kaynak kartın şirketine ait değil": "This source doesn't belong to the card's company",
   "Dosya seçilmedi": "No file selected",
+  "Bu aktarım buradan geri alınamaz": "This transfer can't be undone here",
+  "Bu aktarım yapılmamış": "This transfer hasn't been made",
+  "Arşivdeki kart değiştirilemez": "An archived card can't be changed",
+  "Kart Bağlantılar'da değil; aktarım geri alınamaz": "The card isn't in Contacts; the transfer can't be undone",
+  "Bu kartın siparişleri var; Müşteriler'den çıkarılamaz": "This card has orders; it can't be removed from Customers",
   "Dosya eklemek için şirketin ya da modülün açık olduğu bir departmanın ekibinde olmalısın":
     "To add files you need to be on the company's team or on a team where this module is enabled",
 };

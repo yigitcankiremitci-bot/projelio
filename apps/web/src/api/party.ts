@@ -58,6 +58,8 @@ export const partyApi = {
   /** Bağlantı listeleri (migration 163): oynatma listesi gibi, kart birden çok listede olabilir. */
   listeAc: (kapsamYolu: string, ad: string, partyIdler: string[] = [], modul?: PartyListeModulu) =>
     api.post<BaglantiListeKaydi>(`${kapsamYolu}/baglanti-listeleri`, { ad, partyIdler, modul }),
+  listeler: (kapsamYolu: string, modul?: PartyListeModulu) =>
+    api.get<BaglantiListeKaydi[]>(`${kapsamYolu}/baglanti-listeleri${modul ? `?modul=${modul}` : ""}`),
   listeAdlandir: (listeId: string, ad: string) => api.patch(`/baglanti-listeleri/${listeId}`, { ad }),
   listeSil: (listeId: string) => api.delete(`/baglanti-listeleri/${listeId}`),
   listeyeEkle: (listeId: string, partyIdler: string[]) =>
@@ -100,6 +102,8 @@ export const partyApi = {
   aktarimSecenekleri: (partyId: string) => api.get<PartyAktarimSecenegi[]>(`/party/${partyId}/aktarim`),
   aktar: (partyId: string, hedef: PartyAktarimHedefi) =>
     api.post<{ party: Party; kayitId?: string }>(`/party/${partyId}/aktar`, { hedef }),
+  /** Defter aktarımını geri alır (müşteri, potansiyel, tedarikçi); kart Bağlantılar'da kalır. */
+  aktarimiGeriAl: (partyId: string, hedef: PartyAktarimHedefi) => api.post<Party>(`/party/${partyId}/aktar/geri-al`, { hedef }),
 
   /** Potansiyel müşteri → müşteri (anlaşma yapıldı). */
   musteriyeDonustur: (partyId: string) => api.post<Party>(`/party/${partyId}/musteriye-donustur`, {}),

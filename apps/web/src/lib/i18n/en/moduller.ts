@@ -1351,6 +1351,12 @@ export const moduller: TranslationDict = {
   "{ad}, \"{liste}\" listesine taşındı.": "{ad} moved to \"{liste}\".",
   "{ad}, \"{liste}\" listesinden çıkarıldı.": "{ad} removed from \"{liste}\".",
   "Kart": "Card",
+  "Aktarım geri alınır; kartın başka bir müşteri rolü yoksa Müşteriler'den çıkar. Kart Bağlantılar'da kalır.":
+    "The transfer is undone; if the card has no other customer role it leaves Customers. It stays in Contacts.",
+  "Kart Tedarik'ten çıkar; Bağlantılar'da kalır.": "The card leaves Procurement; it stays in Contacts.",
+  "Liste adı": "List name",
+  "Listesiz": "No list",
+  "Müşteriler'de listesi:": "List in Customers:",
   "Tümünü göster": "Show all",
   "Yalnızca \"{liste}\" listesindekiler gösteriliyor ({n} / {toplam}).": "Showing only the \"{liste}\" list ({n} / {toplam}).",
   "+ Yeni liste…": "+ New list…",

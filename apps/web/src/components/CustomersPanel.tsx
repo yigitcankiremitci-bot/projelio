@@ -2973,27 +2973,56 @@ const AKTARIM_ACIKLAMA: Record<PartyAktarimHedefi, string> = {
  * Bağlantı kartını rolüne göre diğer modüllere aktarma (bkz. backend
  * party/aktarim.ts). Hedef modül şirkette kapalıysa ya da kullanıcının orada
  * yazma yetkisi yoksa seçenek görünmez; yapılmış olanlar onay işaretiyle.
- * Aktarım geri alınamadığı için iki adımlı.
+ * Aktarım da geri alması da iki adımlı; defter aktarımları (müşteri,
+ * potansiyel, tedarikçi) geri alınabilir (2026-10-28).
  */
 function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () => void }) {
   const c = useThemeColors();
   const t = useT();
   const [secenekler, setSecenekler] = useState<PartyAktarimSecenegi[]>([]);
   const [soru, setSoru] = useState<PartyAktarimHedefi | null>(null);
+  // Geri alma da iki adımlı: tek tıkla kart Müşteriler'den çıkmasın.
+  const [geriSoru, setGeriSoru] = useState<PartyAktarimHedefi | null>(null);
   const [mesgul, setMesgul] = useState(false);
   const [hata, setHata] = useState("");
+  // Müşteriler'e aktarırken kartın gireceği müşteri listesi (migration 170):
+  // "" = listesiz, YENI_LISTE = adı yazılan yeni liste (kullanıcı isteği, 2026-10-28).
+  const kapsamYolu = party.jobId ? `/jobs/${party.jobId}` : `/organizations/${party.organizationId}`;
+  const [musteriListeleri, setMusteriListeleri] = useState<BaglantiListeKaydi[] | null>(null);
+  const [listeSecimi, setListeSecimi] = useState("");
+  const [yeniListeAdi, setYeniListeAdi] = useState("");
+  const YENI_LISTE = "\u0000yeni";
+  const musteriDefteri = soru === "musteri" || soru === "potansiyel";
 
   const yukle = () => {
     partyApi.aktarimSecenekleri(party.id).then(setSecenekler).catch(() => setSecenekler([]));
   };
   useEffect(yukle, [party.id, party.updatedAt]);
+  useEffect(() => {
+    if (!musteriDefteri || musteriListeleri) return;
+    // Müşteriler'i okuyamayan liste seçemez; o zaman seçim hiç çıkmaz.
+    partyApi
+      .listeler(kapsamYolu, MUSTERI_MODUL_KEY)
+      .then(setMusteriListeleri)
+      .catch(() => setMusteriListeleri([]));
+  }, [musteriDefteri]);
 
   const aktar = async (hedef: PartyAktarimHedefi) => {
     setMesgul(true);
     setHata("");
     try {
       await partyApi.aktar(party.id, hedef);
+      if (hedef === "musteri" || hedef === "potansiyel") {
+        if (listeSecimi === YENI_LISTE && yeniListeAdi.trim()) {
+          await partyApi.listeAc(kapsamYolu, yeniListeAdi.trim(), [party.id], MUSTERI_MODUL_KEY);
+        } else if (listeSecimi && listeSecimi !== YENI_LISTE) {
+          await partyApi.listeyeEkle(listeSecimi, [party.id]);
+        }
+      }
       setSoru(null);
+      setListeSecimi("");
+      setYeniListeAdi("");
+      setMusteriListeleri(null);
       yukle();
       onDegisti();
     } catch (err) {
@@ -3003,9 +3032,28 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
     }
   };
 
-  const uygun = secenekler.filter((s) => s.durum === "uygun");
+  const geriAl = async (hedef: PartyAktarimHedefi) => {
+    setMesgul(true);
+    setHata("");
+    try {
+      await partyApi.aktarimiGeriAl(party.id, hedef);
+      setGeriSoru(null);
+      yukle();
+      onDegisti();
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("Kaydedilemedi"));
+    } finally {
+      setMesgul(false);
+    }
+  };
+
   const yapilan = secenekler.filter((s) => s.durum === "yapildi");
+  const musteriYapildi = yapilan.some((s) => s.hedef === "musteri");
+  // Müşteri olan karta "Potansiyel yap" sunulmaz: rol eklenir ama müşteri rolü
+  // kaldığı için kart yine Müşteriler sekmesinde durur. Önce müşteri aktarımı geri alınır.
+  const uygun = secenekler.filter((s) => s.durum === "uygun" && !(s.hedef === "potansiyel" && musteriYapildi));
   if (!uygun.length && !yapilan.length) return null;
+  const geriAlinir = (h: PartyAktarimHedefi) => h === "musteri" || h === "potansiyel" || h === "tedarikci";
 
   const dugme = {
     fontSize: 12,
@@ -3016,33 +3064,99 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
     color: c.primary,
     cursor: "pointer",
   } as const;
+  const kucukBaglanti = { fontSize: 11, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", padding: 0, textDecoration: "underline" } as const;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
         <span style={{ color: c.textSecondary }}>{t("Aktar:")}</span>
         {uygun.map((s) => (
-          <button key={s.hedef} onClick={() => setSoru(s.hedef)} disabled={mesgul} style={dugme}>
+          <button
+            key={s.hedef}
+            onClick={() => {
+              setSoru(s.hedef);
+              setGeriSoru(null);
+            }}
+            disabled={mesgul}
+            style={dugme}
+          >
             {t(AKTARIM_ETIKETI[s.hedef])}
           </button>
         ))}
         {yapilan.map((s) => (
-          <span key={s.hedef} style={{ color: c.success }}>
-            ✓ {t(AKTARIM_YAPILDI[s.hedef])}
+          <span key={s.hedef} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: c.success }}>✓ {t(AKTARIM_YAPILDI[s.hedef])}</span>
+            {geriAlinir(s.hedef) && (
+              <button
+                onClick={() => {
+                  setGeriSoru(s.hedef);
+                  setSoru(null);
+                }}
+                disabled={mesgul}
+                style={kucukBaglanti}
+              >
+                {t("Geri al")}
+              </button>
+            )}
           </span>
         ))}
       </div>
       {soru && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ color: c.textSecondary }}>{t(AKTARIM_ACIKLAMA[soru])}</span>
+          {musteriDefteri && musteriListeleri && (
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+              <span style={{ color: c.textSecondary }}>{t("Müşteriler'de listesi:")}</span>
+              <select
+                value={listeSecimi}
+                onChange={(e) => setListeSecimi(e.target.value)}
+                style={{ fontSize: 12, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+              >
+                <option value="">{t("Listesiz")}</option>
+                {musteriListeleri.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.ad}
+                  </option>
+                ))}
+                <option value={YENI_LISTE}>{t("+ Yeni liste…")}</option>
+              </select>
+              {listeSecimi === YENI_LISTE && (
+                <input
+                  autoFocus
+                  value={yeniListeAdi}
+                  maxLength={80}
+                  onChange={(e) => setYeniListeAdi(e.target.value)}
+                  placeholder={t("Liste adı")}
+                  style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+                />
+              )}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => aktar(soru)}
+              disabled={mesgul || (listeSecimi === YENI_LISTE && !yeniListeAdi.trim())}
+              style={{ ...dugme, border: "none", background: c.primary, color: c.onPrimary }}
+            >
+              {t("Onayla")}
+            </button>
+            <button onClick={() => setSoru(null)} style={{ ...dugme, borderColor: c.border, color: c.textSecondary }}>
+              {t("Vazgeç")}
+            </button>
+          </div>
+        </div>
+      )}
+      {geriSoru && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-          <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>{t(AKTARIM_ACIKLAMA[soru])}</span>
-          <button
-            onClick={() => aktar(soru)}
-            disabled={mesgul}
-            style={{ ...dugme, border: "none", background: c.primary, color: c.onPrimary }}
-          >
-            {t("Onayla")}
+          <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>
+            {geriSoru === "tedarikci"
+              ? t("Kart Tedarik'ten çıkar; Bağlantılar'da kalır.")
+              : t("Aktarım geri alınır; kartın başka bir müşteri rolü yoksa Müşteriler'den çıkar. Kart Bağlantılar'da kalır.")}
+          </span>
+          <button onClick={() => geriAl(geriSoru)} disabled={mesgul} style={{ ...dugme, border: "none", background: c.primary, color: c.onPrimary }}>
+            {t("Geri al")}
           </button>
-          <button onClick={() => setSoru(null)} style={{ ...dugme, borderColor: c.border, color: c.textSecondary }}>
+          <button onClick={() => setGeriSoru(null)} style={{ ...dugme, borderColor: c.border, color: c.textSecondary }}>
             {t("Vazgeç")}
           </button>
         </div>

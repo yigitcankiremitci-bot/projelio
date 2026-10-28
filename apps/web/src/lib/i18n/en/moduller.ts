@@ -1351,6 +1351,8 @@ export const moduller: TranslationDict = {
   "{ad}, \"{liste}\" listesine taşındı.": "{ad} moved to \"{liste}\".",
   "{ad}, \"{liste}\" listesinden çıkarıldı.": "{ad} removed from \"{liste}\".",
   "Kart": "Card",
+  "Tümünü göster": "Show all",
+  "Yalnızca \"{liste}\" listesindekiler gösteriliyor ({n} / {toplam}).": "Showing only the \"{liste}\" list ({n} / {toplam}).",
   "+ Yeni liste…": "+ New list…",
   "Başka listeye taşı…": "Move to another list…",
   "Bir listeye daha ekle…": "Also add to a list…",

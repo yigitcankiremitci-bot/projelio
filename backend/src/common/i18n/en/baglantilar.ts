@@ -30,8 +30,6 @@ export const baglantilar: TranslationDict = {
   "Bu kart o modüle zaten aktarılmış": "This card has already been transferred to that module",
   "Hedef modül burada açık değil": "The target module isn't enabled here",
   "Departman bu kartın şirketinde değil": "That department isn't in this card's company",
-  "Dosya eklemek için kartı modülün açık olduğu bir departmandan aç":
-    "To add a file, open the card from a department where the module is enabled",
   "Kartvizit fotoğraf ya da PDF olmalı": "The business card must be a photo or a PDF",
 
   // Lio: kartvizitten bağlantı (taslak → onay)
@@ -67,4 +65,6 @@ export const baglantilar: TranslationDict = {
   "Geçersiz sıra anahtarı": "Invalid order key",
   "Bu kaynak kartın şirketine ait değil": "This source doesn't belong to the card's company",
   "Dosya seçilmedi": "No file selected",
+  "Dosya eklemek için şirketin ya da modülün açık olduğu bir departmanın ekibinde olmalısın":
+    "To add files you need to be on the company's team or on a team where this module is enabled",
 };

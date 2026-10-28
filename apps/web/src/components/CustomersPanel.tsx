@@ -336,7 +336,12 @@ export default function CustomersPanel({
   const [ozelSiralar, setOzelSiralar] = useState<PartyOzelSiralar>({});
   const listeModulu = baglantiModu ? BAGLANTI_MODUL_KEY : MUSTERI_MODUL_KEY;
   const listeAnahtari = `projelio_${baglantiModu ? "baglanti" : "musteri"}_listesi_${kapsamYolu}`;
+  // Müşteriler'de seçim HATIRLANMAZ: listeler üç sekmede ortak ve hatırlanan
+  // bir liste Potansiyel'i de süzüyordu — Bağlantılar'dan potansiyele
+  // aktarılan kart, o listede olmadığı için "kayboldu" (kullanıcı şikâyeti,
+  // 2026-10-28). Bağlantılar'da eskisi gibi hatırlanır.
   const [seciliListe, setSeciliListeHam] = useState<string>(() => {
+    if (!baglantiModu) return "";
     try {
       return localStorage.getItem(listeAnahtari) ?? "";
     } catch {
@@ -345,6 +350,7 @@ export default function CustomersPanel({
   });
   const setSeciliListe = (id: string) => {
     setSeciliListeHam(id);
+    if (!baglantiModu) return;
     try {
       localStorage.setItem(listeAnahtari, id);
     } catch {
@@ -1554,6 +1560,26 @@ export default function CustomersPanel({
             )
           }
         />
+      )}
+
+      {/* Liste süzgeci açıkken bu açıkça yazılır: yoksa listede olmayan kartlar
+          kaybolmuş sanılıyordu (bkz. seciliListe). */}
+      {etkinListe && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, color: c.textSecondary }}>
+          <span>
+            {t("Yalnızca \"{liste}\" listesindekiler gösteriliyor ({n} / {toplam}).", {
+              liste: listeler.find((l) => l.id === etkinListe)?.ad ?? "",
+              n: sekmeKartlari.length,
+              toplam: sekmeTabani.length,
+            })}
+          </span>
+          <button
+            onClick={() => setSeciliListe("")}
+            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+          >
+            {t("Tümünü göster")}
+          </button>
+        </div>
       )}
 
       {haritaAcik && (

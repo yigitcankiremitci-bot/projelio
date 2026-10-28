@@ -35,7 +35,7 @@ import {
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
 import { AccessService } from "../../common/access/access.service";
-import { FilesService, type ProjectFile } from "../files/files.service";
+import { FilesService, type FlatScope, type ProjectFile } from "../files/files.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
 import { AKTARIM_TANIMLARI, aktarimKaydiVerisi, aktarimTanimi, defterAktarimiYapildi, notaEkle } from "./aktarim";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
@@ -1258,13 +1258,26 @@ export class PartyService {
   /**
    * Kartın dosyalarının ineceği yer.
    *
-   * İşte (serbest çalışan) işin dosya ağacı. Şirkette DEPARTMANIN klasörü:
-   * şirket klasörü bütün kadroya açık, rakiplerin kartvizitleri herkesin
-   * Dosyalar ekranına düşerdi. Departman verilmezse kullanıcının üyesi olduğu
-   * ve modülün açık olduğu ilk departman seçilir (Lio böyle yükler).
+   * İşte (serbest çalışan) işin dosya ağacı. Şirkette tercihen DEPARTMANIN
+   * klasörü: şirket klasörü bütün kadroya açık, rakiplerin kartvizitleri
+   * herkesin Dosyalar ekranına düşerdi. Departman verilmezse modülün açık
+   * olduğu departmanlardan biri seçilir (Lio böyle yükler).
+   *
+   * Seçim YÜKLEMENİN kuralıyla yapılır (FilesService.assertFlatAccess:
+   * departmanın kadrosunda olmak). Önceden "departmanı görebiliyor mu"ya
+   * bakılıyordu; şirketin her üyesi bunu geçtiği için kadroda olmayan ekip
+   * arkadaşı seçilen departmana yükleyemiyor, karta dosya ekleyemiyordu
+   * (kullanıcı şikâyeti, 2026-10-28). Kişi hiçbir uygun departmanın
+   * kadrosunda değilse dosya şirketin klasörüne iner — kartı yazabilen biri
+   * dosya ekleyebilmeli; ekleyemiyorsa yüklediği dosyayı kendisi de göremezdi.
    */
-  private async dosyaDepartmani(party: Party, userId: string, departmentId?: string): Promise<string> {
+  private async dosyaKapsami(party: Party, userId: string, departmentId?: string): Promise<FlatScope> {
     const orgId = party.organizationId!;
+    const yukleyebilir = (scope: FlatScope) =>
+      this.files
+        .assertFlatAccess(scope, userId)
+        .then(() => true)
+        .catch(() => false);
     if (departmentId) {
       const { data } = await this.supabase.client
         .from("departments")
@@ -1272,7 +1285,7 @@ export class PartyService {
         .eq("id", departmentId)
         .maybeSingle();
       if (data?.organization_id !== orgId) throw new BadRequestException("Departman bu kartın şirketinde değil");
-      return departmentId;
+      if (await yukleyebilir({ kind: "department", id: departmentId })) return { kind: "department", id: departmentId };
     }
     const modul = party.modules.includes(BAGLANTI_MODUL_KEY)
       ? BAGLANTI_MODUL_KEY
@@ -1286,9 +1299,7 @@ export class PartyService {
       .eq("module_key", modul)
       .not("department_id", "is", null);
     for (const r of (acik ?? []) as any[]) {
-      if ((await this.accessService.departmentAccess(r.department_id, userId).catch(() => null))?.canView) {
-        return r.department_id;
-      }
+      if (await yukleyebilir({ kind: "department", id: r.department_id })) return { kind: "department", id: r.department_id };
     }
     // Modül şirket geneline açılmış (department_id boş — kurulum sihirbazı ya da
     // eski kayıt): katalogdaki departmanlardan ilki, önce birincil (Satış).
@@ -1309,10 +1320,11 @@ export class PartyService {
         .is("archived_at", null);
       const sirali = ((deps ?? []) as any[]).sort((a, b) => anahtarlar.indexOf(a.catalog_key) - anahtarlar.indexOf(b.catalog_key));
       for (const d of sirali) {
-        if ((await this.accessService.departmentAccess(d.id, userId).catch(() => null))?.canView) return d.id;
+        if (await yukleyebilir({ kind: "department", id: d.id })) return { kind: "department", id: d.id };
       }
     }
-    throw new BadRequestException("Dosya eklemek için kartı modülün açık olduğu bir departmandan aç");
+    if (await yukleyebilir({ kind: "organization", id: orgId })) return { kind: "organization", id: orgId };
+    throw new BadRequestException("Dosya eklemek için şirketin ya da modülün açık olduğu bir departmanın ekibinde olmalısın");
   }
 
   /** Dosya/klasör adında yol ayırıcısı ve Drive'ın sevmediği karakterler olmasın. */
@@ -1361,7 +1373,7 @@ export class PartyService {
     const dosya = party.jobId
       ? await this.files.uploadInline(party.jobId, userId, adli, {}, { relativePath: yol }, opts.sizeLimit)
       : await this.files.uploadInlineForFlat(
-          { kind: "department", id: await this.dosyaDepartmani(party, userId, opts.departmentId) },
+          await this.dosyaKapsami(party, userId, opts.departmentId),
           userId,
           adli,
           { relativePath: yol },

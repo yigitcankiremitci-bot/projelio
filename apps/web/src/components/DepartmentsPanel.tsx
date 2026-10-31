@@ -1,6 +1,13 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { Department, DepartmentCatalogEntry } from "@projelio/shared";
+import type {
+  DepartmanKuraliDurumu,
+  Department,
+  DepartmentCatalogEntry,
+  DepartmentMemberRole,
+  SirketEkibi,
+  SirketEkibiUyesi,
+} from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
@@ -16,6 +23,7 @@ import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import ListRowLink, { ListRowStack } from "./ListRowLink";
+import { ROL_ETIKETI } from "./ekipHesaplari/KadroSecimi";
 import SectionToggle from "./SectionToggle";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
@@ -170,7 +178,7 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
             fontSize: 15,
           }}
         >
-          {t("Henüz departman yok. ISO 9001 uyumlu standart departman listesinden seçebilir ya da özel bir departman açabilirsin.")}
+          {t("Henüz departman yok. Küçük ekipte işler yöneticide yürür; ekip büyüdükçe departmanı ilk kişisiyle birlikte açarsın.")}
         </div>
       ) : layout === "scroll" && !isDesktop ? (
         // Telefonda anasayfa özeti: kapaklı kartlar yerine alt alta tek
@@ -240,6 +248,12 @@ const DepartmentsPanel = forwardRef<DepartmentsPanelHandle, Props>(function Depa
 
 export default DepartmentsPanel;
 
+// Departman İLK KİŞİSİYLE açılır (bkz. shared departmanKurali.ts): burada ilk
+// kişi şirketin mevcut ekibinden seçilir. Yeni biriyle açılış Ekip Hesapları
+// ve İşe al formlarındaki "Kişiyle birlikte yeni departman aç" seçeneğinden.
+// Departman kişisiyle birlikte doğduğu için pencere artık tek seferde TEK
+// departman açıyor — eskiden çoklu seçim, kimsesi olmayan departman yığınının
+// kaynağıydı.
 function AddDepartmentModal({
   organizationId,
   availableCatalog,
@@ -253,29 +267,45 @@ function AddDepartmentModal({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [customName, setCustomName] = useState("");
+  const [kural, setKural] = useState<DepartmanKuraliDurumu | null>(null);
+  const [ekip, setEkip] = useState<SirketEkibiUyesi[] | null>(null);
+  const [ilkKisi, setIlkKisi] = useState("");
+  const [rol, setRol] = useState<DepartmentMemberRole>("employee");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const toggleKey = (key: string) => {
-    setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-  };
+  useEffect(() => {
+    api
+      .get<DepartmanKuraliDurumu>(`/organizations/${organizationId}/departman-kurali`)
+      .then(setKural)
+      .catch(() => setKural(null));
+    api
+      .get<SirketEkibi>(`/organizations/${organizationId}/ekip`)
+      .then(({ uyeler }) => setEkip(uyeler.filter((u) => !u.kurucu)))
+      .catch(() => setEkip([]));
+  }, [organizationId]);
+
+  const kapaliSebep = kural && "sebep" in kural.mevcutKisiyle ? kural.mevcutKisiyle.sebep : null;
+  const engel = ekip && ekip.length === 0 ? t("Departman ilk kişisiyle açılır: yönetici dışında birini ekip olarak eklediğinde departman açabilirsin.") : kapaliSebep ? t(kapaliSebep) : null;
 
   const handleSave = async () => {
-    if (selectedKeys.length === 0 && !customName.trim()) {
-      setError(t("En az bir departman seç ya da özel bir isim gir"));
+    if (!selectedKey && !customName.trim()) {
+      setError(t("Bir departman seç ya da özel bir isim gir"));
+      return;
+    }
+    if (!ilkKisi) {
+      setError(t("Departmanın ilk kişisini seç"));
       return;
     }
     setError("");
     setSaving(true);
     try {
-      for (const key of selectedKeys) {
-        await api.post(`/organizations/${organizationId}/departments`, { catalogKey: key });
-      }
-      if (customName.trim()) {
-        await api.post(`/organizations/${organizationId}/departments`, { name: customName.trim() });
-      }
+      await api.post(`/organizations/${organizationId}/departments`, {
+        ...(selectedKey ? { catalogKey: selectedKey } : { name: customName.trim() }),
+        ilkKisi: { userId: ilkKisi, role: rol },
+      });
       notifySidebarChanged();
       onAdded();
     } catch (err) {
@@ -287,55 +317,99 @@ function AddDepartmentModal({
   return (
     <Modal title={t("Departman ekle")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Standart departmanlardan seç")}</span>
-
-        {availableCatalog.length === 0 ? (
-          <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Standart departmanların hepsi zaten eklenmiş.")}</p>
+        {engel ? (
+          <>
+            <p style={{ fontSize: 14, color: c.textPrimary, margin: 0, lineHeight: 1.5 }}>{engel}</p>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0, lineHeight: 1.5 }}>
+              {t("Yeni birini eklerken departmanı onunla birlikte açabilirsin: şirket sayfasındaki Ekip Hesapları ya da İşe al formunda \"Kişiyle birlikte yeni departman aç\"ı işaretle. O zamana kadar modüller yöneticide çalışır.")}
+            </p>
+          </>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
-            {availableCatalog.map((entry) => {
-              const active = selectedKeys.includes(entry.key);
-              return (
-                <button
-                  key={entry.key}
-                  onClick={() => toggleKey(entry.key)}
-                  style={{
-                    textAlign: "left",
-                    padding: "8px 10px",
-                    borderRadius: 8,
-                    border: `1.5px solid ${active ? c.primary : c.border}`,
-                    background: active ? c.background : "transparent",
-                    fontSize: 13,
-                    color: c.textPrimary,
-                  }}
-                >
-                  {entry.name}
-                </button>
-              );
-            })}
-          </div>
-        )}
+          <>
+            <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Standart departmanlardan seç")}</span>
 
-        <div>
-          <label style={{ fontSize: 13, color: c.textSecondary }}>{t("Ya da özel departman adı")}</label>
-          <input
-            value={customName}
-            onChange={(e) => setCustomName(e.target.value)}
-            onKeyDown={onEnter(() => void handleSave())}
-            placeholder={t("Örn. Ar-Ge")}
-            style={{ width: "100%", marginTop: 4 }}
-          />
-        </div>
+            {availableCatalog.length === 0 ? (
+              <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Standart departmanların hepsi zaten eklenmiş.")}</p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
+                {availableCatalog.map((entry) => {
+                  const active = selectedKey === entry.key;
+                  return (
+                    <button
+                      key={entry.key}
+                      onClick={() => {
+                        setSelectedKey(active ? null : entry.key);
+                        setCustomName("");
+                      }}
+                      style={{
+                        textAlign: "left",
+                        padding: "8px 10px",
+                        borderRadius: 8,
+                        border: `1.5px solid ${active ? c.primary : c.border}`,
+                        background: active ? c.background : "transparent",
+                        fontSize: 13,
+                        color: c.textPrimary,
+                      }}
+                    >
+                      {entry.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div>
+              <label style={{ fontSize: 13, color: c.textSecondary }}>{t("Ya da özel departman adı")}</label>
+              <input
+                value={customName}
+                onChange={(e) => {
+                  setCustomName(e.target.value);
+                  if (e.target.value) setSelectedKey(null);
+                }}
+                onKeyDown={onEnter(() => void handleSave())}
+                placeholder={t("Örn. Ar-Ge")}
+                style={{ width: "100%", marginTop: 4 }}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <label style={{ fontSize: 13, color: c.textSecondary }}>{t("İlk kişi")}</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <select value={ilkKisi} onChange={(e) => setIlkKisi(e.target.value)} style={{ flex: "1 1 200px" }}>
+                  <option value="">{ekip === null ? t("Yükleniyor…") : t("Ekipten birini seç…")}</option>
+                  {(ekip ?? []).map((u) => (
+                    <option key={u.userId} value={u.userId}>
+                      {u.fullName}
+                      {u.title ? ` · ${u.title}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <select value={rol} onChange={(e) => setRol(e.target.value as DepartmentMemberRole)}>
+                  {(Object.keys(ROL_ETIKETI) as DepartmentMemberRole[]).map((r) => (
+                    <option key={r} value={r}>
+                      {t(ROL_ETIKETI[r])}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span style={{ fontSize: 12, color: c.textSecondary }}>
+                {t("Departman ilk kişisiyle açılır. 10 kişiden küçük şirketlerde departman sayısı, yönetici dışındaki kişi sayısını geçemez.")}
+              </span>
+            </div>
+          </>
+        )}
 
         {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
-        >
-          {saving ? t("Ekleniyor…") : t("Departmanları ekle")}
-        </button>
+        {!engel && (
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
+          >
+            {saving ? t("Ekleniyor…") : t("Departmanı aç")}
+          </button>
+        )}
       </div>
     </Modal>
   );

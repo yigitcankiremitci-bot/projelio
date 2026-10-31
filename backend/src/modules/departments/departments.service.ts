@@ -1,7 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
-import type { Department, DepartmentAccess, DepartmentMemberRole } from "@projelio/shared";
-import { defaultLocale, ENTITY_TAB_KEYS, sanitizeHiddenTabs } from "@projelio/shared";
+import type { Department, DepartmentAccess, DepartmanKuraliDurumu, DepartmentMemberRole } from "@projelio/shared";
+import {
+  defaultLocale,
+  departmanAcilabilirMi,
+  departmanKuraliDurumu,
+  ENTITY_TAB_KEYS,
+  sanitizeHiddenTabs,
+} from "@projelio/shared";
 import { cevirmen } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { applyOrder } from "../../common/reorder.util";
@@ -280,14 +286,90 @@ export class DepartmentsService {
     return department;
   }
 
-  // catalogKey verilirse departman katalogdaki standart isim/açıklamayla açılır
-  // (name/description override edilebilir); verilmezse özel departmandır.
+  /**
+   * Departman açma kuralının girdileri: arşivlenmemiş departman sayısı ve
+   * yönetici dışındaki kişiler (kadroda onaylı ya da ayrılık onayı bekleyen,
+   * tekil). Kural packages/shared/src/departmanKurali.ts'te.
+   */
+  private async kadroGercekleri(organizationId: string): Promise<{ departmanSayisi: number; kisiler: Set<string> }> {
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+
+    const { data: depts, error } = await this.supabase.client
+      .from("departments")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null);
+    if (error) throw error;
+    const ids = (depts ?? []).map((d: any) => d.id as string);
+
+    const kisiler = new Set<string>();
+    if (ids.length) {
+      const { data: kadro, error: kadroError } = await this.supabase.client
+        .from("department_members")
+        .select("user_id")
+        .in("department_id", ids)
+        .in("status", ["approved", "leave_pending"])
+        .not("user_id", "is", null);
+      if (kadroError) throw kadroError;
+      for (const k of kadro ?? []) if (k.user_id !== org.owner_id) kisiler.add(k.user_id);
+    }
+    return { departmanSayisi: ids.length, kisiler };
+  }
+
+  /** "Departman ekle" ekranı için kuralın bugünkü durumu (yalnızca sahip). */
+  async kuralDurumu(organizationId: string, requestingUserId: string): Promise<DepartmanKuraliDurumu> {
+    await this.assertOrgOwner(organizationId, requestingUserId);
+    const { departmanSayisi, kisiler } = await this.kadroGercekleri(organizationId);
+    return departmanKuraliDurumu(departmanSayisi, kisiler.size);
+  }
+
+  /**
+   * Departman açar. catalogKey verilirse katalogdaki standart isim/açıklamayla
+   * açılır (name/description override edilebilir); verilmezse özel departmandır.
+   *
+   * Departman İLK KİŞİSİYLE doğar (bkz. shared departmanKurali.ts): `ilkKisi`
+   * zorunlu ve departmanın kadrosuna onaylı yazılır. Dışarıdan (HTTP, Lio)
+   * gelen çağrıda ilk kişi şirketin MEVCUT kadrosundan olmalı — yoksa sahip,
+   * davetsiz birini kendi şirketine sokabilirdi. Yeni katılan biriyle açılış
+   * (Ekip Hesapları, İşe al kabulü) `ilkKisiYeni` ile gelir: o servisler kişiyi
+   * kendileri doğruluyor.
+   */
   async create(
     organizationId: string,
-    data: { catalogKey?: string; name?: string; description?: string },
-    requestingUserId?: string
+    data: {
+      catalogKey?: string;
+      name?: string;
+      description?: string;
+      ilkKisi?: { userId?: string; role?: DepartmentMemberRole; title?: string | null };
+    },
+    requestingUserId?: string,
+    opts: { ilkKisiYeni?: boolean } = {}
   ): Promise<Department> {
     await this.assertOrgOwner(organizationId, requestingUserId);
+
+    const ilkKisiId = data.ilkKisi?.userId;
+    const rol: DepartmentMemberRole = data.ilkKisi?.role ?? "employee";
+    if (!["manager", "employee", "subcontractor"].includes(rol)) throw new BadRequestException("Geçersiz kadro rolü.");
+    const { departmanSayisi, kisiler } = await this.kadroGercekleri(organizationId);
+    if (ilkKisiId) {
+      if (ilkKisiId === requestingUserId) {
+        throw new BadRequestException("Departmanın ilk kişisi yönetici dışında biri olmalı.");
+      }
+      if (!opts.ilkKisiYeni && !kisiler.has(ilkKisiId)) {
+        throw new BadRequestException(
+          "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç."
+        );
+      }
+    }
+    const sonra = new Set(kisiler);
+    if (ilkKisiId) sonra.add(ilkKisiId);
+    const karar = departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: ilkKisiId ? sonra.size : 0 });
+    if ("sebep" in karar) throw new BadRequestException(karar.sebep);
 
     let name = data.name?.trim();
     let description = data.description?.trim();
@@ -323,6 +405,22 @@ export class DepartmentsService {
     if (error) {
       if ((error as any).code === "23505") throw new BadRequestException("Bu departman zaten eklenmiş");
       throw error;
+    }
+
+    const { error: kadroError } = await this.supabase.client.from("department_members").insert({
+      department_id: row.id,
+      user_id: ilkKisiId,
+      role: rol,
+      title: data.ilkKisi?.title ?? null,
+      // Davet değil: kişi zaten şirketin ekibinde (ya da onu ekleyen akış
+      // onayını aldı), onaylayacak bir şey yok.
+      status: "approved",
+      invited_by: requestingUserId ?? null,
+    });
+    if (kadroError) {
+      // Kişisiz departman bırakmak kuralın tam tersi: açılışı geri al.
+      await this.supabase.client.from("departments").delete().eq("id", row.id);
+      throw kadroError;
     }
     return mapDepartment(row);
   }

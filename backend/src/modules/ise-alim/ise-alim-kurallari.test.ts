@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import type { EkipHesabiSecenekleri, IseAlimGirdisi } from "@projelio/shared";
+import { departmanKuraliDurumu } from "@projelio/shared";
 import { davetGirdisiniDogrula, gecerliSecim, kabulPlani } from "./ise-alim-kurallari";
 
 const KISI = "3f1c2a9e-1b2c-4d5e-8f90-0123456789ab";
@@ -36,7 +37,38 @@ test("yetkisi olmayan departmana kişi alınamaz", () => {
 });
 
 test("departmansız davet olmaz: şirkete erişim kadrodan geliyor", () => {
-  assert.equal(davetGirdisiniDogrula({ ...gecerli(), departmanlar: [], moduller: [] }, secenekler), "En az bir departman seç.");
+  assert.equal(
+    davetGirdisiniDogrula({ ...gecerli(), departmanlar: [], moduller: [] }, secenekler),
+    "En az bir departman seç ya da kişiyle birlikte yeni bir departman aç."
+  );
+});
+
+test("yeni departmanla davet: yalnızca sahip, kural açıkken", () => {
+  const girdi: IseAlimGirdisi = {
+    ...gecerli(),
+    departmanlar: [],
+    moduller: [],
+    yeniDepartman: { catalogKey: "finans", role: "employee" },
+  };
+  assert.equal(davetGirdisiniDogrula(girdi, secenekler), "Yeni departmanı yalnızca şirket sahibi açabilir.");
+
+  const sahip: EkipHesabiSecenekleri = { ...secenekler, sahipMi: true, departmanKurali: departmanKuraliDurumu(0, 0) };
+  assert.equal(davetGirdisiniDogrula(girdi, sahip), null);
+
+  // Yönetici + 1 kişi, 2 eski departman: yeni kişiyle bile 3. açılamaz.
+  const kapali: EkipHesabiSecenekleri = { ...sahip, departmanKurali: departmanKuraliDurumu(2, 1) };
+  assert.match(davetGirdisiniDogrula(girdi, kapali) ?? "", /kişi sayısını geçemez/);
+
+  assert.equal(
+    davetGirdisiniDogrula({ ...girdi, yeniDepartman: { role: "employee" } }, sahip),
+    "Yeni departmanın adını yaz ya da listeden seç."
+  );
+});
+
+test("gecerliSecim: yeni departmanlı davet, mevcutlar düşse de kabul edilebilir", () => {
+  const davet = { departmanlar: [], moduller: [], yeniDepartman: { name: "Ekip", role: "employee" as const } };
+  assert.deepEqual(gecerliSecim(davet, new Set(), new Set()), { departmanlar: [], moduller: [] });
+  assert.equal(gecerliSecim({ departmanlar: [], moduller: [] }, new Set(), new Set()), null);
 });
 
 test("modül seçilen departmanda açık olmalı", () => {

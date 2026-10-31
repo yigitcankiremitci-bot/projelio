@@ -20,7 +20,13 @@ export function davetGirdisiniDogrula(girdi: IseAlimGirdisi, secenekler: EkipHes
   if (girdi.isTanimi != null && (typeof girdi.isTanimi !== "string" || girdi.isTanimi.length > 2000)) {
     return "İş tanımı en fazla 2000 karakter olabilir.";
   }
-  return kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana kişi alma yetkin yok.");
+  return kadroSeciminiDogrula(
+    girdi.departmanlar,
+    girdi.moduller,
+    secenekler,
+    "Bu departmana kişi alma yetkin yok.",
+    girdi.yeniDepartman
+  );
 }
 
 /** Kişinin şirketteki mevcut kadro satırı (removed hariç). */
@@ -89,12 +95,14 @@ export function kabulPlani(
  * geliyor) ve null döner.
  */
 export function gecerliSecim(
-  davet: Pick<IseAlimGirdisi, "departmanlar" | "moduller">,
+  davet: Pick<IseAlimGirdisi, "departmanlar" | "moduller" | "yeniDepartman">,
   aktifDepartmanlar: Set<string>,
   acikModuller: Set<string>
 ): Pick<IseAlimGirdisi, "departmanlar" | "moduller"> | null {
   const departmanlar = davet.departmanlar.filter((d) => aktifDepartmanlar.has(d.departmentId));
-  if (departmanlar.length === 0) return null;
+  // Kabulde kişiyle açılacak yeni departman varsa mevcutların hepsi düşse de
+  // kabul anlamlı: kişi o departmanla girer.
+  if (departmanlar.length === 0 && !davet.yeniDepartman) return null;
   const kalan = new Set(departmanlar.map((d) => d.departmentId));
   const moduller = davet.moduller.filter((m) => kalan.has(m.departmentId) && acikModuller.has(m.moduleKey));
   return { departmanlar, moduller };

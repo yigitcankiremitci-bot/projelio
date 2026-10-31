@@ -175,7 +175,7 @@ export const uygulama: TranslationDict = {
   "Hedef yüzdelerinin toplamı %{yuzde} — haftanda olmayan bir zamanı bölüştürüyorsun.": "Your target percentages add up to {yuzde}% — you're splitting time your week doesn't have.",
   "Henüz bağlı bir Projelio numarası yok; yönetici bir numara bağladığında burada görünecek.": "There's no connected Projelio number yet; it will appear here once an admin connects one.",
   "Henüz belge yok. Vergi levhası, imza sirküleri ve sicil gazetesi burada dursun; her istendiğinde aranmasın.": "No documents yet. Keep the tax certificate, signature circular and registry gazette here so no one has to hunt for them.",
-  "Henüz departman yok. ISO 9001 uyumlu standart departman listesinden seçebilir ya da özel bir departman açabilirsin.": "No departments yet. Pick from the ISO 9001 standard department list or create a custom one.",
+  "Henüz departman yok. Küçük ekipte işler yöneticide yürür; ekip büyüdükçe departmanı ilk kişisiyle birlikte açarsın.": "No departments yet. In a small team the work runs under the manager; as the team grows, you open a department together with its first person.",
   "Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.": "No customers yet. Sales and Customer Relations see the same list.",
   "Henüz numarasını doğrulayan kullanıcı yok.": "No user has verified their number yet.",
   "Henüz ürün/hizmet yok. Sayfadaki \"+\" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.": "No products/services yet. Use \"+\" on the page to add one to the Product Management department.",

@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { DepartmentsModule } from "../departments/departments.module";
 import { NotificationsModule } from "../notifications/notifications.module";
 import { UsersModule } from "../users/users.module";
 import { EkipHesaplariModule } from "../ekip-hesaplari/ekip-hesaplari.module";
@@ -13,7 +14,7 @@ import { IseAlimService } from "./ise-alim.service";
  * "kim hangi departmana kişi alabilir" kuralı orada tek kopya kalsın.
  */
 @Module({
-  imports: [NotificationsModule, UsersModule, EkipHesaplariModule, RealtimeModule],
+  imports: [NotificationsModule, UsersModule, EkipHesaplariModule, RealtimeModule, DepartmentsModule],
   controllers: [IseAlimController],
   providers: [IseAlimService],
 })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { EkipHesabi, EkipHesabiGirdisi, EkipHesabiSecenekleri } from "@projelio/shared";
+import type { EkipHesabi, EkipHesabiGirdisi, EkipHesabiSecenekleri, YeniDepartmanGirdisi } from "@projelio/shared";
 import { KULLANICI_ADI_DESENI, kullaniciAdiOner } from "@projelio/shared";
 import { ekipHesaplariApi } from "../../api/ekipHesaplari";
 import { useT } from "../../lib/i18n";
@@ -55,6 +55,8 @@ export default function EkipHesabiModal({ kapsam, onClose, onAcildi }: Props) {
   );
   // "departmentId:moduleKey"
   const [moduller, setModuller] = useState<Set<string>>(new Set());
+  // Kişiyle birlikte açılacak departman (bkz. KadroSecimi, shared departmanKurali.ts).
+  const [yeniDepartman, setYeniDepartman] = useState<YeniDepartmanGirdisi | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -90,7 +92,12 @@ export default function EkipHesabiModal({ kapsam, onClose, onAcildi }: Props) {
     const kadro = secenekler
       ? kadroSeciminiTopla(secenekler, departmanlar, moduller)
       : { departmanlar: [], moduller: [] };
-    if (secenekler && kadro.departmanlar.length === 0) return setError(t("En az bir departman seç."));
+    if (secenekler && kadro.departmanlar.length === 0 && !yeniDepartman) {
+      return setError(t("En az bir departman seç ya da kişiyle birlikte yeni bir departman aç."));
+    }
+    if (yeniDepartman && !yeniDepartman.catalogKey && !yeniDepartman.name?.trim()) {
+      return setError(t("Yeni departmanın adını yaz ya da listeden seç."));
+    }
 
     const govde: EkipHesabiGirdisi = {
       fullName: fullName.trim(),
@@ -100,6 +107,7 @@ export default function EkipHesabiModal({ kapsam, onClose, onAcildi }: Props) {
       title: title.trim() || undefined,
       phone: phone.trim() || undefined,
       ...kadro,
+      yeniDepartman: yeniDepartman ?? undefined,
       sifreDegistirmeli,
       karsilamaNotu: karsilamaNotu.trim() || undefined,
       locale,
@@ -293,6 +301,8 @@ export default function EkipHesabiModal({ kapsam, onClose, onAcildi }: Props) {
             moduller={moduller}
             setModuller={setModuller}
             bolum={bolum}
+            yeniDepartman={yeniDepartman}
+            setYeniDepartman={setYeniDepartman}
           />
         )}
 

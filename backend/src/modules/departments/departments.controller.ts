@@ -16,6 +16,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { AuthGuard } from "@nestjs/passport";
 import { UploadRateLimitGuard } from "../../common/guards/upload-rate-limit.guard";
 import { memoryStorage } from "multer";
+import type { DepartmentMemberRole } from "@projelio/shared";
 import { DepartmentsService } from "./departments.service";
 
 @Controller()
@@ -39,13 +40,33 @@ export class DepartmentsController {
     return this.departmentsService.findByOrganization(organizationId, req.user.userId);
   }
 
+  // Departman açma kuralının bugünkü durumu (bkz. shared departmanKurali.ts):
+  // "Departman ekle" formu düğmeyi buna göre açar/kapatır.
+  @Get("organizations/:organizationId/departman-kurali")
+  kuralDurumu(@Param("organizationId") organizationId: string, @Req() req: any) {
+    return this.departmentsService.kuralDurumu(organizationId, req.user.userId);
+  }
+
   @Post("organizations/:organizationId/departments")
   create(
     @Param("organizationId") organizationId: string,
-    @Body() body: { catalogKey?: string; name?: string; description?: string },
+    @Body()
+    body: {
+      catalogKey?: string;
+      name?: string;
+      description?: string;
+      // İlk kişi: şirketin mevcut ekibinden biri (yeni biriyle açılış Ekip
+      // Hesapları / İşe al üzerinden). title istemciden alınmaz.
+      ilkKisi?: { userId?: string; role?: DepartmentMemberRole };
+    },
     @Req() req: any
   ) {
-    return this.departmentsService.create(organizationId, body, req.user.userId);
+    const { ilkKisi, ...rest } = body ?? {};
+    return this.departmentsService.create(
+      organizationId,
+      { ...rest, ilkKisi: ilkKisi ? { userId: ilkKisi.userId, role: ilkKisi.role } : undefined },
+      req.user.userId
+    );
   }
 
   // Departmanlar sekmesinde basılı tutup sürükleyerek sıralama (bkz. OrganizationsController.reorder).

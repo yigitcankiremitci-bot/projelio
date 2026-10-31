@@ -3,6 +3,7 @@ import { AuthModule } from "../auth/auth.module";
 import { EmailModule } from "../auth/email.module";
 import { UsersModule } from "../users/users.module";
 import { FilesModule } from "../files/files.module";
+import { DepartmentsModule } from "../departments/departments.module";
 import { EkipHesaplariController } from "./ekip-hesaplari.controller";
 import { EkipHesaplariService } from "./ekip-hesaplari.service";
 
@@ -14,7 +15,7 @@ import { EkipHesaplariService } from "./ekip-hesaplari.service";
  * kopyası olmamalı.
  */
 @Module({
-  imports: [AuthModule, EmailModule, UsersModule, FilesModule],
+  imports: [AuthModule, EmailModule, UsersModule, FilesModule, DepartmentsModule],
   controllers: [EkipHesaplariController],
   providers: [EkipHesaplariService],
   // Lio hesap açabiliyor (create_team_account); kural ve doğrulama burada kalır.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { EkipHesabiSecenekleri, IseAlimDaveti, User } from "@projelio/shared";
+import type { EkipHesabiSecenekleri, IseAlimDaveti, User, YeniDepartmanGirdisi } from "@projelio/shared";
 import { api } from "../../api/client";
 import { iseAlimApi } from "../../api/iseAlim";
 import { useT } from "../../lib/i18n";
@@ -46,6 +46,8 @@ export default function IseAlModal({ organizationId, secenekler, ekiptekiler, on
   const [isTanimi, setIsTanimi] = useState("");
   const [departmanlar, setDepartmanlar] = useState<DepartmanRolleri>(() => baslangicDepartmanlari(secenekler));
   const [moduller, setModuller] = useState<Set<string>>(new Set());
+  // Kabulde kişiyle birlikte açılacak departman (bkz. KadroSecimi, shared departmanKurali.ts).
+  const [yeniDepartman, setYeniDepartman] = useState<YeniDepartmanGirdisi | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +77,12 @@ export default function IseAlModal({ organizationId, secenekler, ekiptekiler, on
     setError("");
     if (!kisi) return setError(t("İşe alınacak kişiyi seç."));
     const kadro = kadroSeciminiTopla(secenekler, departmanlar, moduller);
-    if (kadro.departmanlar.length === 0) return setError(t("En az bir departman seç."));
+    if (kadro.departmanlar.length === 0 && !yeniDepartman) {
+      return setError(t("En az bir departman seç ya da kişiyle birlikte yeni bir departman aç."));
+    }
+    if (yeniDepartman && !yeniDepartman.catalogKey && !yeniDepartman.name?.trim()) {
+      return setError(t("Yeni departmanın adını yaz ya da listeden seç."));
+    }
     setBusy(true);
     try {
       const davet = await iseAlimApi.davetEt(organizationId, {
@@ -83,6 +90,7 @@ export default function IseAlModal({ organizationId, secenekler, ekiptekiler, on
         pozisyon: pozisyon.trim() || undefined,
         isTanimi: isTanimi.trim() || undefined,
         ...kadro,
+        yeniDepartman: yeniDepartman ?? undefined,
       });
       onGonderildi(davet);
     } catch (err) {
@@ -282,6 +290,8 @@ export default function IseAlModal({ organizationId, secenekler, ekiptekiler, on
           moduller={moduller}
           setModuller={setModuller}
           bolum={bolum}
+          yeniDepartman={yeniDepartman}
+          setYeniDepartman={setYeniDepartman}
         />
       </div>
     </Modal>

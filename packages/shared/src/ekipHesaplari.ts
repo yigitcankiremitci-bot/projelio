@@ -10,6 +10,7 @@
  */
 
 import type { DepartmentMemberRole } from "./types";
+import type { DepartmanKuraliDurumu, YeniDepartmanGirdisi } from "./departmanKurali";
 
 /** Formun departman/modül seçenekleri — yalnızca çağıranın atayabildikleri. */
 export interface EkipHesabiSecenekleri {
@@ -21,6 +22,11 @@ export interface EkipHesabiSecenekleri {
     /** Bu departmanda şirkette açık olan modüller. */
     moduller: { key: string; name: string }[];
   }[];
+  /**
+   * Yalnızca sahibe: departman açma kuralının durumu — formdaki "Yeni
+   * departman" seçeneği buna göre açılır (bkz. departmanKurali.ts).
+   */
+  departmanKurali?: DepartmanKuraliDurumu;
 }
 
 export interface EkipHesabiDepartmanSecimi {
@@ -37,6 +43,11 @@ export interface EkipHesabiGirdisi {
   title?: string;
   phone?: string;
   departmanlar: EkipHesabiDepartmanSecimi[];
+  /**
+   * Kişiyle BİRLİKTE açılacak yeni departman (yalnızca sahip). Departman ilk
+   * kişisiyle doğar; departmansız şirkete ilk çalışan böyle girer.
+   */
+  yeniDepartman?: YeniDepartmanGirdisi;
   /** Kayıt girebileceği modüller; departman üyeliği zaten okuma hakkı veriyor. */
   moduller: { departmentId: string; moduleKey: string }[];
   /** İlk girişte kendi şifresini belirlesin (varsayılan açık). */

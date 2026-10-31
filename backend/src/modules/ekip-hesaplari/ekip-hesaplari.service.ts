@@ -11,6 +11,7 @@ import { UsersService, normalizeEmail, normalizeUsername } from "../users/users.
 import { EmailService } from "../auth/email.service";
 import { GirisBaglantisiService } from "../auth/giris-baglantisi.service";
 import { FilesService } from "../files/files.service";
+import { DepartmentsService } from "../departments/departments.service";
 import { atanabilirDepartmanlar, girdiyiDogrula, kisiGirdisiniDogrula, tekilModuller } from "./ekip-hesabi-kurallari";
 import { ekipHesabiEpostasi } from "./ekip-hesabi-eposta";
 
@@ -68,7 +69,8 @@ export class EkipHesaplariService {
     private usersService: UsersService,
     private emailService: EmailService,
     private girisBaglantisi: GirisBaglantisiService,
-    private filesService: FilesService
+    private filesService: FilesService,
+    private departmentsService: DepartmentsService
   ) {}
 
   // ------------------------------------------------------------- Yetki + seçenekler
@@ -125,6 +127,8 @@ export class EkipHesaplariService {
     const moduller = await this.departmanModulleri(organizationId);
     return {
       sahipMi,
+      // "Yeni departman" seçeneği yalnızca sahibe (departman açmak sahibin işi).
+      departmanKurali: sahipMi ? await this.departmentsService.kuralDurumu(organizationId, userId) : undefined,
       departmanlar: departmanlar
         .filter((d: any) => izinli.has(d.id))
         .map((d: any) => ({
@@ -241,12 +245,32 @@ export class EkipHesaplariService {
     const hata = girdiyiDogrula(girdi, secenekler);
     if (hata) throw new BadRequestException(hata);
 
-    const { yeniId, dil, sifreDegistirmeli } = await this.hesabiAc(
+    // Kişiyle birlikte açılan departman: hesap herhangi bir adımda düşerse
+    // departman da geri alınır — kişisiz departman bırakmak kuralın tam tersi
+    // (kullanıcı silinince kadro satırı cascade ile gider, departman gitmez).
+    let acilanDepartman: string | null = null;
+    const hesapAcilisi = this.hesabiAc(
       { organizationId },
       girdi,
       userId,
       "Bu e-posta adresiyle zaten bir Projelio hesabı var. Kişiyi şirket sayfasındaki “İşe al” ile davet edebilirsin.",
       async (yeniId, title) => {
+        if (girdi.yeniDepartman) {
+          const departman = await this.departmentsService.create(
+            organizationId,
+            {
+              catalogKey: girdi.yeniDepartman.catalogKey?.trim() || undefined,
+              name: girdi.yeniDepartman.name?.trim() || undefined,
+              ilkKisi: { userId: yeniId, role: girdi.yeniDepartman.role, title },
+            },
+            userId,
+            { ilkKisiYeni: true }
+          );
+          acilanDepartman = departman.id;
+        }
+        // Modüller seçilen MEVCUT departmanlara bağlı; yalnızca yeni departmanla
+        // giren kişinin yazılacak başka kadro/modül satırı yok.
+        if (!girdi.departmanlar.length) return;
         const { error: kadroHatasi } = await this.supabase.client.from("department_members").insert(
           girdi.departmanlar.map((d) => ({
             department_id: d.departmentId,
@@ -278,6 +302,14 @@ export class EkipHesaplariService {
         }
       }
     );
+    let sonuc: Awaited<typeof hesapAcilisi>;
+    try {
+      sonuc = await hesapAcilisi;
+    } catch (err) {
+      if (acilanDepartman) await this.supabase.client.from("departments").delete().eq("id", acilanDepartman);
+      throw err;
+    }
+    const { yeniId, dil, sifreDegistirmeli } = sonuc;
 
     const epostaGonderildi = await this.baglantiGonder({ organizationId }, yeniId, userId, {
       not: girdi.karsilamaNotu,

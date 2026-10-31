@@ -5660,7 +5660,11 @@ export class AiAssistantService {
       case "create_department": {
         const department = await this.departmentsService.create(
           input.organizationId,
-          { name: input.name, description: input.description },
+          {
+            name: input.name,
+            description: input.description,
+            ilkKisi: { userId: input.ilkKisiUserId, role: input.ilkKisiRol === "manager" ? "manager" : "employee" },
+          },
           userId
         );
         return { departmentId: department.id, ad: department.name };

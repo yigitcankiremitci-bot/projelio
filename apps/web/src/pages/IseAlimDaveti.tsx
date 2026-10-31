@@ -106,6 +106,16 @@ export default function IseAlimDaveti() {
                   <span style={{ color: c.textSecondary }}> · {t(ROL_ETIKETI[d.role as DepartmentMemberRole])}</span>
                 </div>
               ))}
+              {/* Kabul edince seninle birlikte açılacak departman (migration 172). */}
+              {davet.yeniDepartman && (
+                <div style={{ fontSize: 14, color: c.textPrimary }}>
+                  {departmanAdi(davet.yeniDepartman.name, t)}
+                  <span style={{ color: c.textSecondary }}>
+                    {" "}
+                    · {t(ROL_ETIKETI[davet.yeniDepartman.role])} · {t("kabul edince açılır")}
+                  </span>
+                </div>
+              )}
               {davet.moduller.length > 0 && (
                 <>
                   <span style={{ ...baslik, marginTop: 8 }}>{t("Kayıt girebileceğin modüller")}</span>

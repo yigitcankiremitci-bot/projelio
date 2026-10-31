@@ -293,6 +293,16 @@ export const hatalar: TranslationDict = {
   "Ayrılma talebin zaten onay bekliyor": "Your leave request is already awaiting approval",
   "Bu adda bir odak alanın zaten var.": "You already have a focus area with this name.",
   "Bu departman zaten eklenmiş": "This department has already been added",
+  "Departmanın ilk kişisi yönetici dışında biri olmalı.": "The department's first person must be someone other than the manager.",
+  "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç.":
+    'The first person must be on the company team. To add someone new, choose "New department" in Team Accounts or Hire.',
+  "Yeni departmanı yalnızca şirket sahibi açabilir.": "Only the company owner can open a new department.",
+  "Yeni departman geçersiz.": "The new department is invalid.",
+  "Yeni departmanın adını yaz ya da listeden seç.": "Name the new department or pick one from the list.",
+  "Departman adı en fazla 80 karakter olabilir.": "Department name can be at most 80 characters.",
+  "Departman seçimi geçersiz.": "Invalid department selection.",
+  "En az bir departman seç ya da kişiyle birlikte yeni bir departman aç.":
+    "Pick at least one department or open a new one together with this person.",
   "Bu e-posta zaten kullanılıyor.": "That email is already in use.",
   "Bu kayıt zaten bir alt görev": "This item is already a subtask",
   "Bu kayıt zaten bir üst görev": "This item is already a parent task",

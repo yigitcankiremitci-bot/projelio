@@ -1,5 +1,6 @@
-import { useMemo } from "react";
-import type { DepartmentMemberRole, EkipHesabiSecenekleri } from "@projelio/shared";
+import { useEffect, useMemo, useState } from "react";
+import type { DepartmentCatalogEntry, DepartmentMemberRole, EkipHesabiSecenekleri, YeniDepartmanGirdisi } from "@projelio/shared";
+import { api } from "../../api/client";
 import { useT } from "../../lib/i18n";
 import { departmanAdi } from "../../lib/departmanAdi";
 import { useThemeColors } from "../../theme/useThemeColors";
@@ -57,6 +58,13 @@ interface Props {
   setModuller: React.Dispatch<React.SetStateAction<Set<string>>>;
   /** Bölüm başlığı çizer — formun kendi başlık stiliyle aynı görünsün diye dışarıdan gelir. */
   bolum: (baslik: string) => React.ReactNode;
+  /**
+   * Kişiyle BİRLİKTE açılacak departman (yalnızca sahip). Departman ilk
+   * kişisiyle doğar (bkz. shared departmanKurali.ts): departmansız şirkete ilk
+   * çalışan böyle girer. Verilmezse seçenek görünmez.
+   */
+  yeniDepartman?: YeniDepartmanGirdisi | null;
+  setYeniDepartman?: (yeni: YeniDepartmanGirdisi | null) => void;
 }
 
 /**
@@ -70,9 +78,29 @@ interface Props {
  * düşer — görünmeyen bir seçim sunucuya gidip "modül seçilen departmana ait
  * olmalı" hatası verirdi.
  */
-export default function KadroSecimi({ secenekler, departmanlar, setDepartmanlar, moduller, setModuller, bolum }: Props) {
+export default function KadroSecimi({
+  secenekler,
+  departmanlar,
+  setDepartmanlar,
+  moduller,
+  setModuller,
+  bolum,
+  yeniDepartman,
+  setYeniDepartman,
+}: Props) {
   const c = useThemeColors();
   const t = useT();
+  const yeniAcilabilir = Boolean(secenekler.sahipMi && setYeniDepartman);
+  const [katalog, setKatalog] = useState<DepartmentCatalogEntry[]>([]);
+  useEffect(() => {
+    if (!yeniAcilabilir) return;
+    api
+      .get<DepartmentCatalogEntry[]>("/department-catalog")
+      .then(setKatalog)
+      .catch(() => setKatalog([]));
+  }, [yeniAcilabilir]);
+  const kuralKarari = secenekler.departmanKurali?.yeniKisiyle;
+  const kuralKapali = kuralKarari && "sebep" in kuralKarari ? kuralKarari.sebep : null;
 
   const seciliDepartmanlar = useMemo(
     () => secenekler.departmanlar.filter((d) => departmanlar[d.id]),
@@ -128,7 +156,9 @@ export default function KadroSecimi({ secenekler, departmanlar, setDepartmanlar,
       {bolum(t("Departman ve rol"))}
       {secenekler.departmanlar.length === 0 ? (
         <span style={{ fontSize: 13, color: c.textSecondary }}>
-          {t("Bu şirkette henüz departman yok. Önce bir departman aç; hesap bir departmanın kadrosuna eklenir.")}
+          {yeniAcilabilir
+            ? t("Bu şirkette henüz departman yok. Kişiyi aşağıdan, onunla birlikte açılacak bir departmanla ekle.")
+            : t("Bu şirkette henüz departman yok. Önce bir departman aç; hesap bir departmanın kadrosuna eklenir.")}
         </span>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -169,6 +199,72 @@ export default function KadroSecimi({ secenekler, departmanlar, setDepartmanlar,
               </div>
             );
           })}
+        </div>
+      )}
+
+      {yeniAcilabilir && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+            padding: "6px 10px",
+            border: `1px ${yeniDepartman ? "solid" : "dashed"} ${yeniDepartman ? c.accent : c.border}`,
+            borderRadius: 8,
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textPrimary }}>
+            <input
+              type="checkbox"
+              checked={Boolean(yeniDepartman)}
+              disabled={Boolean(kuralKapali) && !yeniDepartman}
+              onChange={(e) => setYeniDepartman!(e.target.checked ? { role: "employee" } : null)}
+            />
+            {t("Kişiyle birlikte yeni departman aç")}
+          </label>
+          {kuralKapali && !yeniDepartman ? (
+            ipucu(t(kuralKapali))
+          ) : yeniDepartman ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <select
+                value={yeniDepartman.catalogKey ?? ""}
+                onChange={(e) =>
+                  setYeniDepartman!({ ...yeniDepartman, catalogKey: e.target.value || undefined, name: e.target.value ? undefined : yeniDepartman.name })
+                }
+                style={{ fontSize: 12, padding: "4px 6px", flex: "1 1 160px" }}
+              >
+                <option value="">{t("Özel ad…")}</option>
+                {katalog.map((d) => (
+                  <option key={d.key} value={d.key}>
+                    {t(d.name)}
+                  </option>
+                ))}
+              </select>
+              {!yeniDepartman.catalogKey && (
+                <input
+                  value={yeniDepartman.name ?? ""}
+                  onChange={(e) => setYeniDepartman!({ ...yeniDepartman, name: e.target.value })}
+                  placeholder={t("Departman adı")}
+                  maxLength={80}
+                  style={{ fontSize: 12, padding: "4px 6px", flex: "1 1 160px" }}
+                />
+              )}
+              <select
+                value={yeniDepartman.role}
+                onChange={(e) => setYeniDepartman!({ ...yeniDepartman, role: e.target.value as DepartmentMemberRole })}
+                style={{ fontSize: 12, padding: "4px 6px" }}
+              >
+                {(Object.keys(ROL_ETIKETI) as DepartmentMemberRole[]).map((r) => (
+                  <option key={r} value={r}>
+                    {t(ROL_ETIKETI[r])}
+                  </option>
+                ))}
+              </select>
+              <div style={{ flexBasis: "100%" }}>
+                {ipucu(t("Departman, kişi eklendiğinde onunla birlikte açılır. Departmanı açılmamış modüller yöneticide çalışmaya devam eder."))}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 

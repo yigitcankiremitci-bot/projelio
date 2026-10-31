@@ -7,6 +7,7 @@ import type {
   IseAlimGirdisi,
   SirketEkibi,
   SirketEkibiUyesi,
+  YeniDepartmanGirdisi,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { LISTE_TAVANI } from "../../common/liste-tavani";
@@ -14,6 +15,7 @@ import { NotificationsService } from "../notifications/notifications.service";
 import { UsersService } from "../users/users.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { EkipHesaplariService } from "../ekip-hesaplari/ekip-hesaplari.service";
+import { DepartmentsService } from "../departments/departments.service";
 import { davetGirdisiniDogrula, gecerliSecim, kabulPlani } from "./ise-alim-kurallari";
 
 type DavetSatiri = {
@@ -25,6 +27,8 @@ type DavetSatiri = {
   is_tanimi: string | null;
   departmanlar: { departmentId: string; role: DepartmentMemberRole }[];
   moduller: { departmentId: string; moduleKey: string }[];
+  // Kabulde kişiyle birlikte açılacak departman (migration 172).
+  yeni_departman: YeniDepartmanGirdisi | null;
   status: IseAlimDurumu;
   created_at: string;
   responded_at: string | null;
@@ -49,7 +53,8 @@ export class IseAlimService {
     private usersService: UsersService,
     private notifications: NotificationsService,
     private ekipHesaplari: EkipHesaplariService,
-    private realtime: RealtimeGateway
+    private realtime: RealtimeGateway,
+    private departmentsService: DepartmentsService
   ) {}
 
   /**
@@ -209,7 +214,13 @@ export class IseAlimService {
     // kabul edince hiçbir şey değiştirmeyen bir düğme koymak kafa karıştırır.
     const { kadro, moduller } = await this.mevcutUyelik(organizationId, girdi.userId, girdi.departmanlar.map((d) => d.departmentId));
     const plan = kabulPlani(girdi, kadro, moduller);
-    if (!plan.kadroEkle.length && !plan.kadroGuncelle.length && !plan.modulEkle.length && !plan.modulGuncelle.length) {
+    if (
+      !girdi.yeniDepartman &&
+      !plan.kadroEkle.length &&
+      !plan.kadroGuncelle.length &&
+      !plan.modulEkle.length &&
+      !plan.modulGuncelle.length
+    ) {
       throw new BadRequestException("Bu kişi seçtiğin departmanların ve modüllerin hepsinde zaten var.");
     }
 
@@ -222,6 +233,17 @@ export class IseAlimService {
         pozisyon: girdi.pozisyon?.trim() || null,
         is_tanimi: girdi.isTanimi?.trim() || null,
         departmanlar: girdi.departmanlar.map((d) => ({ departmentId: d.departmentId, role: d.role })),
+        // Sütun yalnızca gerektiğinde yazılır: migration 172 uygulanmadan
+        // yayına çıkılırsa sıradan davetler kırılmasın.
+        ...(girdi.yeniDepartman
+          ? {
+              yeni_departman: {
+                catalogKey: girdi.yeniDepartman.catalogKey?.trim() || undefined,
+                name: girdi.yeniDepartman.name?.trim() || undefined,
+                role: girdi.yeniDepartman.role,
+              },
+            }
+          : {}),
         moduller: girdi.moduller.map((m) => ({ departmentId: m.departmentId, moduleKey: m.moduleKey })),
       })
       .select("*")
@@ -352,7 +374,7 @@ export class IseAlimService {
     if (modulError) throw modulError;
 
     const secim = gecerliSecim(
-      satir,
+      { ...satir, yeniDepartman: satir.yeni_departman ?? undefined },
       new Set((depts ?? []).map((d: any) => d.id)),
       new Set((acik ?? []).map((m: any) => m.module_key))
     );
@@ -368,6 +390,48 @@ export class IseAlimService {
     const plan = kabulPlani(secim, kadro, moduller);
     const title = satir.pozisyon?.trim() || null;
     const rolu = new Map(secim.departmanlar.map((d) => [d.departmentId, d.role]));
+
+    // Kişiyle birlikte açılan departman. Kural (departman sayısı ≤ kişi sayısı)
+    // davet anındaki değil BUGÜNKÜ kadroyla uygulanır: arada başka departman
+    // açılmış olabilir. Sonraki adımlardan biri düşerse departman geri alınır —
+    // davet beklemede kalır ve yeniden kabulde baştan açılır.
+    let acilanDepartman: string | null = null;
+    if (satir.yeni_departman) {
+      try {
+        const departman = await this.departmentsService.create(
+          satir.organization_id,
+          {
+            catalogKey: satir.yeni_departman.catalogKey,
+            name: satir.yeni_departman.name,
+            ilkKisi: { userId: satir.user_id, role: satir.yeni_departman.role, title },
+          },
+          satir.invited_by ?? undefined,
+          { ilkKisiYeni: true }
+        );
+        acilanDepartman = departman.id;
+      } catch (err) {
+        if (err instanceof BadRequestException) {
+          throw new BadRequestException(
+            `Davetteki yeni departman şu an açılamıyor: ${(err.getResponse() as any)?.message ?? err.message} Yöneticinden davetini güncellemesini iste.`
+          );
+        }
+        throw err;
+      }
+    }
+    try {
+      await this.uyelikPlaniniYaz(satir, plan, title, rolu);
+    } catch (err) {
+      if (acilanDepartman) await this.supabase.client.from("departments").delete().eq("id", acilanDepartman);
+      throw err;
+    }
+  }
+
+  private async uyelikPlaniniYaz(
+    satir: DavetSatiri,
+    plan: ReturnType<typeof kabulPlani>,
+    title: string | null,
+    rolu: Map<string, DepartmentMemberRole>
+  ): Promise<void> {
 
     if (plan.kadroEkle.length) {
       const { error } = await this.supabase.client.from("department_members").insert(
@@ -465,7 +529,10 @@ export class IseAlimService {
     const deptIds = [...new Set(satirlar.flatMap((s) => s.departmanlar.map((d) => d.departmentId)))];
     const modulKeys = [...new Set(satirlar.flatMap((s) => s.moduller.map((m) => m.moduleKey)))];
 
-    const [{ data: orgs }, { data: kisiler }, { data: depts }, { data: katalog }] = await Promise.all([
+    const yeniKatalog = [
+      ...new Set(satirlar.map((s) => s.yeni_departman?.catalogKey).filter((k): k is string => Boolean(k))),
+    ];
+    const [{ data: orgs }, { data: kisiler }, { data: depts }, { data: katalog }, { data: deptKatalog }] = await Promise.all([
       this.supabase.client.from("organizations").select("id, name").in("id", orgIds),
       this.supabase.client.from("users").select("id, full_name, username").in("id", kisiIds),
       deptIds.length
@@ -474,7 +541,11 @@ export class IseAlimService {
       modulKeys.length
         ? this.supabase.client.from("module_catalog").select("key, name").in("key", modulKeys)
         : Promise.resolve({ data: [] as any[] }),
+      yeniKatalog.length
+        ? this.supabase.client.from("department_catalog").select("key, name").in("key", yeniKatalog)
+        : Promise.resolve({ data: [] as any[] }),
     ]);
+    const katalogAdi = new Map((deptKatalog ?? []).map((d: any) => [d.key, d.name as string]));
     const orgAdi = new Map((orgs ?? []).map((o: any) => [o.id, o.name as string]));
     const kisi = new Map((kisiler ?? []).map((k: any) => [k.id, k]));
     const deptAdi = new Map((depts ?? []).map((d: any) => [d.id, d.name as string]));
@@ -494,6 +565,12 @@ export class IseAlimService {
       departmanlar: s.departmanlar
         .filter((d) => deptAdi.has(d.departmentId))
         .map((d) => ({ id: d.departmentId, name: deptAdi.get(d.departmentId)!, role: d.role })),
+      yeniDepartman: s.yeni_departman
+        ? {
+            name: s.yeni_departman.name ?? (s.yeni_departman.catalogKey ? katalogAdi.get(s.yeni_departman.catalogKey) : undefined) ?? "",
+            role: s.yeni_departman.role,
+          }
+        : undefined,
       moduller: s.moduller.map((m) => ({
         departmentId: m.departmentId,
         key: m.moduleKey,

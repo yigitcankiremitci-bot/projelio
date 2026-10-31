@@ -2193,15 +2193,21 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "create_department",
     description:
       "Organizasyona yeni departman açar (Pazarlama, Muhasebe, Üretim…). Yalnızca organizasyon sahibi " +
-      "yapabilir. Aynı adı taşıyan departman zaten varsa yenisini açma, mevcudu kullan.",
+      "yapabilir. Aynı adı taşıyan departman zaten varsa yenisini açma, mevcudu kullan. Departman İLK " +
+      "KİŞİSİYLE açılır: şirketin ekibinden (list_department_members) yönetici dışında birini ilkKisiUserId " +
+      "olarak ver. 10 kişiden küçük şirkette departman sayısı yönetici dışındaki kişi sayısını geçemez; " +
+      "sunucu reddederse sebebini kullanıcıya aynen aktar ve o işi departmansız (yöneticide) yürütmeyi öner. " +
+      "Şirkette henüz kimse yoksa departman açılamaz: kişiyi create_team_account ile eklemeyi öner.",
     input_schema: {
       type: "object",
       properties: {
         organizationId: { type: "string", description: "list_organizations'tan gelen kimlik." },
         name: { type: "string", description: "Departman adı." },
         description: { type: "string", description: "Ne işle ilgilendiği (opsiyonel)." },
+        ilkKisiUserId: { type: "string", description: "Departmanın ilk kişisi: şirket ekibinden, yönetici dışında biri." },
+        ilkKisiRol: { type: "string", enum: ["manager", "employee"], description: "İlk kişinin rolü (varsayılan employee)." },
       },
-      required: ["organizationId", "name"],
+      required: ["organizationId", "name", "ilkKisiUserId"],
     },
   },
   {

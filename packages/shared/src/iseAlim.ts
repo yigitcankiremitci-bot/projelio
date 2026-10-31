@@ -11,6 +11,7 @@
 
 import type { DepartmentMemberRole } from "./types";
 import type { EkipHesabiDepartmanSecimi } from "./ekipHesaplari";
+import type { YeniDepartmanGirdisi } from "./departmanKurali";
 
 export type IseAlimDurumu = "pending" | "accepted" | "rejected" | "cancelled";
 
@@ -21,6 +22,12 @@ export interface IseAlimGirdisi {
   /** Serbest metin: sorumluluklar, çalışma düzeni. Kişi davette okur. */
   isTanimi?: string;
   departmanlar: EkipHesabiDepartmanSecimi[];
+  /**
+   * Kişiyle birlikte açılacak yeni departman (yalnızca sahip). Davette
+   * saklanır, kişi KABUL EDİNCE açılır — reddedilen davet boş departman
+   * bırakmasın (bkz. departmanKurali.ts).
+   */
+  yeniDepartman?: YeniDepartmanGirdisi;
   moduller: { departmentId: string; moduleKey: string }[];
 }
 
@@ -35,6 +42,8 @@ export interface IseAlimDaveti {
   pozisyon?: string;
   isTanimi?: string;
   departmanlar: { id: string; name: string; role: DepartmentMemberRole }[];
+  /** Kabulde kişiyle birlikte açılacak departman (bkz. IseAlimGirdisi.yeniDepartman). */
+  yeniDepartman?: { name: string; role: DepartmentMemberRole };
   moduller: { departmentId: string; key: string; name: string }[];
   status: IseAlimDurumu;
   createdAt: string;

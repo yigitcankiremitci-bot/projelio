@@ -285,6 +285,32 @@ export const kurumsal: TranslationDict = {
   "Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.":
     'No modules enabled yet. Double-click the heading or use "+" to add one.',
   "Yönetici (departmansız)": "Manager (no department)",
+  // Departman açma kuralı (shared departmanKurali.ts)
+  "Bir departman seç ya da özel bir isim gir": "Pick a department or enter a custom name",
+  "Bu şirkette henüz departman yok. Kişiyi aşağıdan, onunla birlikte açılacak bir departmanla ekle.":
+    "This company has no departments yet. Add the person below with a department that opens together with them.",
+  "Departman adı": "Department name",
+  "Departman ilk kişisiyle açılır. 10 kişiden küçük şirketlerde departman sayısı, yönetici dışındaki kişi sayısını geçemez.":
+    "A department opens with its first person. In companies under 10 people, departments can't outnumber the people besides the manager.",
+  "Departman ilk kişisiyle açılır: yönetici dışında birini ekip olarak eklediğinde departman açabilirsin.":
+    "A department opens with its first person: you can open one once someone besides the manager is on the team.",
+  "Departman, kişi eklendiğinde onunla birlikte açılır. Departmanı açılmamış modüller yöneticide çalışmaya devam eder.":
+    "The department opens together with the person. Modules without a department keep working under the manager.",
+  "Departmanı aç": "Open department",
+  "Departmanın ilk kişisi yönetici dışında biri olmalı.": "The department's first person must be someone other than the manager.",
+  "Departmanın ilk kişisini seç": "Pick the department's first person",
+  "Ekipten birini seç…": "Pick someone from the team…",
+  "En az bir departman seç ya da kişiyle birlikte yeni bir departman aç.":
+    "Pick at least one department or open a new one together with this person.",
+  "Kişiyle birlikte yeni departman aç": "Open a new department with this person",
+  'Yeni birini eklerken departmanı onunla birlikte açabilirsin: şirket sayfasındaki Ekip Hesapları ya da İşe al formunda "Kişiyle birlikte yeni departman aç"ı işaretle. O zamana kadar modüller yöneticide çalışır.':
+    'You can open the department while adding someone new: tick "Open a new department with this person" in the Team Accounts or Hire form on the company page. Until then, modules work under the manager.',
+  "Yeni departmanın adını yaz ya da listeden seç.": "Name the new department or pick one from the list.",
+  "kabul edince açılır": "opens when you accept",
+  "Özel ad…": "Custom name…",
+  "İlk kişi": "First person",
+  "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç.":
+    'The first person must be on the company team. To add someone new, choose "New department" in Team Accounts or Hire.',
   "Departmanı açılmamış bir modül kalmadı — diğer modüller kendi departmanından eklenir.":
     "No modules left without a department — the others are added from their own department.",
   "Serbest çalışanlar için henüz açılmış bir modül yok.": "No modules are open for freelancers yet.",

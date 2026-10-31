@@ -1,4 +1,4 @@
-import type { EkipHesabiGirdisi, EkipHesabiSecenekleri } from "@projelio/shared";
+import type { EkipHesabiGirdisi, EkipHesabiSecenekleri, YeniDepartmanGirdisi } from "@projelio/shared";
 import { KULLANICI_ADI_DESENI } from "@projelio/shared";
 
 /**
@@ -41,7 +41,7 @@ export function atanabilirDepartmanlar(
 export function girdiyiDogrula(girdi: EkipHesabiGirdisi, secenekler: EkipHesabiSecenekleri): string | null {
   return (
     kisiGirdisiniDogrula(girdi) ??
-    kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana hesap açma yetkin yok.")
+    kadroSeciminiDogrula(girdi.departmanlar, girdi.moduller, secenekler, "Bu departmana hesap açma yetkin yok.", girdi.yeniDepartman)
   );
 }
 
@@ -89,10 +89,17 @@ export function kadroSeciminiDogrula(
   departmanSecimi: EkipHesabiGirdisi["departmanlar"],
   modulSecimi: EkipHesabiGirdisi["moduller"],
   secenekler: EkipHesabiSecenekleri,
-  yetkisizMesaji: string
+  yetkisizMesaji: string,
+  yeniDepartman?: YeniDepartmanGirdisi | null
 ): string | null {
-  if (!Array.isArray(departmanSecimi) || departmanSecimi.length === 0) {
-    return "En az bir departman seç.";
+  if (yeniDepartman != null) {
+    const hata = yeniDepartmaniDogrula(yeniDepartman, secenekler);
+    if (hata) return hata;
+  }
+  if (!Array.isArray(departmanSecimi)) return "Departman seçimi geçersiz.";
+  // Kişi şirkete bir departmanla girer — mevcut ya da onunla birlikte açılan.
+  if (departmanSecimi.length === 0 && yeniDepartman == null) {
+    return "En az bir departman seç ya da kişiyle birlikte yeni bir departman aç.";
   }
   const departmanlar = new Map(secenekler.departmanlar.map((d) => [d.id, d]));
   const secilen = new Set<string>();
@@ -111,6 +118,26 @@ export function kadroSeciminiDogrula(
       return "Seçilen modül bu departmanda açık değil.";
     }
   }
+  return null;
+}
+
+/**
+ * Kişiyle birlikte açılacak departmanın biçim kontrolü. Departman sayısı
+ * kuralı (departmanKurali.ts) burada DEĞİL, departmanı gerçekten açan
+ * DepartmentsService.create'te uygulanır — kişi sayısının o anki hâliyle.
+ * Burada yalnızca formun kendi gösterdiği durum tekrar sorulur ki kural
+ * kapalıyken hesap açılıp sonra departman reddedilmesin.
+ */
+export function yeniDepartmaniDogrula(yeni: YeniDepartmanGirdisi, secenekler: EkipHesabiSecenekleri): string | null {
+  if (!secenekler.sahipMi) return "Yeni departmanı yalnızca şirket sahibi açabilir.";
+  if (!yeni || typeof yeni !== "object") return "Yeni departman geçersiz.";
+  if (!(ROLLER as readonly string[]).includes(yeni.role)) return "Geçersiz kadro rolü.";
+  const katalog = typeof yeni.catalogKey === "string" ? yeni.catalogKey.trim() : "";
+  const ad = typeof yeni.name === "string" ? yeni.name.trim() : "";
+  if (!katalog && !ad) return "Yeni departmanın adını yaz ya da listeden seç.";
+  if (ad.length > 80) return "Departman adı en fazla 80 karakter olabilir.";
+  const karar = secenekler.departmanKurali?.yeniKisiyle;
+  if (karar && "sebep" in karar) return karar.sebep;
   return null;
 }
 

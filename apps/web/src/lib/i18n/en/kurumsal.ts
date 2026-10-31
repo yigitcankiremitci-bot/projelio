@@ -282,8 +282,11 @@ export const kurumsal: TranslationDict = {
   "Modülü devre dışı bırak": "Disable module",
   "Henüz etkinleştirilmiş modül yok. Sayfadaki \"+\" ile ekleyebilirsin.":
     'No modules enabled yet. Add one with the "+" on the page.',
-  "Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından \"+\" ile modül ekleyebilirsin.":
-    'No modules enabled yet. Add one with the "+" on a department\'s page.',
+  "Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.":
+    'No modules enabled yet. Double-click the heading or use "+" to add one.',
+  "Yönetici (departmansız)": "Manager (no department)",
+  "Departmanı açılmamış bir modül kalmadı — diğer modüller kendi departmanından eklenir.":
+    "No modules left without a department — the others are added from their own department.",
   "Serbest çalışanlar için henüz açılmış bir modül yok.": "No modules are open for freelancers yet.",
   // Serbest çalışanın Modüller sekmesi: arama, kategori, sıralama (lib/serbestModuller.ts)
   "Modül ara: fatura, müşteri, sosyal medya…": "Search modules: invoice, customer, social media…",

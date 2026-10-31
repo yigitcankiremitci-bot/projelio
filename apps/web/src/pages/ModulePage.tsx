@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import type { Department, Job, ModuleAccess, ModuleCatalogEntry } from "@projelio/shared";
+import type { Department, Job, ModuleAccess, ModuleCatalogEntry, Organization } from "@projelio/shared";
 import { api } from "../api/client";
 import { useBackTarget } from "../lib/backTarget";
 import { gezinti } from "../lib/gezintiGecmisi";
@@ -22,10 +22,11 @@ import { useT } from "../lib/i18n";
  * departman sayfasında yerinde açılmaya devam eder.
  */
 export default function ModulePage() {
-  // Sayfa iki bağlamda açılır: şirkette departman altında, serbest çalışanda iş
-  // altında. Modülün kendisi ikisinde de aynı; değişen yalnızca sahiplik ve
-  // "geri" bağlantısı.
-  const { departmentId, jobId, moduleKey } = useParams();
+  // Sayfa üç bağlamda açılır: şirkette departman altında, şirkette yöneticide
+  // (ilgili departman açılmamışken, bkz. lib/modulYeri.ts) ve serbest
+  // çalışanda iş altında. Modülün kendisi hepsinde aynı; değişen yalnızca
+  // sahiplik ve "geri" bağlantısı.
+  const { departmentId, organizationId: orgParam, jobId, moduleKey } = useParams();
   const c = useThemeColors();
   const t = useT();
 
@@ -37,17 +38,20 @@ export default function ModulePage() {
       ? `department:${departmentId}/module/${moduleKey}`
       : moduleKey && jobId
       ? `job:${jobId}/module/${moduleKey}`
+      : moduleKey && orgParam
+      ? `organization:${orgParam}/module/${moduleKey}`
       : null
   );
   const [department, setDepartment] = useState<Department | null>(null);
   const [job, setJob] = useState<Job | null>(null);
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [entry, setEntry] = useState<ModuleCatalogEntry | null>(null);
   const [access, setAccess] = useState<ModuleAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    if (!moduleKey || (!departmentId && !jobId)) return;
+    if (!moduleKey || (!departmentId && !jobId && !orgParam)) return;
     setLoading(true);
     setNotFound(false);
 
@@ -61,6 +65,17 @@ export default function ModulePage() {
           // Serbest çalışanda ayrı bir onay makamı yok: işin sahibi tam yetkili.
           setAccess(null);
         })
+      : orgParam
+      ? // Yöneticideki modül: departman bağlamı yok. Yetki departmansız
+        // çözülür — sahip tam yetkili, diğerleri modüle atanmışsa ya da ilgili
+        // departman sonradan açılıp üyesiyse görür.
+        Promise.all([
+          api.get<Organization>(`/organizations/${orgParam}`).then(setOrganization),
+          api
+            .get<ModuleAccess>(`/organizations/${orgParam}/module-access?moduleKey=${encodeURIComponent(moduleKey)}`)
+            .catch(() => null)
+            .then(setAccess),
+        ])
       : api.get<Department>(`/departments/${departmentId}`).then(async (dept) => {
           setDepartment(dept);
           const moduleAccess = await api
@@ -77,12 +92,14 @@ export default function ModulePage() {
       .then(([, catalog]) => setEntry(catalog.find((e) => e.key === moduleKey) ?? null))
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [departmentId, jobId, moduleKey]);
+  }, [departmentId, orgParam, jobId, moduleKey]);
 
   const title = entry?.name ?? t("Modül");
   const parent = jobId
     ? // İşin Modüller sekmesi kalktı: modüller Projeler sekmesinin altında.
       { to: `/jobs/${jobId}`, label: job?.title ?? t("İş") }
+    : orgParam
+    ? { to: `/organizations/${orgParam}`, label: organization?.name ?? t("Şirket") }
     : { to: `/departments/${departmentId}?tab=modules`, label: department?.name ?? t("Departman") };
 
   // Geri, GELİNEN yere döner (bkz. lib/backTarget): modüle anasayfadan ya da
@@ -101,7 +118,7 @@ export default function ModulePage() {
     return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>{t("Yükleniyor…")}</p>;
   }
 
-  if (notFound || !moduleKey || (!department && !job)) {
+  if (notFound || !moduleKey || (!department && !job && !organization)) {
     return <p style={{ padding: 28, fontSize: 14, color: c.textSecondary }}>{t("Modül bulunamadı.")}</p>;
   }
 
@@ -139,7 +156,7 @@ export default function ModulePage() {
       <ModuleSurface
         moduleKey={moduleKey}
         moduleName={title}
-        organizationId={department?.organizationId}
+        organizationId={department?.organizationId ?? organization?.id}
         departmentId={departmentId}
         departmentKey={department?.catalogKey}
         jobId={jobId}
@@ -152,7 +169,7 @@ export default function ModulePage() {
           aşağı itiyordu. */}
       <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>
         <ModuleTeamPanel
-          organizationId={department?.organizationId}
+          organizationId={department?.organizationId ?? organization?.id}
           departmentId={departmentId}
           jobId={jobId}
           moduleKey={moduleKey}

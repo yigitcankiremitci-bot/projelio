@@ -286,7 +286,7 @@ export const uygulama: TranslationDict = {
   "Ses yazıya çevriliyor…": "Transcribing audio…",
   "Ses çözümlenemedi.": "Couldn't transcribe the audio.",
   "Sesli komut": "Voice command",
-  "Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra departman sayfalarından açabilirsin.": "No modules available to pick. You can skip this step and turn modules on later from the department pages.",
+  "Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra \"Modül ekle\"den açabilirsin.": 'No modules available to pick. You can skip this step and turn modules on later from "Add module".',
   "Seçtiğin kişiye davet bildirimi gider; kabul ettiğinde ekibe katılır.": "The person you pick gets an invitation notification; they join the team once they accept.",
   "Sigorta poliçesi": "Insurance policy",
   "Slogan": "Slogan",

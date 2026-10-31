@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DepartmentMember, JobMember, ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
+import type { DepartmentMember, JobMember, ModuleAccess, ModuleMember, ModuleMemberRole, SirketEkibi } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
@@ -115,7 +115,28 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
       return;
     }
     if (!departmentId) {
-      setCandidates([]);
+      // Yöneticideki modül (ilgili departman açılmamış, bkz. lib/modulYeri.ts):
+      // adaylar şirketin tüm ekibi. Atama departmansız yazılır; sunucu bunu
+      // "organizasyon geneli" atama sayar.
+      if (!organizationId) {
+        setCandidates([]);
+        return;
+      }
+      api
+        .get<SirketEkibi>(`/organizations/${organizationId}/ekip`)
+        .then(({ uyeler }) => {
+          const list = uyeler.filter((u) => !u.kurucu);
+          setCandidates(
+            list
+              .filter((u) => !assigned.has(u.userId))
+              .map((u) => ({ userId: u.userId, label: `${u.fullName}${u.title ? ` · ${u.title}` : ""}` }))
+          );
+          setCandidateState({ toplam: list.length, hata: false });
+        })
+        .catch(() => {
+          setCandidates([]);
+          setCandidateState({ toplam: 0, hata: true });
+        });
       return;
     }
     api
@@ -132,7 +153,7 @@ export default function ModuleTeamPanel({ organizationId, departmentId, jobId, m
         setCandidates([]);
         setCandidateState({ toplam: 0, hata: true });
       });
-  }, [adding, jobId, departmentId, members]);
+  }, [adding, jobId, departmentId, organizationId, members]);
 
   const canManage = resolved?.canManageTeam ?? false;
 

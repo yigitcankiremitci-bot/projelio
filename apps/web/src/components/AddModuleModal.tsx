@@ -7,6 +7,11 @@ import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
+import { yoneticiyeEklenebilir } from "../lib/modulYeri";
+
+// Departman seçicisindeki "Yönetici" seçeneği: ilgili departmanı açılmamış
+// modüller şirket sahibinde durur (bkz. lib/modulYeri.ts).
+const YONETICI = "__yonetici";
 
 interface Props {
   organizationId: string;
@@ -24,10 +29,17 @@ interface Props {
 // önce hangi departmana ekleneceği seçilir, sonra o departmanın henüz etkin
 // olmayan modülleri listelenir — DepartmentModulesPanel.AddModulesForm ile aynı
 // ekleme mantığı, tek farkla: departman seçimi burada ek bir adım.
+//
+// Departmanı açılmamış bir modül için departman kurmak gerekmez: "Yönetici"
+// seçilir ve modül yöneticide açılır. Küçük işletmeler kimsesi olmayan
+// departmanlar kurmasın diye — departman sonradan açılınca modül oraya geçer.
 export default function AddModuleModal({ organizationId, onClose, onAdded, fixedDepartmentId }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [departments, setDepartments] = useState<Department[]>([]);
+  // Katalog anahtarı olmayan (özel) departmanlar seçicide yok ama "Yönetici"
+  // listesini süzerken tüm departmanlar lazım.
+  const [allDepartments, setAllDepartments] = useState<Department[]>([]);
   const [enabledKeys, setEnabledKeys] = useState<Set<string>>(new Set());
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [departmentId, setDepartmentId] = useState(fixedDepartmentId ?? "");
@@ -44,12 +56,26 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
     ])
       .then(([depts, mods]) => {
         setDepartments(depts.filter((d) => d.catalogKey));
+        setAllDepartments(depts);
+        // Hiç standart departman yoksa seçilecek tek yer yönetici.
+        if (!fixedDepartmentId && !depts.some((d) => d.catalogKey)) setDepartmentId(YONETICI);
         setEnabledKeys(new Set(mods.map((m) => m.moduleKey)));
       })
       .finally(() => setLoadingDepts(false));
   }, [organizationId]);
 
   useEffect(() => {
+    if (departmentId === YONETICI) {
+      setLoadingCatalog(true);
+      setSelectedKeys([]);
+      setError("");
+      api
+        .get<ModuleCatalogEntry[]>("/module-catalog")
+        .then((list) => setCatalog(list.filter((e) => yoneticiyeEklenebilir(e, allDepartments))))
+        .catch(() => setCatalog([]))
+        .finally(() => setLoadingCatalog(false));
+      return;
+    }
     const dept = departments.find((d) => d.id === departmentId);
     if (!dept?.catalogKey) {
       setCatalog([]);
@@ -63,7 +89,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
       .then(setCatalog)
       .catch(() => setCatalog([]))
       .finally(() => setLoadingCatalog(false));
-  }, [departmentId, departments]);
+  }, [departmentId, departments, allDepartments]);
 
   const availableCatalog = catalog.filter((entry) => !enabledKeys.has(entry.key));
 
@@ -98,13 +124,10 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
           <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Departman")}</label>
           {loadingDepts ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
-          ) : departments.length === 0 ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-              {t("Modül eklemek için önce standart departmanlardan birini eklemelisin.")}
-            </p>
           ) : (
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
               <option value="">{t("Departman seç…")}</option>
+              <option value={YONETICI}>{t("Yönetici (departmansız)")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {departmanAdi(d.name, t)}
@@ -119,7 +142,11 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
           (loadingCatalog ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : availableCatalog.length === 0 ? (
-            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Bu departmanın modüllerinin hepsi zaten etkin.")}</p>
+            <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
+              {departmentId === YONETICI
+                ? t("Departmanı açılmamış bir modül kalmadı — diğer modüller kendi departmanından eklenir.")
+                : t("Bu departmanın modüllerinin hepsi zaten etkin.")}
+            </p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>
               {availableCatalog.map((entry) => {

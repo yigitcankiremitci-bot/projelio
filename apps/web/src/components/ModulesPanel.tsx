@@ -13,6 +13,7 @@ import SectionToggle from "./SectionToggle";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import ModuleEmblem from "./ModuleEmblem";
 import AddModuleModal from "./AddModuleModal";
+import { modulDepartmani, yoneticiModulAdresi } from "../lib/modulYeri";
 
 export interface ModulesPanelHandle {
   /** Anasayfadaki "+" menüsünden "Modül ekle" (bkz. OrganizationDetail HomeAddFabRegistrar). */
@@ -29,8 +30,9 @@ interface Props {
 // Şirket anasayfasındaki "Modüller" sekmesi: organizasyonda (hangi departmandan
 // etkinleştirilmiş olursa olsun) etkin olan TÜM modülleri kart görünümünde
 // gösterir — böylece yöneticiler her departmana ayrı ayrı girmeden ekli tüm
-// modülleri tek yerde görebilir. Ekleme/kaldırma ilgili departmanın kendi
-// sayfasından ("+" düğmesi) yapılır; bu sekme salt görünürlük içindir.
+// modülleri tek yerde görebilir. İlgili departmanı açılmamış modüller
+// yöneticide durur ve kartları şirket düzeyindeki sayfaya gider (bkz.
+// lib/modulYeri.ts).
 // Bu sayıya kadar tek satır; üstünde iki satıra bölünüp yana kaydırılır.
 const SINGLE_ROW_LIMIT = 4;
 
@@ -70,7 +72,6 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
 
   useEffect(load, [organizationId]);
 
-  const deptIdByCatalogKey = new Map(departments.filter((d) => d.catalogKey).map((d) => [d.catalogKey as string, d.id]));
   const enabledKeys = new Set(enabled.map((m) => m.moduleKey));
   // Son kullanılan en üstte: ekranda hem liste (telefon) hem şerit (masaüstü)
   // bu sırayı izliyor.
@@ -82,22 +83,19 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
   );
 
   /**
-   * Kart tıklanınca hangi departmanın sayfasına gidilecek.
+   * Kart tıklanınca nereye gidilecek: ilgili departman kuruluysa onun sayfası,
+   * değilse yöneticideki modül sayfası.
    *
-   * Modül BİRDEN FAZLA departmana açık olabiliyor (module_catalog_departments)
-   * ve şirkette bunlardan yalnızca biri kurulmuş olabiliyor. Eskiden yalnızca
-   * BİRİNCİL departmana bakılıyordu: Hesaplar'ın birincili BT olduğu için, modül
-   * Yönetim'den açılmış bir şirkette kart hiçbir yere gitmiyor — tıklanınca
-   * hiçbir şey olmuyordu. Artık kurulu olan ilk departman kazanıyor (liste
-   * zaten birincil başta geliyor).
+   * Modül BİRDEN FAZLA departmana açık olabiliyor (module_catalog_departments);
+   * kurulu olan ilk departman kazanır. Eskiden departmanı olmayan modülün kartı
+   * hiçbir yere gitmiyordu — tıklanınca hiçbir şey olmuyordu.
    */
-  const departmentIdFor = (entry: ModuleCatalogEntry): string | undefined => {
-    const keys = entry.departmentKeys?.length ? entry.departmentKeys : entry.departmentKey ? [entry.departmentKey] : [];
-    for (const key of keys) {
-      const id = deptIdByCatalogKey.get(key);
-      if (id) return id;
-    }
-    return undefined;
+  const departmentIdFor = (entry: ModuleCatalogEntry) => modulDepartmani(entry, departments);
+  const hedef = (entry: ModuleCatalogEntry) => {
+    const departmentId = departmentIdFor(entry);
+    return departmentId
+      ? `/departments/${departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}`
+      : yoneticiModulAdresi(organizationId, entry.key);
   };
 
   return (
@@ -134,18 +132,17 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
             fontSize: 15,
           }}
         >
-          {t("Henüz etkinleştirilmiş modül yok. Bir departmanın sayfasından \"+\" ile modül ekleyebilirsin.")}
+          {t("Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.")}
         </div>
       ) : !isDesktop ? (
         // Telefonda iki satırlık yatay şerit yerine alt alta tek satırlık
         // düğmeler (bkz. ListRowLink). Hedef, kartınkiyle aynı.
         <ListRowStack>
           {activeEntries.map((entry) => {
-            const departmentId = departmentIdFor(entry);
             return (
               <ListRowLink
                 key={entry.key}
-                to={departmentId ? `/departments/${departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}` : undefined}
+                to={hedef(entry)}
                 icon={<ModuleEmblem moduleKey={entry.key} size={ROW_INNER_HEIGHT} radius="11px 0 0 11px" />}
                 iconBleed
                 label={entry.name}
@@ -175,7 +172,7 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
           }}
         >
           {activeEntries.map((entry) => (
-            <ModuleCard key={entry.key} entry={entry} departmentId={departmentIdFor(entry)} />
+            <ModuleCard key={entry.key} entry={entry} to={hedef(entry)} />
           ))}
         </div>
       )}

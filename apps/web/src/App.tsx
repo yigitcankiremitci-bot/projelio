@@ -886,6 +886,7 @@ export default function App() {
                 <Route path="/departments/:id" element={<DepartmentDetail />} />
                 {/* Sayfa yüzeyli modüller kendi adreslerinde açılır (bkz. lib/moduleSurfaces.ts). */}
                 <Route path="/departments/:departmentId/modules/:moduleKey" element={<ModulePage />} />
+                <Route path="/organizations/:organizationId/modules/:moduleKey" element={<ModulePage />} />
                 <Route path="/jobs/:jobId/modules/:moduleKey" element={<ModulePage />} />
                 <Route path="/groups" element={<Groups />} />
                 <Route path="/groups/:id" element={<GroupDetail />} />

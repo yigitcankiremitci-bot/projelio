@@ -28,11 +28,10 @@ export const baslangic: TranslationDict = {
   "Grup (holding) adı": "Group (holding) name",
   "Örn. Acme Yazılım A.Ş.": "e.g. Acme Software Inc.",
   "Örn. Acme Holding": "e.g. Acme Group",
-  '"{ad}" için ISO 9001 uyumlu standart departmanlardan istediklerini işaretle. Bu adımı boş geçip departmanları sonra da ekleyebilirsin.':
-    'Pick the ISO 9001 standard departments you want for "{ad}". You can skip this step and add departments later.',
-  "Ya da özel departman adı (opsiyonel)": "Or a custom department name (optional)",
   "Birden fazla seçebilirsin. Buna göre hangi ekranların öne çıkacağına karar veriyoruz.":
     "You can pick more than one. We use this to decide which screens to put first.",
+  "Yalnızca hemen kullanacaklarını işaretle — seçtiklerin şirketinde açılır, gerisini sonradan ekleyebilirsin.":
+    "Only mark the ones you'll use right away. They're turned on for your company; you can add the rest later.",
   "Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin.":
     "Mark the ones useful to you for now. It's just a preference; you can turn any of them on or off later.",
   "Seçtiklerini bir kez gözden geçir; istersen geri dönüp değiştirebilirsin.":

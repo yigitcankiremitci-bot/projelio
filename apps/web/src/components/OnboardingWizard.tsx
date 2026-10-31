@@ -3,7 +3,6 @@ import { Z, safeTop, safeBottom } from "../lib/layout";
 import { useNavigate } from "react-router-dom";
 import type {
   AccountType,
-  DepartmentCatalogEntry,
   ModuleCatalogEntry,
   OrgType,
   Sector,
@@ -25,6 +24,7 @@ import { cropAvatarImage } from "../lib/imageProcessing";
 import type { CropArea } from "../lib/imageProcessing";
 import AvatarCropper from "./AvatarCropper";
 import { useT } from "../lib/i18n";
+import { yoneticiyeEklenebilir } from "../lib/modulYeri";
 import {
   IconUser,
   IconBuilding,
@@ -82,21 +82,26 @@ const ORG_TYPE_OPTIONS: { type: OrgType; title: string; description: string }[] 
 // dil:anahtar-bitis
 
 // Sihirbazın adımları. Hangilerinin gösterileceği hesap tipine göre değişir:
-// kendi yapısını kuranlara (organization_owner/group_owner) org adımı, yalnızca
-// şirket kuranlara ayrıca departman adımı eklenir. Sıra bu dizideki sıradır.
-type StepKey = "account" | "profile" | "org" | "departments" | "usage" | "modules" | "summary";
+// kendi yapısını kuranlara (organization_owner/group_owner) org adımı eklenir.
+// Sıra bu dizideki sıradır.
+//
+// Şirket kuranlara eskiden bir de departman adımı soruluyordu. Kullanıcı
+// hepsini işaretleme eğilimindeydi ve 2-3 kişilik işletmelerde kimsesi olmayan
+// bir sürü departman doğuyordu. Artık şirket departmansız kurulur; seçilen
+// modüller yöneticide açılır (bkz. lib/modulYeri.ts), departman ekip büyüdükçe
+// şirket sayfasından eklenir.
+type StepKey = "account" | "profile" | "org" | "usage" | "modules" | "summary";
 
 function stepsFor(accountType: AccountType | null): StepKey[] {
   const steps: StepKey[] = ["account", "profile"];
   if (accountType === "organization_owner" || accountType === "group_owner") steps.push("org");
-  if (accountType === "organization_owner") steps.push("departments");
   steps.push("usage", "modules", "summary");
   return steps;
 }
 
 // Uygulamayı ilk kez (ya da mevcut kullanıcılar için ilk yeniden girişte) açan herkese
 // bir kez gösterilir; hesap tipini belirler, kişisel profili toplar ve gerekirse aynı
-// anda Organizasyon/Grup + departmanları oluşturur. Kapatılamaz — tamamlanmadan
+// anda Organizasyon/Grup kurup seçilen modülleri açar. Kapatılamaz — tamamlanmadan
 // arkasındaki uygulama kullanılamaz.
 //
 // Tüm ağ çağrıları SON adımda (finish) yapılır. Adım adım kaydetmiyoruz: kullanıcı
@@ -125,11 +130,6 @@ export default function OnboardingWizard({ onCompleted }: Props) {
   const [name, setName] = useState("");
   const [orgType, setOrgType] = useState<OrgType>("sirket");
 
-  // Adım 4 — departmanlar
-  const [catalog, setCatalog] = useState<DepartmentCatalogEntry[]>([]);
-  const [selectedDeptKeys, setSelectedDeptKeys] = useState<string[]>([]);
-  const [customDept, setCustomDept] = useState("");
-
   // Adım 5/6 — kullanım amacı ve modüller
   const [useCases, setUseCases] = useState<UseCase[]>([]);
   const [modules, setModules] = useState<ModuleCatalogEntry[]>([]);
@@ -139,16 +139,9 @@ export default function OnboardingWizard({ onCompleted }: Props) {
   const steps = useMemo(() => stepsFor(selected), [selected]);
   const step = steps[Math.min(stepIndex, steps.length - 1)];
 
-  useEffect(() => {
-    api
-      .get<DepartmentCatalogEntry[]>("/department-catalog")
-      .then(setCatalog)
-      .catch(() => setCatalog([]));
-  }, []);
-
   // Modül listesi hesap tipine göre farklı bir kaynaktan gelir; bu yüzden modül
-  // adımına GELİNDİĞİNDE yükleniyor, sihirbaz açılışında değil: şirket kuranlarda
-  // liste seçilen departmanlara bağlı ve o seçim daha önceki adımda yapılıyor.
+  // adımına GELİNDİĞİNDE yükleniyor, sihirbaz açılışında değil: hesap tipi
+  // birkaç adım önce değiştirilebiliyor.
   useEffect(() => {
     if (step !== "modules") return;
     let cancelled = false;
@@ -156,24 +149,9 @@ export default function OnboardingWizard({ onCompleted }: Props) {
 
     const load = async (): Promise<ModuleCatalogEntry[]> => {
       if (selected === "organization_owner") {
-        if (selectedDeptKeys.length === 0) return [];
-        // Departman->modül eşlemesi çoktan-çoğa; her departmanın modülleri ayrı
-        // sorgulanıp anahtara göre tekilleştiriliyor (aynı modül iki departmanda olabilir).
-        const lists = await Promise.all(
-          selectedDeptKeys.map((key) =>
-            api.get<ModuleCatalogEntry[]>(`/module-catalog?departmentKey=${encodeURIComponent(key)}`).catch(() => [])
-          )
-        );
-        const seen = new Set<string>();
-        const merged: ModuleCatalogEntry[] = [];
-        for (const list of lists) {
-          for (const m of list) {
-            if (seen.has(m.key)) continue;
-            seen.add(m.key);
-            merged.push(m);
-          }
-        }
-        return merged.sort((a, b) => a.sortOrder - b.sortOrder);
+        // Henüz departman yok: yöneticide açılabilecek tüm şirket modülleri.
+        const all = await api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []);
+        return all.filter((m) => yoneticiyeEklenebilir(m, [])).sort((a, b) => a.sortOrder - b.sortOrder);
       }
       if (selected === "group_owner") {
         const all = await api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []);
@@ -187,7 +165,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
       .then((list) => {
         if (cancelled) return;
         setModules(list);
-        // Artık listede olmayan bir modül seçili kalmasın (departman seçimi değişmiş olabilir).
+        // Artık listede olmayan bir modül seçili kalmasın (hesap tipi değişmiş olabilir).
         const valid = new Set(list.map((m) => m.key));
         setSelectedModuleKeys((prev) => prev.filter((k) => valid.has(k)));
       })
@@ -198,7 +176,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [step, selected, selectedDeptKeys]);
+  }, [step, selected]);
 
   const toggle = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
     setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
@@ -236,7 +214,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
   };
 
   // Tüm sihirbaz sonuçlarını tek seferde uygular: profil + hesap tipi, ardından
-  // (varsa) organizasyon/grup ve departmanlar, en son avatar.
+  // (varsa) organizasyon/grup ve şirketin modülleri, en son avatar.
   const finish = async () => {
     if (!selected) return;
     setLoading(true);
@@ -255,13 +233,14 @@ export default function OnboardingWizard({ onCompleted }: Props) {
         onboardingModules: selectedModuleKeys.length ? selectedModuleKeys : undefined,
       });
 
-      if (result?.organizationId) {
-        for (const key of selectedDeptKeys) {
-          await api.post(`/organizations/${result.organizationId}/departments`, { catalogKey: key }).catch(() => {});
-        }
-        if (customDept.trim()) {
-          await api.post(`/organizations/${result.organizationId}/departments`, { name: customDept.trim() }).catch(() => {});
-        }
+      // Şirkette seçilen modüller gerçekten açılır (yöneticide). Eskiden yalnızca
+      // users.onboarding_modules'a "tercih" olarak yazılıyor, hiçbir şey
+      // açılmıyordu. Hata yutuluyor: modül sonradan "Modül ekle"den de açılır,
+      // kurulumun tamamı bunun için geri alınmasın.
+      if (result?.organizationId && selectedModuleKeys.length) {
+        await api
+          .post(`/organizations/${result.organizationId}/modules`, { moduleKeys: selectedModuleKeys })
+          .catch(() => {});
       }
 
       // Avatar en sonda ve hatası yutuluyor: fotoğraf yüklenemedi diye kurulumun
@@ -309,7 +288,6 @@ export default function OnboardingWizard({ onCompleted }: Props) {
     </div>
   );
 
-  const selectedDeptNames = catalog.filter((d) => selectedDeptKeys.includes(d.key)).map((d) => d.name);
   const selectedModuleNames = modules.filter((m) => selectedModuleKeys.includes(m.key)).map((m) => m.name);
   const accountLabel = OPTIONS.find((o) => o.type === selected)?.title ?? "";
 
@@ -589,38 +567,6 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           </>
         )}
 
-        {step === "departments" && (
-          <>
-            <Header
-              heading={t("Departmanlarını seç")}
-              sub={t('"{ad}" için ISO 9001 uyumlu standart departmanlardan istediklerini işaretle. Bu adımı boş geçip departmanları sonra da ekleyebilirsin.', { ad: name.trim() })}
-            />
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 8, marginBottom: 16 }}>
-              {catalog.map((entry) => (
-                <button
-                  key={entry.key}
-                  onClick={() => toggle(setSelectedDeptKeys, entry.key)}
-                  style={{ ...cardStyle(selectedDeptKeys.includes(entry.key)), fontSize: 14 }}
-                >
-                  {entry.name}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <label style={fieldLabel}>{t("Ya da özel departman adı (opsiyonel)")}</label>
-              <input
-                value={customDept}
-                onChange={(e) => setCustomDept(e.target.value)}
-                onKeyDown={onEnter(() => !loading && goNext())}
-                placeholder={t("Örn. Ar-Ge")}
-                style={{ width: "100%" }}
-              />
-            </div>
-          </>
-        )}
-
         {step === "usage" && (
           <>
             <Header
@@ -660,14 +606,18 @@ export default function OnboardingWizard({ onCompleted }: Props) {
           <>
             <Header
               heading={t("Kullanacağın modüller")}
-              sub={t("Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin.")}
+              sub={
+                selected === "organization_owner"
+                  ? t("Yalnızca hemen kullanacaklarını işaretle — seçtiklerin şirketinde açılır, gerisini sonradan ekleyebilirsin.")
+                  : t("Şimdilik işine yarayacakları işaretle — bu bir tercih kaydı, hepsini sonradan açıp kapatabilirsin.")
+              }
             />
 
             {modulesLoading ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0 }}>{t("Modüller yükleniyor…")}</p>
             ) : modules.length === 0 ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0, lineHeight: 1.5 }}>
-                {t("Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra departman sayfalarından açabilirsin.")}
+                {t("Seçilebilecek bir modül bulunamadı. Bu adımı geçebilirsin; modülleri daha sonra \"Modül ekle\"den açabilirsin.")}
               </p>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
@@ -699,10 +649,6 @@ export default function OnboardingWizard({ onCompleted }: Props) {
                 { label: t("Telefon"), value: phone.trim() },
                 { label: t("Sektör"), value: sector ? t(SECTOR_LABEL[sector]) : "" },
                 { label: t("Ekip büyüklüğü"), value: teamSize ? t(TEAM_SIZE_LABEL[teamSize]) : "" },
-                {
-                  label: t("Departmanlar"),
-                  value: [...selectedDeptNames, customDept.trim()].filter(Boolean).join(", "),
-                },
                 { label: t("Kullanım amacı"), value: useCases.map((u) => t(USE_CASE_LABEL[u])).join(", ") },
                 { label: t("Modüller"), value: selectedModuleNames.join(", ") },
               ]

@@ -1652,7 +1652,10 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     description:
       "Bir modülü açar: organizasyona etkinleştirir ya da serbest çalışanın işine atar. " +
       "Açılabilecek modülleri list_modules'u includeAvailable:true ile çağırarak gör. " +
-      "Yetki: organizasyon tarafında yalnızca organizasyon sahibi, iş tarafında iş sahibi.",
+      "Yetki: organizasyon tarafında yalnızca organizasyon sahibi, iş tarafında iş sahibi. " +
+      "Şirkette aynı anda açık modül sayısı pakete bağlı (Ücretsiz 2, Starter 4, Pro 8, Business sınırsız; " +
+      "proje/görev/dosya gibi çekirdek modüller sayılmaz). Sunucu hak doldu derse sebebi aynen aktar; " +
+      "kullanılmayan bir modülü kapatmayı ya da paketi yükseltmeyi öner, kendiliğinden modül KAPATMA.",
     input_schema: {
       type: "object",
       properties: {

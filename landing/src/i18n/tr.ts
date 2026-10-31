@@ -437,6 +437,7 @@ export const tr = {
         features: [
           "Aylık 20.000 birim Lio Bakiyesi",
           "Sınırsız proje ve görev",
+          "Şirkette 4 modül",
           "Google Drive / OneDrive bağlantısı",
           "Mobil uygulama",
           "E-posta desteği",
@@ -456,6 +457,7 @@ export const tr = {
         features: [
           "Aylık 50.000 birim Lio Bakiyesi",
           "Starter'daki her şey",
+          "Şirkette 8 modül",
           "WhatsApp üzerinden Lio",
           "Gelir-gider ve proje bütçesi",
           "Öncelikli destek",
@@ -475,13 +477,14 @@ export const tr = {
         features: [
           "Aylık 150.000 birim Lio Bakiyesi",
           "Pro'daki her şey",
+          "Sınırsız modül",
           "10 kullanıcıya kadar",
           "Departman bazlı yetkilendirme",
           "Dışa aktarma ve raporlar",
         ],
       },
     ],
-    freeNote: "Ücretsiz plan süresiz açık: hoş geldin bakiyesiyle Lio'yu denersiniz.",
+    freeNote: "Ücretsiz plan süresiz açık: şirketinizde 2 modül kullanır, hoş geldin bakiyesiyle Lio'yu denersiniz.",
     creditsLabel: "birim / ay",
     billedYearly: "Yıllık {tutar} olarak faturalanır",
     // Vitrin TL'ye geçti (PayTR dövizle tahsilat yapılıp yapılmadığını sordu);

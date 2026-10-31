@@ -13,6 +13,7 @@ import ModuleCard from "./ModuleCard";
 import { IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
+import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
 
 interface Props {
   organizationId: string;
@@ -298,6 +299,8 @@ function AddModulesForm({
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const hak = useModulHakki(organizationId);
+  const asiyor = hakkiAsiyor(hak, selectedKeys);
 
   const toggleKey = (key: string) => {
     setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
@@ -356,12 +359,14 @@ function AddModulesForm({
         </div>
       )}
 
+      {availableCatalog.length > 0 && <ModulHakkiBilgisi durum={hak} secilen={selectedKeys} />}
+
       {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
 
       {availableCatalog.length > 0 && (
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || asiyor}
           style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
         >
           {saving ? t("Ekleniyor…") : t("Modülleri ekle")}

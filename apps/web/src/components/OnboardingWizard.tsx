@@ -16,6 +16,8 @@ import {
   TEAM_SIZES,
   USE_CASE_LABEL,
   USE_CASES,
+  MODUL_HAKKI,
+  modulSayilirMi,
 } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -178,6 +180,11 @@ export default function OnboardingWizard({ onCompleted }: Props) {
     };
   }, [step, selected]);
 
+  // Şirket kuranın modül seçimi ücretsiz paketin hakkıyla sınırlı.
+  const kurulumHakki = selected === "organization_owner" ? MODUL_HAKKI.free : null;
+  const sayilanSecim = selectedModuleKeys.filter(modulSayilirMi).length;
+  const hakDoldu = kurulumHakki !== null && sayilanSecim >= kurulumHakki;
+
   const toggle = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, value: T) => {
     setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
   };
@@ -238,8 +245,12 @@ export default function OnboardingWizard({ onCompleted }: Props) {
       // açılmıyordu. Hata yutuluyor: modül sonradan "Modül ekle"den de açılır,
       // kurulumun tamamı bunun için geri alınmasın.
       if (result?.organizationId && selectedModuleKeys.length) {
+        // Geri dönülüp seçim değiştiyse hak aşılmış olabilir; sunucu o zaman
+        // HEPSİNİ reddederdi. Hakka sayılanlardan ilk N'i gönderilir.
+        let sayilan = 0;
+        const gonderilecek = selectedModuleKeys.filter((k) => !modulSayilirMi(k) || ++sayilan <= (kurulumHakki ?? Infinity));
         await api
-          .post(`/organizations/${result.organizationId}/modules`, { moduleKeys: selectedModuleKeys })
+          .post(`/organizations/${result.organizationId}/modules`, { moduleKeys: gonderilecek })
           .catch(() => {});
       }
 
@@ -613,6 +624,17 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               }
             />
 
+            {/* Yeni şirket ücretsiz paketle başlar: seçim onun modül hakkıyla
+                sınırlı (bkz. shared modulHakki.ts). Sunucu fazlasını zaten
+                reddederdi — ve hata yutulduğu için hiçbiri açılmazdı. */}
+            {selected === "organization_owner" && kurulumHakki !== null && (
+              <p style={{ fontSize: 14, color: c.textSecondary, textAlign: "center", margin: "0 0 12px", lineHeight: 1.5 }}>
+                {t("Ücretsiz pakette şirketinde {hak} modül açabilirsin ({secili}/{hak}). Daha fazlası için sonradan paketini yükseltebilirsin.", {
+                  hak: kurulumHakki,
+                  secili: sayilanSecim,
+                })}
+              </p>
+            )}
             {modulesLoading ? (
               <p style={{ fontSize: 15, color: c.textSecondary, textAlign: "center", margin: 0 }}>{t("Modüller yükleniyor…")}</p>
             ) : modules.length === 0 ? (
@@ -623,8 +645,14 @@ export default function OnboardingWizard({ onCompleted }: Props) {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
                 {modules.map((m) => {
                   const active = selectedModuleKeys.includes(m.key);
+                  const kilitli = !active && hakDoldu && modulSayilirMi(m.key);
                   return (
-                    <button key={m.key} onClick={() => toggle(setSelectedModuleKeys, m.key)} style={cardStyle(active)}>
+                    <button
+                      key={m.key}
+                      onClick={() => !kilitli && toggle(setSelectedModuleKeys, m.key)}
+                      disabled={kilitli}
+                      style={{ ...cardStyle(active), opacity: kilitli ? 0.45 : 1 }}
+                    >
                       <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary, marginBottom: 2 }}>{m.name}</span>
                       {m.description && (
                         <span style={{ display: "block", fontSize: 13, color: c.textSecondary, lineHeight: 1.4 }}>{t(m.description)}</span>

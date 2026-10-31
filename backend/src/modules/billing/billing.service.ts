@@ -15,7 +15,7 @@ import { getWebAppUrl } from "../../common/config/env";
 import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.service";
 import { IyzicoClient, IyzicoHatasi } from "./iyzico.client";
 import { PayTRClient } from "./paytr.client";
-import { toleransSonu } from "./paytr-abonelik-takvim";
+import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "./abonelik-hakki";
 import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
 import {
   ayEkle,
@@ -61,12 +61,8 @@ export interface Abonelik {
   createdAt: string;
 }
 
-/**
- * Hak veren durumlar. İkisi de bilinçli:
- *   · past_due — tek bir başarısız çekim erişimi kesmez, sağlayıcı yeniden deniyor.
- *   · canceled — ödenmiş dönem sonuna kadar kullanmaya devam edilir.
- */
-const HAK_VEREN: AbonelikDurumu[] = ["trialing", "active", "past_due", "canceled"];
+// Hak veren durumlar ve nedenleri: abonelik-hakki.ts.
+const HAK_VEREN: AbonelikDurumu[] = HAK_VEREN_DURUMLAR;
 
 /**
  * "Yeni paket almasını engelleyen" durumlar. HAK_VEREN'den farkı 'canceled':
@@ -292,16 +288,7 @@ export class BillingService {
    * donemleriIlerlet() ama ona güvenmiyoruz: cron gecikirse hak sızmasın.
    */
   private donemGecerli(abonelik: Abonelik): boolean {
-    if (!abonelik.currentPeriodEnd) return abonelik.status === "active" || abonelik.status === "trialing";
-    const bitis = new Date(abonelik.currentPeriodEnd);
-    // PayTR'de yenilemeyi biz deniyoruz ve vade geçtikten sonra 14 gün daha
-    // deniyoruz; bu sürede erişim açık kalmalı (kullanıcı kararı, 2026-09-28).
-    // Aktif ama vadesi geçmiş satır da aynı durumda: saat başı iş henüz
-    // çekmemiş olabilir, bir saatlik gecikme erişimi kesmemeli.
-    if (abonelik.source === "paytr" && (abonelik.status === "past_due" || abonelik.status === "active")) {
-      return toleransSonu(bitis).getTime() > Date.now();
-    }
-    return bitis.getTime() > Date.now();
+    return abonelikDonemiGecerli(abonelik);
   }
 
   // ================================================================== Satın alma

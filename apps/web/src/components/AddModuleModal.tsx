@@ -8,6 +8,7 @@ import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
 import { yoneticiyeEklenebilir } from "../lib/modulYeri";
+import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
 
 // Departman seçicisindeki "Yönetici" seçeneği: ilgili departmanı açılmamış
 // modüller şirket sahibinde durur (bkz. lib/modulYeri.ts).
@@ -48,6 +49,8 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const hak = useModulHakki(organizationId);
+  const asiyor = hakkiAsiyor(hak, selectedKeys);
 
   useEffect(() => {
     Promise.all([
@@ -177,12 +180,14 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
             </div>
           ))}
 
+        <ModulHakkiBilgisi durum={hak} secilen={selectedKeys} />
+
         {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
 
         <button
           data-primary
           onClick={handleSave}
-          disabled={saving || !departmentId || selectedKeys.length === 0}
+          disabled={saving || !departmentId || selectedKeys.length === 0 || asiyor}
           style={{
             padding: "11px 0",
             borderRadius: 8,
@@ -191,7 +196,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
             color: c.onPrimary,
             fontSize: 15,
             fontWeight: 500,
-            opacity: !departmentId || selectedKeys.length === 0 ? 0.6 : 1,
+            opacity: !departmentId || selectedKeys.length === 0 || asiyor ? 0.6 : 1,
           }}
         >
           {saving ? t("Ekleniyor…") : t("Modülleri ekle")}

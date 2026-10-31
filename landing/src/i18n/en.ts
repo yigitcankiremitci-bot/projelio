@@ -428,6 +428,7 @@ export const en: Dict = {
         features: [
           "20,000 Lio Units per month",
           "Unlimited projects and tasks",
+          "4 modules for your company",
           "Google Drive / OneDrive connection",
           "Mobile app",
           "Email support",
@@ -447,6 +448,7 @@ export const en: Dict = {
         features: [
           "50,000 Lio Units per month",
           "Everything in Starter",
+          "8 modules for your company",
           "Lio over WhatsApp",
           "Income, expenses and project budgets",
           "Priority support",
@@ -466,13 +468,14 @@ export const en: Dict = {
         features: [
           "150,000 Lio Units per month",
           "Everything in Pro",
+          "Unlimited modules",
           "Up to 10 users",
           "Department-level permissions",
           "Exports and reports",
         ],
       },
     ],
-    freeNote: "The free plan stays open forever: try Lio with your welcome Lio Units.",
+    freeNote: "The free plan stays open forever: use 2 modules in your company and try Lio with your welcome Lio Units.",
     billedYearly: "Billed {tutar} yearly",
     creditsLabel: "units / month",
     chargeNote: "US dollar prices are shown for reference; all payments are charged in Turkish lira.",

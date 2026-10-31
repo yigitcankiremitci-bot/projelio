@@ -285,6 +285,15 @@ export const kurumsal: TranslationDict = {
   "Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.":
     'No modules enabled yet. Double-click the heading or use "+" to add one.',
   "Yönetici (departmansız)": "Manager (no department)",
+  // Paket başına modül hakkı (shared modulHakki.ts)
+  "Paketi yükselt": "Upgrade plan",
+  "{paket} paketi: {sonra}/{hak} modül. Proje, görev ve dosya modülleri sayılmaz.":
+    "{paket} plan: {sonra}/{hak} modules. Project, task and file modules don't count.",
+  "{paket} paketinde modül sınırı yok.": "The {paket} plan has no module limit.",
+  "{paket} paketinin modül hakkı doldu ({kullanilan}/{hak}). Yeni modül için birini kapat ya da paketini yükselt.":
+    "The {paket} plan's module allowance is full ({kullanilan}/{hak}). Turn one off or upgrade your plan to add a new one.",
+  "Ücretsiz pakette şirketinde {hak} modül açabilirsin ({secili}/{hak}). Daha fazlası için sonradan paketini yükseltebilirsin.":
+    "On the Free plan you can turn on {hak} modules for your company ({secili}/{hak}). Upgrade later for more.",
   // Departman açma kuralı (shared departmanKurali.ts)
   "Bir departman seç ya da özel bir isim gir": "Pick a department or enter a custom name",
   "Bu şirkette henüz departman yok. Kişiyi aşağıdan, onunla birlikte açılacak bir departmanla ekle.":

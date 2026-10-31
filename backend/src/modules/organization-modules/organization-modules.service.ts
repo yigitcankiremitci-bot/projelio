@@ -1,6 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import type { OrganizationModule } from "@projelio/shared";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import type { ModulHakkiDurumu, OrganizationModule } from "@projelio/shared";
+import { MODUL_HAKKI, modulEklenebilirMi, modulHakkiDurumu } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "../billing/abonelik-hakki";
+import { requireUuid } from "../../common/validation/input";
 
 function mapOrganizationModule(row: any): OrganizationModule {
   return {
@@ -28,6 +31,58 @@ export class OrganizationModulesService {
     if (data.owner_id !== userId) throw new ForbiddenException("Bu organizasyonu yalnızca sahibi düzenleyebilir");
   }
 
+  /**
+   * Şirketin paketi ve modül hakkı (bkz. shared modulHakki.ts). Paket: şirket
+   * adına alınmış abonelik ya da sahibin kendi aboneliği — hangisi daha çok
+   * hak veriyorsa. Hiçbiri yoksa ücretsiz.
+   */
+  async modulHakki(organizationId: string): Promise<ModulHakkiDurumu> {
+    return (await this.hakVeAcikModuller(organizationId)).durum;
+  }
+
+  private async hakVeAcikModuller(organizationId: string): Promise<{ durum: ModulHakkiDurumu; acik: string[] }> {
+    // Kimlik aşağıda filtre METNİNE gömülüyor; doğrulanmazsa virgülle yeni
+    // koşul eklenebilirdi (bkz. requireUuid).
+    requireUuid(organizationId, "Organizasyon kimliği");
+    const { data: org } = await this.supabase.client
+      .from("organizations")
+      .select("owner_id")
+      .eq("id", organizationId)
+      .maybeSingle();
+    if (!org) throw new NotFoundException("Organizasyon bulunamadı");
+
+    const [{ data: abonelikler, error }, acik] = await Promise.all([
+      this.supabase.client
+        .from("subscriptions")
+        .select("plan_key, status, source, current_period_end")
+        .or(`and(scope.eq.organization,organization_id.eq.${organizationId}),and(scope.eq.user,user_id.eq.${org.owner_id})`)
+        .in("status", HAK_VEREN_DURUMLAR),
+      this.findByOrganization(organizationId),
+    ]);
+    if (error) throw error;
+
+    // null (sınırsız) her sayıdan büyük.
+    const buyukluk = (k: string) => (MODUL_HAKKI[k] === null ? Infinity : MODUL_HAKKI[k] ?? 0);
+    let planKey = "free";
+    for (const a of abonelikler ?? []) {
+      const gecerli = abonelikDonemiGecerli({
+        status: a.status,
+        source: a.source,
+        currentPeriodEnd: a.current_period_end,
+      });
+      if (gecerli && a.plan_key in MODUL_HAKKI && buyukluk(a.plan_key) > buyukluk(planKey)) planKey = a.plan_key;
+    }
+    const anahtarlar = acik.map((m) => m.moduleKey);
+    return { durum: modulHakkiDurumu(planKey, anahtarlar), acik: anahtarlar };
+  }
+
+  /** Modül hakkı yetmiyorsa açılışı reddeder. */
+  private async assertModulHakki(organizationId: string, yeniModuller: string[]): Promise<void> {
+    const { durum, acik } = await this.hakVeAcikModuller(organizationId);
+    const karar = modulEklenebilirMi(durum, acik, yeniModuller);
+    if ("sebep" in karar) throw new BadRequestException(karar.sebep);
+  }
+
   async findByOrganization(organizationId: string): Promise<OrganizationModule[]> {
     const { data, error } = await this.supabase.client
       .from("organization_modules")
@@ -39,6 +94,7 @@ export class OrganizationModulesService {
 
   async enable(organizationId: string, moduleKey: string, requestingUserId?: string): Promise<OrganizationModule> {
     await this.assertOwner(organizationId, requestingUserId);
+    await this.assertModulHakki(organizationId, [moduleKey]);
     const { data: row, error } = await this.supabase.client
       .from("organization_modules")
       .upsert(
@@ -64,6 +120,9 @@ export class OrganizationModulesService {
   async enableMany(organizationId: string, moduleKeys: string[], requestingUserId?: string): Promise<OrganizationModule[]> {
     await this.assertOwner(organizationId, requestingUserId);
     if (!moduleKeys?.length) return [];
+    // Hepsi ya da hiçbiri: yarısını açıp yarısını reddetmek, kullanıcının
+    // hangisinin açıldığını anlamasını zorlaştırırdı.
+    await this.assertModulHakki(organizationId, moduleKeys);
     const { data, error } = await this.supabase.client
       .from("organization_modules")
       .upsert(

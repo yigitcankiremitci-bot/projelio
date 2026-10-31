@@ -61,6 +61,8 @@ function aylikKarsilik(aylik: number): number {
   return Math.round((yillik(aylik) / 12) * 100) / 100;
 }
 
+// Modül sayıları vitrinde yazılı ama kaynağı shared modulHakki.ts (MODUL_HAKKI);
+// bir test ikisinin ayrışmasını yakalıyor (billing.plans.test.ts).
 export const PLANS: Plan[] = [
   {
     key: "free",
@@ -73,6 +75,7 @@ export const PLANS: Plan[] = [
     seats: 1,
     features: [
       "Sınırsız görev ve takvim", // dil:anahtar
+      "Şirkette 2 modül", // dil:anahtar
       "Hoş geldin bakiyesi ile Lio denemesi", // dil:anahtar
       "Mobil uygulama", // dil:anahtar
     ],
@@ -89,6 +92,7 @@ export const PLANS: Plan[] = [
     features: [
       "Aylık 20.000 birim Lio Bakiyesi", // dil:anahtar
       "Sınırsız proje ve görev", // dil:anahtar
+      "Şirkette 4 modül", // dil:anahtar
       "Google Drive / OneDrive bağlantısı", // dil:anahtar
       "E-posta desteği", // dil:anahtar
     ],
@@ -105,6 +109,7 @@ export const PLANS: Plan[] = [
     features: [
       "Aylık 50.000 birim Lio Bakiyesi", // dil:anahtar
       "Starter'daki her şey", // dil:anahtar
+      "Şirkette 8 modül", // dil:anahtar
       "WhatsApp üzerinden Lio", // dil:anahtar
       "Gelir-gider ve proje bütçesi", // dil:anahtar
       "Öncelikli destek", // dil:anahtar
@@ -122,6 +127,7 @@ export const PLANS: Plan[] = [
     features: [
       "Aylık 150.000 birim Lio Bakiyesi", // dil:anahtar
       "Pro'daki her şey", // dil:anahtar
+      "Sınırsız modül", // dil:anahtar
       "10 kullanıcıya kadar", // dil:anahtar
       "Departman bazlı yetkilendirme", // dil:anahtar
       "Dışa aktarma ve raporlar", // dil:anahtar

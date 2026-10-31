@@ -483,6 +483,10 @@ export const uygulama: TranslationDict = {
   // Paket özellikleri (backend billing.plans.ts, Abonelik sayfasında gösteriliyor)
   "Hoş geldin bakiyesi ile Lio denemesi": "Try Lio with a welcome balance",
   "Sınırsız görev ve takvim": "Unlimited tasks and calendar",
+  "Şirkette 2 modül": "2 modules for your company",
+  "Şirkette 4 modül": "4 modules for your company",
+  "Şirkette 8 modül": "8 modules for your company",
+  "Sınırsız modül": "Unlimited modules",
 
   // Sunucu sözlüğünde olup arayüzde de kullanılanlar (denetim tarafları ayrı kontrol ediyor)
   "40 dakika · Online görüşme": "40 minutes · Online meeting",

@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS, yillikAylikYukleme } from "./billing.plans";
+import { MODUL_HAKKI } from "@projelio/shared";
 
 test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
   // Bu sayılar tanıtım sitesinde ve mağaza listelerinde yazılı. Değiştirmek
@@ -127,4 +128,12 @@ test("etkin yıllık abone yükler, ödemesi düşmüş yıllık abone yüklemez
   const temel = { currentPeriodStart: "2026-01-07T09:00:00.000Z", currentPeriodEnd: "2027-01-07T09:00:00.000Z", yenisiYururlukte: false };
   assert.ok(yillikAylikYukleme({ ...temel, status: "active" }, new Date("2026-03-10T00:00:00Z")));
   assert.equal(yillikAylikYukleme({ ...temel, status: "past_due" }, new Date("2026-03-10T00:00:00Z")), null);
+});
+
+test("vitrindeki modül sayısı modül hakkıyla aynı (shared modulHakki.ts)", () => {
+  for (const plan of PLANS) {
+    const hak = MODUL_HAKKI[plan.key];
+    const beklenen = hak === null ? "Sınırsız modül" : `Şirkette ${hak} modül`;
+    assert.ok(plan.features.includes(beklenen), `${plan.key}: "${beklenen}" vitrinde yok`);
+  }
 });

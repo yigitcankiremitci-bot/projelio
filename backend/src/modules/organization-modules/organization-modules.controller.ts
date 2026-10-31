@@ -17,6 +17,14 @@ export class OrganizationModulesController {
     return this.organizationModulesService.findByOrganization(organizationId);
   }
 
+  // Paket başına modül hakkı (bkz. shared modulHakki.ts): "Modül ekle" ve
+  // kurulum sihirbazı kalan hakkı buradan okur.
+  @Get("organizations/:organizationId/modul-hakki")
+  async modulHakki(@Param("organizationId") organizationId: string, @Req() req: any) {
+    await this.access.assertCanViewOrganization(organizationId, req.user.userId);
+    return this.organizationModulesService.modulHakki(organizationId);
+  }
+
   @Post("organizations/:organizationId/modules")
   enable(
     @Param("organizationId") organizationId: string,

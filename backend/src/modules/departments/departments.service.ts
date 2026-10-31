@@ -5,6 +5,8 @@ import {
   defaultLocale,
   departmanAcilabilirMi,
   departmanKuraliDurumu,
+  departmanSayilirMi,
+  MUAF_DEPARTMAN_ANAHTARI,
   ENTITY_TAB_KEYS,
   sanitizeHiddenTabs,
 } from "@projelio/shared";
@@ -301,11 +303,13 @@ export class DepartmentsService {
 
     const { data: depts, error } = await this.supabase.client
       .from("departments")
-      .select("id")
+      .select("id, catalog_key")
       .eq("organization_id", organizationId)
       .is("archived_at", null);
     if (error) throw error;
     const ids = (depts ?? []).map((d: any) => d.id as string);
+    // Yönetim sayıya girmez (bkz. MUAF_DEPARTMAN_ANAHTARI) ama kadrosu kişi sayılır.
+    const sayilan = (depts ?? []).filter((d: any) => departmanSayilirMi(d.catalog_key)).length;
 
     const kisiler = new Set<string>();
     if (ids.length) {
@@ -318,7 +322,7 @@ export class DepartmentsService {
       if (kadroError) throw kadroError;
       for (const k of kadro ?? []) if (k.user_id !== org.owner_id) kisiler.add(k.user_id);
     }
-    return { departmanSayisi: ids.length, kisiler };
+    return { departmanSayisi: sayilan, kisiler };
   }
 
   /** "Departman ekle" ekranı için kuralın bugünkü durumu (yalnızca sahip). */
@@ -355,9 +359,11 @@ export class DepartmentsService {
     const ilkKisiId = data.ilkKisi?.userId;
     const rol: DepartmentMemberRole = data.ilkKisi?.role ?? "employee";
     if (!["manager", "employee", "subcontractor"].includes(rol)) throw new BadRequestException("Geçersiz kadro rolü.");
+    // Yönetim yöneticinin kendi departmanı: kişi istemez, sayıya girmez.
+    const muaf = data.catalogKey === MUAF_DEPARTMAN_ANAHTARI;
     const { departmanSayisi, kisiler } = await this.kadroGercekleri(organizationId);
     if (ilkKisiId) {
-      if (ilkKisiId === requestingUserId) {
+      if (ilkKisiId === requestingUserId && !muaf) {
         throw new BadRequestException("Departmanın ilk kişisi yönetici dışında biri olmalı.");
       }
       if (!opts.ilkKisiYeni && !kisiler.has(ilkKisiId)) {
@@ -368,8 +374,10 @@ export class DepartmentsService {
     }
     const sonra = new Set(kisiler);
     if (ilkKisiId) sonra.add(ilkKisiId);
-    const karar = departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: ilkKisiId ? sonra.size : 0 });
-    if ("sebep" in karar) throw new BadRequestException(karar.sebep);
+    if (!muaf) {
+      const karar = departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: ilkKisiId ? sonra.size : 0 });
+      if ("sebep" in karar) throw new BadRequestException(karar.sebep);
+    }
 
     let name = data.name?.trim();
     let description = data.description?.trim();
@@ -406,6 +414,9 @@ export class DepartmentsService {
       if ((error as any).code === "23505") throw new BadRequestException("Bu departman zaten eklenmiş");
       throw error;
     }
+
+    // Kişisiz açılabilen tek departman Yönetim.
+    if (!ilkKisiId) return mapDepartment(row);
 
     const { error: kadroError } = await this.supabase.client.from("department_members").insert({
       department_id: row.id,

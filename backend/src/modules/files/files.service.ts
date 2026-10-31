@@ -223,6 +223,15 @@ function mapFile(row: any, canEditInDrive: boolean): ProjectFile {
  * ise sağlayıcıya göre `google_account_id` YA DA `microsoft_account_id`
  * kolonunda durur (bkz. migration 034) — ikisi asla birlikte dolu olmaz.
  */
+/** Bırakılan bir departmanın buluttaki kökü ve kökteki öğeleri (bkz. departmanBulutKokleri). */
+export interface DepartmanBulutKoku {
+  provider: StorageProvider;
+  accountId: string;
+  kokKlasor: string;
+  /** Kökteki dosyaların ve klasörlerin bulut kimlikleri. */
+  ogeler: string[];
+}
+
 function storageOwner(row: {
   storage_provider?: string | null;
   google_account_id?: string | null;
@@ -998,6 +1007,95 @@ export class FilesService {
    * Hesap seçimi sırası: şirketin AÇIK seçimi (organization_storage) > şirket
    * sahibinin varsayılan hesabı > işlemi yapan kullanıcınınki.
    */
+  /**
+   * Departman geçişi (migration 173) ÖNCESİ okunur: bırakılacak departmanın
+   * buluttaki kök klasörü ve o kökte duran dosya/klasörler. Departman
+   * silinince department_storage satırı CASCADE ile gidiyor; eski ebeveyn
+   * klasörü bilinmeden Google'da öğe taşınamaz (removeParents).
+   */
+  async departmanBulutKokleri(departmentIds: string[]): Promise<DepartmanBulutKoku[]> {
+    if (!departmentIds.length) return [];
+    const { data: depolar, error } = await this.supabase.client
+      .from("department_storage")
+      .select("*")
+      .in("department_id", departmentIds);
+    if (error) throw error;
+    const sonuc: DepartmanBulutKoku[] = [];
+    for (const depo of depolar ?? []) {
+      if (!depo.drive_folder_id) continue;
+      const sahip = storageOwner(depo);
+      const [{ data: dosyalar }, { data: klasorler }] = await Promise.all([
+        this.supabase.client
+          .from("files")
+          .select("drive_file_id, storage_provider, google_account_id, microsoft_account_id")
+          .eq("department_id", depo.department_id)
+          .is("folder_id", null),
+        this.supabase.client
+          .from("file_folders")
+          .select("drive_folder_id")
+          .eq("department_id", depo.department_id)
+          .is("parent_folder_id", null)
+          .not("drive_folder_id", "is", null),
+      ]);
+      const ogeler: string[] = [];
+      for (const d of dosyalar ?? []) {
+        // Depo sonradan şirketin hesabına geçmişse eski dosyalar eski hesapta
+        // kaldı (bkz. departmaniSirketDeposunaTasi): o kökte değiller, dokunulmaz.
+        const dosyaSahibi = storageOwner(d);
+        if (dosyaSahibi.provider === sahip.provider && dosyaSahibi.accountId === sahip.accountId) ogeler.push(d.drive_file_id);
+      }
+      for (const k of klasorler ?? []) ogeler.push(k.drive_folder_id);
+      sonuc.push({ ...sahip, kokKlasor: depo.drive_folder_id, ogeler });
+    }
+    return sonuc;
+  }
+
+  /**
+   * Geçişten SONRA: eski köklerdeki öğeleri hedef departmanın (Yönetim)
+   * bulut köküne taşır. EN İYİ ÇABA — veritabanı taşıması zaten bitti ve
+   * dosyaya erişim satırdaki hesap + bulut kimliğinden geliyor; burada
+   * yalnızca buluttaki klasör düzeni toparlanıyor. Farklı hesaptaki ya da
+   * taşınamayan öğe eski klasöründe kalır ve sayısı döner.
+   */
+  async departmanKokleriniTasi(
+    kokler: DepartmanBulutKoku[],
+    hedefDepartmanId: string,
+    actingUserId: string
+  ): Promise<{ tasinan: number; kalan: number }> {
+    let tasinan = 0;
+    let kalan = 0;
+    const toplam = kokler.reduce((n, k) => n + k.ogeler.length, 0);
+    if (!toplam) return { tasinan, kalan };
+    let hedef: { provider: StorageProvider; accountId: string; folderId: string };
+    try {
+      hedef = await this.ensureFlatStorage({ kind: "department", id: hedefDepartmanId }, actingUserId);
+    } catch (err) {
+      this.logger.warn(`Geçiş: Yönetim bulut klasörü açılamadı (${hedefDepartmanId}): ${(err as Error).message}`);
+      return { tasinan, kalan: toplam };
+    }
+    for (const kok of kokler) {
+      if (kok.provider !== hedef.provider || kok.accountId !== hedef.accountId || kok.kokKlasor === hedef.folderId) {
+        kalan += kok.ogeler.length;
+        continue;
+      }
+      const accessToken = await this.cloudStorage.getAccessToken(kok.provider, kok.accountId).catch(() => null);
+      if (!accessToken) {
+        kalan += kok.ogeler.length;
+        continue;
+      }
+      for (const oge of kok.ogeler) {
+        try {
+          await this.cloudStorage.moveFile(kok.provider, accessToken, oge, hedef.folderId, kok.kokKlasor);
+          tasinan++;
+        } catch (err) {
+          kalan++;
+          this.logger.warn(`Geçiş: bulut öğesi taşınamadı (${oge}): ${(err as Error).message}`);
+        }
+      }
+    }
+    return { tasinan, kalan };
+  }
+
   private async ensureFlatStorage(
     scope: FlatScope,
     actingUserId: string

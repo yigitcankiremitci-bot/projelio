@@ -292,6 +292,9 @@ export const hatalar: TranslationDict = {
   // Çakışma ve zaten var
   "Ayrılma talebin zaten onay bekliyor": "Your leave request is already awaiting approval",
   "Bu adda bir odak alanın zaten var.": "You already have a focus area with this name.",
+  "Tutulacak departmanları seç.": "Pick the departments to keep.",
+  "Geçiş tamamlanamadı; hiçbir departman silinmedi. Tekrar dene.": "The change couldn't be completed; no department was deleted. Try again.",
+  "Seçilen departmanlardan biri bu şirkette yok.": "One of the selected departments isn't in this company.",
   "Bu departman zaten eklenmiş": "This department has already been added",
   "Departmanın ilk kişisi yönetici dışında biri olmalı.": "The department's first person must be someone other than the manager.",
   "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç.":

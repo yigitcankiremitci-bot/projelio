@@ -249,6 +249,13 @@ export class OrganizationsService {
       .select(ORG_SELECT)
       .single();
     if (error) throw error;
+    // Yeni şirket departman kuralıyla doğuyor: bir kerelik geçiş penceresi
+    // ona çıkmasın (bkz. migration 173). Ayrı güncelleme ve hatası yutuluyor:
+    // migration uygulanmadan yayına çıkılırsa şirket kurmak kırılmasın.
+    await this.supabase.client
+      .from("organizations")
+      .update({ departman_gecisi_at: new Date().toISOString() })
+      .eq("id", row.id);
     return mapOrganization(row);
   }
 

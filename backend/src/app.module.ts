@@ -38,6 +38,7 @@ import { FilesModule } from "./modules/files/files.module";
 import { HealthModule } from "./modules/health/health.module";
 import { CatalogModule } from "./modules/catalog/catalog.module";
 import { DepartmentsModule } from "./modules/departments/departments.module";
+import { DepartmanGecisiModule } from "./modules/departman-gecisi/departman-gecisi.module";
 import { DepartmentMembersModule } from "./modules/department-members/department-members.module";
 import { OrganizationModulesModule } from "./modules/organization-modules/organization-modules.module";
 import { JobModulesModule } from "./modules/job-modules/job-modules.module";
@@ -112,6 +113,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     HealthModule,
     CatalogModule,
     DepartmentsModule,
+    DepartmanGecisiModule,
     DepartmentMembersModule,
     OrganizationModulesModule,
     JobModulesModule,

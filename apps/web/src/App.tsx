@@ -50,6 +50,8 @@ import { useT } from "./lib/i18n";
 //   · TourOverlay/TourLauncher — yalnızca tur başlatılınca
 // Bunlar statik import'ken giriş ekranını görmek için bile indiriliyorlardı.
 const OnboardingWizard = lazy(() => import("./components/OnboardingWizard"));
+// Mevcut şirket sahiplerine bir kerelik departman kuralı geçişi (bkz. migration 173).
+const DepartmanGecisiModal = lazy(() => import("./components/DepartmanGecisiModal"));
 const IlkSifreModal = lazy(() => import("./components/IlkSifreModal"));
 const AiLauncher = lazy(() => import("./components/AiLauncher"));
 const TourOverlay = lazy(() => import("./components/tour/TourOverlay"));
@@ -753,6 +755,12 @@ export default function App() {
       {me && !me.onboardingCompletedAt && !me.mustChangePassword && (
         <Suspense fallback={null}>
           <OnboardingWizard onCompleted={reloadMe} />
+        </Suspense>
+      )}
+      {/* Kurulumu bitmiş sahiplere; sunucu geçişi bekleyen şirket yoksa boş döner. */}
+      {me?.onboardingCompletedAt && !me.mustChangePassword && (
+        <Suspense fallback={null}>
+          <DepartmanGecisiModal />
         </Suspense>
       )}
       {/* Başkasının (ekip yöneticisi ya da admin) açtığı hesap: kişi önce

@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { EN_COK_DUZEN_NESNESI, ODA_KIMLIGI, odaDuzeniTemizle, odaDuzenleyebilir } from "./ofisDuzeni";
+import { EN_COK_DUZEN_NESNESI, ODA_KIMLIGI, odaDuzeniTemizle, odaDuzenleyebilir, studyoDuzenKaydi, studyoOdaDuzenleyebilir } from "./ofisDuzeni";
 
 describe("odaDuzeniTemizle", () => {
   test("bozuk girdi boş düzene düşer", () => {
@@ -71,5 +71,21 @@ describe("odaDuzenleyebilir", () => {
     });
     assert.deepEqual(d.nesneler["dekor:kose-0"], { dx: 1, dz: 1, don: 0, gizli: true, devir: true });
     assert.deepEqual(d.nesneler["dekor:kose-1"], { dx: 1, dz: 1, don: 0 });
+  });
+});
+
+describe("stüdyo düzeni", () => {
+  const is = "11111111-2222-3333-4444-555555555555";
+  test("iş odası işin kimliğiyle (ekipte ortak), ortak alan ve görüşme odası kişinin", () => {
+    assert.deepEqual(studyoDuzenKaydi(is, "u1"), { anahtar: `is:${is}`, job_id: is, user_id: null });
+    assert.deepEqual(studyoDuzenKaydi("ortak", "u1"), { anahtar: "kullanici:u1:ortak", job_id: null, user_id: "u1" });
+    assert.deepEqual(studyoDuzenKaydi("toplanti", "u1"), { anahtar: "kullanici:u1:toplanti", job_id: null, user_id: "u1" });
+  });
+
+  test("iş odasını yalnızca işin sahibi, kendi alanlarını herkes düzenler", () => {
+    assert.equal(studyoOdaDuzenleyebilir(is, [is]), true);
+    assert.equal(studyoOdaDuzenleyebilir(is, []), false);
+    assert.equal(studyoOdaDuzenleyebilir("ortak", []), true);
+    assert.equal(studyoOdaDuzenleyebilir("toplanti", []), true);
   });
 });

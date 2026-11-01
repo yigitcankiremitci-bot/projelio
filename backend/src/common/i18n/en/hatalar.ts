@@ -298,6 +298,7 @@ export const hatalar: TranslationDict = {
   "Bu departman zaten eklenmiş": "This department has already been added",
   "Bu odanın düzenini yalnızca şirket sahibi ya da departman yöneticisi değiştirebilir":
     "Only the company owner or the department manager can change this room's layout",
+  "Bu işin odasını yalnızca işin sahibi düzenleyebilir": "Only the job's owner can change this room's layout",
   "Departmanın ilk kişisi yönetici dışında biri olmalı.": "The department's first person must be someone other than the manager.",
   "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç.":
     'The first person must be on the company team. To add someone new, choose "New department" in Team Accounts or Hire.',

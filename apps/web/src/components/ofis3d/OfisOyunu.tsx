@@ -18,11 +18,15 @@ import {
   ofisPlani,
   ofisSeviyesi,
   KASA_MODULU,
+  KUPA_RAFI,
+  PROJE_ONEKI,
+  type IstasyonBilgisi,
   type EsyaTuru,
   type OfisKaydi,
   type YerlesikEsya,
 } from "../../lib/ofisOyunu";
 import { openLio } from "../../lib/askLio";
+import { isTemasi } from "../../lib/studyoOfisi";
 import { OfisMotoru, type OdaEtiketi, type SahneKisisi } from "./OfisMotoru";
 import { odaDuzeniTemizle, type NesneDuzeni, type OdaDuzeni } from "@projelio/shared";
 import { api, ApiError } from "../../api/client";
@@ -34,9 +38,14 @@ export interface OyunDepartmani {
   /** Departman kapağının CSS arka planı (fotoğraf ya da hazır kapak). */
   kapak?: string;
   /** Departmanda açık modüller; eşyası olanlar odada da durur (MODUL_ESYALARI). */
-  moduller?: { key: string; ad: string }[];
-  /** emek: tamamladığı görev sayısı; yonetici: departman yöneticisi (yönetici masasında oturur). */
-  kisiler: { id: string; ad: string; emek?: number; yonetici?: boolean }[];
+  moduller?: { key: string; ad: string; bilgi?: IstasyonBilgisi }[];
+  /**
+   * emek: tamamladığı görev sayısı; yonetici: departman yöneticisi (yönetici masasında oturur);
+   * istasyon: stüdyoda üzerinde çalıştığı projenin istasyonu (orada ayakta çalışır).
+   */
+  kisiler: { id: string; ad: string; emek?: number; yonetici?: boolean; istasyon?: string }[];
+  /** Stüdyoda odanın döşemesi (bkz. lib/studyoOfisi.ts isTemasi). */
+  tema?: string;
   acikGorev: number;
   gecikmis: number;
 }
@@ -49,6 +58,11 @@ export interface OyunHareketi {
 
 interface Props {
   kapsam: string;
+  /**
+   * Stüdyom: odalar departman değil serbest işler (bkz. lib/studyoOfisi.ts);
+   * metinler ona göre ("İş sayfasını aç", "Görüşme Odası").
+   */
+  studyo?: boolean;
   departmanlar: OyunDepartmani[];
   bugunToplanti: number | null;
   bitenGorev: number;
@@ -137,9 +151,14 @@ const SIMGE: Record<EsyaTuru, string> = {
   heykel: "🏆",
 };
 
-/** Departman adından etiket simgesi ve rengi — referans görseldeki oda kartları gibi. */
-function odaGorunumu(ad: string, sira: number): { ikon: string; ton: string } {
+/** Departman (stüdyoda iş) adından etiket simgesi ve rengi — referans görseldeki oda kartları gibi. */
+function odaGorunumu(ad: string, sira: number, studyo = false): { ikon: string; ton: string } {
   const a = ad.toLocaleLowerCase("tr");
+  if (studyo) {
+    // Serbest işler çoğunlukla bir zanaat: önce onlara bakılır (odanın döşemesiyle aynı karar).
+    const tema = isTemasi(ad);
+    if (tema) return { muzik: { ikon: "muzik", ton: "turuncu" }, video: { ikon: "video", ton: "kirmizi" }, foto: { ikon: "kamera", ton: "mavi" }, tasarim: { ikon: "kalem", ton: "pembe" } }[tema];
+  }
   if (/pazarlama|marketing|sosyal|reklam|iletişim|marka|medya/.test(a)) return { ikon: "megafon", ton: "mavi" };
   if (/satış|satis|sales|müşteri|ticaret/.test(a)) return { ikon: "grafik", ton: "turuncu" };
   if (/finans|muhasebe|mali|bütçe|kasa/.test(a)) return { ikon: "para", ton: "yesil" };
@@ -167,6 +186,7 @@ function kaydiYaz(anahtar: string, k: OfisKaydi): void {
 
 export default function OfisOyunu({
   kapsam,
+  studyo = false,
   departmanlar,
   bugunToplanti,
   bitenGorev,
@@ -214,11 +234,17 @@ export default function OfisOyunu({
   const [seciliNesne, setSeciliNesne] = useState<string | null>(null);
   const [kaydediliyor, setKaydediliyor] = useState(false);
 
+  // Oda düzenlerinin ucu: şirketin (migration 171) ya da stüdyonun (175).
+  // Şirketsiz kişisel ofiste (stüdyo değilse) düzen yok.
+  const duzenUcu = studyo ? "/ofis-duzeni/studyo" : kapsam !== "kisisel" ? `/organizations/${kapsam}/ofis-duzeni` : null;
+  /** Uç henüz yayında değilken (404) düzenin tarayıcıda tutulduğu anahtar. */
+  const yerelKapsam = studyo ? "studyo" : kapsam;
+
   useEffect(() => {
-    if (kapsam === "kisisel") return;
+    if (!duzenUcu) return;
     const ac = new AbortController();
     api
-      .get<{ odalar: Record<string, unknown>; duzenleyebilir: "hepsi" | string[] }>(`/organizations/${kapsam}/ofis-duzeni`, ac.signal)
+      .get<{ odalar: Record<string, unknown>; duzenleyebilir: "hepsi" | string[] }>(duzenUcu, ac.signal)
       .then((y) => {
         const odalar: Record<string, OdaDuzeni> = {};
         for (const [k, v] of Object.entries(y?.odalar ?? {})) odalar[k] = odaDuzeniTemizle(v);
@@ -233,7 +259,7 @@ export default function OfisOyunu({
           setYerelDuzen(true);
           setDuzenleyebilir("hepsi");
           try {
-            const ham = JSON.parse(localStorage.getItem(yerelDuzenAnahtari(kapsam)) ?? "{}") as Record<string, unknown>;
+            const ham = JSON.parse(localStorage.getItem(yerelDuzenAnahtari(yerelKapsam)) ?? "{}") as Record<string, unknown>;
             const odalar: Record<string, OdaDuzeni> = {};
             for (const [k, v] of Object.entries(ham)) odalar[k] = odaDuzeniTemizle(v);
             setDuzenler(odalar);
@@ -243,11 +269,12 @@ export default function OfisOyunu({
         }
       });
     return () => ac.abort();
-  }, [kapsam]);
+  }, [duzenUcu, yerelKapsam]);
 
   const odaDuzenlenebilir = (odaId: string) =>
-    // Ortak alan da düzenlenir (bitkileri); sunucu gibi yalnızca sahibe açık.
-    kapsam !== "kisisel" && (duzenleyebilir === "hepsi" || (odaId !== "ortak" && duzenleyebilir.includes(odaId)));
+    // Ortak alan da düzenlenir (bitkileri); şirkette sunucu gibi yalnızca sahibe
+    // açık. Stüdyoda ortak alan kişinin kendisinin: listede gelir.
+    !!duzenUcu && (duzenleyebilir === "hepsi" || ((odaId !== "ortak" || studyo) && duzenleyebilir.includes(odaId)));
   const ortakDuzenlenebilir = odaDuzenlenebilir("ortak");
   // Son hareketler açılışta birkaç saniye görünür, sonra kendiliğinden kapanır;
   // sol alttaki düğmeyle yeniden açılır. Tek tek de kapatılabilir.
@@ -371,7 +398,7 @@ export default function OfisOyunu({
     const e: Record<string, OdaEtiketi> = {};
     departmanlar.forEach((d, i) => {
       const oda = plan.odalar.find((o) => o.id === d.id);
-      const g = odaGorunumu(d.ad, i);
+      const g = odaGorunumu(d.ad, i, studyo);
       const sigmayan = oda?.sigmayan ? ` · +${oda.sigmayan}` : "";
       e[d.id] = {
         ad: d.ad,
@@ -382,22 +409,24 @@ export default function OfisOyunu({
       };
     });
     e.toplanti = {
-      ad: "Toplantı Odası",
+      ad: studyo ? "Görüşme Odası" : "Toplantı Odası",
       alt: bugunToplanti === null ? "…" : bugunToplanti ? `Bugün ${bugunToplanti} toplantı` : "Bugün toplantı yok",
       ikon: "video",
       ton: "kirmizi",
     };
     e.ortak = { ad: "Ortak Alan", alt: cevrimici.size ? `${cevrimici.size} kişi çevrimiçi` : "Ekip çevrimiçi", ikon: "kahve", ton: "gri" };
     return e;
-  }, [departmanlar, plan, bugunToplanti, cevrimici]);
+  }, [departmanlar, plan, bugunToplanti, cevrimici, studyo]);
 
   const sahneKisileri = useMemo<SahneKisisi[]>(() => {
     const kisiOdasi = new Map<string, string>();
+    // Stüdyoda önce üzerinde çalıştığı projenin odası (istasyonunda durur).
+    for (const d of departmanlar) for (const k of d.kisiler) if (k.istasyon && !kisiOdasi.has(k.id)) kisiOdasi.set(k.id, d.id);
     for (const d of departmanlar) for (const k of d.kisiler) if (k.yonetici && !kisiOdasi.has(k.id)) kisiOdasi.set(k.id, d.id);
     for (const d of departmanlar) for (const k of d.kisiler) if (!kisiOdasi.has(k.id)) kisiOdasi.set(k.id, d.id);
     return (
-      // Birden çok departmanda olan kişi ofiste bir kez gezer: yöneticisi
-      // olduğu odada, yoksa ilk departmanında (oda panelindeki kadro listesi
+      // Birden çok departmanda olan kişi ofiste bir kez gezer: (stüdyoda
+      // çalıştığı projenin odasında,) yöneticisi olduğu odada, yoksa ilk departmanında (oda panelindeki kadro listesi
       // değişmez, orada her departmanda görünür).
       departmanlar.flatMap((d) =>
         d.kisiler.filter((k) => kisiOdasi.get(k.id) === d.id).map((k) => ({
@@ -408,6 +437,7 @@ export default function OfisOyunu({
           ben: k.id === benId,
           emek: k.emek ?? 0,
           yonetici: !!k.yonetici,
+          istasyon: k.istasyon,
         }))
       )
     );
@@ -513,11 +543,19 @@ export default function OfisOyunu({
     motorRef.current.ortakGirilebilir = ortakDuzenlenebilir;
     // Ortak alana devretmek ortak alanın düzenini yazmak demek: yalnızca onu düzenleyebilen.
     motorRef.current.ortagaTasinabilir = ortakDuzenlenebilir;
-  }, [ortakDuzenlenebilir]);
+    motorRef.current.devirOdalari = studyo && Array.isArray(duzenleyebilir) ? new Set(duzenleyebilir) : null;
+  }, [ortakDuzenlenebilir, studyo, duzenleyebilir]);
 
   useEffect(() => {
-    motorRef.current?.kur(plan, etiketler, sahneKisileri);
-  }, [plan, etiketler, sahneKisileri]);
+    const m = motorRef.current;
+    if (!m) return;
+    m.temalariAyarla(new Map(departmanlar.flatMap((d) => (d.tema ? [[d.id, d.tema] as [string, string]] : []))));
+    // Stüdyonun proje istasyonları: ilerleme/teslim değişince panoları tazelenir.
+    m.istasyonlariAyarla(
+      new Map(departmanlar.flatMap((d) => (d.moduller ?? []).flatMap((x) => (x.bilgi ? [[x.key, x.bilgi] as [string, IstasyonBilgisi]] : []))))
+    );
+    m.kur(plan, etiketler, sahneKisileri);
+  }, [plan, etiketler, sahneKisileri, departmanlar]);
 
   useEffect(() => {
     motorRef.current?.esyalariKur(kayit.esyalar);
@@ -565,21 +603,21 @@ export default function OfisOyunu({
         const yeni = { ...d, [odaId]: duzen };
         if (bos) delete yeni[odaId];
         try {
-          localStorage.setItem(yerelDuzenAnahtari(kapsam), JSON.stringify(yeni));
+          localStorage.setItem(yerelDuzenAnahtari(yerelKapsam), JSON.stringify(yeni));
         } catch {
           // kota / gizli pencere: bu oturumda yine geçerli
         }
         return yeni;
       });
     } else if (bos) {
-      await api.delete(`/organizations/${kapsam}/ofis-duzeni/${odaId}`);
+      await api.delete(`${duzenUcu}/${odaId}`);
       setDuzenler((d) => {
         const y = { ...d };
         delete y[odaId];
         return y;
       });
     } else {
-      const kayitli = await api.post<unknown>(`/organizations/${kapsam}/ofis-duzeni/${odaId}`, duzen);
+      const kayitli = await api.post<unknown>(`${duzenUcu}/${odaId}`, duzen);
       setDuzenler((d) => ({ ...d, [odaId]: odaDuzeniTemizle(kayitli) }));
     }
   }
@@ -941,6 +979,7 @@ export default function OfisOyunu({
           cevrimici={cevrimici}
           benId={benId}
           bugunToplanti={bugunToplanti}
+          studyo={studyo}
           onSayfa={icerdekiOda === "ortak" ? undefined : () => onOdaSayfasi(icerdekiOda)}
           onModul={(key) => onModulAc(icerdekiOda, key)}
           onDuzenle={odaDuzenlenebilir(icerdekiOda) ? () => duzenlemeyeBasla(icerdekiOda) : undefined}
@@ -968,6 +1007,7 @@ function OdaPaneli({
   cevrimici,
   benId,
   bugunToplanti,
+  studyo,
   onSayfa,
   onModul,
   onDuzenle,
@@ -980,6 +1020,7 @@ function OdaPaneli({
   cevrimici: Set<string>;
   benId?: string;
   bugunToplanti: number | null;
+  studyo: boolean;
   /** Odanın sayfası (ortak alanın sayfası yok). */
   onSayfa?: () => void;
   onModul: (key: string) => void;
@@ -989,6 +1030,9 @@ function OdaPaneli({
   onCik: () => void;
 }) {
   const toplanti = odaId === "toplanti";
+  // Stüdyoda projeler ayrı listelenir; kupa rafı listede yer almaz (odada durur).
+  const projeler = (departman?.moduller ?? []).filter((m) => m.key.startsWith(PROJE_ONEKI));
+  const digerModuller = (departman?.moduller ?? []).filter((m) => !m.key.startsWith(PROJE_ONEKI) && m.key !== KUPA_RAFI);
   return (
     <div className="of-hud of-oda-paneli" role="dialog" aria-label={etiket?.ad ?? "Oda"}>
       <div className="of-op-bas">
@@ -1017,11 +1061,31 @@ function OdaPaneli({
               <small>gecikmiş</small>
             </span>
           </div>
-          {!!departman.moduller?.length && (
+          {projeler.length > 0 && (
+            <div className="of-op-projeler">
+              <small>Projeler</small>
+              <ul>
+                {projeler.map((m) => (
+                  <li key={m.key}>
+                    <button type="button" onClick={() => onModul(m.key)}>
+                      <span>{m.ad}</span>
+                      {m.bilgi && (
+                        <small className={m.bilgi.gecikti ? "gec" : m.bilgi.yaklasti ? "yakin" : ""}>
+                          {m.bilgi.biten}/{m.bilgi.toplam}
+                          {m.bilgi.teslim && ` · ${m.bilgi.gecikti ? "gecikti" : new Date(m.bilgi.teslim + "T00:00").toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}`}
+                        </small>
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {digerModuller.length > 0 && (
             <div className="of-op-moduller">
               <small>Modüller</small>
               <div>
-                {departman.moduller.map((m) => (
+                {digerModuller.map((m) => (
                   <button key={m.key} type="button" onClick={() => onModul(m.key)}>
                     {m.ad}
                   </button>
@@ -1051,7 +1115,7 @@ function OdaPaneli({
         )}
         {onSayfa && (
           <button type="button" className="of-btn birincil" onClick={onSayfa}>
-            {toplanti ? "Takvimi aç" : "Departman sayfasını aç"}
+            {toplanti ? "Takvimi aç" : studyo ? "İş sayfasını aç" : "Departman sayfasını aç"}
           </button>
         )}
         <button type="button" className="of-btn" onClick={onCik}>
@@ -1213,6 +1277,8 @@ function NesneMenusu({
   const [odaSec, setOdaSec] = useState(false);
   // Kasa modül eşyası gibi davranır ama bir modül değil: kapatılamaz.
   const kasa = nesneId === `modul:${KASA_MODULU}`;
+  const proje = nesneId.startsWith(`modul:${PROJE_ONEKI}`);
+  const kupa = nesneId === `modul:${KUPA_RAFI}`;
   const modul = nesneId.startsWith("modul:");
   const masa = nesneId.startsWith("masa-");
   // Mağazadan alınan eşya kişiseldir: ekibin deposuna gitmez (Düzenle > Sat ile satılır).
@@ -1281,7 +1347,7 @@ function NesneMenusu({
           )}
           {modul && (
             <button type="button" role="menuitem" onClick={onModulAc}>
-              {kasa ? "Kasayı aç" : "Modülü aç"}
+              {kasa ? "Kasayı aç" : proje ? "Projeyi aç" : kupa ? "İşi aç" : "Modülü aç"}
             </button>
           )}
           {kisisel && <small className="of-nm-not">Senin eşyan: yeri yalnızca sende kaydedilir.</small>}
@@ -1297,7 +1363,7 @@ function NesneMenusu({
             Depoya gönder
           </button>
           )}
-          {modul && !kasa && modulKapatabilir && !kapatOnay && (
+          {modul && !kasa && !proje && !kupa && modulKapatabilir && !kapatOnay && (
             <button type="button" role="menuitem" className="tehlike" onClick={() => setKapatOnay(true)}>
               Modülü kapat…
             </button>

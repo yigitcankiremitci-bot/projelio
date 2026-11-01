@@ -38,4 +38,26 @@ export class OfisDuzeniController {
     await this.service.sifirla(organizationId, odaId, req.user.userId);
     return { ok: true };
   }
+
+  // ------------------------------------------------------------ Stüdyom (migration 175)
+  // Şirketsiz: kullanıcının serbest işlerinin odaları + kendi ortak alanı ve
+  // görüşme odası. Görmek için kendi stüdyosu olması yeter; yetki serviste.
+
+  @Get("ofis-duzeni/studyo")
+  studyoGetir(@Req() req: any) {
+    return this.service.studyoGetir(req.user.userId);
+  }
+
+  @Post("ofis-duzeni/studyo/:odaId")
+  studyoKaydet(@Param("odaId") odaId: string, @Body() body: unknown, @Req() req: any) {
+    if (!ODA_KIMLIGI.test(odaId)) throw new BadRequestException("Geçersiz oda");
+    return this.service.studyoKaydet(odaId, body, req.user.userId);
+  }
+
+  @Delete("ofis-duzeni/studyo/:odaId")
+  async studyoSifirla(@Param("odaId") odaId: string, @Req() req: any) {
+    if (!ODA_KIMLIGI.test(odaId)) throw new BadRequestException("Geçersiz oda");
+    await this.service.studyoSifirla(odaId, req.user.userId);
+    return { ok: true };
+  }
 }

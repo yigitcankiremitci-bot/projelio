@@ -705,6 +705,63 @@
   color: var(--yn-accent-dark) !important;
   background: var(--yn-accent-soft);
 }
+/* Stüdyo: odadaki projeler (istasyonlar) — ad, biten/toplam görev, teslim. */
+.of-op-projeler {
+  margin: 0 0 12px;
+}
+.of-op-projeler > small {
+  display: block;
+  margin: 0 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--yn-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.of-op-projeler ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 170px;
+  overflow: auto;
+}
+.of-op-projeler button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--yn-ink-2) !important;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.of-op-projeler button:hover {
+  background: var(--yn-accent-soft);
+}
+.of-op-projeler button span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.of-op-projeler button small {
+  flex: none;
+  font-size: 11px;
+  color: var(--yn-ink-3);
+}
+.of-op-projeler button small.gec {
+  color: var(--yn-red);
+  font-weight: 600;
+}
+.of-op-projeler button small.yakin {
+  color: var(--yn-accent-dark);
+  font-weight: 600;
+}
 .of-op-kisiler {
   list-style: none;
   margin: 0 0 12px;

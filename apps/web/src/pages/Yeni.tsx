@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import type { Department, DepartmentMember, Organization, PersonalBoardItem, Project, ProjeEtkinligi, Task, TaskStatus, User } from "@projelio/shared";
+import type { Department, DepartmentMember, Job, JobMember, Organization, PersonalBoardItem, Project, ProjeEtkinligi, Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { askLio } from "../lib/askLio";
 import { usePresence } from "../lib/liveRoom";
@@ -26,7 +26,9 @@ import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useUndo } from "../lib/undo";
 import Modal from "../components/Modal";
 import OrgBudgetPanel from "../components/OrgBudgetPanel";
-import { KASA_MODULU } from "../lib/ofisOyunu";
+import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
+import { serbestIsMi, studyoOdalari, type StudyoIsi } from "../lib/studyoOfisi";
+import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI } from "../lib/ofisOyunu";
 import "./Yeni.css";
 
 type Ton = "mor" | "mavi" | "turuncu" | "kirmizi" | "yesil" | "pembe" | "gri";
@@ -89,6 +91,9 @@ function gunEtiketi(tarih: string, bugun: string): string {
 
 // ------------------------------------------------------------------ sayfa
 
+/** Ofis seçicisinde stüdyonun değeri (şirket kimlikleriyle çakışmaz). */
+const STUDYO = "__studyo";
+
 export default function Yeni() {
   const navigate = useNavigate();
   const { pushUndo } = useUndo();
@@ -108,7 +113,14 @@ export default function Yeni() {
   const [acikModuller, setAcikModuller] = useState<Set<string> | null>(null);
   // Yönetim odasındaki kasa yalnızca şirketin Kasa sekmesini görebilene konur.
   const [kasaYetkisi, setKasaYetkisi] = useState(false);
-  const [kasaAcik, setKasaAcik] = useState(false);
+  // Açık kasa: şirketin kasası ("org") ya da stüdyoda bir işin bütçesi (iş kimliği).
+  const [kasaAcik, setKasaAcik] = useState<string | null>(null);
+  // Stüdyom: serbest çalışanın işleri ofiste oda olur (bkz. lib/studyoOfisi.ts).
+  // Şirketi olmayan kullanıcı doğrudan stüdyoyu görür.
+  const [studyo, setStudyo] = useState(false);
+  const [serbestIsler, setSerbestIsler] = useState<Job[] | null>(null);
+  const [studyoIsleri, setStudyoIsleri] = useState<StudyoIsi[] | null>(null);
+  const [serbestKatalog, setSerbestKatalog] = useState<{ key: string; name: string }[]>([]);
   const [projeler, setProjeler] = useState<Project[] | null>(null);
   const [projeGorevMap, setProjeGorevMap] = useState<Record<string, Task[]>>({});
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[] | null>(null);
@@ -142,6 +154,7 @@ export default function Yeni() {
         setOrgs(liste);
         if (liste[0]) setOrgId(liste[0].id);
         else {
+          setStudyo(true);
           setDepartmanlar([]);
           setOrgGorevleri([]);
         }
@@ -150,6 +163,10 @@ export default function Yeni() {
         setDepartmanlar([]);
         setOrgGorevleri([]);
       });
+    api
+      .get<Job[]>("/jobs")
+      .then((d) => setSerbestIsler((d ?? []).filter(serbestIsMi)))
+      .catch(() => setSerbestIsler([]));
     api
       .get<Project[]>("/projects")
       .then((d) => setProjeler((d ?? []).filter((p) => !p.archivedAt && p.status !== "archived" && p.status !== "completed")))
@@ -229,6 +246,39 @@ export default function Yeni() {
       .catch(() => setKatalog([]));
   }, []);
 
+  // Stüdyo seçilince (bir kez) her işin ekibi, modülleri ve aktif projelerinin görevleri.
+  useEffect(() => {
+    if (!studyo || !serbestIsler || studyoIsleri) return;
+    let iptal = false;
+    api
+      .get<{ key: string; name: string }[]>("/module-catalog?freelancer=true")
+      .then((d) => !iptal && setSerbestKatalog(d ?? []))
+      .catch(() => undefined);
+    Promise.all(
+      serbestIsler.map(async (job): Promise<StudyoIsi> => {
+        const [uyeler, moduller, projeler] = await Promise.all([
+          api.get<JobMember[]>(`/jobs/${job.id}/members`).catch(() => [] as JobMember[]),
+          api.get<{ moduleKey: string }[]>(`/jobs/${job.id}/modules`).catch(() => [] as { moduleKey: string }[]),
+          api.get<Project[]>(`/jobs/${job.id}/projects`).catch(() => [] as Project[]),
+        ]);
+        const aktif = (projeler ?? []).filter((p) => !p.archivedAt && p.status !== "archived" && p.status !== "completed");
+        const gorevler = (
+          await Promise.all(aktif.map((p) => api.get<Task[]>(`/projects/${p.id}/tasks`).catch(() => [] as Task[])))
+        ).flat();
+        return {
+          job,
+          uyeler: uyeler ?? [],
+          moduller: (moduller ?? []).map((m) => m.moduleKey),
+          projeler: projeler ?? [],
+          gorevler: gorevler.filter((t) => !t.archivedAt),
+        };
+      })
+    ).then((l) => !iptal && setStudyoIsleri(l));
+    return () => {
+      iptal = true;
+    };
+  }, [studyo, serbestIsler, studyoIsleri]);
+
   // Odalardaki karakterler: departmanların onaylı üyeleri.
   useEffect(() => {
     if (!departmanlar?.length) return;
@@ -279,7 +329,7 @@ export default function Yeni() {
   // Genel durum: şirket görevleri; şirket yoksa kişisel pano.
   const genel = useMemo(() => {
     const gecmisMi = (d?: string) => !!d && d.slice(0, 10) < bugun;
-    if (orgGorevleri && orgGorevleri.length) {
+    if (!studyo && orgGorevleri && orgGorevleri.length) {
       const biten = orgGorevleri.filter((t) => t.status === "completed").length;
       const geciken = orgGorevleri.filter((t) => t.status !== "completed" && gecmisMi(t.deadline)).length;
       return { biten, geciken, devam: orgGorevleri.length - biten - geciken };
@@ -288,7 +338,7 @@ export default function Yeni() {
     const biten = liste.filter((i) => i.status === "completed").length;
     const geciken = liste.filter((i) => i.status !== "completed" && gecmisMi(i.effectiveDueDate)).length;
     return { biten, geciken, devam: liste.length - biten - geciken };
-  }, [orgGorevleri, pano, bugun]);
+  }, [orgGorevleri, pano, bugun, studyo]);
   const genelToplam = genel.biten + genel.devam + genel.geciken;
   const genelYuzde = genelToplam ? Math.round((genel.biten / genelToplam) * 100) : 0;
   const genelYuklendi = pano !== null && orgGorevleri !== null;
@@ -299,6 +349,15 @@ export default function Yeni() {
     for (const t of orgGorevleri ?? []) if (t.status === "completed" && t.completedBy) m.set(t.completedBy, (m.get(t.completedBy) ?? 0) + 1);
     return m;
   }, [orgGorevleri]);
+  const studyoDepartmanlari: OyunDepartmani[] = useMemo(() => {
+    if (!studyoIsleri) return [];
+    const ad = new Map([...katalog, ...serbestKatalog].map((m) => [m.key, m.name]));
+    const kapaklar = new Map(studyoIsleri.map((i) => [i.job.id, i.job.coverImageUrl]));
+    return studyoOdalari(studyoIsleri, { benId: ben?.id, benAd: ben?.fullName, benAktifGorev: ben?.activeTaskId, bugun, modulAdi: (k) => ad.get(k) }).map((o) => ({
+      ...o,
+      kapak: coverBackground(kapaklar.get(o.id), o.id),
+    }));
+  }, [studyoIsleri, katalog, serbestKatalog, ben, bugun]);
   const oyunDepartmanlari: OyunDepartmani[] = useMemo(
     () =>
       (departmanlar ?? [])
@@ -496,24 +555,39 @@ export default function Yeni() {
           <main className="yn-main">
             <div className="yn-baslik">
               <h1>Bugün neler oluyor?</h1>
-              <p>Şirketin genel durumuna hızlıca bak ve devam et.</p>
+              <p>{studyo ? "İşlerinin" : "Şirketin"} genel durumuna hızlıca bak ve devam et.</p>
             </div>
             <OfisOyunu
-              key={orgId || "kisisel"}
-              kapsam={orgId || "kisisel"}
-              departmanlar={departmanlar === null ? [] : oyunDepartmanlari}
+              key={studyo ? "studyo" : orgId || "kisisel"}
+              // Stüdyonun mağaza eşyaları ve (ileride) düzeni kişiseldir.
+              kapsam={studyo ? "kisisel" : orgId || "kisisel"}
+              studyo={studyo}
+              departmanlar={studyo ? studyoDepartmanlari : departmanlar === null ? [] : oyunDepartmanlari}
               bugunToplanti={etkinlikler === null ? null : bugunToplanti}
               bitenGorev={bitenGorev}
               hareketler={hareketler}
               cevrimici={cevrimiciIdler}
               benId={ben?.id}
-              onOdaSayfasi={(id) => navigate(id === "toplanti" ? "/calendar" : `/departments/${id}`)}
-              onModulAc={(odaId, key) => (key === KASA_MODULU ? setKasaAcik(true) : navigate(`/departments/${odaId}/modules/${key}`))}
-              onModulKapat={orgId ? (key) => modulKapat(orgId, key) : undefined}
+              onOdaSayfasi={(id) => navigate(id === "toplanti" ? "/calendar" : studyo ? `/jobs/${id}` : `/departments/${id}`)}
+              onModulAc={(odaId, key) =>
+                key === KASA_MODULU
+                  ? setKasaAcik(studyo ? odaId : "org")
+                  : key.startsWith(PROJE_ONEKI)
+                    ? navigate(`/projects/${key.slice(PROJE_ONEKI.length)}`)
+                    : key === KUPA_RAFI
+                      ? navigate(`/jobs/${odaId}`)
+                      : navigate(studyo ? `/jobs/${odaId}/modules/${key}` : `/departments/${odaId}/modules/${key}`)
+              }
+              onModulKapat={orgId && !studyo ? (key) => modulKapat(orgId, key) : undefined}
             />
-            {kasaAcik && orgId && (
-              <Modal title="Kasa" subtitle={orgs.find((o) => o.id === orgId)?.name} onClose={() => setKasaAcik(false)} maxWidth={1100} mobileFullScreen>
+            {kasaAcik === "org" && orgId && (
+              <Modal title="Kasa" subtitle={seciliOrg?.name} onClose={() => setKasaAcik(null)} maxWidth={1100} mobileFullScreen>
                 <OrgBudgetPanel organizationId={orgId} />
+              </Modal>
+            )}
+            {kasaAcik && kasaAcik !== "org" && (
+              <Modal title="Bütçe" subtitle={serbestIsler?.find((j) => j.id === kasaAcik)?.title} onClose={() => setKasaAcik(null)} maxWidth={1100} mobileFullScreen>
+                <ScopeBudgetPanel scopeType="job" scopeId={kasaAcik} />
               </Modal>
             )}
 
@@ -565,16 +639,25 @@ export default function Yeni() {
             <section className="yn-card yn-pad">
               <div className="yn-sec-head">
                 <h3>Genel durum</h3>
-                {orgs.length > 1 ? (
-                  <select value={orgId} onChange={(e) => setOrgId(e.target.value)} aria-label="Şirket seç">
+                {orgs.length + (serbestIsler?.length ? 1 : 0) > 1 ? (
+                  <select
+                    value={studyo ? STUDYO : orgId}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setStudyo(v === STUDYO);
+                      if (v !== STUDYO) setOrgId(v);
+                    }}
+                    aria-label="Ofis seç"
+                  >
                     {orgs.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.name}
                       </option>
                     ))}
+                    {!!serbestIsler?.length && <option value={STUDYO}>Stüdyom (serbest işlerim)</option>}
                   </select>
                 ) : (
-                  <small>{orgGorevleri?.length ? seciliOrg?.name ?? "Tüm projeler" : "Senin işlerin"}</small>
+                  <small>{!studyo && orgGorevleri?.length ? seciliOrg?.name ?? "Tüm projeler" : "Senin işlerin"}</small>
                 )}
               </div>
               <div className="yn-status">

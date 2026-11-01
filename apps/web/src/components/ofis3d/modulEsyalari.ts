@@ -7,7 +7,7 @@
 // böylece eşya hangi modülü temsil ettiğini bir bakışta anlatır.
 
 import * as THREE from "three";
-import type { ModulEsyasi } from "../../lib/ofisOyunu";
+import type { IstasyonBilgisi, ModulEsyasi } from "../../lib/ofisOyunu";
 import { esyaModeli, kutu, malzeme } from "./modeller";
 import { varlik } from "./varliklar";
 
@@ -586,7 +586,135 @@ function kasa(): THREE.Group {
   return g;
 }
 
-export function modulEsyasi(tur: ModulEsyasi): THREE.Group {
+// ------------------------------------------------------------------ stüdyo
+
+const DURUM_RENGI = { gecikti: "#D9534F", yaklasti: "#E3A23B", yolunda: "#4CAF7A" };
+
+function istasyonDurumu(b: IstasyonBilgisi): keyof typeof DURUM_RENGI {
+  return b.gecikti ? "gecikti" : b.yaklasti ? "yaklasti" : "yolunda";
+}
+
+/** Kısa Türkçe tarih: "12 Kas". */
+function kisaTarih(gun: string): string {
+  const [y, a, g] = gun.slice(0, 10).split("-").map(Number);
+  return new Date(y, a - 1, g).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+}
+
+/** Satırı genişliğe sığdırır (en çok `satir` satır, taşan sonda "…"). */
+function sar(x: CanvasRenderingContext2D, metin: string, gen: number, satir: number): string[] {
+  const sonuc: string[] = [];
+  let sira = "";
+  for (const k of metin.split(/\s+/)) {
+    const aday = sira ? `${sira} ${k}` : k;
+    if (x.measureText(aday).width <= gen || !sira) sira = aday;
+    else {
+      sonuc.push(sira);
+      sira = k;
+    }
+  }
+  if (sira) sonuc.push(sira);
+  if (sonuc.length > satir) {
+    const kalan = sonuc.slice(0, satir);
+    let son = kalan[satir - 1];
+    while (son.length > 1 && x.measureText(`${son}…`).width > gen) son = son.slice(0, -1);
+    kalan[satir - 1] = `${son}…`;
+    return kalan;
+  }
+  return sonuc.map((l) => {
+    let t = l;
+    while (t.length > 1 && x.measureText(t).width > gen) t = t.slice(0, -1);
+    return t === l ? l : `${t}…`;
+  });
+}
+
+function istasyonYuzu(ad: string, b: IstasyonBilgisi): THREE.Texture {
+  return doku(512, 370, (x, w, h) => {
+    const durum = istasyonDurumu(b);
+    yuvarlak(x, 0, 0, w, h, 10, "#FBFBFC");
+    // Üst şerit: projenin durumu.
+    x.fillStyle = DURUM_RENGI[durum];
+    x.fillRect(0, 0, w, 14);
+    x.fillStyle = "#3E4858";
+    x.font = `700 38px ${YAZI}`;
+    sar(x, ad, w - 48, 2).forEach((l, i) => x.fillText(l, 24, 70 + i * 44));
+    // İlerleme çubuğu
+    const oran = b.toplam ? b.biten / b.toplam : 0;
+    yuvarlak(x, 24, 186, w - 48, 30, 15, "#E8EAEE");
+    if (oran > 0) yuvarlak(x, 24, 186, Math.max(30, (w - 48) * oran), 30, 15, oran >= 1 ? DURUM_RENGI.yolunda : "#C0813F");
+    x.font = `600 28px ${YAZI}`;
+    x.fillStyle = "#5B6577";
+    x.fillText(b.toplam ? `${b.biten}/${b.toplam} görev · %${Math.round(oran * 100)}` : "Henüz görev yok", 24, 262);
+    if (b.teslim) {
+      x.font = `700 30px ${YAZI}`;
+      x.fillStyle = durum === "yolunda" ? "#3E4858" : DURUM_RENGI[durum];
+      x.fillText(`${b.gecikti ? "Gecikti" : "Teslim"} · ${kisaTarih(b.teslim)}`, 24, 326);
+    }
+  });
+}
+
+/** Proje istasyonu: seyyar pano (adı, ilerlemesi, teslimi) ve tepesinde durum ışığı. */
+function projeIstasyonu(ad: string, b: IstasyonBilgisi): THREE.Group {
+  const g = seyyarPano(istasyonYuzu(ad, b));
+  const metal = malzeme("#B9BEC7", { metal: 0.6, parlak: 0.5 });
+  g.add(yerlestir(silindir(0.012, 0.012, 0.12, metal, 8), 0, 1.6, 0.02));
+  const renk = DURUM_RENGI[istasyonDurumu(b)];
+  const isik = new THREE.Mesh(
+    new THREE.SphereGeometry(0.055, 20, 14),
+    new THREE.MeshStandardMaterial({ color: renk, emissive: renk, emissiveIntensity: 1.4, roughness: 0.3 })
+  );
+  isik.position.set(0, 1.7, 0.02);
+  g.add(isik);
+  return g;
+}
+
+/** Biten projelerin rafı: her biten proje bir kupa ya da altın plak (en çok 8). */
+function kupaRafi(adet: number): THREE.Group {
+  const g = new THREE.Group();
+  const ahsap = malzeme("#8A6446");
+  const altin = malzeme("#D4A24C", { metal: 0.8, parlak: 0.65 });
+  // Gövde: iki yan, arka, üç raf.
+  for (const x of [-0.42, 0.42]) g.add(yerlestir(kutu(0.04, 1.2, 0.34, ahsap, 0.01), x, 0.6, 0));
+  g.add(yerlestir(kutu(0.88, 1.2, 0.02, ahsap, 0.005), 0, 0.6, -0.16));
+  const raflar = [0.04, 0.44, 0.84, 1.2];
+  for (const y of raflar) g.add(yerlestir(kutu(0.88, 0.035, 0.34, ahsap, 0.01), 0, y, 0));
+  const n = Math.min(adet, 8);
+  for (let i = 0; i < n; i++) {
+    // İlk dördü orta rafa, sonrakiler üst rafa; her raf kendi içinde ortalanır.
+    const sira = Math.floor(i / 4);
+    const rafta = Math.min(4, n - sira * 4);
+    const x = ((i % 4) - (rafta - 1) / 2) * 0.2;
+    const y = raflar[1 + sira] + 0.02;
+    const odul = new THREE.Group();
+    odul.position.set(x, y, 0);
+    odul.scale.setScalar(1.45);
+    if (i % 2 === 0) {
+      // Kupa: ayak, gövde, iki kulp.
+      odul.add(yerlestir(kutu(0.08, 0.03, 0.08, malzeme("#3E4858"), 0.005), 0, 0.015, 0.02));
+      odul.add(yerlestir(silindir(0.012, 0.012, 0.08, altin, 8), 0, 0.07, 0.02));
+      odul.add(yerlestir(silindir(0.055, 0.025, 0.1, altin, 18), 0, 0.16, 0.02));
+      for (const s of [-1, 1]) {
+        const kulp = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.006, 6, 14), altin);
+        kulp.position.set(s * 0.06, 0.17, 0.02);
+        kulp.rotation.y = Math.PI / 2;
+        odul.add(kulp);
+      }
+    } else {
+      // Çerçeveli altın plak (arkaya yaslı).
+      const cerceve = kutu(0.17, 0.2, 0.02, malzeme("#1C222C"), 0.005);
+      cerceve.position.set(0, 0.11, -0.08);
+      cerceve.rotation.x = -0.12;
+      odul.add(cerceve);
+      const plak = silindir(0.065, 0.065, 0.006, altin, 28);
+      plak.rotation.x = Math.PI / 2 - 0.12;
+      plak.position.set(0, 0.115, -0.065);
+      odul.add(plak);
+    }
+    g.add(odul);
+  }
+  return g;
+}
+
+export function modulEsyasi(tur: ModulEsyasi, ek: { ad?: string; bilgi?: IstasyonBilgisi } = {}): THREE.Group {
   switch (tur) {
     case "kanban":
       return seyyarPano(kanbanYuzu());
@@ -620,5 +748,9 @@ export function modulEsyasi(tur: ModulEsyasi): THREE.Group {
       return dartTahtasi();
     case "kasa":
       return kasa();
+    case "projeIstasyonu":
+      return projeIstasyonu(ek.ad ?? "Proje", ek.bilgi ?? { biten: 0, toplam: 0 });
+    case "kupaRafi":
+      return kupaRafi(ek.bilgi?.kupa ?? 0);
   }
 }

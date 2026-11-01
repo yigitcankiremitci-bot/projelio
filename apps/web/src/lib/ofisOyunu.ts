@@ -226,7 +226,9 @@ export type ModulEsyasi =
   | "urunKutulari"
   | "huni"
   | "dartTahtasi"
-  | "kasa";
+  | "kasa"
+  | "projeIstasyonu"
+  | "kupaRafi";
 
 /**
  * Yönetim odasındaki para kasası: bir modül değil, şirketin Kasa sayfası
@@ -235,6 +237,35 @@ export type ModulEsyasi =
  * Gerçek modül anahtarlarıyla çakışmasın diye çift alt çizgiyle başlar.
  */
 export const KASA_MODULU = "__kasa";
+
+/**
+ * Stüdyoda (bkz. lib/studyoOfisi.ts) işin her aktif projesi odada bir iş
+ * istasyonudur; biten projeler kupa rafında durur. İkisi de kasa gibi modül
+ * eşyası yolundan gider (odada kalır, taşınır, kaydedilir): proje istasyonunun
+ * anahtarı "proje_<proje kimliği>".
+ */
+export const PROJE_ONEKI = "proje_";
+export const KUPA_RAFI = "__kupalar";
+
+/** Proje istasyonunun yüzünde (ve kupa rafında) yazanlar. */
+export interface IstasyonBilgisi {
+  /** Biten / toplam üst görev. */
+  biten: number;
+  toplam: number;
+  /** Teslim günü (YYYY-MM-DD). */
+  teslim?: string;
+  /** Teslimi geçti ve proje bitmedi: istasyonun ışığı kırmızı yanar. */
+  gecikti?: boolean;
+  /** Teslime 3 gün ya da daha az kaldı: ışık sarı. */
+  yaklasti?: boolean;
+  /** Kupa rafı: biten proje sayısı. */
+  kupa?: number;
+}
+
+/** Anahtarın odadaki eşyası (proje istasyonları dahil); yoksa undefined. */
+export function modulEsyasiTuru(key: string): ModulEsyasi | undefined {
+  return key.startsWith(PROJE_ONEKI) ? "projeIstasyonu" : MODUL_ESYALARI[key];
+}
 
 export const MODUL_ESYALARI: Record<string, ModulEsyasi> = {
   // Satış ve İş Geliştirme
@@ -256,6 +287,7 @@ export const MODUL_ESYALARI: Record<string, ModulEsyasi> = {
   pd_musteri_kazanim_optimizasyonu: "huni",
   pd_buyume_hedefleri: "dartTahtasi",
   [KASA_MODULU]: "kasa",
+  [KUPA_RAFI]: "kupaRafi",
 };
 
 /**
@@ -380,7 +412,7 @@ export function ofisPlani(departmanlar: { id: string; kisi: number; moduller?: s
     masa: d.yonetici && ekip <= 0 ? 0 : Math.min(EN_COK_MASA, Math.max(2, ekip + (ekip % 2))),
     kisi: d.kisi,
     // Yalnızca odada eşyası olan modüller yer kaplar.
-    moduller: (d.moduller ?? []).filter((k) => MODUL_ESYALARI[k]),
+    moduller: (d.moduller ?? []).filter((k) => modulEsyasiTuru(k)),
     };
   });
   const k = hucreler.length + 1;

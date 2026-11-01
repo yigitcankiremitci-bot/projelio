@@ -1,5 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { odaDuzeniTemizle, odaDuzenleyebilir, type OdaDuzeni } from "@projelio/shared";
+import {
+  odaDuzeniTemizle,
+  odaDuzenleyebilir,
+  studyoDuzenKaydi,
+  studyoOdaDuzenleyebilir,
+  type OdaDuzeni,
+} from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 
 export interface OfisDuzeniYaniti {
@@ -61,6 +67,77 @@ export class OfisDuzeniService {
   async sifirla(organizationId: string, odaId: string, userId: string): Promise<void> {
     await this.yetkiyiDogrula(organizationId, odaId, userId);
     const { error } = await this.supabase.client.from("ofis_oda_duzenleri").delete().eq("organization_id", organizationId).eq("oda_id", odaId);
+    if (error) throw error;
+  }
+
+  // ------------------------------------------------------------ Stüdyom (migration 175)
+
+  /**
+   * Kullanıcının stüdyosundaki serbest işler: sahibi olduğu ve onaylı ekibinde
+   * olduğu, şirkete/holdinge bağlı olmayan, arşivlenmemiş işler (web
+   * lib/studyoOfisi.ts serbestIsMi ile aynı kural).
+   */
+  private async studyoIsleri(userId: string): Promise<{ sahibi: string[]; hepsi: string[] }> {
+    const [{ data: sahip, error: e1 }, { data: uyelik, error: e2 }] = await Promise.all([
+      this.supabase.client.from("jobs").select("id").eq("owner_id", userId).is("organization_id", null).is("group_id", null).is("archived_at", null),
+      this.supabase.client.from("job_members").select("job_id").eq("user_id", userId).eq("status", "approved"),
+    ]);
+    if (e1) throw e1;
+    if (e2) throw e2;
+    const sahibi = (sahip ?? []).map((r: { id: string }) => r.id);
+    const uyeIds = (uyelik ?? []).map((r: { job_id: string }) => r.job_id).filter((id: string) => !sahibi.includes(id));
+    let uye: string[] = [];
+    if (uyeIds.length) {
+      const { data, error } = await this.supabase.client
+        .from("jobs")
+        .select("id")
+        .in("id", uyeIds)
+        .is("organization_id", null)
+        .is("group_id", null)
+        .is("archived_at", null);
+      if (error) throw error;
+      uye = (data ?? []).map((r: { id: string }) => r.id);
+    }
+    return { sahibi, hepsi: [...sahibi, ...uye] };
+  }
+
+  async studyoGetir(userId: string): Promise<OfisDuzeniYaniti> {
+    const isler = await this.studyoIsleri(userId);
+    const sorgular = [this.supabase.client.from("studyo_oda_duzenleri").select("oda_id, duzen").eq("user_id", userId)];
+    if (isler.hepsi.length) sorgular.push(this.supabase.client.from("studyo_oda_duzenleri").select("oda_id, duzen").in("job_id", isler.hepsi));
+    const odalar: Record<string, OdaDuzeni> = {};
+    for (const { data, error } of await Promise.all(sorgular)) {
+      if (error) throw error;
+      for (const r of data ?? []) odalar[r.oda_id] = odaDuzeniTemizle(r.duzen);
+    }
+    return { odalar, duzenleyebilir: [...isler.sahibi, "ortak", "toplanti"] };
+  }
+
+  private async studyoYetkisiniDogrula(odaId: string, userId: string): Promise<void> {
+    // Kişisel alanlar için sorgu gerekmez; iş odası için işin sahibi olmalı.
+    if (studyoOdaDuzenleyebilir(odaId, [])) return;
+    const { sahibi } = await this.studyoIsleri(userId);
+    if (!studyoOdaDuzenleyebilir(odaId, sahibi)) {
+      throw new ForbiddenException("Bu işin odasını yalnızca işin sahibi düzenleyebilir");
+    }
+  }
+
+  async studyoKaydet(odaId: string, ham: unknown, userId: string): Promise<OdaDuzeni> {
+    await this.studyoYetkisiniDogrula(odaId, userId);
+    const duzen = odaDuzeniTemizle(ham);
+    const { error } = await this.supabase.client
+      .from("studyo_oda_duzenleri")
+      .upsert(
+        { ...studyoDuzenKaydi(odaId, userId), oda_id: odaId, duzen, updated_by: userId, updated_at: new Date().toISOString() },
+        { onConflict: "anahtar" }
+      );
+    if (error) throw error;
+    return duzen;
+  }
+
+  async studyoSifirla(odaId: string, userId: string): Promise<void> {
+    await this.studyoYetkisiniDogrula(odaId, userId);
+    const { error } = await this.supabase.client.from("studyo_oda_duzenleri").delete().eq("anahtar", studyoDuzenKaydi(odaId, userId).anahtar);
     if (error) throw error;
   }
 }

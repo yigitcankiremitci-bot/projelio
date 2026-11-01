@@ -94,3 +94,30 @@ export function odaDuzenleyebilir(
   if (odaId === "toplanti" || odaId === "ortak") return false;
   return kullanici.yonettigiDepartmanlar.includes(odaId);
 }
+
+// ------------------------------------------------------------------ Stüdyom
+
+/** Stüdyonun kişiye ait alanları (her kullanıcının kendi stüdyosu). */
+export const STUDYO_KISISEL_ALANLAR = ["ortak", "toplanti"] as const;
+
+/**
+ * Stüdyom'da (serbest çalışanın 3D ofisi, migration 175) bir odanın kaydı:
+ * iş odası işin ekibinde ortak (iş kimliğiyle), ortak alan ve görüşme odası
+ * kişinin kendisine ait (kullanıcı kimliğiyle).
+ */
+export function studyoDuzenKaydi(
+  odaId: string,
+  userId: string
+): { anahtar: string; job_id: string | null; user_id: string | null } {
+  return (STUDYO_KISISEL_ALANLAR as readonly string[]).includes(odaId)
+    ? { anahtar: `kullanici:${userId}:${odaId}`, job_id: null, user_id: userId }
+    : { anahtar: `is:${odaId}`, job_id: odaId, user_id: null };
+}
+
+/**
+ * Stüdyoda odayı kim düzenler: kendi ortak alanını ve görüşme odasını herkes;
+ * iş odasını yalnızca işin sahibi (ekipteki diğerleri görür, değiştiremez).
+ */
+export function studyoOdaDuzenleyebilir(odaId: string, sahibiOlduguIsler: string[]): boolean {
+  return (STUDYO_KISISEL_ALANLAR as readonly string[]).includes(odaId) || sahibiOlduguIsler.includes(odaId);
+}

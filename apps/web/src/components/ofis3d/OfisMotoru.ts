@@ -38,7 +38,9 @@ import {
 import { esyaModeli, kutu, malzeme, tahta } from "./modeller";
 import { karakter, varlik, varlikVar, varliklariYukle, type Karakter3D, type VarlikAdi } from "./varliklar";
 import { modulEsyasi } from "./modulEsyalari";
-import { KASA_MODULU, MODUL_ESYALARI, TOPLANTI_MASASI } from "../../lib/ofisOyunu";
+import { temaEsyalari } from "./studyoEsyalari";
+import type { IsTemasi } from "../../lib/studyoOfisi";
+import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI, TOPLANTI_MASASI, modulEsyasiTuru, type IstasyonBilgisi } from "../../lib/ofisOyunu";
 import type { NesneDuzeni } from "@projelio/shared";
 import { izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
 
@@ -62,6 +64,8 @@ export interface SahneKisisi {
   emek: number;
   /** Departman yöneticisi: odadaki yönetici masasında oturur. */
   yonetici?: boolean;
+  /** Stüdyo: üzerinde çalıştığı projenin istasyonu (modül anahtarı); masası yerine onun önünde ayakta durur. */
+  istasyon?: string;
 }
 
 interface Yerlestirme {
@@ -81,6 +85,8 @@ interface Karakter {
   koltukYonu: number;
   /** Oturduğu masanın odadaki sırası ("masa-N"): masa taşınınca koltuğu izler. */
   masaNo: number;
+  /** Masada oturmaz, "koltuk" bir istasyonun önü: orada ayakta çalışır. */
+  ayakta?: boolean;
   oda: OfisOdasi;
   durum: Durum;
   yol: THREE.Vector3[];
@@ -108,6 +114,9 @@ const IKONLAR: Record<string, string> = {
   video: '<rect x="3" y="6.5" width="12.5" height="11" rx="2"/><path d="m15.5 10.5 5.5-3v9l-5.5-3"/>',
   kahve: '<path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/>',
   bina: '<path d="M4 21V5l8-2v18M12 8l8 2v11M8 8v.01M8 12v.01M8 16v.01M16 13v.01M16 17v.01"/>',
+  muzik: '<path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+  kamera: '<path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  kalem: '<path d="M4 20l1-4L16 5l3 3L8 19zM14 7l3 3"/>',
 };
 
 const DUVAR_YUKSEKLIK = 2.6;
@@ -302,6 +311,10 @@ export class OfisMotoru {
   onModulTikla?: (odaId: string, modulKey: string) => void;
   /** Ofiste gezen Lio robotuna tıklanınca (Lio sohbeti açılır). */
   onLioTikla?: () => void;
+  /** Stüdyoda proje istasyonlarının ve kupa rafının bilgisi (anahtar: modül anahtarı). */
+  private istasyonBilgileri = new Map<string, IstasyonBilgisi>();
+  /** Stüdyoda odanın döşemesi (oda kimliği → tema). */
+  private odaTemalari = new Map<string, string>();
   /** Modül adları (üzerine gelince gösterilir); React tarafı katalogdan doldurur. */
   modulAdlari = new Map<string, string>();
   /** Modeller yüklenince (ya da yüklenemeyince) bir kez çağrılır. */
@@ -529,6 +542,48 @@ export class OfisMotoru {
     await this.kisileriKur(plan, kisiler, sira);
     if (sira !== this.kurulumSirasi) return;
     this.lioyuKur(plan);
+  }
+
+  /**
+   * Proje istasyonlarının bilgisi (ilerleme, teslim). Bilgi değiştiyse sahne bir
+   * sonraki kur()'da yeniden çizilir: plan aynı kalsa da pano yüzleri tazelenmeli.
+   */
+  istasyonlariAyarla(bilgiler: Map<string, IstasyonBilgisi>): void {
+    const imza = (m: Map<string, IstasyonBilgisi>) => JSON.stringify([...m].sort(([a], [b]) => a.localeCompare(b)));
+    if (imza(bilgiler) === imza(this.istasyonBilgileri)) return;
+    this.istasyonBilgileri = bilgiler;
+    this.planImza = "";
+  }
+
+  /** Stüdyo odalarının teması (işin türü); değiştiyse sahne bir sonraki kur()'da yeniden döşenir. */
+  temalariAyarla(temalar: Map<string, string>): void {
+    const imza = (m: Map<string, string>) => JSON.stringify([...m].sort(([a], [b]) => a.localeCompare(b)));
+    if (imza(temalar) === imza(this.odaTemalari)) return;
+    this.odaTemalari = temalar;
+    this.planImza = "";
+  }
+
+  /**
+   * Temanın eşyalarını odaya koyar: dış duvarın önünden başlayarak en yakın
+   * boş yere (masalar, modül eşyaları ve köşe bitkileri konduktan sonra).
+   * Sığmayan konmaz. Kimlikleri "dekor:tema-N": düzenleyicide taşınabilir.
+   */
+  private temayiDose(oda: OfisOdasi, tema: IsTemasi, iceDonus: number): void {
+    const dis = { x: -oda.kapiYonu.x, z: -oda.kapiYonu.z };
+    const yan = { x: dis.z, z: dis.x };
+    const cx = oda.x + oda.w / 2;
+    const cz = oda.z + oda.d / 2;
+    // Dış duvarın 1 m önü; eşyalar duvar boyunca sırayla sola/sağa açılır.
+    const derin = (dis.x !== 0 ? oda.w : oda.d) / 2 - 1;
+    temaEsyalari(tema).forEach((obj, i) => {
+      const kayma = (i % 2 === 0 ? 1 : -1) * Math.ceil(i / 2) * 1.3;
+      const bas = { x: cx + dis.x * derin + yan.x * kayma, z: cz + dis.z * derin + yan.z * kayma };
+      obj.position.set(bas.x, ZEMIN_Y, bas.z);
+      obj.rotation.y = iceDonus;
+      const nesneId = `dekor:tema-${i}`;
+      const yer = this.bosYer(obj, oda, nesneId, oda, bas, true);
+      if (yer) this.nesneKoy(oda, nesneId, obj, yer.x, yer.z, iceDonus);
+    });
   }
 
   // ------------------------------------------------------------ Lio
@@ -1163,9 +1218,9 @@ export class OfisMotoru {
       // Modül eşyaları duvar boyunca (yerleri planda). Modülü olan odada genel
       // tahta/kitaplık dekoru konmaz: duvarlar modüllere ayrılır.
       for (const y of oda.moduller) {
-        const tur = MODUL_ESYALARI[y.key];
+        const tur = modulEsyasiTuru(y.key);
         if (!tur) continue;
-        const o = modulEsyasi(tur);
+        const o = modulEsyasi(tur, { ad: this.modulAdlari.get(y.key), bilgi: this.istasyonBilgileri.get(y.key) });
         this.nesneKoy(oda, `modul:${y.key}`, o, y.x, y.z, y.don);
         o.traverse((c) => (c.userData.modul = `${oda.id}|${y.key}`));
         this.modulNesneleri.set(`${oda.id}|${y.key}`, o);
@@ -1197,6 +1252,8 @@ export class OfisMotoru {
         this.nesneKoy(oda, "dekor:askilik", "askilik", ix, iz - 1.1);
         this.nesneKoy(oda, "dekor:kapi-bitkisi", "bitkiKucuk2", ix, iz + 1.1);
       }
+      const tema = this.odaTemalari.get(oda.id) as IsTemasi | undefined;
+      if (tema) this.temayiDose(oda, tema, iceDonus);
     } else if (oda.tur === "toplanti") {
       // Masa ve altı sandalye tek parça: düzenleyicide birlikte taşınır.
       const grup = new THREE.Group();
@@ -1365,10 +1422,33 @@ export class OfisMotoru {
     const eski = new Map(this.karakterler.map((k) => [k.veri.id + "|" + k.veri.odaId, k]));
     const doluluk = new Map<string, number>();
     const patronDolu = new Set<string>();
-    const yerler: { v: SahneKisisi; oda: OfisOdasi; koltuk: THREE.Vector3; koltukYonu: number; masaNo: number }[] = [];
+    const yerler: { v: SahneKisisi; oda: OfisOdasi; koltuk: THREE.Vector3; koltukYonu: number; masaNo: number; ayakta?: boolean }[] = [];
+    const istasyonda = new Map<string, number>();
     for (const v of kisiler) {
       const oda = plan.odalar.find((o) => o.id === v.odaId);
       if (!oda) continue;
+      // Stüdyo: üzerinde çalıştığı projenin istasyonu odadaysa onun önünde,
+      // yüzü panoya dönük ayakta durur (aynı istasyondakiler yan yana).
+      const ist = v.istasyon ? this.modulNesneleri.get(`${oda.id}|${v.istasyon}`) : undefined;
+      if (ist) {
+        const sira = istasyonda.get(v.istasyon!) ?? 0;
+        istasyonda.set(v.istasyon!, sira + 1);
+        const don = ist.rotation.y;
+        const yan = (sira % 2 === 0 ? 1 : -1) * Math.ceil(sira / 2) * 0.5;
+        yerler.push({
+          v,
+          oda,
+          koltuk: new THREE.Vector3(
+            ist.position.x + Math.sin(don) * 0.8 + Math.cos(don) * yan,
+            ZEMIN_Y,
+            ist.position.z + Math.cos(don) * 0.8 - Math.sin(don) * yan
+          ),
+          koltukYonu: don + Math.PI,
+          masaNo: -1,
+          ayakta: true,
+        });
+        continue;
+      }
       // Yönetici (ilki) yönetici masasına; diğerleri sırayla ekip masalarına.
       const patronNo = oda.masalar.findIndex((m) => m.patron);
       let s: number;
@@ -1393,13 +1473,13 @@ export class OfisMotoru {
       });
     }
     const yeni = await Promise.all(
-      yerler.map(async ({ v, oda, koltuk, koltukYonu, masaNo }): Promise<Karakter | null> => {
+      yerler.map(async ({ v, oda, koltuk, koltukYonu, masaNo, ayakta }): Promise<Karakter | null> => {
         const anahtar = v.id + "|" + v.odaId;
         const onceki = eski.get(anahtar);
         if (onceki) {
           eski.delete(anahtar);
           this.halkaRengi(onceki.halka, v);
-          return { ...onceki, veri: v, koltuk, koltukYonu, masaNo, oda };
+          return { ...onceki, veri: v, koltuk, koltukYonu, masaNo, oda, ayakta };
         }
         let k3: Karakter3D;
         try {
@@ -1427,6 +1507,7 @@ export class OfisMotoru {
           koltuk,
           koltukYonu,
           masaNo,
+          ayakta,
           oda,
           durum: "oturuyor",
           yol: [],
@@ -1563,9 +1644,12 @@ export class OfisMotoru {
     k.k3.karisici.update(dt);
 
     if (k.durum === "oturuyor") {
-      n.position.set(k.koltuk.x, k.koltuk.y - OTURMA_INIS, k.koltuk.z);
       n.rotation.y = k.koltukYonu;
-      this.oturt(k);
+      if (k.ayakta) n.position.set(k.koltuk.x, ZEMIN_Y, k.koltuk.z);
+      else {
+        n.position.set(k.koltuk.x, k.koltuk.y - OTURMA_INIS, k.koltuk.z);
+        this.oturt(k);
+      }
       k.sayac -= dt;
       if (k.sayac <= 0) this.yolaCik(k);
       return;
@@ -2013,6 +2097,12 @@ export class OfisMotoru {
    * (bkz. devret). Bunu ortak alanın düzenini kaydedebilen (şirket sahibi) yapar.
    */
   ortagaTasinabilir = false;
+  /**
+   * Eşyası ortak alana devredilebilen odalar; null: hepsi (şirkette sahip her
+   * odayı yazabilir). Stüdyoda yalnızca sahibi olunan işlerin odaları: ekipte
+   * olunan başkasının işinin odası değiştirilemez (sunucu da reddeder).
+   */
+  devirOdalari: Set<string> | null = null;
   /** Odanın eşyası ortak alana bırakıldı: odadan çıkarılıp ortak alana "ek:" olarak eklenmeli. */
   onOrtagaDevir?: (odaId: string, nesneId: string, ortakta: NesneDuzeni & { tur: string }) => void;
 
@@ -2023,6 +2113,7 @@ export class OfisMotoru {
    */
   private devredilebilir(n: { obj: THREE.Object3D; oda: OfisOdasi; nesneId: string }): boolean {
     if (n.oda.tur === "ortak" || !(n.nesneId.startsWith("dekor:") || n.nesneId.startsWith("ek:"))) return false;
+    if (this.devirOdalari && !this.devirOdalari.has(n.oda.id)) return false;
     return typeof n.obj.userData.model === "string" && n.obj.position.y <= ZEMIN_Y + 0.05;
   }
 
@@ -2585,7 +2676,9 @@ export class OfisMotoru {
         b.textContent = this.modulAdlari.get(yeni.id.split("|")[1]) ?? "Modül";
         el.appendChild(b);
         const s = document.createElement("small");
-        s.textContent = yeni.id.endsWith(`|${KASA_MODULU}`) ? "Tıkla, kasayı aç" : "Tıkla, modülü aç";
+        const key = yeni.id.split("|")[1];
+        s.textContent =
+          key === KASA_MODULU ? "Tıkla, kasayı aç" : key.startsWith(PROJE_ONEKI) ? "Tıkla, projeyi aç" : key === KUPA_RAFI ? "Biten projeler" : "Tıkla, modülü aç";
         el.appendChild(s);
         this.sahne.add(this.kisiEtiketi);
         this.kisiEtiketi.position.set(o.position.x, 2.05, o.position.z);

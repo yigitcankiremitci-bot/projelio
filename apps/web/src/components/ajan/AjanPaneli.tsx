@@ -512,7 +512,7 @@ function Liste({ c, durum, tazele, onDurum }: { c: ThemeColors; durum: AjanDurum
         </button>
       </form>
       {hata && <Hata c={c} metin={hata} />}
-      <p style={{ color: c.textSecondary, fontSize: 13 }}>Liste boşalınca ajan, öğrettiklerine bakıp kendine yeni konular ekler.</p>
+      <p style={{ color: c.textSecondary, fontSize: 13 }}>Liste boşalınca ajan, öğrettiklerine bakıp kendine yeni konular ekler. Bunun için Bellek sekmesinden ona en az bir şey öğretmiş olman gerekir.</p>
       {konular.map((k) => (
         <div key={k.id} style={{ ...kart(c), display: "flex", gap: 8, alignItems: "center", opacity: k.durum === "atlandi" ? 0.6 : 1 }}>
           <div style={{ flex: 1 }}>

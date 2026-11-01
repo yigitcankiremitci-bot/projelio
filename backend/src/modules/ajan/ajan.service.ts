@@ -571,6 +571,15 @@ export class AjanService {
       return true;
     }
     if (karar === "liste") {
+      // Hiçbir şey öğretilmemişken liste çıkarılmaz: canlıdaki ilk koşuda
+      // (2026-11-02) model dayanacak bir şey bulamayıp boş döndü. Ajan
+      // kullanıcının öğrettikleri doğrultusunda öğrenir; o yoksa bekler.
+      const { count } = await this.db
+        .from("ajan_bilgileri")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("tur", "ogretilen");
+      if (!count) return false;
       await this.isAc(userId, "liste", "Öğrettiklerime ve şimdiye kadar öğrendiklerine bakarak öğrenme listene yeni konular ekle.");
       return true;
     }

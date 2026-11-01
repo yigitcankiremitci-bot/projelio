@@ -88,6 +88,10 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Archive = lazy(() => import("./pages/Archive"));
 const TasksOverview = lazy(() => import("./pages/TasksOverview"));
 const WorkLog = lazy(() => import("./pages/WorkLog"));
+// Deneme arayüzü (bkz. pages/Sakin.tsx) — mevcut ekranların yerine geçmez.
+const Sakin = lazy(() => import("./pages/Sakin"));
+// Yeni arayüz denemesi (bkz. pages/Yeni.tsx) — o da kendi menüsünü çizer.
+const Yeni = lazy(() => import("./pages/Yeni"));
 const Sosyal = lazy(() => import("./pages/Sosyal"));
 const IseAlimDaveti = lazy(() => import("./pages/IseAlimDaveti"));
 const AiCreditsPage = lazy(() => import("./pages/AiCredits"));
@@ -719,6 +723,11 @@ export default function App() {
   // HEADER_HEIGHT boşluğu ve dekoratif header çubuğunun opak arka planı
   // kaldırılır; sidebar açma düğmesi/logo/bildirim çanı/AI başlatıcı zaten
   // ayrı position:fixed öğeler olduğu için kapağın üzerinde yüzmeye devam eder.
+  // "Sakin Projelio" deneme ana sayfası kendi sol menüsünü çiziyor (bkz.
+  // pages/Sakin.tsx); orada uygulamanın kenar çubuğu ve açma oku gizlenir.
+  // Mobilde kendi menüsü gizlendiği için alt menü (BottomNav) yerinde kalır.
+  const sakinEkrani = location.pathname === "/sakin" || location.pathname === "/yeni";
+  const kenarAcik = sidebarOpen && !sakinEkrani;
   const isCoverPage = /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(
     location.pathname
   );
@@ -771,19 +780,19 @@ export default function App() {
         </Suspense>
       )}
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} isAdmin={me?.role === "admin"} />
+      <Sidebar open={kenarAcik} onClose={() => setSidebarOpen(false)} overlay={!isDesktop} isAdmin={me?.role === "admin"} />
 
       {/* Sidebar artık position:fixed olduğu için akışta yer kaplamıyor;
           içerik sütununu (yalnızca masaüstünde ve açıkken) onun genişliği kadar
           sağa kaydırıyoruz. Mobilde sidebar bir çekmece/overlay olduğu için
           içerik hiçbir zaman kaymaz. */}
-      <div style={{ marginLeft: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
-        {!isCoverPage && (
+      <div style={{ marginLeft: isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
+        {!isCoverPage && !sakinEkrani && (
           <div
             style={{
               position: "fixed",
               top: 0,
-              left: isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0,
+              left: isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0,
               right: 0,
               height: safeTop(HEADER_HEIGHT),
               // Kasıtlı olarak sayfa arka planıyla AYNI renk (beyaz değil): bu şerit
@@ -801,8 +810,8 @@ export default function App() {
             şeridin üstünde kalsınlar. */}
         <CoverStickyHeader
           visibleOn={hasStickyHeader}
-          left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
-          sidebarOpen={sidebarOpen}
+          left={isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0}
+          sidebarOpen={kenarAcik}
           user={me}
         />
 
@@ -810,7 +819,7 @@ export default function App() {
             bir ok butonu durur; basınca sidebar açılır. Yanındaki yüzen Projelio
             logosu 2026-09'da kaldırıldı: logo sidebar'ın içinde zaten var, kapağın
             üstünde de başlığa ve kapak fotoğrafına binip kalabalık yaratıyordu. */}
-        {!sidebarOpen && (
+        {!sidebarOpen && !sakinEkrani && (
           <>
             <button
               onClick={() => setSidebarOpen(true)}
@@ -856,10 +865,10 @@ export default function App() {
             (bkz. lib/liveRoom.ts). Kenar çubuğu açıkken içerik sütununa hizalanır. */}
         {/* Süren yüklemeler: sayfa değişse de görünmeye devam etsin diye
             burada, akıştan bağımsız duruyor (bkz. lib/uploadQueue). */}
-        <UploadTray left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0} />
+        <UploadTray left={isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0} />
         {prefs.showPresence && (
           <PresenceStrip
-            left={isDesktop && sidebarOpen ? SIDEBAR_WIDTH : 0}
+            left={isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0}
             lift={uploadCount > 0 ? UPLOAD_TRAY_HEIGHT + 8 : 0}
           />
         )}
@@ -869,7 +878,7 @@ export default function App() {
             // gizlendiği için boşluk da daralır (bkz. index.css, lib/klavye.ts).
             data-klavyede-alt-bosluk
             style={{
-              paddingTop: isCoverPage ? 0 : safeTop(HEADER_HEIGHT),
+              paddingTop: isCoverPage || sakinEkrani ? 0 : safeTop(HEADER_HEIGHT),
               // Mobilde sayfanın altında üç şey üst üste duruyor: alt menü
               // (68 px + safe-area), onun üstüne taşan yuvarlak FAB (bottom 24 +
               // 64 = tepesi 88 px) ve Lio balonu (bottom 96). Eski 84 px bunların
@@ -902,6 +911,8 @@ export default function App() {
                 <Route path="/tasks" element={<TasksOverview />} />
                 {/* Yaptım: kişisel iş günlüğü. Yapılacaklar'ın tersi (bkz. pages/WorkLog.tsx). */}
                 <Route path="/worklog" element={<WorkLog />} />
+                <Route path="/sakin" element={<Sakin />} />
+                <Route path="/yeni" element={<Yeni />} />
                 {/* Sosyal: arkadaşlar ve kişisel duvarlar — iş/şirket ilişkisinden bağımsız (migration 134). */}
                 <Route path="/sosyal" element={<Sosyal />} />
                 <Route path="/sosyal/:userId" element={<Sosyal />} />
@@ -923,7 +934,7 @@ export default function App() {
           </div>
           {/* Mobilde tam alt menü, masaüstünde ise sadece ortadaki "+" butonu olarak
               render edilir — karar BottomNav içinde isDesktop'a göre veriliyor. */}
-          <BottomNav sidebarOpen={isDesktop && sidebarOpen} />
+          <BottomNav sidebarOpen={isDesktop && kenarAcik} />
         </ProjectFabProvider>
       </div>
     </div>

@@ -1,0 +1,866 @@
+/* Yeni Projelio arayüzü (bkz. pages/Yeni.tsx).
+ *
+ * Projelio'nun marka dili (brand.projelio.app, repoda brand/index.html):
+ * renkler packages/shared/src/theme.ts'ten gelir — uygulama onları
+ * ThemeProvider'da --color-* değişkenleri olarak köke yazar; kullanıcının
+ * seçtiği vurgu rengi ve koyu tema buradan kendiliğinden yansır. Bu dosyada
+ * yeni renk YOK: --yn-* değişkenleri yalnızca --color-*'tan türetilir.
+ * Yazı tipi Bricolage Grotesque; köşe yarıçapı 8 düğme · 14 kart · 22 büyük kart.
+ *
+ * Departman tonları (çivit, çam, bordo) theme.ts'teki vurgu ön ayarlarıdır
+ * (accentPresets), uydurma değil. */
+
+.yn {
+  --yn-bg: var(--color-background);
+  --yn-card: var(--color-surface);
+  --yn-ink: var(--color-text-primary);
+  --yn-ink-2: var(--color-text-secondary);
+  --yn-ink-3: color-mix(in srgb, var(--color-text-secondary) 72%, var(--color-surface));
+  --yn-line: var(--color-border);
+  --yn-soft: color-mix(in srgb, var(--color-border) 40%, var(--color-surface));
+  --yn-accent: var(--color-accent);
+  --yn-accent-dark: var(--color-accent-dark);
+  --yn-accent-soft: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  --yn-primary: var(--color-primary);
+  --yn-primary-dark: var(--color-primary-dark);
+  --yn-green: var(--color-success);
+  --yn-blue: var(--color-primary);
+  --yn-red: var(--color-danger);
+  --yn-ring-bg: color-mix(in srgb, var(--color-success) 14%, var(--color-surface));
+  --yn-cam: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  --yn-shadow: 0 1px 2px rgba(26, 31, 41, 0.05), 0 8px 24px rgba(26, 31, 41, 0.07);
+  /* Markanın "bronz parıltı" gölgesi: vurgu düğmelerinde. */
+  --yn-parilti: 0 10px 30px color-mix(in srgb, var(--color-accent) 30%, transparent);
+  --yn-radius: 14px;
+  --yn-radius-buyuk: 22px;
+  --yn-radius-dugme: 8px;
+  --ton-mor: #4a5fc1;
+  --ton-mavi: var(--color-primary);
+  --ton-turuncu: var(--color-accent);
+  --ton-kirmizi: var(--color-danger);
+  --ton-yesil: #2f7a5b;
+  --ton-pembe: #9c3f52;
+  --ton-gri: var(--color-text-secondary);
+
+  display: flex;
+  min-height: 100vh;
+  background: var(--yn-bg);
+  color: var(--yn-ink);
+  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+}
+.yn a {
+  color: inherit;
+  text-decoration: none;
+}
+.yn button {
+  font: inherit;
+  color: inherit;
+}
+.yn-i {
+  width: 1.25em;
+  height: 1.25em;
+  flex: none;
+}
+
+/* ------------------------------------------------------------- sol menü */
+.yn-side {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 236px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 14px 18px;
+  /* Zemin satır içi stilden gelir (useSidebarStyle); bu yalnızca yedek. */
+  background: var(--color-primary-dark);
+  color: #c7ccd6;
+}
+.yn-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 26px;
+  color: var(--yn-accent);
+  font-size: 20px;
+  font-weight: 600;
+}
+.yn-logo-kutu {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 8px;
+  background: #fff;
+}
+.yn-logo-kutu img {
+  width: 24px;
+  height: 24px;
+}
+.yn-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.yn-nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  color: #c7ccd6;
+  font-weight: 400;
+  font-size: 15px;
+  transition: background 0.18s, color 0.18s, transform 0.18s;
+}
+/* Uygulama kenar çubuğundaki gibi: seçili satırın solunda vurgu renginde çizgi. */
+.yn-nav a::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--yn-accent);
+  transform: translateY(-50%);
+  transition: height 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.yn-nav a .yn-i {
+  width: 22px;
+  height: 22px;
+}
+.yn-nav a:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+  transform: translateX(3px);
+}
+.yn-nav a.on {
+  background: rgba(255, 255, 255, 0.11);
+  color: #fff;
+  font-weight: 500;
+}
+.yn-nav a.on::before {
+  height: 60%;
+}
+.yn-nav a.on .yn-i {
+  color: var(--yn-accent);
+}
+.yn-me {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: 14px;
+}
+.yn-me:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.yn-me-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.yn-me-txt b {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-me-txt b {
+  color: #fff;
+}
+.yn-me-txt small {
+  color: #9aa6b4;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-me > .yn-i {
+  color: #9aa6b4;
+}
+
+/* ------------------------------------------------------------- üst şerit */
+.yn-body {
+  flex: 1;
+  min-width: 0;
+  padding: 22px 26px 28px 30px;
+}
+.yn-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-left: calc((100% - 340px - 24px) * 0.32);
+  /* Sağ üstte uygulamanın sabit "?" ve bildirim düğmeleri duruyor. */
+  padding-right: 92px;
+  margin-bottom: 4px;
+}
+.yn-search {
+  position: relative;
+  flex: 1;
+  max-width: 700px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 18px;
+  background: var(--yn-card);
+  border: 1px solid var(--yn-line);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(26, 31, 41, 0.03);
+  color: var(--yn-ink-3);
+}
+.yn-search input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--yn-ink);
+}
+.yn-search input::placeholder {
+  color: var(--yn-ink-3);
+}
+.yn-search:focus-within {
+  border-color: color-mix(in srgb, var(--yn-accent) 35%, var(--yn-card));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--yn-accent) 8%, transparent);
+}
+.yn-search-res {
+  position: absolute;
+  top: 50px;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: var(--yn-card);
+  border: 1px solid var(--yn-line);
+  border-radius: 14px;
+  box-shadow: var(--yn-shadow);
+  padding: 6px;
+}
+.yn-search-res button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.yn-search-res button:hover {
+  background: var(--yn-accent-soft);
+}
+.yn-search-res small {
+  flex: none;
+  min-width: 64px;
+  color: var(--yn-ink-3);
+  font-size: 11.5px;
+}
+.yn-ask {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--yn-radius-dugme);
+  background: var(--yn-card);
+  box-shadow: 0 1px 2px rgba(26, 31, 41, 0.04);
+  color: var(--yn-accent) !important;
+  font-weight: 600;
+  cursor: pointer;
+}
+.yn-ask:hover {
+  background: var(--yn-accent-soft);
+}
+
+/* ------------------------------------------------------------- ızgara */
+.yn-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+}
+.yn-main {
+  min-width: 0;
+}
+.yn-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------- ofis */
+.yn-baslik {
+  margin: 10px 0 14px 4px;
+}
+.yn-baslik h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.yn-baslik p {
+  margin: 4px 0 0;
+  color: var(--yn-ink-2);
+  font-size: 14.5px;
+}
+
+/* ------------------------------------------------------------- simge kutuları */
+.yn-ico {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 21px;
+}
+.yn-ico.sm {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+}
+.yn-ico .yn-i {
+  width: 1em;
+  height: 1em;
+}
+.t-mor {
+  background: color-mix(in srgb, var(--ton-mor) 13%, var(--yn-card));
+  color: var(--ton-mor);
+}
+.t-mavi {
+  background: color-mix(in srgb, var(--ton-mavi) 13%, var(--yn-card));
+  color: var(--ton-mavi);
+}
+.t-turuncu {
+  background: color-mix(in srgb, var(--ton-turuncu) 13%, var(--yn-card));
+  color: var(--ton-turuncu);
+}
+.t-kirmizi {
+  background: color-mix(in srgb, var(--ton-kirmizi) 13%, var(--yn-card));
+  color: var(--ton-kirmizi);
+}
+.t-yesil {
+  background: color-mix(in srgb, var(--ton-yesil) 13%, var(--yn-card));
+  color: var(--ton-yesil);
+}
+.t-pembe {
+  background: color-mix(in srgb, var(--ton-pembe) 13%, var(--yn-card));
+  color: var(--ton-pembe);
+}
+.t-gri {
+  background: color-mix(in srgb, var(--ton-gri) 13%, var(--yn-card));
+  color: var(--ton-gri);
+}
+
+/* ------------------------------------------------------------- avatarlar */
+.yn-av {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--yn-accent-soft);
+  color: var(--yn-accent-dark);
+  color: var(--yn-accent);
+  font-weight: 700;
+  line-height: 1;
+}
+.yn-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.yn-avs {
+  display: inline-flex;
+  flex: none;
+}
+.yn-avs .yn-av {
+  box-shadow: 0 0 0 2px var(--yn-card);
+}
+.yn-avs .yn-av + .yn-av {
+  margin-left: -6px;
+}
+.yn-av-more {
+  background: var(--yn-soft);
+  color: var(--yn-ink-2);
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------- kartlar */
+.yn-card {
+  background: var(--yn-card);
+  border-radius: var(--yn-radius);
+  box-shadow: var(--yn-shadow);
+}
+.yn-pad {
+  padding: 20px 20px 16px;
+}
+.yn-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.yn-sec-head h2,
+.yn-sec-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+.yn-sec-head small {
+  color: var(--yn-ink-3);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-sec-head select {
+  max-width: 150px;
+  border: 0;
+  background: transparent;
+  color: var(--yn-ink-3);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.yn-sec-head > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--yn-accent);
+  font-size: 13px;
+  font-weight: 500;
+}
+.yn-more-link {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  color: var(--yn-accent) !important;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.yn-plus {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--yn-line);
+  color: var(--yn-ink-2);
+}
+.yn-plus:hover {
+  background: var(--yn-accent-soft);
+  color: var(--yn-accent);
+}
+.yn-empty-txt {
+  margin: 4px 0 6px;
+  color: var(--yn-ink-3);
+  font-size: 13px;
+}
+
+/* Genel durum */
+.yn-status {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.yn-ring {
+  flex: none;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.yn-ring > div {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--yn-card);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+.yn-legend {
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.yn-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--yn-ink-2);
+  font-size: 13.5px;
+}
+.yn-legend b {
+  margin-left: auto;
+  color: var(--yn-ink);
+  font-weight: 600;
+}
+.yn-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.d-green {
+  background: var(--yn-green);
+}
+.d-blue {
+  background: var(--yn-blue);
+}
+.d-red {
+  background: var(--yn-red);
+}
+
+/* Bugünün odağı */
+.yn-focus {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.yn-focus li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--yn-line);
+  border-radius: 12px;
+}
+.yn-check {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--yn-ink-3);
+  background: var(--yn-card);
+  color: #fff !important;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.yn-check:hover {
+  border-color: var(--yn-accent);
+}
+.yn-focus li.done .yn-check {
+  background: var(--yn-accent);
+  border-color: var(--yn-accent);
+}
+.yn-focus-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+}
+.yn-focus-txt small {
+  color: var(--yn-ink-3);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-focus-txt small.late {
+  color: var(--yn-red);
+}
+.yn-focus li.done .yn-focus-txt {
+  color: var(--yn-ink-3);
+  text-decoration: line-through;
+}
+
+/* Yaklaşan etkinlikler */
+.yn-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.yn-events li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.yn-ev-time {
+  flex: none;
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  color: var(--yn-ink-2);
+  font-size: 14px;
+}
+.yn-ev-time small {
+  font-size: 11px;
+  color: var(--yn-ink-3);
+}
+.yn-ev-txt {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.yn-ev-txt b {
+  font-weight: 500;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-ev-txt small {
+  color: var(--yn-ink-3);
+  font-size: 12px;
+}
+
+/* Lio kartı */
+.yn-lio {
+  padding: 20px 18px 18px;
+  border-radius: var(--yn-radius);
+  background: linear-gradient(160deg, var(--yn-accent-soft) 0%, var(--yn-card) 100%);
+  border: 1px solid color-mix(in srgb, var(--yn-accent) 35%, var(--yn-card));
+}
+.yn-lio-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.yn-lio-head img {
+  /* Markanın Lio'su (bronz çember, gülen gözler) — brand/assets/lio-mascot.png. */
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  flex: none;
+}
+.yn-lio-head h3 {
+  margin: 0 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.yn-lio-head h3 .yn-i {
+  color: var(--yn-accent);
+}
+.yn-lio-head p {
+  margin: 0;
+  color: var(--yn-ink-2);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.yn-lio-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 8px 0 16px;
+  background: var(--yn-card);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--yn-accent) 8%, transparent);
+}
+.yn-lio-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--yn-ink);
+}
+.yn-lio-input button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--yn-accent-soft);
+  color: var(--yn-accent) !important;
+  cursor: pointer;
+}
+.yn-lio-input button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Öne çıkan projeler */
+.yn-featured {
+  margin-top: 22px;
+  max-width: 1000px;
+}
+.yn-proj-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.yn-proj {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  min-height: 98px;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.yn-proj:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(26, 31, 41, 0.05), 0 14px 30px rgba(26, 31, 41, 0.09);
+}
+.yn-proj-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.yn-proj-body b {
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.yn-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.yn-bar-row small {
+  color: var(--yn-ink-2);
+  font-size: 12px;
+}
+.yn-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--yn-line);
+  overflow: hidden;
+}
+.yn-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--yn-green);
+}
+.yn-go {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--yn-line);
+  color: var(--yn-ink-2);
+  flex: none;
+}
+.yn-empty {
+  padding: 22px;
+  color: var(--yn-ink-3);
+  grid-column: 1 / -1;
+}
+
+/* ------------------------------------------------------------- yükleniyor */
+.yn-skel {
+  background: linear-gradient(90deg, var(--yn-soft) 0%, var(--yn-card) 50%, var(--yn-soft) 100%) !important;
+  background-size: 200% 100% !important;
+  animation: yn-shimmer 1.3s infinite linear;
+  box-shadow: none !important;
+}
+.yn-skel > * {
+  visibility: hidden;
+}
+.yn-skel-list {
+  height: 120px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--yn-soft) 0%, var(--yn-card) 50%, var(--yn-soft) 100%);
+  background-size: 200% 100%;
+  animation: yn-shimmer 1.3s infinite linear;
+}
+@keyframes yn-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.yn-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 50;
+  padding: 11px 18px;
+  border-radius: 12px;
+  background: var(--yn-ink);
+  color: #fff;
+  font-size: 13.5px;
+  box-shadow: var(--yn-shadow);
+}
+.yn-toast.err {
+  background: var(--yn-red);
+}
+
+/* ------------------------------------------------------------- dar ekranlar */
+@media (max-width: 1240px) {
+  .yn-grid {
+    grid-template-columns: minmax(0, 1fr) 290px;
+  }
+}
+@media (max-width: 1080px) {
+  .yn-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yn-right {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .yn-top {
+    padding-left: 0;
+  }
+}
+@media (max-width: 860px) {
+  /* Mobilde uygulamanın alt menüsü (BottomNav) yerinde kalıyor; kendi sol
+   * menümüz gizlenir. */
+  .yn-side {
+    display: none;
+  }
+  .yn-body {
+    padding: 14px 16px 24px;
+  }
+  .yn-right,
+  .yn-proj-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .yn-ask {
+    padding: 0 14px;
+  }
+}
+@media (max-width: 560px) {
+  .yn-ask {
+    display: none;
+  }
+}

@@ -36,6 +36,18 @@ export function askLioDraft(message: string): void {
   window.dispatchEvent(new CustomEvent<AskLioRequest>(EVENT_NAME, { detail: { message, autoSend: false } }));
 }
 
+const OPEN_EVENT = "projelio:open-lio";
+
+/** Lio panelini mesajsız açar (ör. 3D ofiste gezen Lio robotuna tıklanınca). */
+export function openLio(): void {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
+export function onOpenLio(handler: () => void): () => void {
+  window.addEventListener(OPEN_EVENT, handler);
+  return () => window.removeEventListener(OPEN_EVENT, handler);
+}
+
 export function onAskLio(handler: (request: AskLioRequest) => void): () => void {
   const listener = (e: Event) => handler((e as CustomEvent<AskLioRequest>).detail);
   window.addEventListener(EVENT_NAME, listener);

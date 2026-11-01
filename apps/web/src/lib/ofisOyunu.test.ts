@@ -9,6 +9,7 @@ import {
   duzeniUygula,
   masaAlani,
   MODUL_ESYALARI,
+  modulYerleri,
   yolHakki,
   ofisPlani,
   ofisSeviyesi,
@@ -321,5 +322,22 @@ describe("duzeniUygula (oda düzenleyicisi)", () => {
     assert.ok(!yeni.moduller.some((y) => y.key === "crm_musteri"));
     assert.ok(yeni.sigmayanModuller.includes("crm_musteri"));
     assert.ok(yeni.duzen);
+  });
+});
+
+describe("modulYerleri", () => {
+  const oda = { x: 0, z: 0, w: 10, d: 5 };
+  const kapi = { x: 0, z: 1 }; // kapı güneyde, dış duvar kuzeyde
+
+  test("tek eşya köşeye (bitkinin önüne) değil, duvarın içerisine konur", () => {
+    const [y] = modulYerleri(oda, kapi, null, 1);
+    assert.ok(y.x >= 1.35 && y.x <= oda.w - 1.35, `x=${y.x}`);
+  });
+
+  test("yer azsa köşeye bitişik yerler de kullanılır (sığan eşya sayısı azalmaz)", () => {
+    const hepsi = modulYerleri(oda, kapi, null, 50);
+    assert.ok(hepsi.some((y) => y.x < 1.35 && y.z < 1), "kuzeybatı köşesindeki yer de dolmalı");
+    const anahtar = new Set(hepsi.map((y) => `${y.x.toFixed(2)},${y.z.toFixed(2)}`));
+    assert.equal(anahtar.size, hepsi.length, "aynı yer iki kez verilmez");
   });
 });

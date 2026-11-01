@@ -24,6 +24,9 @@ import { coverBackground } from "../lib/covers";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { useUndo } from "../lib/undo";
+import Modal from "../components/Modal";
+import OrgBudgetPanel from "../components/OrgBudgetPanel";
+import { KASA_MODULU } from "../lib/ofisOyunu";
 import "./Yeni.css";
 
 type Ton = "mor" | "mavi" | "turuncu" | "kirmizi" | "yesil" | "pembe" | "gri";
@@ -103,6 +106,9 @@ export default function Yeni() {
   // Modüller: katalog (hangi modül hangi departmanın) + şirkette açık olanlar.
   const [katalog, setKatalog] = useState<{ key: string; name: string; departmentKeys?: string[] }[]>([]);
   const [acikModuller, setAcikModuller] = useState<Set<string> | null>(null);
+  // Yönetim odasındaki kasa yalnızca şirketin Kasa sekmesini görebilene konur.
+  const [kasaYetkisi, setKasaYetkisi] = useState(false);
+  const [kasaAcik, setKasaAcik] = useState(false);
   const [projeler, setProjeler] = useState<Project[] | null>(null);
   const [projeGorevMap, setProjeGorevMap] = useState<Record<string, Task[]>>({});
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[] | null>(null);
@@ -203,6 +209,11 @@ export default function Yeni() {
       .get<Task[]>(`/organizations/${orgId}/tasks`, ac.signal)
       .then((d) => setOrgGorevleri((d ?? []).filter((t) => !t.archivedAt)))
       .catch(() => setOrgGorevleri([]));
+    setKasaYetkisi(false);
+    api
+      .get<Organization>(`/organizations/${orgId}`, ac.signal)
+      .then((o) => setKasaYetkisi(o?.viewerAccess?.canViewBudget === true))
+      .catch(() => undefined);
     setAcikModuller(null);
     api
       .get<{ moduleKey: string }[]>(`/organizations/${orgId}/modules`, ac.signal)
@@ -302,9 +313,13 @@ export default function Yeni() {
             // yoksa katalog varsayılanı, o da yoksa kimlikten türeyen hazır kapak.
             kapak: coverBackground(getDepartmentCoverUrl(d), d.id),
             // Departmanın modülleri: katalogda bu departmana ait ve şirkette açık olanlar.
-            moduller: katalog
-              .filter((m) => d.catalogKey && m.departmentKeys?.includes(d.catalogKey) && acikModuller?.has(m.key))
-              .map((m) => ({ key: m.key, ad: m.name })),
+            moduller: [
+              ...katalog
+                .filter((m) => d.catalogKey && m.departmentKeys?.includes(d.catalogKey) && acikModuller?.has(m.key))
+                .map((m) => ({ key: m.key, ad: m.name })),
+              // Para kasası Yönetim odasında durur; tıklanınca şirketin Kasa'sı açılır.
+              ...(kasaYetkisi && d.catalogKey === "yonetim" ? [{ key: KASA_MODULU, ad: "Kasa" }] : []),
+            ],
             kisiler: (uyeler[d.id] ?? []).map((u) => ({
               id: u.userId as string,
               ad: u.fullName || u.username || "Ekip üyesi",
@@ -315,7 +330,7 @@ export default function Yeni() {
             gecikmis: acik.filter((t) => t.deadline && t.deadline.slice(0, 10) < bugun).length,
           };
         }),
-    [departmanlar, orgGorevleri, uyeler, bugun, emek, katalog, acikModuller]
+    [departmanlar, orgGorevleri, uyeler, bugun, emek, katalog, acikModuller, kasaYetkisi]
   );
   const bitenGorev = useMemo(
     () => (orgGorevleri?.length ? orgGorevleri : []).filter((t) => t.status === "completed").length || (pano ?? []).filter((i) => i.status === "completed").length,
@@ -493,9 +508,14 @@ export default function Yeni() {
               cevrimici={cevrimiciIdler}
               benId={ben?.id}
               onOdaSayfasi={(id) => navigate(id === "toplanti" ? "/calendar" : `/departments/${id}`)}
-              onModulAc={(odaId, key) => navigate(`/departments/${odaId}/modules/${key}`)}
+              onModulAc={(odaId, key) => (key === KASA_MODULU ? setKasaAcik(true) : navigate(`/departments/${odaId}/modules/${key}`))}
               onModulKapat={orgId ? (key) => modulKapat(orgId, key) : undefined}
             />
+            {kasaAcik && orgId && (
+              <Modal title="Kasa" subtitle={orgs.find((o) => o.id === orgId)?.name} onClose={() => setKasaAcik(false)} maxWidth={1100} mobileFullScreen>
+                <OrgBudgetPanel organizationId={orgId} />
+              </Modal>
+            )}
 
             <section className="yn-featured">
               <div className="yn-sec-head">

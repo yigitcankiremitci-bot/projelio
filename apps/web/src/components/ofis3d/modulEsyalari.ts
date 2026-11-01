@@ -543,6 +543,49 @@ function dartTahtasi(): THREE.Group {
   return g;
 }
 
+/** Para kasası (Yönetim odası → şirketin Kasa sayfası): çelik gövde, kadranlı kapı, üstünde altınlar. */
+function kasa(): THREE.Group {
+  const g = new THREE.Group();
+  const celik = malzeme("#3E4858", { metal: 0.5, parlak: 0.45 });
+  const kapi = malzeme("#4A5568", { metal: 0.55, parlak: 0.5 });
+  const altin = malzeme("#C0813F", { metal: 0.7, parlak: 0.6 });
+  // Ayaklar ve gövde
+  for (const [x, z] of [
+    [-0.28, -0.22],
+    [0.28, -0.22],
+    [-0.28, 0.22],
+    [0.28, 0.22],
+  ])
+    g.add(yerlestir(kutu(0.07, 0.06, 0.07, celik, 0.01), x, 0.03, z));
+  g.add(yerlestir(kutu(0.7, 0.8, 0.56, celik, 0.035), 0, 0.46, 0));
+  // Kapı: gövdeden hafif taşan levha, kenarında iki menteşe
+  g.add(yerlestir(kutu(0.58, 0.68, 0.03, kapi, 0.02), 0, 0.46, 0.29));
+  for (const y of [0.3, 0.62]) g.add(yerlestir(kutu(0.03, 0.1, 0.04, altin, 0.008), -0.3, y, 0.29));
+  // Şifre kadranı ve çevirme kolu
+  const kadran = silindir(0.085, 0.085, 0.035, altin, 32);
+  kadran.rotation.x = Math.PI / 2;
+  kadran.position.set(0.05, 0.52, 0.32);
+  g.add(kadran);
+  const ic = silindir(0.05, 0.05, 0.04, malzeme("#1C222C", { parlak: 0.5 }), 24);
+  ic.rotation.x = Math.PI / 2;
+  ic.position.set(0.05, 0.52, 0.33);
+  g.add(ic);
+  for (let i = 0; i < 3; i++) {
+    const kol = kutu(0.022, 0.2, 0.022, altin, 0.008);
+    kol.position.set(0.05, 0.34, 0.33);
+    kol.rotation.z = (i * Math.PI) / 3;
+    g.add(kol);
+  }
+  // Üstte istif altınlar
+  [
+    [-0.15, 0.02, 3],
+    [0.08, -0.05, 2],
+  ].forEach(([x, z, adet]) => {
+    for (let i = 0; i < adet; i++) g.add(yerlestir(silindir(0.06, 0.06, 0.02, altin, 20), x + i * 0.004, 0.87 + i * 0.022, z));
+  });
+  return g;
+}
+
 export function modulEsyasi(tur: ModulEsyasi): THREE.Group {
   switch (tur) {
     case "kanban":
@@ -575,5 +618,7 @@ export function modulEsyasi(tur: ModulEsyasi): THREE.Group {
       return urunKutulari();
     case "dartTahtasi":
       return dartTahtasi();
+    case "kasa":
+      return kasa();
   }
 }

@@ -38,7 +38,7 @@ import {
 import { esyaModeli, kutu, malzeme, tahta } from "./modeller";
 import { karakter, varlik, varlikVar, varliklariYukle, type Karakter3D, type VarlikAdi } from "./varliklar";
 import { modulEsyasi } from "./modulEsyalari";
-import { MODUL_ESYALARI, TOPLANTI_MASASI } from "../../lib/ofisOyunu";
+import { KASA_MODULU, MODUL_ESYALARI, TOPLANTI_MASASI } from "../../lib/ofisOyunu";
 import type { NesneDuzeni } from "@projelio/shared";
 import { izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
 
@@ -276,6 +276,21 @@ function paspasDokusu(): THREE.CanvasTexture {
 
 // ------------------------------------------------------------------ motor
 
+interface LioRobotu {
+  obj: THREE.Group;
+  /** Süzülen kısım (gövde + gözler); gölge yerde kalır. */
+  govde: THREE.Group;
+  gozler: THREE.Group;
+  golge: THREE.Mesh;
+  yol: { x: number; z: number }[];
+  /** Hedefe varınca bekleyeceği süre (sn). */
+  bekle: number;
+  /** Bakmak istediği yön (rotation.y). */
+  yon: number;
+  /** Bir sonraki göz kırpmaya kalan süre. */
+  kirp: number;
+}
+
 export class OfisMotoru {
   onOdaTikla?: (odaId: string) => void;
   onEsyaTikla?: (esyaId: string, ekran: { x: number; y: number }) => void;
@@ -285,6 +300,8 @@ export class OfisMotoru {
   onOdadanCikildi?: () => void;
   /** Odadaki bir modül eşyasına tıklanınca (modül sayfası açılır). */
   onModulTikla?: (odaId: string, modulKey: string) => void;
+  /** Ofiste gezen Lio robotuna tıklanınca (Lio sohbeti açılır). */
+  onLioTikla?: () => void;
   /** Modül adları (üzerine gelince gösterilir); React tarafı katalogdan doldurur. */
   modulAdlari = new Map<string, string>();
   /** Modeller yüklenince (ya da yüklenemeyince) bir kez çağrılır. */
@@ -358,7 +375,9 @@ export class OfisMotoru {
   private fare = new THREE.Vector2();
   private fareVar = false;
   private basilan: { x: number; y: number } | null = null;
-  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul"; id: string } | null = null;
+  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio"; id: string } | null = null;
+  /** Ortalıkta gezen Lio robotu (ilk kurulumda bir kez yaratılır). */
+  private lio: LioRobotu | null = null;
   private kisiEtiketi: CSS2DObject;
   private girisAnimasyonu = 0;
   private gecis: { t: number; hedefBas: THREE.Vector3; hedefSon: THREE.Vector3; konumBas: THREE.Vector3; konumSon: THREE.Vector3 } | null = null;
@@ -508,6 +527,122 @@ export class OfisMotoru {
     // Plan değişince (duvarlar, eşyalar) mağaza eşyalarına yeniden bakılır.
     this.esyalariKur(this.bekleyenEsyalar ?? this.esyalar);
     await this.kisileriKur(plan, kisiler, sira);
+    if (sira !== this.kurulumSirasi) return;
+    this.lioyuKur(plan);
+  }
+
+  // ------------------------------------------------------------ Lio
+
+  /**
+   * Lio: maskotun (lio-base.png) yüzen küre hâli — şeftali gövde, üstünde
+   * benekler, kapalı gülen gözler. Kişiler gibi yürüyüş ızgarasında yol bulur
+   * ama yerden yüksekte süzülür; çoğunlukla ortak alanda, arada odalarda gezer.
+   */
+  private lioyuKur(plan: OfisPlani): void {
+    if (this.lio) {
+      // Plan değişti (ör. oda eklendi): Lio ofisin dışında kaldıysa ortak alana döner.
+      const p = this.lio.obj.position;
+      if (!plan.odalar.some((o) => p.x > o.x && p.x < o.x + o.w && p.z > o.z && p.z < o.z + o.d)) this.lioyuOrtayaKoy(plan);
+      this.lio.yol = [];
+      return;
+    }
+    const obj = new THREE.Group();
+    const govde = new THREE.Group();
+    const kure = new THREE.Mesh(new THREE.SphereGeometry(0.34, 40, 28), new THREE.MeshStandardMaterial({ color: "#F4A98A", roughness: 0.5, emissive: "#F4A98A", emissiveIntensity: 0.12 }));
+    kure.castShadow = true;
+    govde.add(kure);
+    // Maskottaki benekler: gövdeye gömülü küçük renkli kabarcıklar.
+    const benekRenk = ["#F6D37A", "#E9935F", "#F2C46B", "#E8865A"];
+    for (let i = 0; i < 16; i++) {
+      const a = (i * 2.399) % (Math.PI * 2);
+      const y = 1 - (2 * (i + 0.5)) / 16;
+      const r = Math.sqrt(1 - y * y);
+      const yon = new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
+      // Yüzün (gözlerin) üstüne gelenler atlanır.
+      if (yon.z > 0.55 && Math.abs(yon.y) < 0.45) continue;
+      const b = new THREE.Mesh(new THREE.SphereGeometry(0.018 + (i % 3) * 0.008, 10, 8), malzeme(benekRenk[i % benekRenk.length], { parlak: 0.5 }));
+      b.position.copy(yon.multiplyScalar(0.338));
+      govde.add(b);
+    }
+    // Gözler: kapalı, gülen yaylar (yarım simit), önü +z.
+    const gozler = new THREE.Group();
+    for (const x of [-0.115, 0.115]) {
+      const goz = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.016, 8, 20, Math.PI), malzeme("#5A3A1E", { parlak: 0.3 }));
+      goz.position.set(x, 0.045, 0.325);
+      goz.rotation.x = -0.12;
+      gozler.add(goz);
+    }
+    govde.add(gozler);
+    obj.add(govde);
+    // Yerdeki yumuşak gölge: süzülürken büyüyüp küçülür.
+    const golge = new THREE.Mesh(
+      new THREE.CircleGeometry(0.3, 32),
+      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.16, depthWrite: false })
+    );
+    golge.rotation.x = -Math.PI / 2;
+    golge.position.y = 0.012;
+    obj.add(golge);
+    obj.traverse((c) => (c.userData.lio = true));
+    this.sahne.add(obj);
+    this.lio = { obj, govde, gozler, golge, yol: [], bekle: 2, yon: 0, kirp: 3 };
+    this.lioyuOrtayaKoy(plan);
+  }
+
+  private lioyuOrtayaKoy(plan: OfisPlani): void {
+    const ortak = plan.odalar.find((o) => o.tur === "ortak");
+    if (!this.lio || !ortak) return;
+    this.lio.obj.position.set(ortak.x + ortak.w / 2, ZEMIN_Y, ortak.z + ortak.d / 2);
+  }
+
+  private lioHedefSec(): void {
+    const l = this.lio;
+    const plan = this.plan;
+    const iz = this.izgara();
+    if (!l || !plan || !iz) return;
+    const ortak = plan.odalar.find((o) => o.tur === "ortak");
+    const odalar = plan.odalar.filter((o) => o.tur !== "ortak");
+    const oda = Math.random() < 0.65 || !odalar.length ? ortak : odalar[Math.floor(Math.random() * odalar.length)];
+    if (!oda) return;
+    const hedef = { x: oda.x + 0.8 + Math.random() * Math.max(0, oda.w - 1.6), z: oda.z + 0.8 + Math.random() * Math.max(0, oda.d - 1.6) };
+    const yol = yolBul(iz, { x: l.obj.position.x, z: l.obj.position.z }, hedef);
+    if (yol) l.yol = yol;
+  }
+
+  private lioyuOynat(dt: number, t: number): void {
+    const l = this.lio;
+    if (!l) return;
+    const g = l.obj;
+    const salinim = Math.sin(t * 2.2);
+    l.govde.position.y = 0.82 + salinim * 0.05;
+    l.govde.rotation.z = Math.sin(t * 1.1) * 0.05;
+    l.golge.scale.setScalar(1 - salinim * 0.1);
+    // Arada göz kırpar.
+    l.kirp -= dt;
+    if (l.kirp <= 0) l.kirp = 3 + Math.random() * 4;
+    l.gozler.scale.y = l.kirp < 0.15 ? 0.25 : 1;
+    if (this.ustteki?.tur === "lio") {
+      // Üzerine gelinince durur ve kameraya döner.
+      l.yon = Math.atan2(this.kamera.position.x - g.position.x, this.kamera.position.z - g.position.z);
+    } else if (l.yol.length) {
+      const h = l.yol[0];
+      const dx = h.x - g.position.x;
+      const dz = h.z - g.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.05) {
+        l.yol.shift();
+        if (!l.yol.length) l.bekle = 2 + Math.random() * 5;
+      } else {
+        const adim = Math.min(d, 0.75 * dt);
+        g.position.x += (dx / d) * adim;
+        g.position.z += (dz / d) * adim;
+        l.yon = Math.atan2(dx, dz);
+      }
+    } else if ((l.bekle -= dt) <= 0) {
+      l.bekle = 3; // yol bulunamazsa bir süre sonra yeniden dener
+      this.lioHedefSec();
+    }
+    const fark = Math.atan2(Math.sin(l.yon - g.rotation.y), Math.cos(l.yon - g.rotation.y));
+    g.rotation.y += fark * Math.min(1, dt * 4);
   }
 
   esyalariKur(esyalar: YerlesikEsya[]): void {
@@ -1382,6 +1517,7 @@ export class OfisMotoru {
       this.karakteriOynat(k, dt);
       if (k.durum !== "oturuyor") this.duvardanGecirme(k, eski, dt);
     }
+    this.lioyuOynat(dt, t);
 
     for (let i = this.parcaciklar.length - 1; i >= 0; i--) {
       const p = this.parcaciklar[i];
@@ -2328,6 +2464,7 @@ export class OfisMotoru {
     if (!u) return;
     if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
     else if (u.tur === "oda") this.onOdaTikla?.(u.id);
+    else if (u.tur === "lio") this.onLioTikla?.();
     else if (u.tur === "modul") {
       const [odaId, key] = u.id.split("|");
       this.onModulTikla?.(odaId, key);
@@ -2395,6 +2532,7 @@ export class OfisMotoru {
     this.isin.setFromCamera(this.fare, this.kamera);
     const hedefler: THREE.Object3D[] = [
       ...this.kisiGrubu.children,
+      ...(this.lio ? [this.lio.obj] : []),
       ...(this.duzenleme ? this.esyaGrubu.children : []),
       ...this.modulNesneleri.values(),
       ...this.zeminler,
@@ -2404,6 +2542,7 @@ export class OfisMotoru {
     if (vurus) {
       const ud = vurus.object.userData;
       if (ud.kisiId) yeni = { tur: "kisi", id: ud.kisiId };
+      else if (ud.lio) yeni = { tur: "lio", id: "lio" };
       else if (ud.modul && !this.duzenleme) yeni = { tur: "modul", id: ud.modul };
       else if (ud.esyaId) yeni = { tur: "esya", id: ud.esyaId };
       else if (ud.odaId) {
@@ -2446,13 +2585,28 @@ export class OfisMotoru {
         b.textContent = this.modulAdlari.get(yeni.id.split("|")[1]) ?? "Modül";
         el.appendChild(b);
         const s = document.createElement("small");
-        s.textContent = "Tıkla, modülü aç";
+        s.textContent = yeni.id.endsWith(`|${KASA_MODULU}`) ? "Tıkla, kasayı aç" : "Tıkla, modülü aç";
         el.appendChild(s);
         this.sahne.add(this.kisiEtiketi);
         this.kisiEtiketi.position.set(o.position.x, 2.05, o.position.z);
         this.kisiEtiketi.visible = true;
       }
       this.kap.style.cursor = "pointer";
+    } else if (yeni.tur === "lio") {
+      if (this.lio) {
+        const el = this.kisiEtiketi.element;
+        el.textContent = "";
+        const b = document.createElement("b");
+        b.textContent = "Lio";
+        el.appendChild(b);
+        const s = document.createElement("small");
+        s.textContent = "Tıkla, sohbet et";
+        el.appendChild(s);
+        this.lio.obj.add(this.kisiEtiketi);
+        this.kisiEtiketi.position.set(0, 1.45, 0);
+        this.kisiEtiketi.visible = true;
+        this.kap.style.cursor = "pointer";
+      }
     } else {
       const k = this.karakterler.find((c) => c.veri.id === yeni.id);
       if (k) {

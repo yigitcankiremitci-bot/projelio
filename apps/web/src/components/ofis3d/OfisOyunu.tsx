@@ -17,10 +17,12 @@ import {
   duzeniUygula,
   ofisPlani,
   ofisSeviyesi,
+  KASA_MODULU,
   type EsyaTuru,
   type OfisKaydi,
   type YerlesikEsya,
 } from "../../lib/ofisOyunu";
+import { openLio } from "../../lib/askLio";
 import { OfisMotoru, type OdaEtiketi, type SahneKisisi } from "./OfisMotoru";
 import { odaDuzeniTemizle, type NesneDuzeni, type OdaDuzeni } from "@projelio/shared";
 import { api, ApiError } from "../../api/client";
@@ -389,10 +391,16 @@ export default function OfisOyunu({
     return e;
   }, [departmanlar, plan, bugunToplanti, cevrimici]);
 
-  const sahneKisileri = useMemo<SahneKisisi[]>(
-    () =>
+  const sahneKisileri = useMemo<SahneKisisi[]>(() => {
+    const kisiOdasi = new Map<string, string>();
+    for (const d of departmanlar) for (const k of d.kisiler) if (k.yonetici && !kisiOdasi.has(k.id)) kisiOdasi.set(k.id, d.id);
+    for (const d of departmanlar) for (const k of d.kisiler) if (!kisiOdasi.has(k.id)) kisiOdasi.set(k.id, d.id);
+    return (
+      // Birden çok departmanda olan kişi ofiste bir kez gezer: yöneticisi
+      // olduğu odada, yoksa ilk departmanında (oda panelindeki kadro listesi
+      // değişmez, orada her departmanda görünür).
       departmanlar.flatMap((d) =>
-        d.kisiler.map((k) => ({
+        d.kisiler.filter((k) => kisiOdasi.get(k.id) === d.id).map((k) => ({
           id: k.id,
           ad: k.ad,
           odaId: d.id,
@@ -401,9 +409,9 @@ export default function OfisOyunu({
           emek: k.emek ?? 0,
           yonetici: !!k.yonetici,
         }))
-      ),
-    [departmanlar, cevrimici, benId]
-  );
+      )
+    );
+  }, [departmanlar, cevrimici, benId]);
 
   // Motor bir kez kurulur; geri çağırmalar her zaman güncel duruma ref'ten bakar.
   const durumRef = useRef({ kayit, puan, anahtar, onModulAc });
@@ -439,6 +447,7 @@ export default function OfisOyunu({
     };
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
     motor.onModulTikla = (odaId, key) => durumRef.current.onModulAc(odaId, key);
+    motor.onLioTikla = () => openLio();
     motor.onNesneDegisti = (odaId: string, nesneId: string, d: NesneDuzeni) => {
       // Eklenen eşyanın türü motorun bildirdiğinde yok: kaybolmasın.
       const yaz = (t: OdaDuzeni | null | undefined): OdaDuzeni => {
@@ -1202,6 +1211,8 @@ function NesneMenusu({
   const [acik, setAcik] = useState(false);
   const [kapatOnay, setKapatOnay] = useState(false);
   const [odaSec, setOdaSec] = useState(false);
+  // Kasa modül eşyası gibi davranır ama bir modül değil: kapatılamaz.
+  const kasa = nesneId === `modul:${KASA_MODULU}`;
   const modul = nesneId.startsWith("modul:");
   const masa = nesneId.startsWith("masa-");
   // Mağazadan alınan eşya kişiseldir: ekibin deposuna gitmez (Düzenle > Sat ile satılır).
@@ -1270,7 +1281,7 @@ function NesneMenusu({
           )}
           {modul && (
             <button type="button" role="menuitem" onClick={onModulAc}>
-              Modülü aç
+              {kasa ? "Kasayı aç" : "Modülü aç"}
             </button>
           )}
           {kisisel && <small className="of-nm-not">Senin eşyan: yeri yalnızca sende kaydedilir.</small>}
@@ -1286,7 +1297,7 @@ function NesneMenusu({
             Depoya gönder
           </button>
           )}
-          {modul && modulKapatabilir && !kapatOnay && (
+          {modul && !kasa && modulKapatabilir && !kapatOnay && (
             <button type="button" role="menuitem" className="tehlike" onClick={() => setKapatOnay(true)}>
               Modülü kapat…
             </button>

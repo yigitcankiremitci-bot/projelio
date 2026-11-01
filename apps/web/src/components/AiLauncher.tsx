@@ -4,7 +4,7 @@ import { useLocation } from "react-router-dom";
 import { LIO_LAUNCHER, Z, lioBottomCss, lioKucukMu, lioLauncherSize } from "../lib/layout";
 import { setLioCompact, setLioLift, useLioLift, useLioModalAcik } from "../lib/lioBalon";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { onAskLio } from "../lib/askLio";
+import { onAskLio, onOpenLio } from "../lib/askLio";
 import { setLioPanelOpen } from "../lib/lioPanel";
 import type { AskLioRequest } from "../lib/askLio";
 import { tourAnchor } from "../lib/tour/types";
@@ -102,6 +102,7 @@ export default function AiLauncher() {
       }),
     []
   );
+  useEffect(() => onOpenLio(() => setOpen(true)), []);
 
   // Lio arada bir göz kırpar: normalde 10-12sn'de bir, üzerine gelinince
   // ilgisi artmış gibi 4-6sn'de bir — her seferinde 0.3sn'liğine gözler kapanır.

@@ -225,7 +225,16 @@ export type ModulEsyasi =
   | "reklamPanosu"
   | "urunKutulari"
   | "huni"
-  | "dartTahtasi";
+  | "dartTahtasi"
+  | "kasa";
+
+/**
+ * Yönetim odasındaki para kasası: bir modül değil, şirketin Kasa sayfası
+ * (gelir/gider defteri). Modül eşyalarıyla aynı yoldan konup taşındığı için
+ * sahte bir modül anahtarıyla taşınır; tıklanınca sayfa değil modal açılır.
+ * Gerçek modül anahtarlarıyla çakışmasın diye çift alt çizgiyle başlar.
+ */
+export const KASA_MODULU = "__kasa";
 
 export const MODUL_ESYALARI: Record<string, ModulEsyasi> = {
   // Satış ve İş Geliştirme
@@ -246,6 +255,7 @@ export const MODUL_ESYALARI: Record<string, ModulEsyasi> = {
   pd_urun_stratejileri: "urunKutulari",
   pd_musteri_kazanim_optimizasyonu: "huni",
   pd_buyume_hedefleri: "dartTahtasi",
+  [KASA_MODULU]: "kasa",
 };
 
 /**
@@ -284,26 +294,33 @@ export function modulYerleri(
   const sonuc: { x: number; z: number; don: number; alan: Dikdortgen }[] = [];
   const derinOrta = MODUL_PAY + MODUL_IZ.derin / 2;
   const genis = (r: Dikdortgen, p: number) => ({ x: r.x - p, z: r.z - p, w: r.w + 2 * p, d: r.d + 2 * p });
-  for (const n of duvarlar) {
-    // Duvarın yeri ve boyu: iç normal +z ise kuzey duvarı, −z ise güney, +x batı, −x doğu.
-    const yatay = n.z !== 0;
-    const sabit = yatay ? (n.z > 0 ? oda.z : oda.z + oda.d) : n.x > 0 ? oda.x : oda.x + oda.w;
-    const bas = yatay ? oda.x : oda.z;
-    const boy = yatay ? oda.w : oda.d;
-    for (let s = 0.95; s <= boy - 0.95 + 1e-9; s += MODUL_ARALIK) {
-      const x = yatay ? bas + s : sabit + n.x * derinOrta;
-      const z = yatay ? sabit + n.z * derinOrta : bas + s;
-      const kapiyaUzak = kapiYonu.z !== 0 ? Math.abs(z - kapiDuvari) : Math.abs(x - kapiDuvari);
-      if (kapiyaUzak < 1.4) continue;
-      const alan: Dikdortgen = yatay
-        ? { x: x - MODUL_IZ.boy / 2, z: z - MODUL_IZ.derin / 2, w: MODUL_IZ.boy, d: MODUL_IZ.derin }
-        : { x: x - MODUL_IZ.derin / 2, z: z - MODUL_IZ.boy / 2, w: MODUL_IZ.derin, d: MODUL_IZ.boy };
-      if (masaEngel && kesisir(genis(alan, 0.15), masaEngel)) continue;
-      if (sonuc.some((o) => kesisir(genis(alan, 0.08), o.alan))) continue;
-      // Kameradan öteye bakan duvardaki eşya kameraya döner (cam duvarın önünde
-      // vitrin gibi); yoksa arkasıyla görünürdü.
-      const don = kameraya(n) <= -0.3 ? Math.atan2(-n.x, -n.z) : Math.atan2(n.x, n.z);
-      sonuc.push({ x, z, don, alan });
+  // Köşelerde bitki durur (köşeden ~0,5 m, yaprakları ~0,4 m yayılır): köşeye
+  // bitişik yerler ancak ikinci turda, başka yer kalmazsa kullanılır — yoksa
+  // odadaki tek eşya (ör. Yönetim'deki kasa) bitkinin arkasında kalıyordu.
+  for (const koseDahil of [false, true]) {
+    for (const n of duvarlar) {
+      // Duvarın yeri ve boyu: iç normal +z ise kuzey duvarı, −z ise güney, +x batı, −x doğu.
+      const yatay = n.z !== 0;
+      const sabit = yatay ? (n.z > 0 ? oda.z : oda.z + oda.d) : n.x > 0 ? oda.x : oda.x + oda.w;
+      const bas = yatay ? oda.x : oda.z;
+      const boy = yatay ? oda.w : oda.d;
+      for (let s = 0.95; s <= boy - 0.95 + 1e-9; s += MODUL_ARALIK) {
+        if (!koseDahil && (s < 1.35 || s > boy - 1.35)) continue;
+        const x = yatay ? bas + s : sabit + n.x * derinOrta;
+        const z = yatay ? sabit + n.z * derinOrta : bas + s;
+        const kapiyaUzak = kapiYonu.z !== 0 ? Math.abs(z - kapiDuvari) : Math.abs(x - kapiDuvari);
+        if (kapiyaUzak < 1.4) continue;
+        const alan: Dikdortgen = yatay
+          ? { x: x - MODUL_IZ.boy / 2, z: z - MODUL_IZ.derin / 2, w: MODUL_IZ.boy, d: MODUL_IZ.derin }
+          : { x: x - MODUL_IZ.derin / 2, z: z - MODUL_IZ.boy / 2, w: MODUL_IZ.derin, d: MODUL_IZ.boy };
+        if (masaEngel && kesisir(genis(alan, 0.15), masaEngel)) continue;
+        if (sonuc.some((o) => kesisir(genis(alan, 0.08), o.alan))) continue;
+        // Kameradan öteye bakan duvardaki eşya kameraya döner (cam duvarın önünde
+        // vitrin gibi); yoksa arkasıyla görünürdü.
+        const don = kameraya(n) <= -0.3 ? Math.atan2(-n.x, -n.z) : Math.atan2(n.x, n.z);
+        sonuc.push({ x, z, don, alan });
+        if (sonuc.length >= adet) break;
+      }
       if (sonuc.length >= adet) break;
     }
     if (sonuc.length >= adet) break;

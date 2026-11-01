@@ -35,6 +35,11 @@ MODEL="$(grep -E '^AJAN_MODEL=' "$AYAR" 2>/dev/null | cut -d= -f2- || true)"
 MODEL="${MODEL:-qwen3:8b}"
 API="$(grep -E '^PROJELIO_API=' "$AYAR" 2>/dev/null | cut -d= -f2- || true)"
 API="${API:-https://api.projelio.app}"
+# Arama: VPS'teki SearXNG (deploy/searxng-kur.sh), yalnızca tailnet'te açık —
+# bu Mac Tailscale'e bağlı değilse arama düşer, sayfa okuma yine çalışır.
+SEARX="$(grep -E '^SEARXNG_URL=' "$AYAR" 2>/dev/null | cut -d= -f2- || true)"
+SEARX="${SEARX:-http://100.111.242.24:8888}"
+BRAVE="$(grep -E '^BRAVE_API_KEY=' "$AYAR" 2>/dev/null | cut -d= -f2- || true)"
 # Anahtar yalnızca bu dosyada ve yalnızca sahibine okunur.
 umask 077
 cat > "$AYAR" <<EOF
@@ -42,7 +47,9 @@ PROJELIO_API=$API
 AJAN_ANAHTARI=$ANAHTAR
 AJAN_MODEL=$MODEL
 OLLAMA_URL=http://127.0.0.1:11434
+SEARXNG_URL=$SEARX
 EOF
+[[ -n "$BRAVE" ]] && echo "BRAVE_API_KEY=$BRAVE" >> "$AYAR"
 
 ollama list | grep -q "^$MODEL" || ollama pull "$MODEL"
 

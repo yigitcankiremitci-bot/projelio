@@ -1,0 +1,24 @@
+# Varsayılanların üstüne yalnızca değişenler (use_default_settings).
+use_default_settings: true
+
+general:
+  instance_name: "Projelio Ajan"
+  enable_metrics: false
+
+search:
+  # Ajan JSON ister; varsayılan yalnızca html.
+  formats: [html, json]
+  default_lang: "tr"
+  safe_search: 0
+  autocomplete: ""
+
+server:
+  # Tek kullanıcı (Mac'teki ajan), tailnet içinde: hız sınırlayıcı Redis ister
+  # ve burada koruyacağı kimse yok.
+  limiter: false
+  image_proxy: false
+  public_instance: false
+
+outgoing:
+  request_timeout: 5.0
+  max_request_timeout: 10.0

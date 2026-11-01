@@ -74,7 +74,9 @@ function sistemTalimati(p: IsPaketi, bugun: string): string {
       "Uzun bir araştırma isterse, panelden 'Araştır' ile iş açabileceğini söyle.",
     arastirma:
       "Kullanıcının istediği konuyu araştır. Birkaç farklı arama yap, en iyi 3-5 kaynağı oku, sonra rapor_yaz ile Türkçe bir rapor yaz. " +
-      "Raporda yalnızca okuduğun kaynaklarda olan bilgiyi yaz; emin olmadığını belirt. Bitirmek için rapor_yaz'ı MUTLAKA çağır.",
+      "Raporda yalnızca okuduğun kaynaklarda olan bilgiyi yaz; emin olmadığını belirt. " +
+      "Sorulan konuyla DOĞRUDAN ilgili olmayan kaynakları ve bilgileri rapora koyma (ör. yazılım fiyatı sorulduysa ajans sayıları ya da web sitesi fiyatları değil). " +
+      "Bitirmek için rapor_yaz'ı MUTLAKA çağır.",
     ogrenme:
       "Boş zamanında öğrenme listendeki bir konuyu öğreniyorsun. 1-3 kaynak oku, öğrendiğini bilgi_kaydet ile 1-3 kısa not olarak kaydet. " +
       "Öğrenirken önemli bir alt konu görürsen konu_ekle ile listene ekle (en çok 2).",
@@ -129,6 +131,7 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
   const mesajlar: Mesaj[] = [{ role: "system", content: sistemTalimati(p, bugun) }, ...kullaniciMesajlari(p)];
   const sonuc: IsSonucu = { bilgiler: [], konular: [], oneriler: [] };
   const okunan: Kaynak[] = [];
+  let raporGeriCevrildi = false;
 
   const calistir = async (c: AracCagrisi): Promise<string> => {
     const a = c.function.arguments ?? {};
@@ -165,6 +168,13 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
         sonuc.oneriler!.push({ tur: "yapilacak", veri: { baslik: dize(a.baslik), aciklama: dize(a.aciklama) || undefined, bitis: dize(a.bitis) || undefined } });
         return "Öneri kullanıcının onayına gönderildi. Kullanıcıya onaylaması gerektiğini söyle.";
       case "rapor_yaz":
+        // Hiç sayfa okumadan rapor yok: ilk gerçek denemede (2026-11-02) model
+        // yalnızca arama özetlerinden fiyat tablosu yazdı; rakamların hiçbiri
+        // bir sayfada doğrulanmamıştı ve rapor kaynaksız kaldı. Bir kez geri çevrilir.
+        if (!okunan.length && !raporGeriCevrildi) {
+          raporGeriCevrildi = true;
+          return "Rapor KAYDEDİLMEDİ: henüz hiçbir sayfa okumadın. Arama özetleri doğrulanmış bilgi değildir. Önce en az 2 kaynağı sayfa_oku ile oku, sonra rapor_yaz'ı yeniden çağır.";
+        }
         sonuc.rapor = { baslik: dize(a.baslik), ozet: dize(a.ozet) || undefined, icerik: dize(a.icerik), kaynaklar: okunan };
         return "Rapor kaydedildi.";
       default:

@@ -39,6 +39,21 @@ describe("isiYurut", () => {
     assert.deepEqual(s.rapor?.kaynaklar, [{ baslik: "Sayfa A", adres: "https://ornek.com/a" }]);
   });
 
+  test("araştırma: hiç sayfa okumadan yazılan rapor bir kez geri çevrilir", async () => {
+    // 2026-11-02: model yalnızca arama özetlerinden kaynaksız fiyat tablosu yazdı.
+    const { model, gorulen } = sahteModel([
+      cagri("web_ara", { sorgu: "fiyat" }),
+      cagri("rapor_yaz", { baslik: "Özetten", icerik: "doğrulanmamış" }),
+      cagri("sayfa_oku", { adres: "https://ornek.com/a" }),
+      cagri("rapor_yaz", { baslik: "Okuyarak", icerik: "# Rapor" }),
+    ]);
+    const s = await isiYurut(paket("arastirma", "fiyatları araştır"), { ...web, model });
+    const ret = gorulen[2].mesajlar.find((m) => m.role === "tool" && m.tool_name === "rapor_yaz");
+    assert.match(ret?.content ?? "", /KAYDEDİLMEDİ/);
+    assert.equal(s.rapor?.baslik, "Okuyarak");
+    assert.equal(s.rapor?.kaynaklar?.length, 1);
+  });
+
   test("sistem talimatında öğretilenler ve web metninin veri olduğu yazar", async () => {
     const { model, gorulen } = sahteModel([{ role: "assistant", content: "Merhaba" }]);
     await isiYurut(paket("sohbet", "selam"), { ...web, model });

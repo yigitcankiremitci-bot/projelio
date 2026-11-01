@@ -1,0 +1,32 @@
+# SearXNG: Ajan MVP'nin internet araması (bkz. ajan/README.md, deploy/searxng-kur.sh).
+#
+# YALNIZCA TAILNET'E AÇIK: port VPS'in Tailscale adresine bağlı, genel IP'de
+# dinlemez. Açık bir SearXNG herkesin arama vekili olur ve sunucunun IP'si
+# arama motorlarınca hızla engellenir. Kullanıcı Mac'ten Tailscale üzerinden
+# ulaşır (SEARXNG_URL=http://100.111.242.24:8888).
+#
+# Ana dağıtım zincirine (docker-compose.prod.yml) bilerek DAHİL DEĞİL: tailnet
+# adresi açılışta hazır değilse port bağlanamaz, compose hata verir ve
+# Projelio'nun kendi dağıtımını durdururdu.
+name: projelio-searxng
+
+services:
+  searxng:
+    image: searxng/searxng:2026.11.1-10db664f1
+    container_name: projelio-searxng
+    restart: unless-stopped
+    ports:
+      - "100.111.242.24:8888:8080"
+    environment:
+      SEARXNG_BASE_URL: http://100.111.242.24:8888/
+      # Gizli anahtar repoda değil: kurulum betiği sunucuda .env'e üretir.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?SEARXNG_SECRET tanımlı değil}
+    volumes:
+      - ./settings.yml:/etc/searxng/settings.yml:ro
+    mem_limit: 384m
+    cpus: 1
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }

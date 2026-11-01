@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { isiYurut, type Yardimcilar } from "./ajan.ts";
+import { iddiaVarMi, isiYurut, type Yardimcilar } from "./ajan.ts";
 import type { IsPaketi } from "./api.ts";
 import type { Mesaj } from "./ollama.ts";
 
@@ -69,6 +69,29 @@ describe("isiYurut", () => {
     assert.equal(s.rapor?.icerik, "Bulduklarım: ...");
   });
 
+  test("araç çağırmadan 'unutmayacağım' derse bir kez geri çevrilir", async () => {
+    // 2026-11-02 uçtan uca denemede qwen3:8b tam olarak bunu yaptı.
+    const { model, gorulen } = sahteModel([
+      { role: "assistant", content: "Tamam, unutmayacağım." },
+      cagri("bilgi_kaydet", { baslik: "Rapor biçimi", icerik: "Madde madde ve kısa yaz" }),
+      { role: "assistant", content: "Kaydettim." },
+    ]);
+    const s = await isiYurut(paket("sohbet", "raporları madde madde yaz, unutma"), { ...web, model });
+    assert.match(gorulen[1].mesajlar[gorulen[1].mesajlar.length - 1].content, /Sistem notu/);
+    assert.equal(s.bilgiler?.length, 1);
+    assert.equal(s.mesaj, "Kaydettim.");
+  });
+
+  test("geri çevirme yalnızca bir kez: model ısrar ederse yanıtı gider", async () => {
+    const { model, gorulen } = sahteModel([
+      { role: "assistant", content: "Hatırlatacağım." },
+      { role: "assistant", content: "Hatırlatacağım, söz." },
+    ]);
+    const s = await isiYurut(paket("sohbet", "hatırlat"), { ...web, model });
+    assert.equal(gorulen.length, 2);
+    assert.equal(s.mesaj, "Hatırlatacağım, söz.");
+  });
+
   test("araç hatası işi düşürmez, modele hata olarak döner", async () => {
     const { model, gorulen } = sahteModel([cagri("sayfa_oku", { adres: "http://192.168.1.1" }), { role: "assistant", content: "Okuyamadım." }]);
     await isiYurut(paket("sohbet", "şunu oku"), {
@@ -80,5 +103,15 @@ describe("isiYurut", () => {
     });
     const aracYaniti = gorulen[1].mesajlar.find((m) => m.role === "tool");
     assert.match(aracYaniti?.content ?? "", /^Hata: Bu adres okunamaz/);
+  });
+});
+
+describe("iddiaVarMi", () => {
+  test("kaydetme ve hatırlatma sözleri yakalanır", () => {
+    for (const m of ["Kaydettim.", "Yarın hatırlatacağım", "Tamam, UNUTMAYACAĞIM!", "Listene ekledim", "Bunu aklımda tutacağım"]) assert.equal(iddiaVarMi(m), true, m);
+  });
+
+  test("sıradan yanıtlar iddia sayılmaz", () => {
+    for (const m of ["Merhaba, nasıl yardımcı olabilirim?", "Bunu kaydetmemi ister misin?", "Ekleyebilirim, onaylar mısın?"]) assert.equal(iddiaVarMi(m), false, m);
   });
 });

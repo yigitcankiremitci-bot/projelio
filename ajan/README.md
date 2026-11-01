@@ -43,7 +43,8 @@ Kaldırmak için: `bash ajan/kur.sh --kaldir`.
 | `PROJELIO_API` | `https://api.projelio.app` | |
 | `AJAN_MODEL` | `qwen3:8b` | M2 / 16 GB için. Daha güçlü Mac'te `qwen3:14b` denenebilir. |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | |
-| `SEARXNG_URL` | — | Tanımlıysa arama kendi SearXNG'nden, yoksa DuckDuckGo'dan. |
+| `SEARXNG_URL` | — | Kendi SearXNG'n (JSON çıkışı açık). Önce bu denenir. |
+| `BRAVE_API_KEY` | — | Brave Search API anahtarı (ücretsiz katmanı var). İkisi de yoksa ajan arama yapamaz, yalnızca verilen adresleri okur. |
 
 ## Güvenlik
 

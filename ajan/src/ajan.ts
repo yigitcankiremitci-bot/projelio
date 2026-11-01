@@ -65,8 +65,13 @@ function sistemTalimati(p: IsPaketi, bugun: string): string {
     : "(Henüz bir şey öğretilmedi.)";
   const gorev: Record<IsPaketi["is"]["tur"], string> = {
     sohbet:
-      "Kullanıcıyla sohbet ediyorsun. Kısa ve net yanıt ver. Kullanıcı bir şeyi hatırlamanı isterse bilgi_kaydet ile kaydet. " +
-      "Bir iş yapmanı isterse yapilacak_oner ile öner; kendin ekleyemezsin. Uzun bir araştırma isterse, panelden 'Araştır' ile iş açabileceğini söyle.",
+      "Kullanıcıyla sohbet ediyorsun. Kısa ve net yanıt ver. " +
+      "Kullanıcı bir kural ya da bilgi verip hatırlamanı isterse ('unutma', 'bundan sonra', 'şunu bil') bilgi_kaydet aracını ÇAĞIR. " +
+      "Bir hatırlatma ya da yapılacak iş isterse yapilacak_oner aracını ÇAĞIR; kendin ekleyemezsin, kullanıcı onaylar. Saati açıklamaya yaz. " +
+      "Bir mesajda ikisi birden varsa İKİ aracı da çağır. Örnek: 'raporları kısa yaz, unutma; yarın 10'da Ali'yi aramamı hatırlat' → " +
+      "bilgi_kaydet(baslik: 'Rapor biçimi', icerik: 'Raporları kısa yaz') VE yapilacak_oner(baslik: 'Ali'yi ara', bitis: <yarının tarihi>, aciklama: 'Saat 10:00'). " +
+      "Aracı çağırmadan 'kaydettim', 'unutmayacağım', 'hatırlatacağım' DEME: araç çağrılmadıysa hiçbir şey kaydedilmemiştir. " +
+      "Uzun bir araştırma isterse, panelden 'Araştır' ile iş açabileceğini söyle.",
     arastirma:
       "Kullanıcının istediği konuyu araştır. Birkaç farklı arama yap, en iyi 3-5 kaynağı oku, sonra rapor_yaz ile Türkçe bir rapor yaz. " +
       "Raporda yalnızca okuduğun kaynaklarda olan bilgiyi yaz; emin olmadığını belirt. Bitirmek için rapor_yaz'ı MUTLAKA çağır.",
@@ -97,10 +102,29 @@ function kullaniciMesajlari(p: IsPaketi): Mesaj[] {
   return gecmis;
 }
 
+/**
+ * Model aracı çağırmadan "kaydettim / hatırlatacağım / ekledim" diyor mu.
+ *
+ * NEDEN: İlk uçtan uca denemede (2026-11-02) kullanıcı "raporlarını madde madde
+ * yaz, unutma; yarın 10'da Ali'yi aramamı hatırlat" dedi; qwen3:8b hiçbir araç
+ * çağırmadan "unutmayacağım, hatırlatacağım" yazdı. Ne not düştü ne öneri.
+ * Lio'daki aynı sorunun çözümü (backend ai-assistant/yapildi-iddiasi.ts) burada
+ * da geçerli: iddia var ama yazan araç çalışmadıysa model bir kez geri çevrilir.
+ */
+const IDDIA = /(kaydettim|kaydedildi|not (aldım|ettim)|ekledim|eklendi|unutmayacağım|unutmam|hatırlatacağım|hatırlatırım|hatırlatma (kurdum|oluşturdum)|aklımda tutacağım|aklımda)(?![\p{L}])/iu;
+
+export function iddiaVarMi(metin: string): boolean {
+  return IDDIA.test(metin.toLocaleLowerCase("tr"));
+}
+
+const YAZAN_ARACLAR = new Set(["bilgi_kaydet", "konu_ekle", "yapilacak_oner", "rapor_yaz"]);
+
 const dize = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim());
 
 export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
-  const bugun = y.bugun ?? new Date().toISOString().slice(0, 10);
+  // Yerel tarih (sv-SE biçimi YYYY-AA-GG): toISOString UTC verir ve Türkiye'de
+  // gece yarısından sonraki üç saat "bugün"ü dün sanıp "yarın"ı yanlış güne koyardı.
+  const bugun = y.bugun ?? new Date().toLocaleDateString("sv-SE");
   const araclar = TUR_ARACLARI[p.is.tur].map((a) => ARACLAR[a]);
   const mesajlar: Mesaj[] = [{ role: "system", content: sistemTalimati(p, bugun) }, ...kullaniciMesajlari(p)];
   const sonuc: IsSonucu = { bilgiler: [], konular: [], oneriler: [] };
@@ -125,10 +149,12 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
         return s.length ? s.map((b) => `- ${b.baslik}: ${b.icerik}`).join("\n") : "Bellekte bununla ilgili not yok.";
       }
       case "bilgi_kaydet": {
+        // Kaynak yalnızca bu işte GERÇEKTEN okunmuş sayfa olabilir: ilk denemede
+        // model hiç okumadığı bir adresi (projelio.com) kaynak diye yazdı.
         const kaynaklar = dize(a.kaynaklar)
           .split(/[,\s]+/)
-          .filter((k) => /^https?:\/\//.test(k))
-          .map((adres) => okunan.find((o) => o.adres === adres) ?? { baslik: adres, adres });
+          .map((adres) => okunan.find((o) => o.adres === adres))
+          .filter((k): k is Kaynak => !!k);
         sonuc.bilgiler!.push({ baslik: dize(a.baslik), icerik: dize(a.icerik), kaynaklar });
         return "Kaydedildi.";
       }
@@ -147,6 +173,8 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
   };
 
   let son = "";
+  let yazdi = false;
+  let geriCevrildi = false;
   for (let adim = 0; adim < EN_COK_ADIM[p.is.tur]; adim++) {
     // Son adımda araç verilmez: model ne bulduysa onu yazmak zorunda kalır.
     const sonAdim = adim === EN_COK_ADIM[p.is.tur] - 1;
@@ -154,11 +182,24 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
     mesajlar.push(cevap);
     son = cevap.content.trim();
     const cagrilar = (cevap.tool_calls ?? []).filter((c) => TUR_ARACLARI[p.is.tur].includes(c.function?.name as keyof typeof ARACLAR));
-    if (!cagrilar.length) break;
+    if (!cagrilar.length) {
+      if (p.is.tur === "sohbet" && !yazdi && !geriCevrildi && !sonAdim && iddiaVarMi(son)) {
+        geriCevrildi = true;
+        mesajlar.push({
+          role: "user",
+          content:
+            "(Sistem notu: Hiçbir araç çağırmadan kaydettiğini ya da hatırlatacağını söyledin, ama hiçbir şey kaydedilmedi. " +
+            "Gerçekten kaydetmek için bilgi_kaydet ya da yapilacak_oner aracını şimdi çağır; yapamıyorsan bunu açıkça söyle.)",
+        });
+        continue;
+      }
+      break;
+    }
     for (const c of cagrilar) {
       let yanit: string;
       try {
         yanit = await calistir(c);
+        if (YAZAN_ARACLAR.has(c.function.name)) yazdi = true;
       } catch (e: any) {
         yanit = `Hata: ${e?.message ?? e}`;
       }

@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { adresGuvenliMi, ddgSonuclari, htmlMetni, ozelAdresMi, varliklariCoz } from "./web.ts";
+import { adresGuvenliMi, braveSonuclari, htmlMetni, ozelAdresMi, varliklariCoz } from "./web.ts";
 
 // Ajan kullanıcının kendi ağında çalışıyor ve okuyacağı adresi bir dil modeli
 // seçiyor. Buradaki bir gerileme, bir web sayfasının modeli modemin ya da
@@ -41,12 +41,19 @@ describe("varliklariCoz", () => {
   });
 });
 
-describe("ddgSonuclari", () => {
-  test("yönlendirme bağlantısından asıl adres çıkar, reklam atlanır", () => {
-    const html =
-      '<div class="result results_links results_links_deep result--ad"><a class="result__a" href="https://duckduckgo.com/y.js?ad=1">Reklam</a></div>' +
-      '<div class="result results_links results_links_deep web-result"><a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fornek.com%2Ffiyat&amp;rut=x">Örnek <b>Fiyat</b></a>' +
-      '<a class="result__snippet" href="#">Aylık   paketler</a></div>';
-    assert.deepEqual(ddgSonuclari(html, 5), [{ baslik: "Örnek Fiyat", adres: "https://ornek.com/fiyat", ozet: "Aylık paketler" }]);
+describe("braveSonuclari", () => {
+  test("etiketler temizlenir, http(s) olmayan sonuç düşer, sınır uygulanır", () => {
+    const j = {
+      web: {
+        results: [
+          { title: "Örnek <strong>Fiyat</strong>", url: "https://ornek.com/fiyat", description: "Aylık &amp; yıllık   paketler" },
+          { title: "Kötü", url: "javascript:alert(1)", description: "" },
+          { title: "Üçüncü", url: "https://c.com", description: "" },
+        ],
+      },
+    };
+    assert.deepEqual(braveSonuclari(j, 1), [{ baslik: "Örnek Fiyat", adres: "https://ornek.com/fiyat", ozet: "Aylık & yıllık paketler" }]);
+    assert.equal(braveSonuclari(j, 5).length, 2);
+    assert.deepEqual(braveSonuclari({}, 5), []);
   });
 });

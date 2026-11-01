@@ -133,37 +133,27 @@ export async function sayfaOku(adres: string, sinir = 6000): Promise<{ baslik: s
   return { baslik: baslik || y.adres, adres: y.adres, metin: metin.slice(0, sinir) };
 }
 
-/** DuckDuckGo'nun anahtarsız HTML arayüzünü çözümler. */
-export function ddgSonuclari(html: string, sinir: number): AramaSonucu[] {
-  const sonuc: AramaSonucu[] = [];
-  const bloklar = html.split(/class="result results_links/).slice(1);
-  for (const b of bloklar) {
-    const a = b.match(/class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
-    if (!a) continue;
-    let adres = varliklariCoz(a[1]);
-    // Bağlantılar DuckDuckGo yönlendirmesinden geçer: asıl adres `uddg` parametresinde.
-    try {
-      const u = new URL(adres, "https://duckduckgo.com");
-      adres = u.searchParams.get("uddg") ?? u.toString();
-    } catch {
-      continue;
-    }
-    if (!/^https?:\/\//.test(adres) || /duckduckgo\.com\/y\.js/.test(adres)) continue; // reklamlar
-    const ozet = b.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/)?.[1] ?? "";
-    sonuc.push({
-      baslik: varliklariCoz(a[2].replace(/<[^>]+>/g, "")).trim(),
-      adres,
-      ozet: varliklariCoz(ozet.replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim(),
-    });
-    if (sonuc.length >= sinir) break;
-  }
-  return sonuc;
+/** Brave Search API yanıtını (web.results) ortak biçime çevirir; http(s) olmayanlar düşer. */
+export function braveSonuclari(j: any, sinir: number): AramaSonucu[] {
+  const temiz = (s: unknown) => varliklariCoz(String(s ?? "").replace(/<[^>]+>/g, "")).replace(/\s+/g, " ").trim();
+  return ((j?.web?.results ?? []) as any[])
+    .filter((r) => /^https?:\/\//.test(r?.url ?? ""))
+    .slice(0, sinir)
+    .map((r) => ({ baslik: temiz(r.title) || r.url, adres: r.url, ozet: temiz(r.description) }));
 }
 
 /**
- * Arama. SEARXNG_URL tanımlıysa (kendi SearXNG'n) o kullanılır, yoksa
- * DuckDuckGo. SearXNG kullanıcının kendi makinesinde/ağında durduğu için
- * yukarıdaki yerel-ağ yasağından muaf: o adresi model değil kullanıcı seçti.
+ * Arama. Yalnızca izin verilmiş, resmî yollardan:
+ *   · SEARXNG_URL — kendi SearXNG'n (JSON çıkışı açık olmalı). Kullanıcının
+ *     kendi makinesinde/ağında durduğu için yukarıdaki yerel-ağ yasağından
+ *     muaf: o adresi model değil kullanıcı seçti.
+ *   · BRAVE_API_KEY — Brave Search API (ücretsiz katmanı var).
+ *
+ * Bir arama motorunun HTML sayfasını kazımak YOK: DuckDuckGo'nun HTML
+ * arayüzüyle denendi, ilk günden bot denetimine takıldı (202, boş sayfa) ve
+ * model "sonuç bulunamadı" diye boş rapor yazdı. Denetimi atlatmaya çalışmak
+ * sitenin açık isteğine aykırı; bu yüzden yalnızca anahtarlı API ya da
+ * kullanıcının kendi motoru.
  */
 export async function webAra(sorgu: string, sinir = 6): Promise<AramaSonucu[]> {
   const searx = process.env.SEARXNG_URL;
@@ -177,10 +167,20 @@ export async function webAra(sorgu: string, sinir = 6): Promise<AramaSonucu[]> {
     const j: any = await y.json();
     return (j.results ?? []).slice(0, sinir).map((r: any) => ({ baslik: r.title ?? r.url, adres: r.url, ozet: r.content ?? "" }));
   }
-  const y = await getir("https://html.duckduckgo.com/html/", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ q: sorgu, kl: "tr-tr" }).toString(),
-  });
-  return ddgSonuclari(y.govde, sinir);
+  const brave = process.env.BRAVE_API_KEY;
+  if (brave) {
+    const u = new URL("https://api.search.brave.com/res/v1/web/search");
+    u.searchParams.set("q", sorgu);
+    u.searchParams.set("count", String(sinir));
+    u.searchParams.set("country", "TR");
+    u.searchParams.set("search_lang", "tr");
+    const y = await fetch(u, {
+      signal: AbortSignal.timeout(ZAMAN_ASIMI_MS),
+      headers: { Accept: "application/json", "X-Subscription-Token": brave },
+    });
+    if (y.status === 429) throw new Error("Brave Search kotası doldu; bir süre sonra tekrar dene.");
+    if (!y.ok) throw new Error(`Brave Search ${y.status} döndü.`);
+    return braveSonuclari(await y.json(), sinir);
+  }
+  throw new Error("İnternet araması ayarlı değil: ~/.projelio-ajan/ayar.env içine SEARXNG_URL ya da BRAVE_API_KEY yaz. Sayfa okuma yine çalışır.");
 }

@@ -29,7 +29,7 @@ function ayarOku(): Record<string, string> {
   } catch {
     // dosya yoksa ortam değişkenleri yeter
   }
-  return { ...ayar, ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(PROJELIO_API|AJAN_|OLLAMA_URL|SEARXNG_URL)/.test(k)) as [string, string][]) };
+  return { ...ayar, ...Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(PROJELIO_API|AJAN_|OLLAMA_URL|SEARXNG_URL|BRAVE_API_KEY)/.test(k)) as [string, string][]) };
 }
 
 const ayar = ayarOku();
@@ -38,7 +38,7 @@ if (!ANAHTAR) {
   console.error(`AJAN_ANAHTARI yok. Projelio'da ajan paneli > Mac bağlantısı'ndan anahtar üretip ${AYAR_DOSYASI} dosyasına yaz.`);
   process.exit(1);
 }
-if (ayar.SEARXNG_URL) process.env.SEARXNG_URL = ayar.SEARXNG_URL;
+for (const k of ["SEARXNG_URL", "BRAVE_API_KEY"]) if (ayar[k]) process.env[k] = ayar[k];
 
 const projelio = new Projelio(ayar.PROJELIO_API ?? "https://api.projelio.app", ANAHTAR);
 const ollama: OllamaAyar = { url: ayar.OLLAMA_URL ?? "http://127.0.0.1:11434", model: ayar.AJAN_MODEL ?? "qwen3:8b" };

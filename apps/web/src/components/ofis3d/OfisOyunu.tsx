@@ -63,6 +63,11 @@ interface Props {
    * metinler ona göre ("İş sayfasını aç", "Görüşme Odası").
    */
   studyo?: boolean;
+  /**
+   * İlk veriler (departmanlar, üyeler, modüller…) tamamlandı mı. Gelmeden sahne
+   * kurulmaz, "Ofis kuruluyor…" görünür: odalar parça parça belirmesin.
+   */
+  veriHazir?: boolean;
   departmanlar: OyunDepartmani[];
   bugunToplanti: number | null;
   bitenGorev: number;
@@ -187,6 +192,7 @@ function kaydiYaz(anahtar: string, k: OfisKaydi): void {
 export default function OfisOyunu({
   kapsam,
   studyo = false,
+  veriHazir = true,
   departmanlar,
   bugunToplanti,
   bitenGorev,
@@ -548,14 +554,14 @@ export default function OfisOyunu({
 
   useEffect(() => {
     const m = motorRef.current;
-    if (!m) return;
+    if (!m || !veriHazir) return;
     m.temalariAyarla(new Map(departmanlar.flatMap((d) => (d.tema ? [[d.id, d.tema] as [string, string]] : []))));
     // Stüdyonun proje istasyonları: ilerleme/teslim değişince panoları tazelenir.
     m.istasyonlariAyarla(
       new Map(departmanlar.flatMap((d) => (d.moduller ?? []).flatMap((x) => (x.bilgi ? [[x.key, x.bilgi] as [string, IstasyonBilgisi]] : []))))
     );
     m.kur(plan, etiketler, sahneKisileri);
-  }, [plan, etiketler, sahneKisileri, departmanlar]);
+  }, [plan, etiketler, sahneKisileri, departmanlar, veriHazir]);
 
   useEffect(() => {
     motorRef.current?.esyalariKur(kayit.esyalar);
@@ -755,7 +761,7 @@ export default function OfisOyunu({
     <div ref={kokRef} className={`of${tam ? " tam-ekran" : ""}${sahteTamEkran ? " sahte-tam" : ""}`}>
       <div ref={kapRef} className="of-sahne" />
       {destekYok && <div className="of-destek">Ofis yüklenemedi. Tarayıcın 3D çizimi (WebGL) desteklemiyor ya da modeller indirilemedi.</div>}
-      {yukleniyor && !destekYok && (
+      {(yukleniyor || !veriHazir) && !destekYok && (
         <div className="of-yukleniyor" role="status">
           <span className="of-yk-halka" />
           Ofis kuruluyor…

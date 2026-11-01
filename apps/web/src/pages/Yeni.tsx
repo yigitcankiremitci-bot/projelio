@@ -112,7 +112,10 @@ export default function Yeni() {
   const [katalog, setKatalog] = useState<{ key: string; name: string; departmentKeys?: string[] }[]>([]);
   const [acikModuller, setAcikModuller] = useState<Set<string> | null>(null);
   // Yönetim odasındaki kasa yalnızca şirketin Kasa sekmesini görebilene konur.
-  const [kasaYetkisi, setKasaYetkisi] = useState(false);
+  // null: henüz bilinmiyor (ofis açılışı bunu da bekler, bkz. ofisHazir).
+  const [kasaYetkisi, setKasaYetkisi] = useState<boolean | null>(null);
+  const [katalogHazir, setKatalogHazir] = useState(false);
+  const [uyelerHazir, setUyelerHazir] = useState(false);
   // Açık kasa: şirketin kasası ("org") ya da stüdyoda bir işin bütçesi (iş kimliği).
   const [kasaAcik, setKasaAcik] = useState<string | null>(null);
   // Stüdyom: serbest çalışanın işleri ofiste oda olur (bkz. lib/studyoOfisi.ts).
@@ -226,11 +229,11 @@ export default function Yeni() {
       .get<Task[]>(`/organizations/${orgId}/tasks`, ac.signal)
       .then((d) => setOrgGorevleri((d ?? []).filter((t) => !t.archivedAt)))
       .catch(() => setOrgGorevleri([]));
-    setKasaYetkisi(false);
+    setKasaYetkisi(null);
     api
       .get<Organization>(`/organizations/${orgId}`, ac.signal)
       .then((o) => setKasaYetkisi(o?.viewerAccess?.canViewBudget === true))
-      .catch(() => undefined);
+      .catch(() => !ac.signal.aborted && setKasaYetkisi(false));
     setAcikModuller(null);
     api
       .get<{ moduleKey: string }[]>(`/organizations/${orgId}/modules`, ac.signal)
@@ -243,7 +246,8 @@ export default function Yeni() {
     api
       .get<{ key: string; name: string; departmentKeys?: string[] }[]>("/module-catalog")
       .then((d) => setKatalog(d ?? []))
-      .catch(() => setKatalog([]));
+      .catch(() => setKatalog([]))
+      .finally(() => setKatalogHazir(true));
   }, []);
 
   // Stüdyo seçilince (bir kez) her işin ekibi, modülleri ve aktif projelerinin görevleri.
@@ -281,7 +285,12 @@ export default function Yeni() {
 
   // Odalardaki karakterler: departmanların onaylı üyeleri.
   useEffect(() => {
-    if (!departmanlar?.length) return;
+    setUyelerHazir(false);
+    if (!departmanlar) return;
+    if (!departmanlar.length) {
+      setUyelerHazir(true);
+      return;
+    }
     const ac = new AbortController();
     Promise.all(
       departmanlar.map((d) =>
@@ -291,7 +300,9 @@ export default function Yeni() {
           .catch(() => [d.id, []] as const)
       )
     ).then((liste) => {
-      if (!ac.signal.aborted) setUyeler(Object.fromEntries(liste));
+      if (ac.signal.aborted) return;
+      setUyeler(Object.fromEntries(liste));
+      setUyelerHazir(true);
     });
     return () => ac.abort();
   }, [departmanlar]);
@@ -349,6 +360,21 @@ export default function Yeni() {
     for (const t of orgGorevleri ?? []) if (t.status === "completed" && t.completedBy) m.set(t.completedBy, (m.get(t.completedBy) ?? 0) + 1);
     return m;
   }, [orgGorevleri]);
+  // Ofis açılışta ilk veriler TAMAMLANINCA tek seferde kurulur. Önce boş planla
+  // kurulunca yalnızca ortak alan görünüyor, departmanlar/üyeler/modüller
+  // geldikçe odalar birer birer belirip kamera yeniden kadraj yapıyordu.
+  // Bir istek asılı kalırsa ofis yine de 8 sn sonra eldekiyle açılır.
+  const [beklemeBitti, setBeklemeBitti] = useState(false);
+  useEffect(() => {
+    setBeklemeBitti(false);
+    const t = window.setTimeout(() => setBeklemeBitti(true), 8000);
+    return () => window.clearTimeout(t);
+  }, [orgId, studyo]);
+  const ofisHazir =
+    beklemeBitti ||
+    (studyo
+      ? studyoIsleri !== null && ben !== null && katalogHazir
+      : departmanlar !== null && uyelerHazir && acikModuller !== null && katalogHazir && kasaYetkisi !== null);
   const studyoDepartmanlari: OyunDepartmani[] = useMemo(() => {
     if (!studyoIsleri) return [];
     const ad = new Map([...katalog, ...serbestKatalog].map((m) => [m.key, m.name]));
@@ -588,6 +614,7 @@ export default function Yeni() {
               // Stüdyonun mağaza eşyaları ve (ileride) düzeni kişiseldir.
               kapsam={studyo ? "kisisel" : orgId || "kisisel"}
               studyo={studyo}
+              veriHazir={ofisHazir}
               departmanlar={studyo ? studyoDepartmanlari : departmanlar === null ? [] : oyunDepartmanlari}
               bugunToplanti={etkinlikler === null ? null : bugunToplanti}
               bitenGorev={bitenGorev}

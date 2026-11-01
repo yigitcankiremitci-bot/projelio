@@ -14,6 +14,10 @@ import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import ModuleEmblem from "./ModuleEmblem";
 import AddModuleModal from "./AddModuleModal";
 import { modulDepartmani, yoneticiModulAdresi } from "../lib/modulYeri";
+import { isOpenableModule } from "../lib/entityModules";
+import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
+import { kartModaldaAcilir } from "../lib/moduleSurfaces";
+import ModuleModal from "./ModuleModal";
 
 export interface ModulesPanelHandle {
   /** Anasayfadaki "+" menüsünden "Modül ekle" (bkz. OrganizationDetail HomeAddFabRegistrar). */
@@ -97,6 +101,16 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
       ? `/departments/${departmentId}?tab=modules&module=${encodeURIComponent(entry.key)}`
       : yoneticiModulAdresi(organizationId, entry.key);
   };
+  // Kart modalde açılır (kullanıcı kararı, 2026-11-01): anasayfadan ayrılmadan
+  // çalışılır, kapatınca yerine dönülür. Açılamayan (henüz veri girişi olmayan
+  // panel) ve çekirdek modül eskisi gibi adrese gider — departman sayfası
+  // birincisinin sebebini yazıyor, ikincisi sekmeye yönlendiriyor.
+  const [acik, setAcik] = useState<ModuleCatalogEntry | null>(null);
+  const tikla = (entry: ModuleCatalogEntry): { to?: string; onClick?: () => void } =>
+    isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key])) && kartModaldaAcilir(entry.key)
+      ? { onClick: () => setAcik(entry) }
+      : { to: hedef(entry) };
+  const acikDepartman = acik ? departments.find((d) => d.id === departmentIdFor(acik)) : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -142,7 +156,7 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
             return (
               <ListRowLink
                 key={entry.key}
-                to={hedef(entry)}
+                {...tikla(entry)}
                 icon={<ModuleEmblem moduleKey={entry.key} size={ROW_INNER_HEIGHT} radius="11px 0 0 11px" />}
                 iconBleed
                 label={entry.name}
@@ -172,9 +186,21 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
           }}
         >
           {activeEntries.map((entry) => (
-            <ModuleCard key={entry.key} entry={entry} to={hedef(entry)} />
+            <ModuleCard key={entry.key} entry={entry} {...tikla(entry)} />
           ))}
         </div>
+      )}
+
+      {acik && (
+        <ModuleModal
+          moduleKey={acik.key}
+          moduleName={acik.name}
+          description={acik.description}
+          organizationId={organizationId}
+          departmentId={acikDepartman?.id}
+          departmentKey={acikDepartman?.catalogKey}
+          onClose={() => setAcik(null)}
+        />
       )}
 
       {adding && (

@@ -5,7 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isOpenableModule } from "../lib/entityModules";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
-import { moduleSurface } from "../lib/moduleSurfaces";
+import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { departmanModulAdresi, departmanModulleriniYukle } from "../lib/departmanModulleri";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
 import { sonAcilislar, sonKullanimaGoreSirala } from "../lib/sonKullanilanModul";
@@ -74,12 +74,12 @@ export default function PageModulesBar(props: Props) {
 
   const sirali = sonKullanimaGoreSirala(entries, (e) => e.key, sonAcilislar());
 
-  /** Modül nerede açılır: sayfa yüzeyli kendi adresinde, modal yüzeyli yerinde. */
+  /** Modül nerede açılır: modalde, yerinde; çekirdek modül kendi adresinde. */
   const hedef = (entry: ModuleCatalogEntry): { to?: string; onClick?: () => void } => {
-    if (props.kind === "department") return { to: departmanModulAdresi(props.departmentId, entry.key) };
     if (!isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key]))) return {};
-    return moduleSurface(entry.key) === "modal"
-      ? { onClick: () => setModalEntry(entry) }
+    if (kartModaldaAcilir(entry.key)) return { onClick: () => setModalEntry(entry) };
+    return props.kind === "department"
+      ? { to: departmanModulAdresi(props.departmentId, entry.key) }
       : { to: `/jobs/${props.jobId}/modules/${encodeURIComponent(entry.key)}` };
   };
 
@@ -117,12 +117,18 @@ export default function PageModulesBar(props: Props) {
         </div>
       )}
 
-      {modalEntry && props.kind === "job" && (
+      {modalEntry && (
         <ModuleModal
           moduleKey={modalEntry.key}
           moduleName={modalEntry.name}
           description={modalEntry.description}
-          jobId={props.jobId}
+          {...(props.kind === "job"
+            ? { jobId: props.jobId }
+            : {
+                organizationId: props.organizationId,
+                departmentId: props.departmentId,
+                departmentKey: props.departmentKey,
+              })}
           onClose={() => setModalEntry(null)}
         />
       )}

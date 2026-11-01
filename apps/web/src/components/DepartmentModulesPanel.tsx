@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { ModuleAccess, ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
+import type { ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { isOpenableModule } from "../lib/entityModules";
-import { moduleSurface } from "../lib/moduleSurfaces";
+import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { useUndo } from "../lib/undo";
 import ModuleModal from "./ModuleModal";
 import ModuleCard from "./ModuleCard";
@@ -39,15 +39,11 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  // Modüller artık kart olarak listelenir; sayfa yüzeyli olanlar kendi
-  // sayfasına gider, modal yüzeyli olanlar burada açılır
-  // (bkz. lib/moduleSurfaces.ts ve pages/ModulePage.tsx).
+  // Modüller kart olarak listelenir ve kart modalde açılır; yalnızca çekirdek
+  // modüller kendi sayfasına gider (bkz. lib/moduleSurfaces.ts kartModaldaAcilir).
   const [modalKey, setModalKey] = useState<string | null>(null);
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
-  // Açılan modüldeki yetki bir kez çözülüp hem ekip paneline hem kayıt paneline
-  // veriliyor — her ikisi ayrı ayrı sormasın.
-  const [access, setAccess] = useState<ModuleAccess | null>(null);
   const [notice, setNotice] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
   const { pushUndo } = useUndo();
@@ -69,8 +65,8 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
       setNotice(t("Bu modül henüz veri girişine açık değil — diğer modüllerin verisinden gösterge üretecek."));
       return;
     }
-    // Sayfa yüzeyli modül kendi sayfasında açılır; modal yüzeyli olan burada.
-    if (moduleSurface(requested) === "modal") setModalKey(requested);
+    // Kartlar gibi modalde açılır; çekirdek modül kendi sayfasına (sekmeye) gider.
+    if (kartModaldaAcilir(requested)) setModalKey(requested);
     // replace: bu sekme yalnızca bir aktarma durağı. Yeni kayıt açılsaydı modül
     // sayfasının geri düğmesi kullanıcıyı geldiği yere (anasayfa) değil, hiç
     // görmediği departman Modüller sekmesine götürürdü.
@@ -97,32 +93,6 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
 
   useEffect(load, [organizationId, departmentKey]);
 
-  // Modül açıldığında o modüldeki yetkiyi çöz. Kapanınca sıfırlanır ki bir
-  // sonraki modül eski yetkiyle render edilmesin.
-  //
-  // Yetki modal yüzeyli modüller için de çözülmeli, yoksa (ör. Kimlik ve
-  // Yön'de) onay düğmesi hiç görünmez. Sayfa yüzeyli modüller yetkisini kendi
-  // sayfasında çözer (bkz. pages/ModulePage.tsx).
-  useEffect(() => {
-    if (!modalKey) {
-      setAccess(null);
-      return;
-    }
-    let cancelled = false;
-    api
-      .get<ModuleAccess>(
-        `/organizations/${organizationId}/module-access?moduleKey=${encodeURIComponent(modalKey)}&departmentId=${departmentId}`
-      )
-      .then((a) => {
-        if (!cancelled) setAccess(a);
-      })
-      .catch(() => {
-        if (!cancelled) setAccess(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [modalKey, organizationId, departmentId]);
 
   // Özel (kataloğa dayanmayan) departmanların önceden tanımlı modülü yok, o
   // yüzden bu sayfalarda "+" düğmesi devreye girmez.
@@ -245,9 +215,9 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
             // Müşteri gibi ortak varlığa yazan modüllerin kendi paneli var,
             // module_records tanımı yok — yine de açılabilir olmalı.
             const openable = isOpenableModule(entry.key, Boolean(config));
-            // Yüzey modülün tanımından gelir: kısa iş modalde biter, çalışma
-            // alanı olan modül kendi sayfasında açılır (bkz. lib/moduleSurfaces.ts).
-            const opensInModal = moduleSurface(entry.key) === "modal";
+            // Kart modalde açılır (yetki ve ekip ModuleModal'da çözülür);
+            // çekirdek modül kendi sayfasına gider (bkz. kartModaldaAcilir).
+            const opensInModal = kartModaldaAcilir(entry.key);
             return (
               <ModuleCard
                 key={entry.key}
@@ -266,8 +236,8 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
         </div>
       )}
 
-      {/* Modal yüzeyli modüller satır içinde açılmaz: iş tek ekranda biter ve
-          kullanıcı kapatınca listedeki yerine döner. */}
+      {/* Modül satır içinde açılmaz: modalde çalışılır, kapatınca kullanıcı
+          listedeki yerine döner. */}
       {modalEntry && (
         <ModuleModal
           moduleKey={modalEntry.key}
@@ -276,7 +246,6 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
           organizationId={organizationId}
           departmentId={departmentId}
           departmentKey={departmentKey}
-          access={access}
           onClose={() => setModalKey(null)}
         />
       )}

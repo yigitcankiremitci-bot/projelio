@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { isOpenableModule } from "../lib/entityModules";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
-import { moduleSurface } from "../lib/moduleSurfaces";
+import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { useUndo } from "../lib/undo";
 import ModuleCard from "./ModuleCard";
 import ModuleModal from "./ModuleModal";
@@ -202,7 +202,8 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
           {activeEntries.map((entry) => {
             const openable = isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key]));
-            const opensInModal = moduleSurface(entry.key) === "modal";
+            // Kart modalde açılır; çekirdek modül kendi sayfasına (bkz. kartModaldaAcilir).
+            const opensInModal = kartModaldaAcilir(entry.key);
             return (
               <ModuleCard
                 key={entry.key}

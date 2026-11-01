@@ -149,3 +149,13 @@ export function moduleSurface(moduleKey: string): ModuleSurface {
 export function moduleModalWidth(moduleKey: string): number {
   return moduleArchetype(moduleKey) === "a1_form" ? 900 : 760;
 }
+
+/**
+ * Modül KARTINA tıklanınca modal mı açılır (kullanıcı kararı, 2026-11-01:
+ * kartlar modalde açılır). Yüzeyden bağımsız — sayfa yüzeyli modül de modalde,
+ * geniş açılır (bkz. ModuleModal). Tek istisna çekirdek modüller: açılınca
+ * kapsamın sekmesine yönlendiriyorlar, modalin arkasında kalırdı.
+ */
+export function kartModaldaAcilir(moduleKey: string): boolean {
+  return moduleArchetype(moduleKey) !== "cekirdek";
+}

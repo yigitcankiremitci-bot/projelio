@@ -261,6 +261,11 @@ export interface Job {
   // İlk girişte açılan eğitici örnek iş (bkz. migration 118). Arayüz bu işte
   // "Örnekleri sil" şeridini gösterir.
   isSample?: boolean;
+  /**
+   * İşin sahibi bu işte müşterisine hizmet veriyor (migration 176): işin
+   * projelerindeki görev bütçeleri FİYAT KALEMİDİR, ödenmez ve deftere yazılmaz.
+   */
+  hizmetIsi?: boolean;
 }
 
 // Holding katmanı. Tamamen opsiyonel — bir Grup birden çok Organization'a ve/veya
@@ -1158,6 +1163,8 @@ export interface Project {
    * (migration 111). Defter işe toplanmaz; gelirler işe gider olarak yansır.
    */
   hizmetProjesi?: boolean;
+  /** Projenin bağlı olduğu iş bir hizmet işi mi (bkz. Job.hizmetIsi). Salt okunur. */
+  hizmetIsi?: boolean;
 }
 
 // --- Proje paylaşım linki (üyelik gerektirmeyen takip) -----------------------

@@ -169,4 +169,10 @@ export const butce: TranslationDict = {
   "+ Alacak": "+ Receivable",
   "+ Borç": "+ Payable",
   "Bu müşteriyle kayıtlı alacak ya da borç yok.": "No receivables or payables recorded with this customer.",
+  "Bu işte müşterime hizmet veriyorum": "I provide services to my client in this job",
+  "İşaretlenirse görev bütçeleri yaptığın işin fiyat kalemleri sayılır: onay beklemez, ödenmez ve Kasa'na gider yazılmaz. Müşterinin ödemesini proje bütçesine gelir olarak gir.":
+    "If checked, task budgets count as price items for your work: they need no approval, aren't paid, and aren't recorded as expenses in your Kasa. Enter the client's payment as income in the project budget.",
+  "Fiyat kalemleri": "Price items",
+  "Bu iş bir hizmet işi: kalemler müşterinin ödediği ücretin dökümüdür, Kasa'ya yazılmaz. Toplam: {tutar} ₺":
+    "This is a service job: the items break down the fee your client pays and aren't recorded in your Kasa. Total: {tutar} ₺",
 };

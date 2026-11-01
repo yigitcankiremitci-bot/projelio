@@ -7,6 +7,7 @@ import { LISTE_TAVANI } from "../../common/liste-tavani";
 import { ButceErisimService } from "./butce-erisim.service";
 import { mapTalep } from "./butce-hiyerarsi.service";
 import { mapTransaction, SECIM } from "./butce-eslestirme";
+import { HIZMET_ISI_ODEME_HATASI, hizmetIsiProjeleri } from "./hizmet-isi";
 
 /**
  * Görev bütçesi onay akışı.
@@ -79,6 +80,7 @@ export class GorevButceService {
     if (error) throw error;
     if (!row) throw new NotFoundException("Görev bulunamadı");
 
+    if (await this.hizmetIsiGorevi(gorev)) return mapTalep(row);
     await this.yoneticileriUyar(gorev, `${tutar} ${(data.currency || "TRY").toUpperCase()}`, (row as any).title);
     return mapTalep(row);
   }
@@ -144,6 +146,7 @@ export class GorevButceService {
     if (gorev.budget_status !== "planned") {
       throw new BadRequestException("Yalnızca onaylanmış (planlanan) bir bütçe ödenmiş sayılabilir");
     }
+    if (await this.hizmetIsiGorevi(gorev)) throw new BadRequestException(HIZMET_ISI_ODEME_HATASI);
 
     const hareket = await this.deftereIsle(gorev, userId);
 
@@ -195,6 +198,8 @@ export class GorevButceService {
     const gorev = await this.gorev(taskId).catch(() => null);
     if (!gorev || !gorev.budget || Number(gorev.budget) <= 0) return;
     if (gorev.budget_status !== "pending") return;
+    // Hizmet işinde kalem bir fiyattır, onay beklemez: kimseye "onay bekliyor" gitmesin.
+    if (await this.hizmetIsiGorevi(gorev)) return;
     await this.yoneticileriUyar(
       gorev,
       `${Number(gorev.budget)} ${gorev.budget_currency || "TRY"}`,
@@ -220,6 +225,12 @@ export class GorevButceService {
   }
 
   // --------------------------------------------------------------- Yardımcılar
+
+  /** Görev bir hizmet işinin projesinde mi (bkz. hizmet-isi.ts). */
+  private async hizmetIsiGorevi(gorev: any): Promise<boolean> {
+    if (!gorev.project_id) return false;
+    return (await hizmetIsiProjeleri(this.supabase, [gorev.project_id])).has(gorev.project_id);
+  }
 
   private async gorev(taskId: string): Promise<any> {
     const { data } = await this.supabase.client
@@ -340,6 +351,10 @@ export class GorevButceService {
         task_id: gorev.id,
         owner_id: await this.defterSahibi(gorev),
         created_by: userId ?? null,
+        // Yazılmazsa varsayılan 'manual' düşüyordu: görev başına tek satır
+        // indeksi (yalnızca task_budget'a uygulanır) bu satırları hiç korumuyor,
+        // satır da elle girilmiş gibi düzenlenebiliyordu (bkz. migration 176).
+        source: "task_budget",
         // Görev bütçesi ekip ödemesidir: "payout" türü tam olarak bunun için
         // var (bkz. butceToplama > giderMi — gider gibi toplanır ama muhasebe
         // kırılımında malzeme giderinden ayrı durur).

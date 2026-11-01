@@ -173,6 +173,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
   }
 
   const budgetTasks = tasks.filter((t) => (t.budget ?? 0) > 0);
+  const hizmetIsi = !!project.hizmetIsi;
   const sumBy = (status: Task["budgetStatus"]) =>
     budgetTasks.filter((t) => t.budgetStatus === status).reduce((sum, t) => sum + (t.budget ?? 0), 0);
   const pendingTotal = sumBy("pending");
@@ -255,12 +256,15 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "flex", gap: 8 }}>
-        <SummaryCard label={t("Onaylanan")} amount={approvedTotal} color={c.success} />
-        <SummaryCard label={t("Beklenen")} amount={pendingTotal} color={c.warning} />
-        <SummaryCard label={t("Planlanan")} amount={plannedTotal} color={c.primary} />
-        <SummaryCard label={t("Ödenen")} amount={paidTotal} color={c.accentDark} />
-      </div>
+      {/* Onay/ödeme durumları hizmet işinde anlamsız: kalemler ödenmez. */}
+      {!hizmetIsi && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <SummaryCard label={t("Onaylanan")} amount={approvedTotal} color={c.success} />
+          <SummaryCard label={t("Beklenen")} amount={pendingTotal} color={c.warning} />
+          <SummaryCard label={t("Planlanan")} amount={plannedTotal} color={c.primary} />
+          <SummaryCard label={t("Ödenen")} amount={paidTotal} color={c.accentDark} />
+        </div>
+      )}
 
       {/* Tahsilat durumu */}
       <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 10, padding: "12px 14px" }}>
@@ -481,7 +485,19 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
       </div>
 
       <div>
-        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>{t("Görev bütçeleri")}</h4>
+        <h4 style={{ fontSize: 16, fontWeight: 500, color: c.textPrimary, margin: "0 0 8px" }}>
+          {hizmetIsi ? t("Fiyat kalemleri") : t("Görev bütçeleri")}
+        </h4>
+        {/* Hizmet işinde görev bütçesi yaptığın işin fiyatıdır, ödenecek bir
+            para değil: "ödendi" demek kendi kazancını Kasa'na gider yazıyordu
+            (bkz. Job.hizmetIsi). Kalemler yalnızca dökümdür. */}
+        {hizmetIsi && budgetTasks.length > 0 && (
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: "0 0 8px" }}>
+            {t("Bu iş bir hizmet işi: kalemler müşterinin ödediği ücretin dökümüdür, Kasa'ya yazılmaz. Toplam: {tutar} ₺", {
+              tutar: budgetTasks.reduce((sum, k) => sum + (k.budget ?? 0), 0).toLocaleString(bicimDili()),
+            })}
+          </p>
+        )}
         {budgetTasks.length === 0 ? (
           <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Bütçe eklenmiş görev yok.")}</p>
         ) : (
@@ -505,43 +521,45 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, flexShrink: 0 }}>
                   {(kayit.budget ?? 0).toLocaleString(bicimDili())} ₺
                 </span>
-                <span
-                  style={{
-                    fontSize: 12,
-                    flexShrink: 0,
-                    padding: "2px 8px",
-                    borderRadius: 20,
-                    color:
-                      kayit.budgetStatus === "paid"
-                        ? c.success
-                        : kayit.budgetStatus === "planned"
-                          ? c.primary
-                          : kayit.budgetStatus === "rejected"
-                            ? c.danger
-                            : c.warning,
-                    background:
-                      kayit.budgetStatus === "paid"
-                        ? `${c.success}1a`
-                        : kayit.budgetStatus === "planned"
-                          ? `${c.primary}1a`
-                          : kayit.budgetStatus === "rejected"
-                            ? `${c.danger}1a`
-                            : `${c.warning}1a`,
-                  }}
-                >
-                  {kayit.budgetStatus === "paid"
-                    ? t("Ödendi")
-                    : kayit.budgetStatus === "planned"
-                      ? t("Planlandı")
-                      : kayit.budgetStatus === "rejected"
-                        ? t("Reddedildi")
-                        : t("Bekliyor")}
-                </span>
+                {!hizmetIsi && (
+                  <span
+                    style={{
+                      fontSize: 12,
+                      flexShrink: 0,
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      color:
+                        kayit.budgetStatus === "paid"
+                          ? c.success
+                          : kayit.budgetStatus === "planned"
+                            ? c.primary
+                            : kayit.budgetStatus === "rejected"
+                              ? c.danger
+                              : c.warning,
+                      background:
+                        kayit.budgetStatus === "paid"
+                          ? `${c.success}1a`
+                          : kayit.budgetStatus === "planned"
+                            ? `${c.primary}1a`
+                            : kayit.budgetStatus === "rejected"
+                              ? `${c.danger}1a`
+                              : `${c.warning}1a`,
+                    }}
+                  >
+                    {kayit.budgetStatus === "paid"
+                      ? t("Ödendi")
+                      : kayit.budgetStatus === "planned"
+                        ? t("Planlandı")
+                        : kayit.budgetStatus === "rejected"
+                          ? t("Reddedildi")
+                          : t("Bekliyor")}
+                  </span>
+                )}
                 {/* Onay ile ödeme AYRI adımlar: onay bir taahhüttür, bütçeyi
                     bağlar ama kasadan para çıkarmaz. Tek adım olsaydı onaylanan
                     her talep aynı anda harcanmış sayılır ve nakit akışı
                     gerçekte olmayan çıkışlar gösterirdi. */}
-                {isOwner && kayit.budgetStatus === "pending" && (
+                {isOwner && !hizmetIsi && kayit.budgetStatus === "pending" && (
                   <>
                     <button
                       onClick={() => gorevKarari(kayit, "approve")}
@@ -559,7 +577,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                     </button>
                   </>
                 )}
-                {isOwner && kayit.budgetStatus === "planned" && (
+                {isOwner && !hizmetIsi && kayit.budgetStatus === "planned" && (
                   <button
                     onClick={() => gorevKarari(kayit, "pay")}
                     disabled={approvingId === kayit.id}
@@ -570,7 +588,7 @@ const BudgetPanel = forwardRef<BudgetPanelHandle, Props>(function BudgetPanel(
                 )}
                 {/* Reddedilen talep silinmez: gerekçesiyle durur ki talep eden
                     kişi "onaylandı mı, unutuldu mu" diye beklemesin. */}
-                {isOwner && kayit.budgetStatus === "rejected" && (
+                {isOwner && !hizmetIsi && kayit.budgetStatus === "rejected" && (
                   <button
                     onClick={() => gorevKarari(kayit, "approve")}
                     disabled={approvingId === kayit.id}

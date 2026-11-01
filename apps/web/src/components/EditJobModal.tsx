@@ -46,6 +46,8 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   // kural): kapatılan sekme açılış olarak kalırsa sayfa sessizce Projeler'e düşer.
   const acikSekmeler = JOB_TABS.filter((sekme) => !hiddenTabs.includes(sekme.key));
   const gecerliAcilis: JobTab = acikSekmeler.some((sekme) => sekme.key === defaultTab) ? defaultTab : "projects";
+  // Müşterine hizmet verdiğin iş (bkz. Job.hizmetIsi).
+  const [hizmetIsi, setHizmetIsi] = useState(!!job.hizmetIsi);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [hiring, setHiring] = useState(false);
@@ -78,6 +80,8 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
         // Yalnızca değiştiyse: migration 122 uygulanmamış bir sunucuda
         // bilinmeyen kolona yazmak işin diğer ayarlarının kaydını da düşürürdü.
         ...(gecerliAcilis !== kayitliAcilis ? { defaultTab: gecerliAcilis } : {}),
+        // Aynı sebeple yalnızca değiştiyse (migration 176).
+        ...(hizmetIsi !== !!job.hizmetIsi ? { hizmetIsi } : {}),
         // Hazır kapak seçimi (ya da kapağı kaldırma) doğrudan bu alanla kaydedilir;
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== job.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
@@ -151,6 +155,21 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
             {t("Bu iş açıldığında ilk görünecek sekme. Yalnızca bu iş için geçerli.")}
           </p>
         </div>
+
+        <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+          <input
+            type="checkbox"
+            checked={hizmetIsi}
+            onChange={(e) => setHizmetIsi(e.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 15, color: c.textPrimary }}>{t("Bu işte müşterime hizmet veriyorum")}</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>
+              {t("İşaretlenirse görev bütçeleri yaptığın işin fiyat kalemleri sayılır: onay beklemez, ödenmez ve Kasa'na gider yazılmaz. Müşterinin ödemesini proje bütçesine gelir olarak gir.")}
+            </span>
+          </span>
+        </label>
 
         <TabVisibilitySection scope="job" value={hiddenTabs} onChange={setHiddenTabs} />
 

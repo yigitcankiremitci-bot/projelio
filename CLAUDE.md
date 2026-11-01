@@ -427,6 +427,14 @@ Değişmez kurallar:
   (`POST /budget/transactions/:id/recurring`). Kayıt SİLİNMEZ — o para gerçekten
   çıktı; yeni düzenli ödeme BİR SONRAKİ vadeden başlar, yoksa aynı ay iki kez
   işlenirdi.
+- **Hizmet işinde görev bütçesi bir FİYAT KALEMİDİR** (`jobs.hizmet_isi`,
+  migration 176; İşi düzenle > "Bu işte müşterime hizmet veriyorum"): müşterisi
+  sistemde olmayan serbest çalışanın işi. Kalemler onay kuyruğuna düşmez,
+  "ödendi" yapılamaz (`GorevButceService.odendiIsaretle` reddeder), deftere
+  yazılmaz; gelir müşterinin ödemesi olarak elle girilir. Ödenseydi kazanç
+  Kasa'ya gider düşerdi; gelire çevirmek de ücretle birlikte iki kez saymak
+  olurdu. Proje düzeyindeki `hizmet_projesi` (111) başka durum: orada müşteri
+  işin sahibi olarak sistemde.
 - `fm_alacak_borc` bilerek MODÜL olarak kaldı: orada henüz gerçekleşmemiş para
   var ve hiçbir bakiyeye girmez.
 - Türev paneller (Finansal Analiz, Yönetim Analizi) deftere `BUTCE_DEFTERI`

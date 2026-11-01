@@ -33,6 +33,8 @@ function mapJob(row: any): Job {
     // Kolon yoksa (migration 122 uygulanmadan) eski davranış: Projeler.
     defaultTab: row.default_tab ?? "projects",
     isSample: row.is_sample === true || undefined,
+    // Kolon yoksa (migration 176 uygulanmadan) false: görev bütçeleri eskisi gibi ödenir.
+    hizmetIsi: row.hizmet_isi === true,
   };
 }
 
@@ -295,6 +297,7 @@ export class JobsService {
       }
       patch.default_tab = data.defaultTab;
     }
+    if (data.hizmetIsi !== undefined) patch.hizmet_isi = !!data.hizmetIsi;
     if (data.organizationId !== undefined || data.groupId !== undefined) {
       const nextOrgId = data.organizationId !== undefined ? data.organizationId : undefined;
       const nextGroupId = data.groupId !== undefined ? data.groupId : undefined;

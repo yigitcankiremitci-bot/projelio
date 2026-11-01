@@ -156,7 +156,15 @@ export class ProjectsService {
     if (error) throw error;
     if (!data) throw new NotFoundException("Proje bulunamadı");
     await this.assertCanView(id, data, requestingUserId);
-    return mapProject(data);
+    const proje = mapProject(data);
+    // Bütçe sekmesi görev bütçelerini fiyat kalemi olarak göstersin diye
+    // (bkz. Job.hizmetIsi). Ayrı sorgu: kolon yoksa (migration 176
+    // uygulanmadan) proje sayfası düşmesin, bayrak yok sayılsın.
+    if (data.job_id) {
+      const { data: is } = await this.supabase.client.from("jobs").select("hizmet_isi").eq("id", data.job_id).maybeSingle();
+      proje.hizmetIsi = (is as any)?.hizmet_isi === true;
+    }
+    return proje;
   }
 
   // Proje detayını kimler görebilir: proje sahibi, projenin onaylı üyeleri ve

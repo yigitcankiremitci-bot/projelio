@@ -15,6 +15,7 @@ import { ButceErisimService } from "./butce-erisim.service";
 import type { ViewerKapsami } from "./butce-erisim";
 import { mapTransaction, mapRecurringPayment, SECIM, DUZENLI_SECIM } from "./butce-eslestirme";
 import { aynaKayit } from "./hizmet-anlasmasi";
+import { hizmetIsiProjeleri } from "./hizmet-isi";
 
 /**
  * Kademeler arası bütçe toplaması.
@@ -502,11 +503,15 @@ export class ButceHiyerarsiService {
     if (projectIds.length > 0) istekler.push(sorgu("project_id", projectIds));
     if (departmentIds.length > 0) istekler.push(sorgu("department_id", departmentIds));
 
-    const sonuclar = await Promise.all(istekler);
+    const [sonuclar, hizmetProjeleri] = await Promise.all([
+      Promise.all(istekler),
+      hizmetIsiProjeleri(this.supabase, projectIds),
+    ]);
     const satirlar: any[] = [];
     for (const s of sonuclar) {
       if (s.error) throw s.error;
-      satirlar.push(...(s.data ?? []));
+      // Hizmet işinin kalemleri bir fiyattır, onay ya da ödeme beklemez.
+      satirlar.push(...(s.data ?? []).filter((r: any) => !r.project_id || !hizmetProjeleri.has(r.project_id)));
     }
     // Karar bekleyenler önce (yapılacak iş onlar), sonra ödeme bekleyenler.
     // Her grup içinde en eski talep üstte: ne kadar beklediyse o kadar acil.

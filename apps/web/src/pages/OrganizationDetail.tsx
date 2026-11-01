@@ -18,6 +18,7 @@ import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
 import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
+import { modulDepartmani } from "../lib/modulYeri";
 import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
@@ -93,15 +94,10 @@ export default function OrganizationDetail() {
   useEffect(() => {
     api.get<ModuleCatalogEntry[]>("/module-catalog").then(setModuleCatalog).catch(() => setModuleCatalog([]));
   }, []);
+  // Departmanı açılmamış modülün evi Yönetim (bkz. lib/modulYeri.ts).
   const openModuleDepartmentId = (() => {
     const entry = moduleCatalog.find((e) => e.key === openModuleTab?.key);
-    if (!entry) return undefined;
-    const keys = entry.departmentKeys?.length ? entry.departmentKeys : entry.departmentKey ? [entry.departmentKey] : [];
-    for (const key of keys) {
-      const dept = departments.find((d) => d.catalogKey === key);
-      if (dept) return dept.id;
-    }
-    return undefined;
+    return entry ? modulDepartmani(entry, departments) : undefined;
   })();
   // Bütçe sekmesi yalnızca finansal görünürlüğü olanlara açık (bkz. canViewOrgBudget);
   // yetkisi olmayan ?tab=budget ile gelse bile Anasayfa'ya düşer.

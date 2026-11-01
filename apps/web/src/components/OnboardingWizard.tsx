@@ -26,7 +26,7 @@ import { cropAvatarImage } from "../lib/imageProcessing";
 import type { CropArea } from "../lib/imageProcessing";
 import AvatarCropper from "./AvatarCropper";
 import { useT } from "../lib/i18n";
-import { yoneticiyeEklenebilir } from "../lib/modulYeri";
+import { yonetimeDuser } from "../lib/modulYeri";
 import {
   IconUser,
   IconBuilding,
@@ -89,9 +89,9 @@ const ORG_TYPE_OPTIONS: { type: OrgType; title: string; description: string }[] 
 //
 // Şirket kuranlara eskiden bir de departman adımı soruluyordu. Kullanıcı
 // hepsini işaretleme eğilimindeydi ve 2-3 kişilik işletmelerde kimsesi olmayan
-// bir sürü departman doğuyordu. Artık şirket departmansız kurulur; seçilen
-// modüller yöneticide açılır (bkz. lib/modulYeri.ts), departman ekip büyüdükçe
-// şirket sayfasından eklenir.
+// bir sürü departman doğuyordu. Artık şirket yalnızca Yönetim'le kurulur;
+// seçilen modüller orada açılır (bkz. lib/modulYeri.ts), departman ekip
+// büyüdükçe şirket sayfasından eklenir.
 type StepKey = "account" | "profile" | "org" | "usage" | "modules" | "summary";
 
 function stepsFor(accountType: AccountType | null): StepKey[] {
@@ -153,7 +153,7 @@ export default function OnboardingWizard({ onCompleted }: Props) {
       if (selected === "organization_owner") {
         // Henüz departman yok: yöneticide açılabilecek tüm şirket modülleri.
         const all = await api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []);
-        return all.filter((m) => yoneticiyeEklenebilir(m, [])).sort((a, b) => a.sortOrder - b.sortOrder);
+        return all.filter((m) => yonetimeDuser(m, [])).sort((a, b) => a.sortOrder - b.sortOrder);
       }
       if (selected === "group_owner") {
         const all = await api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []);

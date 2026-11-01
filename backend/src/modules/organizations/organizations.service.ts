@@ -256,6 +256,13 @@ export class OrganizationsService {
       .from("organizations")
       .update({ departman_gecisi_at: new Date().toISOString() })
       .eq("id", row.id);
+    // Yönetim şirketle birlikte doğar: kuraldan muaf (kişi istemez), ve
+    // departmanı açılmamış modüllerin evi orası (bkz. shared modulEvi.ts).
+    // Hata yutuluyor: departmansız şirket de çalışır, modül şirket düzeyindeki
+    // sayfaya düşer.
+    await this.supabase.client
+      .from("departments")
+      .insert({ organization_id: row.id, catalog_key: "yonetim", name: "YÖNETİM", sort_order: -1 });
     return mapOrganization(row);
   }
 

@@ -7,12 +7,8 @@ import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
-import { yoneticiyeEklenebilir } from "../lib/modulYeri";
+import { departmaninKatalogu } from "../lib/modulYeri";
 import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
-
-// Departman seçicisindeki "Yönetici" seçeneği: ilgili departmanı açılmamış
-// modüller şirket sahibinde durur (bkz. lib/modulYeri.ts).
-const YONETICI = "__yonetici";
 
 interface Props {
   organizationId: string;
@@ -31,21 +27,20 @@ interface Props {
 // olmayan modülleri listelenir — DepartmentModulesPanel.AddModulesForm ile aynı
 // ekleme mantığı, tek farkla: departman seçimi burada ek bir adım.
 //
-// Departmanı açılmamış bir modül için departman kurmak gerekmez: "Yönetici"
-// seçilir ve modül yöneticide açılır. Küçük işletmeler kimsesi olmayan
-// departmanlar kurmasın diye — departman sonradan açılınca modül oraya geçer.
+// Departmanı açılmamış bir modül için departman kurmak gerekmez: Yönetim'in
+// listesinde durur ve orada açılır (bkz. lib/modulYeri.ts). Küçük işletmeler
+// kimsesi olmayan departmanlar kurmasın diye — departman sonradan açılınca
+// modül oraya geçer. Arada "Yönetici (departmansız)" diye ayrı bir seçenek
+// vardı; departmanların yanında kafa karıştırdığı için kaldırıldı.
 export default function AddModuleModal({ organizationId, onClose, onAdded, fixedDepartmentId }: Props) {
   const c = useThemeColors();
   const t = useT();
   const [departments, setDepartments] = useState<Department[]>([]);
-  // Katalog anahtarı olmayan (özel) departmanlar seçicide yok ama "Yönetici"
-  // listesini süzerken tüm departmanlar lazım.
-  const [allDepartments, setAllDepartments] = useState<Department[]>([]);
+  // Katalog anahtarı olmayan (özel) departmanların modülü yok, seçicide yoklar.
+  const [fullCatalog, setFullCatalog] = useState<ModuleCatalogEntry[]>([]);
   const [enabledKeys, setEnabledKeys] = useState<Set<string>>(new Set());
   const [loadingDepts, setLoadingDepts] = useState(true);
   const [departmentId, setDepartmentId] = useState(fixedDepartmentId ?? "");
-  const [catalog, setCatalog] = useState<ModuleCatalogEntry[]>([]);
-  const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -56,43 +51,29 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
     Promise.all([
       api.get<Department[]>(`/organizations/${organizationId}/departments`).catch(() => []),
       api.get<OrganizationModule[]>(`/organizations/${organizationId}/modules`).catch(() => []),
+      api.get<ModuleCatalogEntry[]>("/module-catalog").catch(() => []),
     ])
-      .then(([depts, mods]) => {
-        setDepartments(depts.filter((d) => d.catalogKey));
-        setAllDepartments(depts);
-        // Hiç standart departman yoksa seçilecek tek yer yönetici.
-        if (!fixedDepartmentId && !depts.some((d) => d.catalogKey)) setDepartmentId(YONETICI);
+      .then(([depts, mods, cat]) => {
+        const secilebilir = depts.filter((d) => d.catalogKey);
+        setDepartments(secilebilir);
+        setFullCatalog(cat);
+        // Tek departman varsa (küçük şirkette çoğu zaman yalnızca Yönetim)
+        // sorulacak bir şey yok.
+        if (!fixedDepartmentId && secilebilir.length === 1) setDepartmentId(secilebilir[0].id);
         setEnabledKeys(new Set(mods.map((m) => m.moduleKey)));
       })
       .finally(() => setLoadingDepts(false));
   }, [organizationId]);
 
+  // Departman sayfasından açıldıysa (fixedDepartmentId) seçicideki liste
+  // yüklenene kadar departman bilinmiyor; katalog o zaman süzülür.
+  const dept = departments.find((d) => d.id === departmentId);
+  const catalog = departmaninKatalogu(fullCatalog, dept?.catalogKey, departments);
+  const loadingCatalog = loadingDepts;
   useEffect(() => {
-    if (departmentId === YONETICI) {
-      setLoadingCatalog(true);
-      setSelectedKeys([]);
-      setError("");
-      api
-        .get<ModuleCatalogEntry[]>("/module-catalog")
-        .then((list) => setCatalog(list.filter((e) => yoneticiyeEklenebilir(e, allDepartments))))
-        .catch(() => setCatalog([]))
-        .finally(() => setLoadingCatalog(false));
-      return;
-    }
-    const dept = departments.find((d) => d.id === departmentId);
-    if (!dept?.catalogKey) {
-      setCatalog([]);
-      return;
-    }
-    setLoadingCatalog(true);
     setSelectedKeys([]);
     setError("");
-    api
-      .get<ModuleCatalogEntry[]>(`/module-catalog?departmentKey=${encodeURIComponent(dept.catalogKey)}`)
-      .then(setCatalog)
-      .catch(() => setCatalog([]))
-      .finally(() => setLoadingCatalog(false));
-  }, [departmentId, departments, allDepartments]);
+  }, [departmentId]);
 
   const availableCatalog = catalog.filter((entry) => !enabledKeys.has(entry.key));
 
@@ -130,7 +111,6 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
           ) : (
             <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={{ width: "100%" }}>
               <option value="">{t("Departman seç…")}</option>
-              <option value={YONETICI}>{t("Yönetici (departmansız)")}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>
                   {departmanAdi(d.name, t)}
@@ -146,9 +126,7 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
           ) : availableCatalog.length === 0 ? (
             <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
-              {departmentId === YONETICI
-                ? t("Departmanı açılmamış bir modül kalmadı — diğer modüller kendi departmanından eklenir.")
-                : t("Bu departmanın modüllerinin hepsi zaten etkin.")}
+              {t("Bu departmanın modüllerinin hepsi zaten etkin.")}
             </p>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 6 }}>

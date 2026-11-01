@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
+import { departmaniAcik, modulunEvi } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireOneOf, optionalOneOf, requireUuid } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -188,23 +189,37 @@ export class ModuleMembersService {
     const ids = (data ?? []).map((r: any) => r.department_id).filter(Boolean) as string[];
     if (ids.length > 0) return ids;
 
-    // Modül organizasyon geneli etkinleştirilmişse (department_id boş — kurulum
-    // sihirbazından gelen eski kayıtlar böyle) hangi departmanın kapsadığını
-    // katalogdan çıkarırız.
-    const { data: catalogRow } = await this.supabase.client
-      .from("module_catalog")
-      .select("department_key")
-      .eq("key", moduleKey)
-      .maybeSingle();
-    if (!catalogRow?.department_key) return [];
-
-    const { data: deptRows } = await this.supabase.client
-      .from("departments")
-      .select("id")
-      .eq("organization_id", organizationId)
-      .eq("catalog_key", catalogRow.department_key)
-      .is("archived_at", null);
-    return (deptRows ?? []).map((r: any) => r.id);
+    // Modül organizasyon geneli etkinleştirilmişse (department_id boş — olağan
+    // durum bu) evini katalogdan çıkarırız: ilgili departmanı açıksa o, değilse
+    // Yönetim (bkz. shared modulEvi.ts — arayüzün kart adresiyle aynı kural).
+    // Eskiden yalnızca birincil departman (module_catalog.department_key)
+    // aranıyordu: birincili kurulmamış şirkette ikinci departmanın ekibi
+    // modülü göremiyordu, departmanı hiç açılmamış modüle de sahipten başka
+    // kimse giremiyordu.
+    const [{ data: katalog }, { data: deptRows }] = await Promise.all([
+      this.supabase.client
+        .from("module_catalog_departments")
+        .select("department_key, is_primary, sort_order")
+        .eq("module_key", moduleKey)
+        .order("is_primary", { ascending: false })
+        .order("sort_order", { ascending: true }),
+      this.supabase.client
+        .from("departments")
+        .select("id, catalog_key")
+        .eq("organization_id", organizationId)
+        .not("catalog_key", "is", null)
+        .is("archived_at", null)
+        .order("created_at", { ascending: true }),
+    ]);
+    const anahtarlar = ((katalog ?? []) as any[]).map((k) => k.department_key as string);
+    const departmanlar = ((deptRows ?? []) as any[]).map((d) => ({ id: d.id as string, catalogKey: d.catalog_key as string }));
+    // Modül birden çok departmana açıksa hepsinin ekibi erişir (kartın gittiği
+    // ilk departman yalnızca adres); hiçbiri açık değilse ev Yönetim.
+    if (departmaniAcik(anahtarlar, departmanlar)) {
+      return departmanlar.filter((d) => anahtarlar.includes(d.catalogKey)).map((d) => d.id);
+    }
+    const ev = modulunEvi(anahtarlar, departmanlar);
+    return ev ? [ev] : [];
   }
 
   private async assertCanManageTeam(

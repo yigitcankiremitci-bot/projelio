@@ -14,6 +14,7 @@ import { IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
+import { departmanKatalogunuYukle } from "../lib/departmanModulleri";
 
 interface Props {
   organizationId: string;
@@ -84,7 +85,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
     }
     setLoading(true);
     Promise.all([
-      api.get<ModuleCatalogEntry[]>(`/module-catalog?departmentKey=${encodeURIComponent(departmentKey)}`).catch(() => []),
+      departmanKatalogunuYukle(organizationId, departmentKey),
       api.get<OrganizationModule[]>(`/organizations/${organizationId}/modules`).catch(() => []),
     ])
       .then(([cat, org]) => {

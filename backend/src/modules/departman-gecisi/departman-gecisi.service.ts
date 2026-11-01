@@ -139,6 +139,17 @@ export class DepartmanGecisiService {
       throw new BadRequestException("Geçiş tamamlanamadı; hiçbir departman silinmedi. Tekrar dene.");
     }
 
+    // Fonksiyon bırakılan departmanların modül satırlarını Yönetim'e sabitliyor;
+    // ev hesaplanan bir şey (bkz. shared modulEvi.ts, migration 174): sabit
+    // kalırsa ilgili departman sonradan açıldığında yetki Yönetim'de kalırdı.
+    if (yonetimId) {
+      const { error: modulHatasi } = await this.supabase.client
+        .from("organization_modules")
+        .update({ department_id: null })
+        .eq("department_id", yonetimId as string);
+      if (modulHatasi) this.logger.warn(`Geçiş: modül evleri boşaltılamadı (${organizationId}): ${modulHatasi.message}`);
+    }
+
     const bulut = yonetimId
       ? await this.files.departmanKokleriniTasi(kokler, yonetimId as string, userId)
       : { tasinan: 0, kalan: 0 };

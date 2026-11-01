@@ -284,7 +284,6 @@ export const kurumsal: TranslationDict = {
     'No modules enabled yet. Add one with the "+" on the page.',
   "Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.":
     'No modules enabled yet. Double-click the heading or use "+" to add one.',
-  "Yönetici (departmansız)": "Manager (no department)",
   // Paket başına modül hakkı (shared modulHakki.ts)
   "Paketi yükselt": "Upgrade plan",
   "{paket} paketi: {sonra}/{hak} modül. Proje, görev ve dosya modülleri sayılmaz.":
@@ -342,8 +341,6 @@ export const kurumsal: TranslationDict = {
   "İlk kişi": "First person",
   "İlk kişi şirketin ekibinden olmalı. Yeni birini eklemek için Ekip Hesapları ya da İşe al'da \"Yeni departman\"ı seç.":
     'The first person must be on the company team. To add someone new, choose "New department" in Team Accounts or Hire.',
-  "Departmanı açılmamış bir modül kalmadı — diğer modüller kendi departmanından eklenir.":
-    "No modules left without a department — the others are added from their own department.",
   "Serbest çalışanlar için henüz açılmış bir modül yok.": "No modules are open for freelancers yet.",
   // Serbest çalışanın Modüller sekmesi: arama, kategori, sıralama (lib/serbestModuller.ts)
   "Modül ara: fatura, müşteri, sosyal medya…": "Search modules: invoice, customer, social media…",

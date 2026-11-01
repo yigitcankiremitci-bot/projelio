@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ModuleCatalogEntry } from "@projelio/shared";
-import { modulDepartmani, yoneticiModulAdresi, yoneticiyeEklenebilir } from "./modulYeri";
+import { departmaninKatalogu, modulDepartmani, yoneticiModulAdresi, yonetimeDuser } from "./modulYeri";
 
 const modul = (over: Partial<ModuleCatalogEntry>): ModuleCatalogEntry => ({
   key: "faturalar",
@@ -11,6 +11,8 @@ const modul = (over: Partial<ModuleCatalogEntry>): ModuleCatalogEntry => ({
   sortOrder: 0,
   ...over,
 });
+
+const yonetim = { id: "y", catalogKey: "yonetim" };
 
 test("modulDepartmani: kurulu olan ilk ilgili departman kazanır", () => {
   const entry = modul({ departmentKeys: ["finans", "yonetim"] });
@@ -24,18 +26,34 @@ test("modulDepartmani: kurulu olan ilk ilgili departman kazanır", () => {
   );
 });
 
-test("modulDepartmani: departman yoksa yöneticide (undefined)", () => {
+test("modulDepartmani: departmanı yoksa Yönetim'de, Yönetim de yoksa undefined", () => {
+  assert.equal(modulDepartmani(modul({ departmentKey: "finans" }), [yonetim]), "y");
   assert.equal(modulDepartmani(modul({ departmentKey: "finans" }), []), undefined);
   // Özel departmanın katalog anahtarı yok, hiçbir modülün evi olamaz.
   assert.equal(modulDepartmani(modul({ departmentKey: "finans" }), [{ id: "x", catalogKey: null }]), undefined);
 });
 
-test("yoneticiyeEklenebilir: yalnızca departmanı açık olmayan şirket modülleri", () => {
-  const depts = [{ id: "d1", catalogKey: "finans" }];
-  assert.equal(yoneticiyeEklenebilir(modul({ departmentKey: "finans" }), depts), false);
-  assert.equal(yoneticiyeEklenebilir(modul({ key: "crm_musteri", departmentKey: "satis" }), depts), true);
-  assert.equal(yoneticiyeEklenebilir(modul({ key: "h", scope: "holding" }), []), false);
-  assert.equal(yoneticiyeEklenebilir(modul({ key: "yonetim_gorev_yonetimi", departmentKey: "yonetim" }), []), false);
+test("yonetimeDuser: yalnızca departmanı açık olmayan şirket modülleri", () => {
+  const depts = [yonetim, { id: "d1", catalogKey: "finans" }];
+  assert.equal(yonetimeDuser(modul({ departmentKey: "finans" }), depts), false);
+  assert.equal(yonetimeDuser(modul({ key: "crm_musteri", departmentKey: "satis" }), depts), true);
+  assert.equal(yonetimeDuser(modul({ key: "h", scope: "holding" }), []), false);
+  assert.equal(yonetimeDuser(modul({ key: "yonetim_gorev_yonetimi", departmentKey: "yonetim" }), []), false);
+});
+
+test("departmaninKatalogu: Yönetim kendi modülleri + departmanı açılmamışlar", () => {
+  const katalog = [
+    modul({ key: "yonetim_vizyon_sablonu", departmentKey: "yonetim" }),
+    modul({ key: "faturalar", departmentKey: "finans" }),
+    modul({ key: "crm_musteri", departmentKeys: ["satis", "musteri"] }),
+  ];
+  const depts = [yonetim, { id: "s", catalogKey: "satis" }];
+  assert.deepEqual(
+    departmaninKatalogu(katalog, "yonetim", depts).map((e) => e.key),
+    ["yonetim_vizyon_sablonu", "faturalar"]
+  );
+  assert.deepEqual(departmaninKatalogu(katalog, "satis", depts).map((e) => e.key), ["crm_musteri"]);
+  assert.deepEqual(departmaninKatalogu(katalog, undefined, depts), []);
 });
 
 test("yoneticiModulAdresi", () => {

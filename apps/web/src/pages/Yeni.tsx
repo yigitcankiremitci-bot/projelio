@@ -554,8 +554,34 @@ export default function Yeni() {
         <div className="yn-grid">
           <main className="yn-main">
             <div className="yn-baslik">
-              <h1>Bugün neler oluyor?</h1>
-              <p>{studyo ? "İşlerinin" : "Şirketin"} genel durumuna hızlıca bak ve devam et.</p>
+              <div>
+                <h1>Bugün neler oluyor?</h1>
+                <p>{studyo ? "İşlerinin" : "Şirketin"} genel durumuna hızlıca bak ve devam et.</p>
+              </div>
+              {/* Şirket ofisi ↔ Stüdyom: ofisin hemen üstünde, görünür. Sağ
+                  sütundaki seçici dar ekranda ofisin altına düşüyor, gözden kaçıyordu. */}
+              {orgs.length + (serbestIsler?.length ? 1 : 0) > 1 && (
+                <div className="yn-ofis-sec" role="group" aria-label="Ofis seç">
+                  {orgs.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      aria-pressed={!studyo && orgId === o.id}
+                      onClick={() => {
+                        setStudyo(false);
+                        setOrgId(o.id);
+                      }}
+                    >
+                      {o.name}
+                    </button>
+                  ))}
+                  {!!serbestIsler?.length && (
+                    <button type="button" aria-pressed={studyo} onClick={() => setStudyo(true)}>
+                      Stüdyom
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <OfisOyunu
               key={studyo ? "studyo" : orgId || "kisisel"}

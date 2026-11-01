@@ -42,6 +42,7 @@ import { DepartmanGecisiModule } from "./modules/departman-gecisi/departman-geci
 import { DepartmentMembersModule } from "./modules/department-members/department-members.module";
 import { OrganizationModulesModule } from "./modules/organization-modules/organization-modules.module";
 import { OfisDuzeniModule } from "./modules/ofis-duzeni/ofis-duzeni.module";
+import { AjanModule } from "./modules/ajan/ajan.module";
 import { JobModulesModule } from "./modules/job-modules/job-modules.module";
 import { PartnersModule } from "./modules/partners/partners.module";
 import { ProductsModule } from "./modules/products/products.module";
@@ -118,6 +119,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     DepartmentMembersModule,
     OrganizationModulesModule,
     OfisDuzeniModule,
+    AjanModule,
     JobModulesModule,
     PartnersModule,
     ProductsModule,

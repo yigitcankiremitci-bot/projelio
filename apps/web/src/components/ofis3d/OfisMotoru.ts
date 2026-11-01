@@ -300,6 +300,20 @@ interface LioRobotu {
   kirp: number;
 }
 
+/** Ajan robotunun hâli (Ajan MVP, migration 177): Mac'teki programın durumundan gelir. */
+export interface AjanRobotBilgisi {
+  ad: string;
+  hal: "uyuyor" | "bosta" | "calisiyor";
+  /** Okunmamış rapor ya da onay bekleyen öneri var: antende turuncu ışık. */
+  haber: boolean;
+  not?: string | null;
+}
+
+interface AjanRobotu extends LioRobotu {
+  isik: THREE.Mesh;
+  ekran: THREE.Mesh;
+}
+
 export class OfisMotoru {
   onOdaTikla?: (odaId: string) => void;
   onEsyaTikla?: (esyaId: string, ekran: { x: number; y: number }) => void;
@@ -311,6 +325,8 @@ export class OfisMotoru {
   onModulTikla?: (odaId: string, modulKey: string) => void;
   /** Ofiste gezen Lio robotuna tıklanınca (Lio sohbeti açılır). */
   onLioTikla?: () => void;
+  /** Ajan robotuna tıklanınca (ajan paneli açılır). */
+  onAjanTikla?: () => void;
   /** Stüdyoda proje istasyonlarının ve kupa rafının bilgisi (anahtar: modül anahtarı). */
   private istasyonBilgileri = new Map<string, IstasyonBilgisi>();
   /** Stüdyoda odanın döşemesi (oda kimliği → tema). */
@@ -388,9 +404,12 @@ export class OfisMotoru {
   private fare = new THREE.Vector2();
   private fareVar = false;
   private basilan: { x: number; y: number } | null = null;
-  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio"; id: string } | null = null;
+  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio" | "ajan"; id: string } | null = null;
   /** Ortalıkta gezen Lio robotu (ilk kurulumda bir kez yaratılır). */
   private lio: LioRobotu | null = null;
+  /** Ajan robotu: yalnızca ajanı açık hesapta, ajaniAyarla ile görünür. */
+  private ajan: AjanRobotu | null = null;
+  private ajanBilgisi: AjanRobotBilgisi | null = null;
   private kisiEtiketi: CSS2DObject;
   private girisAnimasyonu = 0;
   private gecis: { t: number; hedefBas: THREE.Vector3; hedefSon: THREE.Vector3; konumBas: THREE.Vector3; konumSon: THREE.Vector3 } | null = null;
@@ -542,6 +561,7 @@ export class OfisMotoru {
     await this.kisileriKur(plan, kisiler, sira);
     if (sira !== this.kurulumSirasi) return;
     this.lioyuKur(plan);
+    this.ajaniKur(plan);
   }
 
   /**
@@ -584,6 +604,144 @@ export class OfisMotoru {
       const yer = this.bosYer(obj, oda, nesneId, oda, bas, true);
       if (yer) this.nesneKoy(oda, nesneId, obj, yer.x, yer.z, iceDonus);
     });
+  }
+
+  // ------------------------------------------------------------ Ajan
+
+  /**
+   * Ajanın hâlini değiştirir; null robotu gizler (ajanı kapalı hesap). Plan
+   * henüz kurulmadıysa bilgi saklanır, robot plan kurulunca yaratılır.
+   */
+  ajaniAyarla(bilgi: AjanRobotBilgisi | null): void {
+    this.ajanBilgisi = bilgi;
+    if (this.plan) this.ajaniKur(this.plan);
+    if (this.ustteki?.tur === "ajan") {
+      // Etiket yeni hâli göstersin.
+      const u = this.ustteki;
+      this.ustteki = null;
+      this.ustteyiAyarla(u);
+    }
+  }
+
+  /**
+   * Ajan: Lio'nun yanında gezen küçük, kutu gövdeli robot — koyu ekran yüz,
+   * iki parlak göz, tepesinde durum ışığı. Lio şirketin asistanı, ajan ise
+   * kullanıcının kendi Mac'inde çalışan kişisel yardımcısı; ayrı görünsünler.
+   */
+  private ajaniKur(plan: OfisPlani): void {
+    if (!this.ajanBilgisi) {
+      if (this.ajan) this.ajan.obj.visible = false;
+      return;
+    }
+    if (this.ajan) {
+      this.ajan.obj.visible = true;
+      const p = this.ajan.obj.position;
+      if (!plan.odalar.some((o) => p.x > o.x && p.x < o.x + o.w && p.z > o.z && p.z < o.z + o.d)) this.ajaniKoseyeKoy(plan);
+      this.ajan.yol = [];
+      return;
+    }
+    const obj = new THREE.Group();
+    const govde = new THREE.Group();
+    const kafa = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.42), malzeme("#3E4858", { parlak: 0.35 }));
+    kafa.castShadow = true;
+    govde.add(kafa);
+    const ekran = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.27, 0.02), new THREE.MeshStandardMaterial({ color: "#1C222C", roughness: 0.3 }));
+    ekran.position.set(0, 0, 0.215);
+    govde.add(ekran);
+    const gozler = new THREE.Group();
+    for (const x of [-0.08, 0.08]) {
+      const goz = new THREE.Mesh(
+        new THREE.CircleGeometry(0.035, 20),
+        new THREE.MeshStandardMaterial({ color: "#7FE3D2", emissive: "#7FE3D2", emissiveIntensity: 0.9 })
+      );
+      goz.position.set(x, 0.02, 0.227);
+      gozler.add(goz);
+    }
+    govde.add(gozler);
+    const anten = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.16, 8), malzeme("#66707F"));
+    anten.position.set(0, 0.28, 0);
+    govde.add(anten);
+    const isik = new THREE.Mesh(new THREE.SphereGeometry(0.045, 16, 12), new THREE.MeshStandardMaterial({ color: "#9AA3B2", emissive: "#000000" }));
+    isik.position.set(0, 0.38, 0);
+    govde.add(isik);
+    // Kulak gibi iki yan çıkıntı: uzaktan bakınca da yüzün hangi yana döndüğü belli olsun.
+    for (const x of [-0.27, 0.27]) {
+      const kulak = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.04, 16), malzeme("#C0813F", { parlak: 0.4 }));
+      kulak.rotation.z = Math.PI / 2;
+      kulak.position.set(x, 0, 0);
+      govde.add(kulak);
+    }
+    obj.add(govde);
+    const golge = new THREE.Mesh(
+      new THREE.CircleGeometry(0.28, 32),
+      new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.16, depthWrite: false })
+    );
+    golge.rotation.x = -Math.PI / 2;
+    golge.position.y = 0.012;
+    obj.add(golge);
+    obj.traverse((c) => (c.userData.ajan = true));
+    this.sahne.add(obj);
+    this.ajan = { obj, govde, gozler, golge, yol: [], bekle: 1, yon: 0, kirp: 2, isik, ekran };
+    this.ajaniKoseyeKoy(plan);
+  }
+
+  private ajaniKoseyeKoy(plan: OfisPlani): void {
+    const ortak = plan.odalar.find((o) => o.tur === "ortak");
+    if (!this.ajan || !ortak) return;
+    this.ajan.obj.position.set(ortak.x + 1, ZEMIN_Y, ortak.z + 1);
+  }
+
+  private ajaniOynat(dt: number, t: number): void {
+    const a = this.ajan;
+    const bilgi = this.ajanBilgisi;
+    if (!a || !bilgi || !a.obj.visible) return;
+    const uyuyor = bilgi.hal === "uyuyor";
+    const calisiyor = bilgi.hal === "calisiyor";
+    // Uyurken yere yakın, gözleri kısık ve ışığı sönük; çalışırken ışık yeşil
+    // yanıp söner, haber varsa turuncu.
+    const salinim = Math.sin(t * (calisiyor ? 4 : 2));
+    a.govde.position.y = (uyuyor ? 0.42 : 0.78) + salinim * (uyuyor ? 0.01 : 0.04);
+    a.golge.scale.setScalar(1 - salinim * 0.08);
+    a.kirp -= dt;
+    if (a.kirp <= 0) a.kirp = 2.5 + Math.random() * 4;
+    a.gozler.scale.y = uyuyor ? 0.15 : a.kirp < 0.12 ? 0.2 : 1;
+    const isik = a.isik.material as THREE.MeshStandardMaterial;
+    const renk = uyuyor ? "#66707F" : bilgi.haber ? "#E9935F" : calisiyor ? "#2E9E5B" : "#7FE3D2";
+    isik.color.set(renk);
+    isik.emissive.set(uyuyor ? "#000000" : renk);
+    isik.emissiveIntensity = uyuyor ? 0 : calisiyor || bilgi.haber ? 0.5 + 0.5 * Math.abs(Math.sin(t * 3)) : 0.4;
+    if (uyuyor) return; // uyuyan robot gezmez
+    if (this.ustteki?.tur === "ajan") {
+      a.yon = Math.atan2(this.kamera.position.x - a.obj.position.x, this.kamera.position.z - a.obj.position.z);
+    } else if (calisiyor) {
+      // Çalışırken bir yere gitmez, olduğu yerde "düşünür": yavaşça döner.
+      a.yon += dt * 0.6;
+    } else this.robotuYurut(a, dt, 0.9);
+    const fark = Math.atan2(Math.sin(a.yon - a.obj.rotation.y), Math.cos(a.yon - a.obj.rotation.y));
+    a.obj.rotation.y += fark * Math.min(1, dt * 4);
+  }
+
+  /** Lio ile ajanın ortak yürüyüşü: yolu izler, varınca bekler, sonra yeni hedef seçer. */
+  private robotuYurut(l: LioRobotu, dt: number, hiz: number): void {
+    const g = l.obj;
+    if (l.yol.length) {
+      const h = l.yol[0];
+      const dx = h.x - g.position.x;
+      const dz = h.z - g.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.05) {
+        l.yol.shift();
+        if (!l.yol.length) l.bekle = 2 + Math.random() * 5;
+      } else {
+        const adim = Math.min(d, hiz * dt);
+        g.position.x += (dx / d) * adim;
+        g.position.z += (dz / d) * adim;
+        l.yon = Math.atan2(dx, dz);
+      }
+    } else if ((l.bekle -= dt) <= 0) {
+      l.bekle = 3; // yol bulunamazsa bir süre sonra yeniden dener
+      this.robotHedefSec(l);
+    }
   }
 
   // ------------------------------------------------------------ Lio
@@ -649,8 +807,7 @@ export class OfisMotoru {
     this.lio.obj.position.set(ortak.x + ortak.w / 2, ZEMIN_Y, ortak.z + ortak.d / 2);
   }
 
-  private lioHedefSec(): void {
-    const l = this.lio;
+  private robotHedefSec(l: LioRobotu): void {
     const plan = this.plan;
     const iz = this.izgara();
     if (!l || !plan || !iz) return;
@@ -678,24 +835,7 @@ export class OfisMotoru {
     if (this.ustteki?.tur === "lio") {
       // Üzerine gelinince durur ve kameraya döner.
       l.yon = Math.atan2(this.kamera.position.x - g.position.x, this.kamera.position.z - g.position.z);
-    } else if (l.yol.length) {
-      const h = l.yol[0];
-      const dx = h.x - g.position.x;
-      const dz = h.z - g.position.z;
-      const d = Math.hypot(dx, dz);
-      if (d < 0.05) {
-        l.yol.shift();
-        if (!l.yol.length) l.bekle = 2 + Math.random() * 5;
-      } else {
-        const adim = Math.min(d, 0.75 * dt);
-        g.position.x += (dx / d) * adim;
-        g.position.z += (dz / d) * adim;
-        l.yon = Math.atan2(dx, dz);
-      }
-    } else if ((l.bekle -= dt) <= 0) {
-      l.bekle = 3; // yol bulunamazsa bir süre sonra yeniden dener
-      this.lioHedefSec();
-    }
+    } else this.robotuYurut(l, dt, 0.75);
     const fark = Math.atan2(Math.sin(l.yon - g.rotation.y), Math.cos(l.yon - g.rotation.y));
     g.rotation.y += fark * Math.min(1, dt * 4);
   }
@@ -1599,6 +1739,7 @@ export class OfisMotoru {
       if (k.durum !== "oturuyor") this.duvardanGecirme(k, eski, dt);
     }
     this.lioyuOynat(dt, t);
+    this.ajaniOynat(dt, t);
 
     for (let i = this.parcaciklar.length - 1; i >= 0; i--) {
       const p = this.parcaciklar[i];
@@ -2556,6 +2697,7 @@ export class OfisMotoru {
     if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
     else if (u.tur === "oda") this.onOdaTikla?.(u.id);
     else if (u.tur === "lio") this.onLioTikla?.();
+    else if (u.tur === "ajan") this.onAjanTikla?.();
     else if (u.tur === "modul") {
       const [odaId, key] = u.id.split("|");
       this.onModulTikla?.(odaId, key);
@@ -2624,6 +2766,7 @@ export class OfisMotoru {
     const hedefler: THREE.Object3D[] = [
       ...this.kisiGrubu.children,
       ...(this.lio ? [this.lio.obj] : []),
+      ...(this.ajan?.obj.visible ? [this.ajan.obj] : []),
       ...(this.duzenleme ? this.esyaGrubu.children : []),
       ...this.modulNesneleri.values(),
       ...this.zeminler,
@@ -2634,6 +2777,7 @@ export class OfisMotoru {
       const ud = vurus.object.userData;
       if (ud.kisiId) yeni = { tur: "kisi", id: ud.kisiId };
       else if (ud.lio) yeni = { tur: "lio", id: "lio" };
+      else if (ud.ajan) yeni = { tur: "ajan", id: "ajan" };
       else if (ud.modul && !this.duzenleme) yeni = { tur: "modul", id: ud.modul };
       else if (ud.esyaId) yeni = { tur: "esya", id: ud.esyaId };
       else if (ud.odaId) {
@@ -2685,6 +2829,29 @@ export class OfisMotoru {
         this.kisiEtiketi.visible = true;
       }
       this.kap.style.cursor = "pointer";
+    } else if (yeni.tur === "ajan") {
+      if (this.ajan && this.ajanBilgisi) {
+        const el = this.kisiEtiketi.element;
+        el.textContent = "";
+        const b = document.createElement("b");
+        b.textContent = this.ajanBilgisi.ad;
+        el.appendChild(b);
+        const s = document.createElement("small");
+        const hal = this.ajanBilgisi.hal;
+        s.textContent =
+          hal === "uyuyor"
+            ? "Uyuyor (Mac kapalı) · Tıkla"
+            : hal === "calisiyor"
+              ? `${this.ajanBilgisi.not ?? "Çalışıyor"} · Tıkla`
+              : this.ajanBilgisi.haber
+                ? "Sana haberi var · Tıkla"
+                : "Tıkla, konuş";
+        el.appendChild(s);
+        this.ajan.obj.add(this.kisiEtiketi);
+        this.kisiEtiketi.position.set(0, 1.55, 0);
+        this.kisiEtiketi.visible = true;
+        this.kap.style.cursor = "pointer";
+      }
     } else if (yeni.tur === "lio") {
       if (this.lio) {
         const el = this.kisiEtiketi.element;

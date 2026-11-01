@@ -14,7 +14,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const searchRoots = [join(root, "apps/web/src"), join(root, "backend/src"), join(root, "packages")];
+const searchRoots = [join(root, "apps/web/src"), join(root, "backend/src"), join(root, "packages"), join(root, "ajan/src")];
 
 const filterArg = process.argv.find((a) => a.startsWith("--filter="));
 const filter = filterArg ? filterArg.slice("--filter=".length) : null;

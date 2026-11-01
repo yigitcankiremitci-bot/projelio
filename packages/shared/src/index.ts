@@ -37,3 +37,4 @@ export * from "./ofisDuzeni";
 export * from "./departmanKurali";
 export * from "./modulHakki";
 export * from "./modulEvi";
+export * from "./ajan";

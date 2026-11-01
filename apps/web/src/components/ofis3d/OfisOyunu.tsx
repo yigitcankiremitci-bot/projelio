@@ -30,6 +30,9 @@ import { isTemasi } from "../../lib/studyoOfisi";
 import { OfisMotoru, type OdaEtiketi, type SahneKisisi } from "./OfisMotoru";
 import { odaDuzeniTemizle, type NesneDuzeni, type OdaDuzeni } from "@projelio/shared";
 import { api, ApiError } from "../../api/client";
+import { ajanApi } from "../../api/ajan";
+import AjanPaneli from "../ajan/AjanPaneli";
+import type { AjanDurumu } from "@projelio/shared";
 import "./OfisOyunu.css";
 
 export interface OyunDepartmani {
@@ -206,6 +209,9 @@ export default function OfisOyunu({
   const kapRef = useRef<HTMLDivElement>(null);
   const kokRef = useRef<HTMLDivElement>(null);
   const motorRef = useRef<OfisMotoru | null>(null);
+  // Ajan robotu (migration 177): yalnızca ajanı açık hesapta görünür.
+  const [ajanDurumu, setAjanDurumu] = useState<AjanDurumu | null>(null);
+  const [ajanAcik, setAjanAcik] = useState(false);
   const anahtar = kayitAnahtari(kapsam);
   const [kayit, setKayit] = useState<OfisKaydi>(() => kaydiOku(anahtar));
   const [magaza, setMagaza] = useState(false);
@@ -449,6 +455,37 @@ export default function OfisOyunu({
     );
   }, [departmanlar, cevrimici, benId]);
 
+  // Ajanın hâli dakikada bir yoklanır (panel açıkken panel 5 sn'de bir yoklar).
+  // Uç yoksa ya da hesap izinli değilse robot hiç çıkmaz.
+  useEffect(() => {
+    const ac = new AbortController();
+    const yokla = () => {
+      if (document.hidden) return;
+      // Hata (uç henüz yayında değil, ağ yok) robotu yalnızca gizler.
+      ajanApi.durum(ac.signal).then(setAjanDurumu).catch(() => undefined);
+    };
+    yokla();
+    const z = setInterval(yokla, 60_000);
+    return () => {
+      clearInterval(z);
+      ac.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const d = ajanDurumu;
+    motorRef.current?.ajaniAyarla(
+      d?.izinli
+        ? {
+            ad: d.ad,
+            hal: !d.bagli ? "uyuyor" : d.calisiyor ? "calisiyor" : "bosta",
+            haber: d.okunmamisRapor + d.bekleyenOneri > 0,
+            not: d.not,
+          }
+        : null
+    );
+  }, [ajanDurumu, yukleniyor]);
+
   // Motor bir kez kurulur; geri çağırmalar her zaman güncel duruma ref'ten bakar.
   const durumRef = useRef({ kayit, puan, anahtar, onModulAc });
   durumRef.current = { kayit, puan, anahtar, onModulAc };
@@ -484,6 +521,7 @@ export default function OfisOyunu({
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
     motor.onModulTikla = (odaId, key) => durumRef.current.onModulAc(odaId, key);
     motor.onLioTikla = () => openLio();
+    motor.onAjanTikla = () => setAjanAcik(true);
     motor.onNesneDegisti = (odaId: string, nesneId: string, d: NesneDuzeni) => {
       // Eklenen eşyanın türü motorun bildirdiğinde yok: kaybolmasın.
       const yaz = (t: OdaDuzeni | null | undefined): OdaDuzeni => {
@@ -1002,6 +1040,8 @@ export default function OfisOyunu({
           {bildiri}
         </div>
       )}
+
+      {ajanAcik && <AjanPaneli onClose={() => setAjanAcik(false)} onDurum={setAjanDurumu} />}
     </div>
   );
 }

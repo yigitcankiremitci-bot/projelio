@@ -1336,7 +1336,10 @@
 .of.sahte-tam {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  /* Uygulamanın süslerinin (çekmece, Lio paneli: Z ≤ 62) üstünde ama
+     pencerelerin (Z.modal = 100, lib/layout.ts) ALTINDA: 2000 iken ofisten
+     açılan modaller tam ekranın arkasında kalıyordu. */
+  z-index: 95;
 }
 
 @media (max-width: 860px) {

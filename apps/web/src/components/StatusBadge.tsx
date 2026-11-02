@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePortalHedefi } from "../lib/portalHedefi";
 import type { ProjectStatus } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconCheck, IconChevronRight } from "./icons";
@@ -32,6 +33,7 @@ const badgeStyle = (s: { bg: string; text: string }) => ({
 
 export default function StatusBadge({ status, onChange }: Props) {
   const c = useThemeColors();
+  const portalHedefi = usePortalHedefi();
   const t = useT();
   const s = PROJECT_STATUS_STYLE[status];
   const [open, setOpen] = useState(false);
@@ -193,7 +195,7 @@ export default function StatusBadge({ status, onChange }: Props) {
               </button>
             ))}
           </div>,
-          document.body
+          portalHedefi
         )}
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Z } from "../lib/layout";
 import { createPortal } from "react-dom";
+import { usePortalHedefi } from "../lib/portalHedefi";
 import type { ProjectFile } from "@projelio/shared";
 import { filesApi } from "../api/files";
 import {
@@ -27,6 +28,7 @@ interface Props {
 
 export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Props) {
   const c = useThemeColors();
+  const portalHedefi = usePortalHedefi();
   const t = useT();
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -78,6 +80,9 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         position: "fixed",
         inset: 0,
         background: "rgba(26,31,41,0.6)",
+        // Tam ekrandaki 3D ofisin içine taşındığında onun "user-select: none"ı
+        // geçmesin: metin seçilemiyor, Safari'de kutulara yazılamıyordu.
+        ...(portalHedefi !== document.body ? { userSelect: "text" as const, WebkitUserSelect: "text" as const } : {}),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -258,7 +263,7 @@ export default function FilePreviewModal({ file, onClose, onMaybeChanged }: Prop
         </div>
       </div>
     </div>,
-    document.body
+    portalHedefi
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { bodyScrollLock } from "../lib/scrollLock";
 import { Z, SAFE_TOP, SAFE_BOTTOM } from "../lib/layout";
 import { createPortal } from "react-dom";
+import { usePortalHedefi } from "../lib/portalHedefi";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
@@ -99,6 +100,7 @@ export default function Modal({
 }: Props) {
   const c = useThemeColors();
   const t = useT();
+  const portalHedefi = usePortalHedefi();
   const boxRef = useRef<HTMLDivElement>(null);
   const fullScreen = mobileFullScreen && typeof window !== "undefined" && window.innerWidth < 768;
 
@@ -187,6 +189,9 @@ export default function Modal({
         position: "fixed",
         inset: 0,
         background: "rgba(26,31,41,0.45)",
+        // Tam ekrandaki 3D ofisin içine taşındığında onun "user-select: none"ı
+        // geçmesin: metin seçilemiyor, Safari'de kutulara yazılamıyordu.
+        ...(portalHedefi !== document.body ? { userSelect: "text" as const, WebkitUserSelect: "text" as const } : {}),
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -278,6 +283,6 @@ export default function Modal({
         )}
       </div>
     </div>,
-    document.body
+    portalHedefi
   );
 }

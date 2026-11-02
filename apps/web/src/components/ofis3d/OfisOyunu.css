@@ -1388,39 +1388,21 @@
   }
 }
 
-/* Seçili kişinin başının üstündeki işaret; kendi karakterinde "düzenle" düğmesi. */
+/* Seçili kişinin başının üstündeki ok. Zıplayan ok ::after'da: CSS2DRenderer
+ * etiketi ekrana kendi elemanının transform'uyla yerleştiriyor; animasyon o
+ * elemanda olunca her karede konumu ezip işareti sol üst köşeye kaçırıyordu. */
 .of-kisi-isaret {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
   pointer-events: none;
-  animation: of-isaret-zipla 1.2s ease-in-out infinite;
 }
 .of-kisi-isaret::after {
   content: "";
+  display: block;
   width: 0;
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-top: 11px solid var(--yn-accent);
-}
-.of-kisi-isaret button {
-  pointer-events: auto;
-  margin-bottom: 4px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--yn-accent);
-  color: #fff;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow: 0 6px 16px rgba(26, 31, 41, 0.25);
-}
-.of-kisi-isaret button:hover {
-  filter: brightness(1.08);
+  animation: of-isaret-zipla 1.2s ease-in-out infinite;
 }
 @keyframes of-isaret-zipla {
   50% {
@@ -1428,7 +1410,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .of-kisi-isaret {
+  .of-kisi-isaret::after {
     animation: none;
   }
 }

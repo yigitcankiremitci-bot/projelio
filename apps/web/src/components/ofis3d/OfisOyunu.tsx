@@ -317,6 +317,10 @@ export default function OfisOyunu({
   /** Kendi karakterini düzenlerken taslak (null: kayıtlı görünüm yok, adından türetilen). */
   const [karakterTaslagi, setKarakterTaslagi] = useState<{ g: KarakterGorunumu | null } | null>(null);
   const [karakterKaydediliyor, setKarakterKaydediliyor] = useState(false);
+  /** Sahnede seçili kişi: kendisiyse sol üstte "Karakterini düzenle" çıkar. */
+  const [seciliKisi, setSeciliKisi] = useState<string | null>(null);
+  const benIdRef = useRef(benId);
+  benIdRef.current = benId;
   /** Oda paneli kapatılabilir; kapatmak kamerayı odadan çıkarmaz (yalnızca "Ofise dön" ve Esc çıkarır). */
   const [panelAcik, setPanelAcik] = useState(false);
   // Oda düzenleri: ekipte ortak (sunucu); uç yoksa geçici olarak tarayıcıda.
@@ -658,8 +662,17 @@ export default function OfisOyunu({
     }
   }
 
-  const durumRef = useRef({ kayit, puan, anahtar, onModulAc, karakteriDuzenle });
-  durumRef.current = { kayit, puan, anahtar, onModulAc, karakteriDuzenle };
+  // Kendi karakteri seçiliyken sol üstte (oda düğmelerinin yanında). Kişinin başının
+  // üstünde dururken karakterle birlikte kayıyor, tıklaması zorlaşıyordu.
+  const karakterDugmesi =
+    seciliKisi && seciliKisi === benId && !karakterTaslagi && !duzenlenen && !rafta ? (
+      <button type="button" className="of-btn birincil" onClick={karakteriDuzenle}>
+        Karakterini düzenle
+      </button>
+    ) : null;
+
+  const durumRef = useRef({ kayit, puan, anahtar, onModulAc });
+  durumRef.current = { kayit, puan, anahtar, onModulAc };
 
   useEffect(() => {
     const kap = kapRef.current;
@@ -690,7 +703,11 @@ export default function OfisOyunu({
       setMagaza(false);
     };
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
-    motor.onKarakterDuzenle = () => durumRef.current.karakteriDuzenle();
+    motor.onKisiSecildi = (id) => {
+      setSeciliKisi(id);
+      // Oda paneli de sol üstte: kendi karakterini seçince düzenleme düğmesine yer açılır.
+      if (id && id === benIdRef.current) setPanelAcik(false);
+    };
     motor.onRafDegisti = (acik) => {
       setRafta(acik);
       // Raf ekranın ortasında: oda paneli önünü kapatmasın.
@@ -1213,6 +1230,8 @@ export default function OfisOyunu({
         </div>
       )}
 
+      {!(icerdekiOda && !panelAcik) && karakterDugmesi && <div className="of-hud of-oda-mini">{karakterDugmesi}</div>}
+
       {icerdekiOda && !panelAcik && !duzenlenen && !rafta && (
         <div className="of-hud of-oda-mini">
           <button type="button" className="of-btn" onClick={() => setPanelAcik(true)}>
@@ -1228,6 +1247,7 @@ export default function OfisOyunu({
           >
             Ofise dön
           </button>
+          {karakterDugmesi}
         </div>
       )}
 

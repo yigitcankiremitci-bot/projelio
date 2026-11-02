@@ -3,6 +3,7 @@ import type { DepartmentMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { decideDepartmentAccess } from "../departments/department-access";
+import { KoltukService } from "../../common/koltuk/koltuk.service";
 
 function mapDepartmentMember(row: any): DepartmentMember {
   return {
@@ -30,7 +31,8 @@ function mapDepartmentMember(row: any): DepartmentMember {
 export class DepartmentMembersService {
   constructor(
     private supabase: SupabaseService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private koltuklar: KoltukService
   ) {}
 
   private async assertOrgOwner(departmentId: string, userId?: string): Promise<string> {
@@ -142,6 +144,11 @@ export class DepartmentMembersService {
     // doğrudan onaylı açılır ve bildirim gitmez — kurucu böylece kendini bir
     // departmana yönetici (sorumlu) olarak atayabiliyor.
     const kendisi = !!data.userId && data.userId === requestingUserId;
+    // Yer yoksa davet bile açılmasın: kişi kabul edince "yer dolu" görmesin.
+    // E-postayla davette kişi henüz belli değil; kontrol kabulde (respond).
+    if (data.userId) {
+      await this.koltuklar.departmanaEklenebilir(departmentId, data.userId, { taseronRolu: data.role === "subcontractor" });
+    }
 
     const { data: row, error } = await this.supabase.client
       .from("department_members")
@@ -226,6 +233,13 @@ export class DepartmentMembersService {
     const existing = await this.findById(id);
     if (existing.userId && existing.userId !== requestingUserId) {
       throw new ForbiddenException("Bu daveti yalnızca davet edilen kişi yanıtlayabilir");
+    }
+
+    // Davet atıldığında yer vardı ama kabule kadar dolmuş olabilir.
+    if (approve) {
+      await this.koltuklar.departmanaEklenebilir(existing.departmentId, requestingUserId, {
+        taseronRolu: existing.role === "subcontractor",
+      });
     }
 
     const patch: Record<string, unknown> = { status: approve ? "approved" : "rejected" };

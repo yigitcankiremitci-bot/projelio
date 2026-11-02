@@ -4078,7 +4078,18 @@ export interface BillingPlanView {
   };
   monthlyCredits: number;
   featured: boolean;
+  /** Fiyata dahil kişi sayısı. */
   seats: number;
+  /**
+   * Kişi sayısıyla fiyatlanan pakette (Business) ek kişi başına fiyat ve
+   * bakiye; null ise paket sabit kişilik. charge null = ek kişi şu an satılamaz.
+   */
+  extraSeat: {
+    priceUsd: { monthly: number; yearlyMonthly: number };
+    charge: { monthly: number | null; yearlyMonthly: number | null };
+    credits: number;
+    max: number;
+  } | null;
   features: string[];
 }
 

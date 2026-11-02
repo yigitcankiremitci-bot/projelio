@@ -92,7 +92,7 @@ export const abonelik: TranslationDict = {
   // Katalogdan (backend billing.plans.ts) geldikleri için metinler orada yazılı.
   "Aylık 20.000 birim Lio Bakiyesi": "20,000 Lio Units per month",
   "Aylık 50.000 birim Lio Bakiyesi": "50,000 Lio Units per month",
-  "Aylık 150.000 birim Lio Bakiyesi": "150,000 Lio Units per month",
+  "Aylık 100.000 birim Lio Bakiyesi, her ek kişiyle +10.000": "100,000 Lio Units per month, +10,000 per extra person",
   "Sınırsız proje ve görev": "Unlimited projects and tasks",
   "Google Drive / OneDrive bağlantısı": "Google Drive / OneDrive connection",
   "E-posta desteği": "Email support",
@@ -101,7 +101,8 @@ export const abonelik: TranslationDict = {
   "WhatsApp üzerinden Lio": "Lio over WhatsApp",
   "Gelir-gider ve proje bütçesi": "Income, expenses and project budgets",
   "Öncelikli destek": "Priority support",
-  "10 kullanıcıya kadar": "Up to 10 users",
+  "Şirkette 3 kişiye kadar": "Up to 3 people in your company",
+  "3 kişi dahil, ek kişi başına 4,99 $": "3 people included, $4.99 per extra person",
   "Departman bazlı yetkilendirme": "Department-level permissions",
   "Dışa aktarma ve raporlar": "Exports and reports",
 
@@ -142,6 +143,15 @@ export const abonelik: TranslationDict = {
   "Son ödeme alınamadı. Paketin açık; ödemeyi birkaç gün boyunca yeniden deneyeceğiz. Hemen ödemek ya da başka bir kart kullanmak için aşağıdaki düğmeye bas.": "The last payment didn't go through. Your plan is still active; we'll retry over the next few days. Use the button below to pay now or use a different card.",
   "{donem} ödeme: {tutar}. Bir sonraki dönem aynı karttan otomatik yenilenir; istediğin zaman iptal edebilirsin.": "{donem} payment: {tutar}. The next period renews automatically from the same card; you can cancel any time.",
   "{plan} paketine geç": "Switch to {plan}",
+  "{plan} paketine geç ({kisi} kişi)": "Switch to {plan} ({kisi} people)",
+  "Kişi sayısı": "People",
+  "Şirketin paketindeki {sinir} kişilik yer dolu. Kişi sayısını artırmak için destekten yardım iste.":
+    "Your company's plan is full at {sinir} people. Ask support to add more people.",
+  "Bu pakette şirkete en çok {sinir} kişi eklenebilir. Daha kalabalık bir ekip için Business'a geç.":
+    "This plan allows up to {sinir} people in a company. Switch to Business for a larger team.",
+  "Bir kişi azalt": "Remove one person",
+  "Bir kişi ekle": "Add one person",
+  "{dahil} kişi dahil, ek kişi başına {tutar} / ay": "{dahil} people included, {tutar} / month per extra person",
   "Öde": "Pay",
   "Ödeme kartını değiştir": "Change payment card",
   "Ödeme onayı gecikiyor. Birkaç dakika sonra sayfayı yenile; sorun sürerse destekle iletişime geç.": "Payment confirmation is taking longer than usual. Refresh the page in a few minutes; if it persists, contact support.",

@@ -12,6 +12,7 @@ import { EmailService } from "../auth/email.service";
 import { GirisBaglantisiService } from "../auth/giris-baglantisi.service";
 import { FilesService } from "../files/files.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { KoltukService } from "../../common/koltuk/koltuk.service";
 import { atanabilirDepartmanlar, girdiyiDogrula, kisiGirdisiniDogrula, tekilModuller } from "./ekip-hesabi-kurallari";
 import { ekipHesabiEpostasi } from "./ekip-hesabi-eposta";
 
@@ -70,7 +71,8 @@ export class EkipHesaplariService {
     private emailService: EmailService,
     private girisBaglantisi: GirisBaglantisiService,
     private filesService: FilesService,
-    private departmentsService: DepartmentsService
+    private departmentsService: DepartmentsService,
+    private koltuklar: KoltukService
   ) {}
 
   // ------------------------------------------------------------- Yetki + seçenekler
@@ -244,6 +246,13 @@ export class EkipHesaplariService {
     const secenekler = await this.secenekler(organizationId, userId);
     const hata = girdiyiDogrula(girdi, secenekler);
     if (hata) throw new BadRequestException(hata);
+
+    // Kişi hakkı hesap AÇILMADAN önce: yer yokken açılan hesap şirkete
+    // bağlanamaz ve ortada sahipsiz bir hesap kalırdı.
+    const roller = [...girdi.departmanlar.map((d) => d.role), ...(girdi.yeniDepartman ? [girdi.yeniDepartman.role] : [])];
+    await this.koltuklar.kisiEklenebilir(organizationId, null, {
+      taseronRolu: roller.length > 0 && roller.every((r) => r === "subcontractor"),
+    });
 
     // Kişiyle birlikte açılan departman: hesap herhangi bir adımda düşerse
     // departman da geri alınır — kişisiz departman bırakmak kuralın tam tersi

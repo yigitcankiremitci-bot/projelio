@@ -22,7 +22,14 @@ export const billingApi = {
   cancel: (id: string) => api.post<Subscription>(`/billing/subscription/${id}/cancel`, {}),
 
   /** İndirim kodu önizlemesi; kullanımı YAZMAZ, tutar ödemede sunucuda yeniden hesaplanır. */
-  indirimOnizle: (body: { kod: string; kapsam: "abonelik" | "lio"; planKey?: string; period?: string; packageKey?: string }) =>
+  indirimOnizle: (body: {
+    kod: string;
+    kapsam: "abonelik" | "lio";
+    planKey?: string;
+    period?: string;
+    packageKey?: string;
+    koltuk?: number;
+  }) =>
     api.post<IndirimOzeti>("/billing/indirim-kodu/onizle", body),
 
   cardUpdate: (id: string) => api.post<{ checkoutFormContent: string }>(`/billing/subscription/${id}/card-update`, {}),
@@ -66,6 +73,8 @@ export const billingApi = {
       organizationId?: string;
       onay: boolean;
       indirimKodu?: string;
+      /** Kişi sayısıyla fiyatlanan pakette (Business) seçilen kişi sayısı. */
+      koltuk?: number;
     }) =>
       api.post<PayTRForm>("/billing/paytr/abonelik", body),
     gecikmisOdeme: (subscriptionId: string, onay: boolean) =>

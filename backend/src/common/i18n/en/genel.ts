@@ -34,11 +34,12 @@ export const genel: TranslationDict = {
   "İşlem başarısız oldu: {hata}": "The action failed: {hata}",
 
   // Arayüz sözlüğünde olup sunucuda da kullanılanlar + hesap verisi dışa aktarma
-  "10 kullanıcıya kadar": "Up to 10 users",
+  "3 kişi dahil, ek kişi başına 4,99 $": "3 people included, $4.99 per extra person",
+  "Şirkette 3 kişiye kadar": "Up to 3 people in your company",
   "Ad soyad": "Full name",
   "Aktif": "Active",
   "Atanan": "Assignee",
-  "Aylık 150.000 birim Lio Bakiyesi": "150,000 Lio Units per month",
+  "Aylık 100.000 birim Lio Bakiyesi, her ek kişiyle +10.000": "100,000 Lio Units per month, +10,000 per extra person",
   "Aylık 20.000 birim Lio Bakiyesi": "20,000 Lio Units per month",
   "Aylık 50.000 birim Lio Bakiyesi": "50,000 Lio Units per month",
   "Başlangıç": "Start",

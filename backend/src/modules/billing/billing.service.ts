@@ -16,15 +16,18 @@ import { BillingSettingsService, type OdemeSaglayici } from "./billing-settings.
 import { IyzicoClient, IyzicoHatasi } from "./iyzico.client";
 import { PayTRClient } from "./paytr.client";
 import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "./abonelik-hakki";
-import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
+import { abonelikTutari, aylikKarsilikTl, ekKoltukVitrini } from "./abonelik-tutari";
+import { KoltukService } from "../../common/koltuk/koltuk.service";
 import {
   ayEkle,
   findPlan,
   FREE_PLAN,
   isBillingPeriod,
   isPlanKey,
+  koltukCoz,
   periodMonths,
   PLANS,
+  planBirimi,
   planPriceUsd,
   SATIN_ALINABILIR,
   type BillingPeriod,
@@ -58,6 +61,8 @@ export interface Abonelik {
   priceUsd?: number;
   /** PayTR: çekimin yapılacağı saklı kartın son 4 hanesi. */
   kartSon4?: string;
+  /** Satın alınan kişi sayısı (koltuklu paket); yoksa eski ya da koltuksuz abonelik. */
+  koltuk?: number;
   createdAt: string;
 }
 
@@ -92,6 +97,7 @@ function mapAbonelik(row: any): Abonelik {
     currency: row.currency ?? "TRY",
     priceUsd: row.price_usd === null || row.price_usd === undefined ? undefined : Number(row.price_usd),
     kartSon4: row.kart_son4 ?? undefined,
+    koltuk: row.koltuk ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -120,19 +126,22 @@ export class BillingService {
   private readonly settings: BillingSettingsService;
   private readonly iyzico: IyzicoClient;
   private readonly paytr: PayTRClient;
+  private readonly koltuklar: KoltukService;
 
   constructor(
     @Inject(SupabaseService) supabase: SupabaseService,
     @Inject(AiCreditsService) credits: AiCreditsService,
     @Inject(BillingSettingsService) settings: BillingSettingsService,
     @Inject(IyzicoClient) iyzico: IyzicoClient,
-    @Inject(PayTRClient) paytr: PayTRClient
+    @Inject(PayTRClient) paytr: PayTRClient,
+    @Inject(KoltukService) koltuklar: KoltukService
   ) {
     this.supabase = supabase;
     this.credits = credits;
     this.settings = settings;
     this.iyzico = iyzico;
     this.paytr = paytr;
+    this.koltuklar = koltuklar;
   }
 
   // ==================================================================== Vitrin
@@ -159,6 +168,13 @@ export class BillingService {
       monthlyCredits: number;
       featured: boolean;
       seats: number;
+      /** Koltuklu pakette ek kişi başı fiyat ve bakiye; tutar null ise ek kişi satılamaz. */
+      extraSeat: {
+        priceUsd: { monthly: number; yearlyMonthly: number };
+        charge: { monthly: number | null; yearlyMonthly: number | null };
+        credits: number;
+        max: number;
+      } | null;
       features: string[];
     }>;
     subscription: Abonelik | null;
@@ -196,6 +212,7 @@ export class BillingService {
         monthlyCredits: plan.monthlyCredits,
         featured: plan.featured,
         seats: plan.seats,
+        extraSeat: ekKoltukVitrini(plan, kur),
         features: plan.features,
       })),
       subscription: abonelik,
@@ -308,7 +325,11 @@ export class BillingService {
     if (!this.iyzico.isConfigured()) {
       throw new ServiceUnavailableException("Ödeme sağlayıcısı henüz yapılandırılmamış.");
     }
-    const { planKey, period, scope, organizationId } = await this.satinAlmaOnKontrol(userId, istek);
+    const { planKey, period, scope, organizationId, koltuk } = await this.satinAlmaOnKontrol(userId, istek);
+    // iyzico'da tutar ödeme planına sabit; ek kişinin tutarı oraya eklenemez.
+    if (koltuk !== null && koltuk > (findPlan(planKey)?.seats ?? 0)) {
+      throw new BadRequestException("Ek kişili paket bu ödeme yöntemiyle alınamıyor.");
+    }
 
     const ref = await this.settings.planRef("iyzico", planKey, period);
     if (!ref?.referenceCode) {
@@ -359,13 +380,25 @@ export class BillingService {
    */
   async satinAlmaOnKontrol(
     userId: string,
-    istek: { planKey: string; period: string; scope?: string; organizationId?: string }
-  ): Promise<{ planKey: PlanKey; period: BillingPeriod; scope: AbonelikKapsami; organizationId?: string }> {
+    istek: { planKey: string; period: string; scope?: string; organizationId?: string; koltuk?: unknown }
+  ): Promise<{ planKey: PlanKey; period: BillingPeriod; scope: AbonelikKapsami; organizationId?: string; koltuk: number | null }> {
     demoHesabindaYasak(userId, "abonelik satın alma");
     const dogrulanmis = this.istegiDogrula(istek);
-    const { scope, organizationId } = dogrulanmis;
+    const { scope, organizationId, koltuk } = dogrulanmis;
 
     if (scope === "organization") await this.organizasyonSahibiMi(userId, organizationId!);
+
+    // Şirketteki kişi sayısının altında koltuk satılmaz: alır almaz yer dolu
+    // olur ve "kişi ekleyemiyorum" diye dönerdi. Bireysel pakette sahibi olunan
+    // en kalabalık şirkete bakılır. Mevcut üyeler zaten çıkarılmıyor.
+    if (koltuk !== null) {
+      const kullanilan = await this.enKalabalikSirket(scope === "organization" ? [organizationId!] : await this.sahibiOlunanSirketler(userId));
+      if (koltuk < kullanilan) {
+        throw new BadRequestException(
+          hataMetni("Şirketinde şu an {kisi} kişi var; en az bu kadar kişilik paket seçmelisin.", { kisi: kullanilan })
+        );
+      }
+    }
 
     // Yürürlükte bir abonelik varsa ikincisini SATTIRMIYORUZ: iki abonelik iki
     // kez tahsilat demek ve hangisinin geçerli olduğu belirsizleşir. İPTAL
@@ -449,6 +482,8 @@ export class BillingService {
     fiyat?: { amount: number; currency: string };
     /** PayTR: çekimin yapılacağı saklı kart. */
     kart?: { ctoken: string; son4: string };
+    /** Satın alınan kişi sayısı; verilmezse koltuklu pakette taban kişi sayısı. */
+    koltuk?: number | null;
   }): Promise<Abonelik> {
     const mevcut = await this.abonelikSaglayiciReferansiyla(params.source, params.providerRef);
     if (mevcut && mevcut.userId !== params.userId) {
@@ -465,6 +500,11 @@ export class BillingService {
       params.source === "manual" || params.source === "paytr" ? "iyzico" : params.source;
     const ref = await this.settings.planRef(refSaglayici, params.planKey, params.period);
     const bitis = params.bitis ?? ayEkle(params.baslangic, periodMonths(params.period));
+    // Mağaza ve iyzico aynı aboneliği yenilemede yeniden yazıyor; koltuk
+    // verilmediyse satırdakini koru. Yoksa eski (koltuksuz) Business bir
+    // mağaza yenilemesinde 3 kişiye düşerdi.
+    const koltuk =
+      params.koltuk !== undefined ? params.koltuk : mevcut ? mevcut.koltuk ?? null : plan.ekKoltuk ? plan.seats : null;
 
     const { data, error } = await this.supabase.client
       .from("subscriptions")
@@ -485,7 +525,8 @@ export class BillingService {
           canceled_at: null,
           price_amount: params.fiyat?.amount ?? ref?.priceAmount ?? null,
           currency: params.fiyat?.currency ?? ref?.currency ?? "TRY",
-          price_usd: planPriceUsd(plan, params.period),
+          price_usd: planPriceUsd(plan, params.period, koltuk),
+          koltuk,
           ...(params.kart ? { paytr_ctoken: params.kart.ctoken, kart_son4: params.kart.son4 } : {}),
           updated_at: new Date().toISOString(),
         },
@@ -556,7 +597,10 @@ export class BillingService {
    */
   async krediYukle(abonelik: Abonelik, donemBasi: Date): Promise<boolean> {
     const plan = findPlan(abonelik.planKey);
-    if (!plan || plan.monthlyCredits <= 0) return false;
+    // Koltuklu pakette bakiye kişi sayısıyla büyür; eski Business söz verilen
+    // miktarı almaya devam eder (bkz. planBirimi).
+    const birim = plan ? planBirimi(plan, abonelik.koltuk) : 0;
+    if (!plan || birim <= 0) return false;
 
     const donemIso = donemBasi.toISOString();
     const { data: yerTutma, error: eklemeHatasi } = await this.supabase.client
@@ -564,7 +608,7 @@ export class BillingService {
       .insert({
         subscription_id: abonelik.id,
         period_start: donemIso,
-        credits: plan.monthlyCredits,
+        credits: birim,
         granted_to: abonelik.userId,
       })
       .select("id")
@@ -583,7 +627,7 @@ export class BillingService {
       // kredi ayının başında bitecek diye işaretler (migration 117).
       hareketId = await this.credits.grantPlan(
         abonelik.userId,
-        plan.monthlyCredits,
+        birim,
         `Paket bakiyesi: ${plan.name} (${donemIso.slice(0, 10)})`,
         ayEkle(donemBasi, 1)
       );
@@ -608,7 +652,7 @@ export class BillingService {
       /* denetim bağı kurulamadı, kredi yüklendi */
     }
 
-    this.logger.log(`Paket kredisi yüklendi: ${plan.monthlyCredits} kredi -> ${abonelik.userId} (${abonelik.id}).`);
+    this.logger.log(`Paket kredisi yüklendi: ${birim} kredi ->${abonelik.userId} (${abonelik.id}).`);
     return true;
   }
 
@@ -898,11 +942,12 @@ export class BillingService {
 
   // ================================================================ Yardımcılar
 
-  istegiDogrula(istek: { planKey: string; period: string; scope?: string; organizationId?: string }): {
+  istegiDogrula(istek: { planKey: string; period: string; scope?: string; organizationId?: string; koltuk?: unknown }): {
     planKey: PlanKey;
     period: BillingPeriod;
     scope: AbonelikKapsami;
     organizationId?: string;
+    koltuk: number | null;
   } {
     if (!isPlanKey(istek.planKey) || !SATIN_ALINABILIR.includes(istek.planKey)) {
       throw new BadRequestException("Geçersiz paket.");
@@ -913,10 +958,27 @@ export class BillingService {
     if (scope === "organization" && !istek.organizationId) {
       throw new BadRequestException("Şirket aboneliği için şirket seçilmeli.");
     }
-    return { planKey: istek.planKey, period: istek.period, scope, organizationId: istek.organizationId };
+
+    // Bireysel abonelik de koltuk taşır: sahibin kendi paketi sahibi olduğu
+    // şirketlere hak verir (bkz. KoltukService, modül hakkıyla aynı kural).
+    const cozulen = koltukCoz(findPlan(istek.planKey)!, istek.koltuk);
+    if ("hata" in cozulen) throw new BadRequestException(hataMetni(cozulen.hata, cozulen.params));
+    return { planKey: istek.planKey, period: istek.period, scope, organizationId: istek.organizationId, koltuk: cozulen.koltuk };
   }
 
   /** Şirket aboneliğini yalnızca şirket sahibi alabilir — fatura sahibi o olacak. */
+  private async sahibiOlunanSirketler(userId: string): Promise<string[]> {
+    const { data, error } = await this.supabase.client.from("organizations").select("id").eq("owner_id", userId);
+    if (error) throw error;
+    return (data ?? []).map((o: any) => o.id);
+  }
+
+  /** Verilen şirketlerden koltuk sayılan kişisi en çok olanın kişi sayısı. */
+  private async enKalabalikSirket(organizationIds: string[]): Promise<number> {
+    const durumlar = await Promise.all(organizationIds.map((id) => this.koltuklar.durum(id)));
+    return durumlar.reduce((enCok, d) => Math.max(enCok, d.kullanilan), 0);
+  }
+
   async organizasyonSahibiMi(userId: string, organizationId: string): Promise<void> {
     const { data, error } = await this.supabase.client
       .from("organizations")

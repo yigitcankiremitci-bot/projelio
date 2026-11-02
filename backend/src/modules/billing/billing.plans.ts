@@ -37,7 +37,35 @@ export interface Plan {
   featured: boolean;
   /** Aynı anda kaç kişi bu abonelikten yararlanabilir (şirket planlarında koltuk). */
   seats: number;
+  /** Koltukla fiyatlanan paketlerde ek kişi kuralı; yoksa paket sabit kişilik. */
+  ekKoltuk?: EkKoltuk;
   features: string[];
+}
+
+/**
+ * Ek koltuk (kullanıcı kararı, 2026-11-02).
+ *
+ * Business eskiden 24,99 $'a 10 kişiydi: 2 kişilik şirket de 10 kişilik şirket
+ * de aynı parayı ödüyordu, kişi başı 2,50 $ rakiplerin dörtte biriydi. Artık
+ * taban fiyata `seats` kadar kişi dahil, her ek kişi ayrıca fiyatlanır.
+ *
+ * KOLTUK SATIN ALIRKEN SEÇİLİR, gerçek üye sayısından türetilmez: PayTR
+ * yenilemesinde duyurulmamış tutar çekilmiyor (paytr-abonelik-takvim.ts) ve
+ * tutar her ay üye sayısıyla oynasaydı her yenileme bir duyuru gerektirirdi.
+ * Koltuk dolunca yeni üye eklenmez (bkz. KoltukService).
+ *
+ * KOLTUK SÜTUNU BOŞ = 2026-11 ÖNCESİ BUSINESS. O aboneler eski tutarla ve
+ * söz verilen bakiyeyle devam eder, koltuk sınırı onlara uygulanmaz.
+ */
+export interface EkKoltuk {
+  /** Ek kişi başına aylık fiyat (USD). */
+  usdMonthly: number;
+  /** Ek kişi başına aylık Lio Bakiyesi. */
+  credits: number;
+  /** Bir abonelikte en çok kaç kişi olabilir. */
+  enCok: number;
+  /** Koltuk sütunu boş (eski) Business aboneliğine yüklenen aylık bakiye. */
+  koltuksuzCredits: number;
 }
 
 /**
@@ -76,6 +104,7 @@ export const PLANS: Plan[] = [
     features: [
       "Sınırsız görev ve takvim", // dil:anahtar
       "Şirkette 2 modül", // dil:anahtar
+      "Şirkette 3 kişiye kadar", // dil:anahtar
       "Hoş geldin bakiyesi ile Lio denemesi", // dil:anahtar
       "Mobil uygulama", // dil:anahtar
     ],
@@ -93,6 +122,7 @@ export const PLANS: Plan[] = [
       "Aylık 20.000 birim Lio Bakiyesi", // dil:anahtar
       "Sınırsız proje ve görev", // dil:anahtar
       "Şirkette 4 modül", // dil:anahtar
+      "Şirkette 3 kişiye kadar", // dil:anahtar
       "Google Drive / OneDrive bağlantısı", // dil:anahtar
       "E-posta desteği", // dil:anahtar
     ],
@@ -110,6 +140,7 @@ export const PLANS: Plan[] = [
       "Aylık 50.000 birim Lio Bakiyesi", // dil:anahtar
       "Starter'daki her şey", // dil:anahtar
       "Şirkette 8 modül", // dil:anahtar
+      "Şirkette 3 kişiye kadar", // dil:anahtar
       "WhatsApp üzerinden Lio", // dil:anahtar
       "Gelir-gider ve proje bütçesi", // dil:anahtar
       "Öncelikli destek", // dil:anahtar
@@ -118,17 +149,18 @@ export const PLANS: Plan[] = [
   {
     key: "business",
     name: "Business",
-    priceUsdMonthly: 24.99,
-    priceUsdYearlyMonthly: aylikKarsilik(24.99),
-    priceUsdYearly: yillik(24.99),
-    monthlyCredits: 150_000,
+    priceUsdMonthly: 19.99,
+    priceUsdYearlyMonthly: aylikKarsilik(19.99),
+    priceUsdYearly: yillik(19.99),
+    monthlyCredits: 100_000,
     featured: false,
-    seats: 10,
+    seats: 3,
+    ekKoltuk: { usdMonthly: 4.99, credits: 10_000, enCok: 50, koltuksuzCredits: 150_000 },
     features: [
-      "Aylık 150.000 birim Lio Bakiyesi", // dil:anahtar
+      "Aylık 100.000 birim Lio Bakiyesi, her ek kişiyle +10.000", // dil:anahtar
       "Pro'daki her şey", // dil:anahtar
       "Sınırsız modül", // dil:anahtar
-      "10 kullanıcıya kadar", // dil:anahtar
+      "3 kişi dahil, ek kişi başına 4,99 $", // dil:anahtar
       "Departman bazlı yetkilendirme", // dil:anahtar
       "Dışa aktarma ve raporlar", // dil:anahtar
     ],
@@ -152,9 +184,48 @@ export function isBillingPeriod(value: string): value is BillingPeriod {
   return value === "monthly" || value === "yearly";
 }
 
-/** Vitrin fiyatı (USD) — dönem farkını tek yerden çözer. */
-export function planPriceUsd(plan: Plan, period: BillingPeriod): number {
-  return period === "yearly" ? plan.priceUsdYearly : plan.priceUsdMonthly;
+/** Vitrin fiyatı (USD) — dönem farkını tek yerden çözer. Koltuklu pakette ek kişiler dahil. */
+export function planPriceUsd(plan: Plan, period: BillingPeriod, koltuk?: number | null): number {
+  const taban = period === "yearly" ? plan.priceUsdYearly : plan.priceUsdMonthly;
+  const ek = ekKoltukSayisi(plan, koltuk);
+  if (!plan.ekKoltuk || ek === 0) return taban;
+  const kisiBasi = period === "yearly" ? yillik(plan.ekKoltuk.usdMonthly) : plan.ekKoltuk.usdMonthly;
+  return Math.round((taban + ek * kisiBasi) * 100) / 100;
+}
+
+/** Ek kişinin yıllık ödemedeki aylık karşılığı (USD); taban fiyatla aynı 10/12 kuralı. */
+export function ekKoltukYillikAylikUsd(ek: EkKoltuk): number {
+  return aylikKarsilik(ek.usdMonthly);
+}
+
+/** Tabana dahil olanların üstündeki kişi sayısı. Koltuksuz pakette ya da koltuk boşsa 0. */
+export function ekKoltukSayisi(plan: Plan, koltuk?: number | null): number {
+  if (!plan.ekKoltuk || koltuk === null || koltuk === undefined) return 0;
+  return Math.max(0, koltuk - plan.seats);
+}
+
+/**
+ * Satın alma isteğindeki koltuk sayısı. Koltuksuz pakette null (sütun boş kalır);
+ * koltuklu pakette belirtilmemişse taban kişi sayısı. Geçersizse hata metni.
+ */
+export function koltukCoz(
+  plan: Plan,
+  istenen: unknown
+): { koltuk: number | null } | { hata: string; params: { enAz: number; enCok: number } } {
+  if (!plan.ekKoltuk) return { koltuk: null };
+  if (istenen === undefined || istenen === null || istenen === "") return { koltuk: plan.seats };
+  const sayi = Number(istenen);
+  if (!Number.isInteger(sayi) || sayi < plan.seats || sayi > plan.ekKoltuk.enCok) {
+    return { hata: "Kişi sayısı {enAz} ile {enCok} arasında olmalı.", params: { enAz: plan.seats, enCok: plan.ekKoltuk.enCok } };
+  }
+  return { koltuk: sayi };
+}
+
+/** Aboneliğe her ay yüklenecek Lio Bakiyesi. */
+export function planBirimi(plan: Plan, koltuk?: number | null): number {
+  if (!plan.ekKoltuk) return plan.monthlyCredits;
+  if (koltuk === null || koltuk === undefined) return plan.ekKoltuk.koltuksuzCredits;
+  return plan.monthlyCredits + ekKoltukSayisi(plan, koltuk) * plan.ekKoltuk.credits;
 }
 
 /**

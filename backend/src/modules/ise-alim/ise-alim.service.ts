@@ -16,6 +16,7 @@ import { UsersService } from "../users/users.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { EkipHesaplariService } from "../ekip-hesaplari/ekip-hesaplari.service";
 import { DepartmentsService } from "../departments/departments.service";
+import { KoltukService } from "../../common/koltuk/koltuk.service";
 import { davetGirdisiniDogrula, gecerliSecim, kabulPlani } from "./ise-alim-kurallari";
 
 type DavetSatiri = {
@@ -54,7 +55,8 @@ export class IseAlimService {
     private notifications: NotificationsService,
     private ekipHesaplari: EkipHesaplariService,
     private realtime: RealtimeGateway,
-    private departmentsService: DepartmentsService
+    private departmentsService: DepartmentsService,
+    private koltuklar: KoltukService
   ) {}
 
   /**
@@ -390,6 +392,13 @@ export class IseAlimService {
     const plan = kabulPlani(secim, kadro, moduller);
     const title = satir.pozisyon?.trim() || null;
     const rolu = new Map(secim.departmanlar.map((d) => [d.departmentId, d.role]));
+
+    // Kişi hakkı davet anında değil KABULDE uygulanır: arada şirket dolmuş
+    // olabilir. Her departmana taşeron olarak giren kişi yer harcamaz.
+    const roller = [...secim.departmanlar.map((d) => d.role), ...(satir.yeni_departman ? [satir.yeni_departman.role] : [])];
+    await this.koltuklar.kisiEklenebilir(satir.organization_id, satir.user_id, {
+      taseronRolu: roller.length > 0 && roller.every((r) => r === "subcontractor"),
+    });
 
     // Kişiyle birlikte açılan departman. Kural (departman sayısı ≤ kişi sayısı)
     // davet anındaki değil BUGÜNKÜ kadroyla uygulanır: arada başka departman

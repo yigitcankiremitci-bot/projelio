@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { BillingService } from "./billing.service";
+import { planBirimi } from "./billing.plans";
 import { StorePurchasesService } from "./store-purchases.service";
 import { PayTROdemeService } from "./paytr-odeme.service";
 import { PayTRAbonelikService } from "./paytr-abonelik.service";
@@ -32,7 +33,7 @@ export class BillingController {
    */
   @Post("indirim-kodu/onizle")
   async indirimOnizle(
-    @Body() body: { kod?: string; kapsam?: string; planKey?: string; period?: string; packageKey?: string },
+    @Body() body: { kod?: string; kapsam?: string; planKey?: string; period?: string; packageKey?: string; koltuk?: number },
     @Req() req: any
   ) {
     const kod = String(body?.kod ?? "");
@@ -45,6 +46,7 @@ export class BillingController {
       kod,
       planKey: String(body?.planKey ?? ""),
       period: String(body?.period ?? ""),
+      koltuk: body?.koltuk,
     });
   }
 
@@ -57,7 +59,8 @@ export class BillingController {
 
   @Post("paytr/abonelik")
   paytrAbonelikFormu(
-    @Body() body: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string },
+    @Body()
+    body: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string; koltuk?: number },
     @Req() req: any
   ) {
     return this.paytrAbonelik.abonelikFormu(req.user.userId, body ?? ({} as any), req.ip ?? "");
@@ -97,7 +100,7 @@ export class BillingController {
   @Get("subscription")
   async subscription(@Req() req: any) {
     const { plan, subscription } = await this.billing.aktifPlan(req.user.userId);
-    return { plan: plan.key, planName: plan.name, monthlyCredits: plan.monthlyCredits, subscription };
+    return { plan: plan.key, planName: plan.name, monthlyCredits: planBirimi(plan, subscription?.koltuk), subscription };
   }
 
   /**

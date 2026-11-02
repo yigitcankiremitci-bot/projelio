@@ -34,9 +34,39 @@ const JETON_ANAHTARI = "projelio.billing.token";
 const ONCEKI_DURUM_ANAHTARI = "projelio.billing.paytrOncesi";
 
 type KartFormuIstegi =
-  | { tur: "ilk"; plan: BillingPlanView; tutar: number }
+  | { tur: "ilk"; plan: BillingPlanView; tutar: number; koltuk?: number }
   | { tur: "elle"; abonelik: Subscription }
   | { tur: "kart"; abonelik: Subscription };
+
+/**
+ * Seçilen kişi sayısıyla kartın tutarları. Ek kişiler tabana EKLENİR —
+ * sunucu tahsilatı aynı kuralla hesaplar (backend billing/abonelik-tutari.ts),
+ * burada yalnızca gösteriliyor; ödenen tutar yine sunucudan gelir.
+ * Ek kişinin TL tutarı yoksa (kur tanımsız) ek kişili paket satılamaz: null.
+ */
+function kisiliTutarlar(plan: BillingPlanView, donem: "monthly" | "yearly", kisi: number) {
+  const es = plan.extraSeat;
+  const ek = es ? Math.max(0, kisi - plan.seats) : 0;
+  const ekle = (taban: number | null | undefined, kisiBasi: number | null | undefined, kat = 1) =>
+    taban === null || taban === undefined ? null : ek === 0 ? taban : kisiBasi === null || kisiBasi === undefined ? null : taban + ek * kisiBasi * kat;
+
+  const aylikTl = ekle(plan.charge.monthly?.amount, es?.charge.monthly);
+  const yillikAylikTl = ekle(plan.charge.yearlyMonthly, es?.charge.yearlyMonthly);
+  const yillikTl = ekle(plan.charge.yearly?.amount, es?.charge.yearlyMonthly, 12);
+  const kisiUsd = (alan: "monthly" | "yearlyMonthly") => ek * (es?.priceUsd[alan] ?? 0);
+  return {
+    tahsilat: donem === "monthly" ? aylikTl : yillikTl,
+    /** Büyük rakam: aylıkta aylık tutar, yıllıkta aylık karşılık. */
+    buyukTl: donem === "monthly" ? aylikTl : yillikAylikTl,
+    aylikTl,
+    usd: {
+      monthly: plan.priceUsd.monthly + kisiUsd("monthly"),
+      yearlyMonthly: plan.priceUsd.yearlyMonthly + kisiUsd("yearlyMonthly"),
+      yearly: plan.priceUsd.yearly + kisiUsd("yearlyMonthly") * 12,
+    },
+    birim: plan.monthlyCredits + ek * (es?.credits ?? 0),
+  };
+}
 
 function abonelikIzi(a: Subscription | null): string {
   return a ? [a.id, a.status, a.currentPeriodEnd ?? "", a.kartSon4 ?? ""].join("|") : "-";
@@ -82,6 +112,8 @@ export default function BillingPage() {
   const [mesaj, setMesaj] = useState<{ tur: "iyi" | "kotu"; metin: string } | null>(null);
   const formKabi = useRef<HTMLDivElement | null>(null);
   const [kartFormu, setKartFormu] = useState<KartFormuIstegi | null>(null);
+  /** Kişi sayısıyla fiyatlanan paketlerde seçilen kişi sayısı (paket anahtarına göre). */
+  const [kisiler, setKisiler] = useState<Record<string, number>>({});
 
   const yenile = useCallback((signal?: AbortSignal) => {
     return billingApi
@@ -227,7 +259,7 @@ export default function BillingPage() {
 
   // Web'de abonelik PayTR ile alınıyor (2026-09). iyzico akışı (checkout,
   // odemeFormunuAc, kartGuncelle) eski iyzico abonelikleri için duruyor.
-  const satinAl = (plan: BillingPlanView, tutar: number) => kartFormunuAc({ tur: "ilk", plan, tutar });
+  const satinAl = (plan: BillingPlanView, tutar: number, koltuk?: number) => kartFormunuAc({ tur: "ilk", plan, tutar, koltuk });
 
   const iptalEt = async (abonelik: Subscription) => {
     if (!window.confirm(t("Paketin dönem sonuna kadar açık kalacak, sonra ücretsiz plana düşeceksin. İptal edilsin mi?"))) {
@@ -426,10 +458,12 @@ export default function BillingPage() {
           {(veri?.plans ?? [])
             .filter((plan) => plan.key !== "free")
             .map((plan) => {
-              const tahsilat = donem === "monthly" ? plan.charge.monthly : plan.charge.yearly;
-              const usd = donem === "monthly" ? plan.priceUsd.monthly : plan.priceUsd.yearly;
+              const kisi = plan.extraSeat ? (kisiler[plan.key] ?? plan.seats) : plan.seats;
+              const tutarlar = kisiliTutarlar(plan, donem, kisi);
+              const tahsilat = tutarlar.tahsilat === null ? null : { amount: tutarlar.tahsilat };
+              const usd = donem === "monthly" ? tutarlar.usd.monthly : tutarlar.usd.yearly;
               // Büyük rakamın TL karşılığı: aylıkta aylık tutar, yıllıkta aylık karşılık.
-              const buyukTl = donem === "yearly" ? plan.charge.yearlyMonthly : (plan.charge.monthly?.amount ?? null);
+              const buyukTl = tutarlar.buyukTl;
               // TL tutar gelmediyse (kur tanımsız) dolara düşülür; fiyatsız kart göstermek daha kötü.
               const tlVitrin = locale !== "en" && buyukTl !== null;
               const bu = yururlukte && abonelik?.planKey === plan.key;
@@ -477,9 +511,9 @@ export default function BillingPage() {
                   <div style={{ margin: "12px 0 2px", fontSize: 30, fontWeight: 600, color: c.textPrimary, letterSpacing: -0.5 }}>
                     {tlVitrin ? (
                       <>
-                        {donem === "yearly" && plan.charge.monthly && (
+                        {donem === "yearly" && tutarlar.aylikTl !== null && (
                           <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
-                            {tlYaz(plan.charge.monthly.amount)}
+                            {tlYaz(tutarlar.aylikTl)}
                           </s>
                         )}
                         {tlYaz(buyukTl!)}
@@ -488,10 +522,10 @@ export default function BillingPage() {
                       <>
                         {donem === "yearly" && (
                           <s style={{ fontSize: 16, fontWeight: 400, color: c.textSecondary, marginRight: 8 }}>
-                            ${plan.priceUsd.monthly.toFixed(2)}
+                            ${tutarlar.usd.monthly.toFixed(2)}
                           </s>
                         )}
-                        ${(donem === "yearly" ? plan.priceUsd.yearlyMonthly : usd).toFixed(2)}
+                        ${(donem === "yearly" ? tutarlar.usd.yearlyMonthly : usd).toFixed(2)}
                       </>
                     )}
                     <span style={{ fontSize: 14, fontWeight: 400, color: c.textSecondary }}>{t(" / ay")}</span>
@@ -514,8 +548,24 @@ export default function BillingPage() {
                         : t("Kartından {tutar} çekilir").replace("{tutar}", tlYaz(tahsilat.amount))}
                   </div>
 
+                  {plan.extraSeat && (
+                    <KisiSecici
+                      c={c}
+                      deger={kisi}
+                      enAz={plan.seats}
+                      enCok={plan.extraSeat.max}
+                      kisiBasi={
+                        locale !== "en" && plan.extraSeat.charge.monthly !== null
+                          ? tlYaz((donem === "yearly" ? plan.extraSeat.charge.yearlyMonthly : plan.extraSeat.charge.monthly) ?? 0)
+                          : `$${(donem === "yearly" ? plan.extraSeat.priceUsd.yearlyMonthly : plan.extraSeat.priceUsd.monthly).toFixed(2)}`
+                      }
+                      dahil={plan.seats}
+                      onChange={(n) => setKisiler((onceki) => ({ ...onceki, [plan.key]: n }))}
+                    />
+                  )}
+
                   <div style={{ marginTop: 14, fontSize: 14, color: c.textPrimary, fontWeight: 500 }}>
-                    {plan.monthlyCredits.toLocaleString(bicimDili())} {t("birim / ay")}
+                    {tutarlar.birim.toLocaleString(bicimDili())} {t("birim / ay")}
                   </div>
 
                   <ul style={{ margin: "12px 0 18px", padding: "0 0 0 18px", color: c.textSecondary, fontSize: 13.5, lineHeight: 1.75 }}>
@@ -525,7 +575,7 @@ export default function BillingPage() {
                   </ul>
 
                   <button
-                    onClick={() => tahsilat && satinAl(plan, tahsilat.amount)}
+                    onClick={() => tahsilat && satinAl(plan, tahsilat.amount, plan.extraSeat ? kisi : undefined)}
                     disabled={!satinAlinabilir || islemde !== null}
                     style={{
                       marginTop: "auto",
@@ -572,7 +622,9 @@ export default function BillingPage() {
         <PayTRKartFormu
           baslik={
             kartFormu.tur === "ilk"
-              ? t("{plan} paketine geç", { plan: t(kartFormu.plan.name) })
+              ? kartFormu.koltuk
+                ? t("{plan} paketine geç ({kisi} kişi)", { plan: t(kartFormu.plan.name), kisi: kartFormu.koltuk })
+                : t("{plan} paketine geç", { plan: t(kartFormu.plan.name) })
               : kartFormu.tur === "elle"
                 ? t("Ödemeyi şimdi yap")
                 : t("Ödeme kartını değiştir")
@@ -592,12 +644,13 @@ export default function BillingPage() {
           dugmeMetni={kartFormu.tur === "kart" ? t("Kartı doğrula") : t("Öde")}
           indirimOnizle={
             kartFormu.tur === "ilk"
-              ? (kod) => billingApi.indirimOnizle({ kod, kapsam: "abonelik", planKey: kartFormu.plan.key, period: donem })
+              ? (kod) =>
+                  billingApi.indirimOnizle({ kod, kapsam: "abonelik", planKey: kartFormu.plan.key, period: donem, koltuk: kartFormu.koltuk })
               : undefined
           }
           formuAl={(onay, indirimKodu) =>
             kartFormu.tur === "ilk"
-              ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay, indirimKodu })
+              ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay, indirimKodu, koltuk: kartFormu.koltuk })
               : kartFormu.tur === "elle"
                 ? billingApi.paytr.gecikmisOdeme(kartFormu.abonelik.id, onay)
                 : billingApi.paytr.kartDegisim(kartFormu.abonelik.id, onay)
@@ -605,6 +658,55 @@ export default function BillingPage() {
           onKapat={() => setKartFormu(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** Kişi sayısı seçici: tabana dahil olanın altına inmez, paketin üst sınırını aşmaz. */
+function KisiSecici({
+  c,
+  deger,
+  enAz,
+  enCok,
+  kisiBasi,
+  dahil,
+  onChange,
+}: {
+  c: ReturnType<typeof useThemeColors>;
+  deger: number;
+  enAz: number;
+  enCok: number;
+  kisiBasi: string;
+  dahil: number;
+  onChange: (n: number) => void;
+}) {
+  const t = useT();
+  const dugme = (etkin: boolean): React.CSSProperties => ({
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    border: `1px solid ${c.border}`,
+    background: c.surface,
+    color: etkin ? c.textPrimary : c.textSecondary,
+    cursor: etkin ? "pointer" : "default",
+    fontSize: 16,
+    lineHeight: 1,
+  });
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ fontSize: 13.5, color: c.textPrimary, fontWeight: 500 }}>{t("Kişi sayısı")}</span>
+        <button aria-label={t("Bir kişi azalt")} disabled={deger <= enAz} onClick={() => onChange(deger - 1)} style={dugme(deger > enAz)}>
+          −
+        </button>
+        <span style={{ minWidth: 22, textAlign: "center", fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{deger}</span>
+        <button aria-label={t("Bir kişi ekle")} disabled={deger >= enCok} onClick={() => onChange(deger + 1)} style={dugme(deger < enCok)}>
+          +
+        </button>
+      </div>
+      <div style={{ fontSize: 12.5, color: c.textSecondary, marginTop: 6 }}>
+        {t("{dahil} kişi dahil, ek kişi başına {tutar} / ay", { dahil, tutar: kisiBasi })}
+      </div>
     </div>
   );
 }

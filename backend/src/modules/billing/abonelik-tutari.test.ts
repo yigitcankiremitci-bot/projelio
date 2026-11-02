@@ -89,3 +89,23 @@ test("aylık karşılık: kur yoksa ve ücretsiz planda null", () => {
   assert.equal(aylikKarsilikTl(starter, null), null);
   assert.equal(aylikKarsilikTl(FREE_PLAN, 50), null);
 });
+
+const business = findPlan("business")!;
+
+test("Business: ek kişiler tabana kurdan eklenir", () => {
+  // Taban 19,99 × 50 = 999,50 -> 1.000; ek kişi 4,99 × 50 = 249,50 -> 250.
+  assert.deepEqual(abonelikTutari(business, "monthly", 50, null, 3), { amount: 1000, currency: "TRY" });
+  assert.deepEqual(abonelikTutari(business, "monthly", 50, null, 5), { amount: 1500, currency: "TRY" });
+});
+
+test("Business yıllık: ek kişi de 10 ay kuralından geçer ve aylık karşılığın 12 katıdır", () => {
+  // Taban aylık karşılık 16,66 $ -> 833 -> 840 ₺; ek kişi 4,16 $ -> 208 -> 210 ₺.
+  assert.deepEqual(abonelikTutari(business, "yearly", 50, null, 5), { amount: (840 + 2 * 210) * 12, currency: "TRY" });
+});
+
+test("sabitlenmiş tabana ek kişi kurdan eklenir; kur yoksa ek kişili paket satılmaz", () => {
+  const ref = { referenceCode: "kod", priceAmount: 900, currency: "TRY" };
+  assert.deepEqual(abonelikTutari(business, "monthly", 50, ref, 5), { amount: 1400, currency: "TRY" });
+  assert.equal(abonelikTutari(business, "monthly", null, ref, 5), null);
+  assert.deepEqual(abonelikTutari(business, "monthly", null, ref, 3), { amount: 900, currency: "TRY" });
+});

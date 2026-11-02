@@ -42,6 +42,7 @@ interface OdemeSatiri {
   organization_id: string | null;
   plan_key: PlanKey;
   period: BillingPeriod;
+  koltuk: number | null;
   donem_basi: string | null;
   tutar: number | string;
   para_birimi: string;
@@ -52,6 +53,11 @@ interface OdemeSatiri {
   indirim_kodu_id: string | null;
   liste_tutari: number | string | null;
   created_at: string;
+}
+
+/** Sepet satırında kişi sayısı: koltuklu pakette "(5 kişi)", değilse boş. */
+function kisiEki(koltuk: number | null | undefined): string {
+  return koltuk ? ` (${koltuk} kişi)` : "";
 }
 
 /** Kart değişiminde çekilip iade edilen doğrulama tutarı. */
@@ -103,12 +109,12 @@ export class PayTRAbonelikService {
   /** Paket satın alma: 3D'li ilk ödemenin form alanları. */
   async abonelikFormu(
     userId: string,
-    istek: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string },
+    istek: { planKey: string; period: string; scope?: string; organizationId?: string; onay?: boolean; indirimKodu?: string; koltuk?: unknown },
     userIp: string
   ): Promise<DirektFormu> {
     this.yapilandirilmis();
-    const { planKey, period, scope, organizationId } = await this.billing.satinAlmaOnKontrol(userId, istek);
-    const liste = await this.guncelTutar(planKey, period);
+    const { planKey, period, scope, organizationId, koltuk } = await this.billing.satinAlmaOnKontrol(userId, istek);
+    const liste = await this.guncelTutar(planKey, period, koltuk);
     if (liste === null) {
       throw new ServiceUnavailableException("Bu paket şu an satın alınamıyor. Lütfen bizimle iletişime geç.");
     }
@@ -125,6 +131,7 @@ export class PayTRAbonelikService {
       organizationId: organizationId ?? null,
       planKey,
       period,
+      koltuk,
       subscriptionId: null,
       donemBasi: null,
       tutar: indirim?.tutar ?? liste,
@@ -134,9 +141,9 @@ export class PayTRAbonelikService {
   }
 
   /** Ödeme formundaki "Uygula": kodu doğrular, indirimli tutarı gösterir. Kullanım YAZMAZ. */
-  async indirimOnizle(userId: string, istek: { kod: string; planKey: string; period: string }) {
-    const { planKey, period } = this.billing.istegiDogrula(istek);
-    const liste = await this.guncelTutar(planKey, period);
+  async indirimOnizle(userId: string, istek: { kod: string; planKey: string; period: string; koltuk?: unknown }) {
+    const { planKey, period, koltuk } = this.billing.istegiDogrula(istek);
+    const liste = await this.guncelTutar(planKey, period, koltuk);
     if (liste === null) throw new ServiceUnavailableException("Bu paket şu an satın alınamıyor. Lütfen bizimle iletişime geç.");
     const sonuc = await this.indirimler.uygula(userId, istek.kod, { kapsam: "abonelik", planKey, period }, liste);
     return indirimOzeti(sonuc);
@@ -207,6 +214,8 @@ export class PayTRAbonelikService {
     organizationId: string | null;
     planKey: PlanKey;
     period: BillingPeriod;
+    /** Yalnızca ilk ödemede: aboneliğin açılacağı kişi sayısı. */
+    koltuk?: number | null;
     subscriptionId: string | null;
     donemBasi: string | null;
     tutar: number;
@@ -246,6 +255,7 @@ export class PayTRAbonelikService {
       organization_id: p.organizationId,
       plan_key: p.planKey,
       period: p.period,
+      koltuk: p.koltuk ?? null,
       donem_basi: p.donemBasi,
       tutar: p.tutar,
       merchant_oid: merchantOid,
@@ -262,7 +272,7 @@ export class PayTRAbonelikService {
     const sepetAdi =
       p.tur === "kart_degisim"
         ? "Projelio kart doğrulama (iade edilir)"
-        : `Projelio ${plan?.name ?? p.planKey} — ${p.period === "yearly" ? "yıllık" : "aylık"}`;
+        : `Projelio ${plan?.name ?? p.planKey}${kisiEki(p.koltuk)} — ${p.period === "yearly" ? "yıllık" : "aylık"}`;
 
     return this.paytr.direktForm({
       merchantOid,
@@ -373,6 +383,8 @@ export class PayTRAbonelikService {
       baslangic: new Date(),
       fiyat: { amount: Number(satir.tutar), currency: satir.para_birimi },
       kart: kart ?? undefined,
+      // Ödeme satırındaki sayı formu açarken sunucunun yazdığı; tutar da onunla hesaplandı.
+      koltuk: satir.koltuk ?? undefined,
     });
     await this.supabase.client.from("paytr_abonelik_odemeleri").update({ subscription_id: abonelik.id }).eq("id", satir.id);
 
@@ -608,7 +620,7 @@ export class PayTRAbonelikService {
         userName: kullanici.ad,
         userPhone: telefonAlani(kullanici.telefon),
         userAddress: "Elektronik teslimat",
-        sepet: [[`Projelio ${plan?.name ?? ham.plan_key} — ${ham.period === "yearly" ? "yıllık" : "aylık"} yenileme`, tutar.toFixed(2), 1]],
+        sepet: [[`Projelio ${plan?.name ?? ham.plan_key}${kisiEki(ham.koltuk)} — ${ham.period === "yearly" ? "yıllık" : "aylık"} yenileme`, tutar.toFixed(2), 1]],
         utoken,
         ctoken: ham.paytr_ctoken,
         basariliUrl: this.paketlerUrl(),
@@ -682,7 +694,7 @@ export class PayTRAbonelikService {
       gonderilenVade: ham.hatirlatma_vadesi ? new Date(ham.hatirlatma_vadesi) : null,
       sonTutar: ham.price_amount === null ? null : Number(ham.price_amount),
       sonListe: ham.liste_tutari === null ? null : Number(ham.liste_tutari),
-      guncelListe: await this.guncelTutar(ham.plan_key, ham.period),
+      guncelListe: await this.yenilemeListesi(ham),
       sonrakiIndirim: await this.sonrakiIndirim(ham),
     });
     if (!karar) return false;
@@ -763,11 +775,27 @@ export class PayTRAbonelikService {
   }
 
   /** Bugünkü liste tutarı (TL). Web'in TL tutar satırları tabloda "iyzico" adıyla duruyor. */
-  private async guncelTutar(planKey: PlanKey, period: BillingPeriod): Promise<number | null> {
+  private async guncelTutar(planKey: PlanKey, period: BillingPeriod, koltuk?: number | null): Promise<number | null> {
     const plan = findPlan(planKey);
     if (!plan) return null;
     const [kur, ref] = await Promise.all([this.settings.usdTryKuru(), this.settings.planRef("iyzico", planKey, period)]);
-    return abonelikTutari(plan, period, kur, ref)?.amount ?? null;
+    return abonelikTutari(plan, period, kur, ref, koltuk)?.amount ?? null;
+  }
+
+  /**
+   * Yenilemede karşılaştırılacak güncel liste tutarı.
+   *
+   * KOLTUKSUZ ESKİ BUSINESS kendi son liste tutarında kalır: katalog 24,99 $ /
+   * 10 kişiden 19,99 $ + kişi başına değişti ve güncel fiyata geçirmek onu
+   * 3 kişilik bir pakete indirmek olurdu. Diğer her abonelik eskisi gibi
+   * güncel fiyata bakar (değiştiyse 7 gün önce duyurulur).
+   */
+  private async yenilemeListesi(ham: any): Promise<number | null> {
+    const plan = findPlan(ham.plan_key);
+    if (plan?.ekKoltuk && (ham.koltuk === null || ham.koltuk === undefined)) {
+      return ham.liste_tutari === null || ham.liste_tutari === undefined ? null : Number(ham.liste_tutari);
+    }
+    return this.guncelTutar(ham.plan_key, ham.period, ham.koltuk);
   }
 
   /** Bu vadede çekilecek tutar, indirimsiz hâli ve indirimin uygulanıp uygulanmadığı. */

@@ -1,7 +1,7 @@
 import { Controller, Get } from "@nestjs/common";
 import { BillingSettingsService } from "./billing-settings.service";
 import { PLANS, type Plan } from "./billing.plans";
-import { abonelikTutari, aylikKarsilikTl } from "./abonelik-tutari";
+import { abonelikTutari, aylikKarsilikTl, ekKoltukVitrini } from "./abonelik-tutari";
 import { AiCreditOrdersService } from "../ai-assistant/ai-credit-orders.service";
 
 /**
@@ -46,6 +46,7 @@ export class BillingPublicController {
         monthlyCredits: plan.monthlyCredits,
         featured: plan.featured,
         seats: plan.seats,
+        extraSeat: ekKoltukVitrini(plan, kur),
       })),
     };
   }

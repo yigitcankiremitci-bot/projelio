@@ -1,5 +1,5 @@
 import { tlFiyat } from "@projelio/shared";
-import type { BillingPeriod, Plan } from "./billing.plans";
+import { ekKoltukSayisi, ekKoltukYillikAylikUsd, type BillingPeriod, type Plan } from "./billing.plans";
 
 /**
  * Bir paketin dönem başına TAHSİLAT TUTARI (saf fonksiyon).
@@ -31,6 +31,53 @@ export interface SaglayiciTutari {
 }
 
 export function abonelikTutari(
+  plan: Plan,
+  period: BillingPeriod,
+  kur: number | null,
+  ref?: SaglayiciTutari | null,
+  koltuk?: number | null
+): { amount: number; currency: string } | null {
+  const taban = tabanTutar(plan, period, kur, ref);
+  const ek = ekKoltukSayisi(plan, koltuk);
+  if (taban === null || ek === 0) return taban;
+
+  // Ek kişiler TABANDAN AYRI fiyatlanıp toplanır: taban sağlayıcıda sabitlenmiş
+  // olabilir, kişi başı tutar ise her zaman kurdan gelir. Kur yoksa ek kişili
+  // paket satılmaz (taban satılabilse bile) — uydurma bir kişi başı tutar yok.
+  const kisiBasi = ekKoltukTl(plan, period, kur);
+  return kisiBasi === null ? null : { amount: taban.amount + ek * kisiBasi, currency: taban.currency };
+}
+
+/**
+ * Bir ek kişinin dönem başına TL tutarı. Yıllıkta tabanla aynı kural: aylık
+ * karşılık 10 ₺'ye yuvarlanır, yıllık = onun 12 katı (vitrindeki iki rakam tutsun).
+ */
+export function ekKoltukTl(plan: Plan, period: BillingPeriod, kur: number | null): number | null {
+  if (!plan.ekKoltuk || kur === null) return null;
+  if (period === "yearly") {
+    const aylik = tlFiyat(ekKoltukYillikAylikUsd(plan.ekKoltuk), kur);
+    return aylik === null ? null : aylik * 12;
+  }
+  return tlFiyat(plan.ekKoltuk.usdMonthly, kur);
+}
+
+/**
+ * Vitrindeki ek kişi satırı. Panel ve tanıtım sitesinin ucu ikisi de bunu
+ * döner; ayrı hesaplasalar ek kişi fiyatı iki yerde ayrışırdı. Tutar null ise
+ * (kur yok) ek kişi satılamaz.
+ */
+export function ekKoltukVitrini(plan: Plan, kur: number | null) {
+  if (!plan.ekKoltuk) return null;
+  const yillikTl = ekKoltukTl(plan, "yearly", kur);
+  return {
+    priceUsd: { monthly: plan.ekKoltuk.usdMonthly, yearlyMonthly: ekKoltukYillikAylikUsd(plan.ekKoltuk) },
+    charge: { monthly: ekKoltukTl(plan, "monthly", kur), yearlyMonthly: yillikTl === null ? null : yillikTl / 12 },
+    credits: plan.ekKoltuk.credits,
+    max: plan.ekKoltuk.enCok,
+  };
+}
+
+function tabanTutar(
   plan: Plan,
   period: BillingPeriod,
   kur: number | null,

@@ -873,6 +873,11 @@ export const hatalar: TranslationDict = {
   "{label} sayı olmalı": "{label} must be a number",
   "{label} {min} değerinden küçük olamaz": "{label} can't be less than {min}",
   "Ödeme başlatılamadı: {message}": "Couldn't start the payment: {message}",
+  "Ek kişili paket bu ödeme yöntemiyle alınamıyor.": "A plan with extra people can't be bought with this payment method.",
+  "Kişi sayısı {enAz} ile {enCok} arasında olmalı.": "The number of people must be between {enAz} and {enCok}.",
+  "Şirketinde şu an {kisi} kişi var; en az bu kadar kişilik paket seçmelisin.": "Your company has {kisi} people right now; choose a plan for at least that many.",
+  "Şirketin paketindeki {sinir} kişilik yer dolu. Kişi sayısını artırmak için destekten yardım iste.": "Your company's plan is full at {sinir} people. Ask support to add more people.",
+  "Bu pakette şirkete en çok {sinir} kişi eklenebilir. Daha kalabalık bir ekip için Business'a geç.": "This plan allows up to {sinir} people in a company. Switch to Business for a larger team.",
 
   // Taşerona kapalı yüzeyler (common/access/subcontractor.ts SURFACE_MESSAGE)
   "Taşeron hesapları bu ayarları değiştiremez": "Subcontractor accounts can't change these settings",

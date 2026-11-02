@@ -36,5 +36,6 @@ export * from "./anasayfaSirasi";
 export * from "./ofisDuzeni";
 export * from "./departmanKurali";
 export * from "./modulHakki";
+export * from "./koltukHakki";
 export * from "./modulEvi";
 export * from "./ajan";

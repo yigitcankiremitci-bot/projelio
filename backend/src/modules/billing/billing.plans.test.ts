@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { ayEkle, findPlan, krediAyiBasi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS, yillikAylikYukleme } from "./billing.plans";
+import { ayEkle, findPlan, koltukCoz, krediAyiBasi, planBirimi, PLANS, planPriceUsd, SATIN_ALINABILIR, YEARLY_MONTHS, yillikAylikYukleme } from "./billing.plans";
 import { MODUL_HAKKI } from "@projelio/shared";
 
 test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
@@ -18,7 +18,7 @@ test("vitrin fiyatları duyurulan liste ile birebir aynı", () => {
     [
       ["starter", 4.99, 4.16, 49.9, 20_000],
       ["pro", 9.99, 8.33, 99.9, 50_000],
-      ["business", 24.99, 20.83, 249.9, 150_000],
+      ["business", 19.99, 16.66, 199.9, 100_000],
     ]
   );
 });
@@ -136,4 +136,29 @@ test("vitrindeki modül sayısı modül hakkıyla aynı (shared modulHakki.ts)",
     const beklenen = hak === null ? "Sınırsız modül" : `Şirkette ${hak} modül`;
     assert.ok(plan.features.includes(beklenen), `${plan.key}: "${beklenen}" vitrinde yok`);
   }
+});
+
+test("koltuk: Business'ta taban kişi varsayılan, aralık dışı reddedilir; koltuksuz pakette yok", () => {
+  const business = findPlan("business")!;
+  assert.deepEqual(koltukCoz(business, undefined), { koltuk: 3 });
+  assert.deepEqual(koltukCoz(business, "7"), { koltuk: 7 });
+  assert.ok("hata" in koltukCoz(business, 2));
+  assert.ok("hata" in koltukCoz(business, 51));
+  assert.ok("hata" in koltukCoz(business, 4.5));
+  assert.deepEqual(koltukCoz(findPlan("pro")!, 5), { koltuk: null });
+});
+
+test("bakiye kişiyle büyür; koltuksuz (eski) Business söz verilen 150.000'i alır", () => {
+  const business = findPlan("business")!;
+  assert.equal(planBirimi(business, 3), 100_000);
+  assert.equal(planBirimi(business, 5), 120_000);
+  assert.equal(planBirimi(business, null), 150_000);
+  assert.equal(planBirimi(findPlan("starter")!, 9), 20_000);
+});
+
+test("USD vitrin fiyatı ek kişileri içerir", () => {
+  const business = findPlan("business")!;
+  assert.equal(planPriceUsd(business, "monthly", 5), 29.97);
+  assert.equal(planPriceUsd(business, "yearly", 5), 299.7);
+  assert.equal(planPriceUsd(business, "monthly", null), 19.99);
 });

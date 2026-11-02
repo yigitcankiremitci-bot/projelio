@@ -14,6 +14,7 @@ import {
   AJAN_SIRKET_BUTCESI,
   ajanSonrakiCalisma,
   ajanIsAsiliMi,
+  ajanIsSirasi,
   ajanKirp,
   ajanKonuAnahtari,
   ajanOgretilenleriSigdir,
@@ -791,7 +792,7 @@ export class AjanService {
    */
   private async siradakiniKap(userId: string): Promise<AjanIs | null> {
     // Kullanıcının istedikleri (araştırma, otomasyon) ajanın kendi işlerinden önce.
-    for (const turler of [["sohbet"], ["arastirma", "otomasyon"], ["fikir", "ogrenme", "liste"]]) {
+    for (const turler of ajanIsSirasi()) {
       const { data } = await this.db
         .from("ajan_isleri")
         .select("id")

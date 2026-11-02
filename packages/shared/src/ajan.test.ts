@@ -14,6 +14,7 @@ import {
   ajanFikriTemizle,
   ajanSonrakiCalisma,
   ajanHassasAlanlariAt,
+  ajanIsSirasi,
   ajanProjelioAraciMi,
   AJAN_SIRKET_ARALIGI_MS,
   AJAN_FIKIR_ARALIGI_MS,
@@ -247,5 +248,14 @@ describe("şirketi tanıma", () => {
   test("Lio devri: başlık ve talimat şart", () => {
     const s = ajanSonucunuTemizle({ oneriler: [{ tur: "lio", veri: { baslik: "Görev aç", talimat: "X projesine görev aç" } }, { tur: "lio", veri: { baslik: "boş" } }] });
     assert.deepEqual(s.oneriler, [{ tur: "lio", veri: { baslik: "Görev aç", talimat: "X projesine görev aç" } }]);
+  });
+});
+
+describe("ajanIsSirasi", () => {
+  test("sohbet önce, kullanıcının istekleri sonra, ajanın işleri en son; şirket dahil her tür sırada", () => {
+    const [ilk, ikinci, son] = ajanIsSirasi();
+    assert.deepEqual(ilk, ["sohbet"]);
+    assert.deepEqual(ikinci.sort(), ["arastirma", "otomasyon"]);
+    assert.ok(son.includes("sirket"));
   });
 });

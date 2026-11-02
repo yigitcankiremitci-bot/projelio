@@ -15,6 +15,29 @@
  * sirket: boşta, şirketin Projelio'daki profilini inceleyip not/fikir çıkarma (179).
  */
 export type AjanIsTuru = "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon" | "sirket";
+
+/**
+ * Mac'in işi alma sırası (küçük önce): kullanıcının sohbeti, sonra onun
+ * istedikleri (araştırma, otomasyon), en son ajanın kendi işleri.
+ * Record olduğu için yeni bir iş türü buraya yazılmazsa DERLEME düşer: 'sirket'
+ * eklenip listeye konmayınca iş oluşturuluyor ama hiç alınmıyordu (2026-11-02).
+ */
+export const AJAN_IS_ONCELIGI: Record<AjanIsTuru, 0 | 1 | 2> = {
+  sohbet: 0,
+  arastirma: 1,
+  otomasyon: 1,
+  sirket: 2,
+  fikir: 2,
+  ogrenme: 2,
+  liste: 2,
+};
+
+/** AJAN_IS_ONCELIGI'nden, önceliğe göre gruplanmış iş türleri. */
+export function ajanIsSirasi(): AjanIsTuru[][] {
+  const gruplar: AjanIsTuru[][] = [[], [], []];
+  for (const [tur, o] of Object.entries(AJAN_IS_ONCELIGI) as [AjanIsTuru, 0 | 1 | 2][]) gruplar[o].push(tur);
+  return gruplar;
+}
 export type AjanIsDurumu = "bekliyor" | "calisiyor" | "bitti" | "hata";
 export type AjanKonuDurumu = "bekliyor" | "ogreniliyor" | "ogrenildi" | "atlandi";
 export type AjanBilgiTuru = "ogretilen" | "ogrenilen";

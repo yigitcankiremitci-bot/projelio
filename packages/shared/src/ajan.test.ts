@@ -6,10 +6,13 @@ import {
   AJAN_LISTE_ARALIGI_MS,
   AJAN_OGRENME_ARALIGI_MS,
   AJAN_SINIRLARI,
+  ajanAramaKelimeleri,
   ajanBagliMi,
+  ajanBellekAlintisi,
   ajanBostaNeYapsin,
   ajanIsAsiliMi,
   ajanKonuAnahtari,
+  ajanOgretilenleriSigdir,
   ajanSonucunuTemizle,
 } from "./ajan";
 
@@ -98,5 +101,47 @@ describe("ajanSonucunuTemizle", () => {
 describe("ajanKonuAnahtari", () => {
   test("büyük/küçük harf ve noktalama farkı aynı konu sayılır", () => {
     assert.equal(ajanKonuAnahtari("İnstagram Reels, algoritma!"), ajanKonuAnahtari("instagram reels algoritma"));
+  });
+});
+
+describe("uzun öğretilenler", () => {
+  // 2026-11-02: kullanıcı 100 sayfalık metin öğretmek istedi; tamamı istemde
+  // olsa qwen3:8b'nin 16K bağlamı ilk belgede dolardı.
+  const belge = "Giriş. " + "dolgu metni ".repeat(20_000) + "Fiyatlandırma: Pro paket aylık 499 TL. " + "son ".repeat(5000);
+
+  test("kısa kural olduğu gibi, uzun belgenin yalnızca başı istemde", () => {
+    const s = ajanOgretilenleriSigdir([
+      { baslik: "Biçim", icerik: "Kısa yaz" },
+      { baslik: "El kitabı", icerik: belge },
+    ]);
+    assert.equal(s[0].icerik, "Kısa yaz");
+    assert.ok(s[1].icerik.length < 800);
+    assert.match(s[1].icerik, /bellekte_ara/);
+  });
+
+  test("bütçe dolunca eski öğretilenler istemden düşer", () => {
+    const liste = Array.from({ length: 20 }, (_, i) => ({ baslik: `k${i}`, icerik: "x".repeat(1400) }));
+    const s = ajanOgretilenleriSigdir(liste, 5000);
+    assert.equal(s.length, 3);
+    assert.equal(s[0].baslik, "k0");
+  });
+
+  test("alıntı belgenin başını değil aranan yeri gösterir", () => {
+    const a = ajanBellekAlintisi(belge, ajanAramaKelimeleri("Pro paket fiyatı"));
+    assert.match(a, /aylık 499 TL/);
+    assert.ok(a.length < 2500);
+  });
+
+  test("eşleşme yoksa başı döner, kısa metin olduğu gibi", () => {
+    assert.ok(ajanBellekAlintisi(belge, ["yokyok"]).startsWith("Giriş."));
+    assert.equal(ajanBellekAlintisi("kısa not", ["not"]), "kısa not");
+  });
+
+  test("arama kelimeleri küçültülür, kısalar ve tekrarlar atılır", () => {
+    assert.deepEqual(ajanAramaKelimeleri("İstanbul'da ve İSTANBUL fiyat?"), ["istanbul", "fiyat"]);
+  });
+
+  test("öğretilen sınırı 100 sayfaya yeter", () => {
+    assert.ok(AJAN_SINIRLARI.ogretilen >= 100 * 3000);
   });
 });

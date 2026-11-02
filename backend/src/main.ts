@@ -43,6 +43,7 @@ try {
 
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
+import { json } from "express";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
@@ -105,6 +106,12 @@ async function bootstrap() {
   // bayt bayt aynı olmayabilir. Nest ham gövdeyi yalnızca bu seçenekle
   // (req.rawBody) saklar. Bkz. whatsapp-webhook.controller.ts
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
+
+  // Ajana öğretilen metin 100 sayfa olabilir (AJAN_SINIRLARI.ogretilen, 600K
+  // karakter ≈ Türkçede 1+ MB JSON). Express'in varsayılan 100 KB sınırı onu
+  // 413'le düşürüyordu. Sınır YALNIZCA bu uçta büyük: Nest'in kendi
+  // ayrıştırıcısı sonra gelir ve gövde ayrıştırılmış olduğu için ona dokunmaz.
+  app.use("/ajan/bilgiler", json({ limit: "4mb" }));
 
   // Render (ve benzeri PaaS) uygulamayı bir ters vekil sunucunun arkasında çalıştırır.
   // Bu ayar yapılmazsa Express, req.ip olarak istemcinin değil vekil sunucunun iç

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import type { AjanBilgi, AjanDurumu, AjanIs, AjanKonu, AjanMesaj, AjanOneri, AjanRapor, AjanRaporOzeti, ThemeColors } from "@projelio/shared";
+import { AJAN_SINIRLARI, type AjanBilgi, type AjanDurumu, type AjanIs, type AjanKonu, type AjanMesaj, type AjanOneri, type AjanRapor, type AjanRaporOzeti, type ThemeColors } from "@projelio/shared";
 import { ajanApi } from "../../api/ajan";
 import { ignoreAbort } from "../../api/client";
 import { markdownBloklari, type SatirIci } from "../../lib/ajanMetin";
@@ -400,9 +400,15 @@ function Bellek({ c }: { c: ThemeColors }) {
     <div>
       <p style={{ color: c.textSecondary, marginTop: 0 }}>
         Öğrettiklerin her işte ajana kural olarak gider: nasıl yazacağı, neye önem vereceği, işin hakkında bilmesi gerekenler.
+        Uzun bir belge de yapıştırabilirsin (100 sayfaya kadar): ajan onu baştan sona ezberlemez, gerektiğinde içinde arayıp ilgili yerini okur.
       </p>
       <input value={baslik} onChange={(e) => setBaslik(e.target.value)} placeholder="Başlık (isteğe bağlı)" maxLength={200} style={{ ...giris(c), width: "100%", marginBottom: 6 }} />
-      <textarea value={icerik} onChange={(e) => setIcerik(e.target.value)} placeholder="Ör. Projelio küçük ajanslar ve serbest çalışanlar için bir iş yönetimi uygulaması. Rakiplerimiz: …" rows={3} maxLength={8000} style={{ ...giris(c), width: "100%", resize: "vertical" }} />
+      <textarea value={icerik} onChange={(e) => setIcerik(e.target.value)} placeholder="Ör. Projelio küçük ajanslar ve serbest çalışanlar için bir iş yönetimi uygulaması. Rakiplerimiz: …" rows={3} maxLength={AJAN_SINIRLARI.ogretilen} style={{ ...giris(c), width: "100%", resize: "vertical" }} />
+      {icerik.length > 2000 && (
+        <small style={{ color: c.textSecondary, display: "block" }}>
+          {icerik.length.toLocaleString("tr-TR")} / {AJAN_SINIRLARI.ogretilen.toLocaleString("tr-TR")} karakter
+        </small>
+      )}
       <button type="button" disabled={!icerik.trim()} style={{ ...dugme(c, true), marginTop: 6 }} onClick={ogret}>
         Öğret
       </button>
@@ -432,7 +438,12 @@ function Bellek({ c }: { c: ThemeColors }) {
               Sil
             </button>
           </div>
-          <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{b.icerik}</div>
+          <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>
+            {b.uzunluk > b.icerik.length ? `${b.icerik}…` : b.icerik}
+          </div>
+          {b.uzunluk > b.icerik.length && (
+            <small style={{ color: c.textSecondary, display: "block" }}>Uzun belge · toplam {b.uzunluk.toLocaleString("tr-TR")} karakter, burada yalnızca başı görünüyor.</small>
+          )}
           {!!b.kaynaklar.length && (
             <small style={{ color: c.textSecondary }}>
               {b.kaynaklar.map((k, i) => (

@@ -23,7 +23,9 @@ export interface AjanBilgi {
   id: string;
   tur: AjanBilgiTuru;
   baslik: string;
+  /** Listede uzun metnin yalnızca başı gelir; tamamının boyu `uzunluk`'ta. */
   icerik: string;
+  uzunluk: number;
   kaynaklar: AjanKaynak[];
   createdAt: string;
 }
@@ -153,6 +155,12 @@ export const AJAN_SINIRLARI = {
   girdi: 1000,
   baslik: 200,
   bilgi: 8000,
+  /**
+   * Kullanıcının elle öğrettiği tek metin: 100 sayfalık bir belge de sığsın
+   * (sayfa ~3000 karakter). Bu kadarı modele HİÇBİR ZAMAN tek parça gitmez;
+   * istemde yalnızca başı durur, kalanı bellekte_ara ile parça parça okunur.
+   */
+  ogretilen: 600_000,
   rapor: 60_000,
   ozet: 1000,
   konu: 200,
@@ -272,4 +280,77 @@ export function ajanSonucunuTemizle(ham: unknown): AjanIsSonucu {
 /** Aynı konu iki kez listeye girmesin diye karşılaştırma anahtarı. */
 export function ajanKonuAnahtari(konu: string): string {
   return konu.toLocaleLowerCase("tr").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+// ------------------------------------------------------------------ uzun öğretilenler
+
+/** İstemde tam yer alan öğretilenin en uzun boyu; uzunu "belge" sayılır. */
+export const AJAN_ISTEMDE_TAM_SINIR = 1500;
+/** Belgenin istemde duran başı. */
+export const AJAN_BELGE_BASI = 600;
+/** Tüm öğretilenlerin istemdeki toplam payı (qwen3:8b bağlamı 16K token). */
+export const AJAN_OGRETILEN_BUTCESI = 12_000;
+
+/**
+ * Öğretilenleri modelin bağlamına sığdırır. Kısa olanlar (kurallar) olduğu
+ * gibi gider; uzun belgenin yalnızca başı ve "tamamı bellekte" notu gider.
+ * Liste yeniden eskiye gelir; bütçe dolunca eskiler düşer — bellekte_ara
+ * onları yine bulur.
+ */
+export function ajanOgretilenleriSigdir(liste: { baslik: string; icerik: string }[], butce = AJAN_OGRETILEN_BUTCESI) {
+  const sonuc: { baslik: string; icerik: string }[] = [];
+  let kalan = butce;
+  for (const o of liste) {
+    const icerik =
+      o.icerik.length <= AJAN_ISTEMDE_TAM_SINIR
+        ? o.icerik
+        : `${o.icerik.slice(0, AJAN_BELGE_BASI).trimEnd()}… [Uzun belge, toplam ${o.icerik.length} karakter. Ayrıntı gerektiğinde bellekte_ara ile içinde ara.]`;
+    if (icerik.length + o.baslik.length > kalan) break;
+    kalan -= icerik.length + o.baslik.length;
+    sonuc.push({ baslik: o.baslik, icerik });
+  }
+  return sonuc;
+}
+
+/** Aramanın kelimeleri: kısa ekler ve noktalama aramayı boğmasın. */
+export function ajanAramaKelimeleri(sorgu: string): string[] {
+  const kelimeler = sorgu
+    .toLocaleLowerCase("tr")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((k) => k.length >= 3);
+  return [...new Set(kelimeler)].slice(0, 6);
+}
+
+/**
+ * Uzun metinden aranan kelimelerin geçtiği yerlerin çevresini alır. 100
+ * sayfalık belgenin başını değil, sorulan yerini göstermek için: bellekte_ara
+ * eskiden her kaydın ilk 1500 karakterini dönüyordu.
+ */
+export function ajanBellekAlintisi(icerik: string, kelimeler: string[], pencere = 700, enCok = 3): string {
+  if (icerik.length <= pencere * 2) return icerik;
+  const kucuk = icerik.toLocaleLowerCase("tr");
+  const konumlar: number[] = [];
+  for (const k of kelimeler) {
+    let i = kucuk.indexOf(k);
+    while (i >= 0 && konumlar.length < 50) {
+      konumlar.push(i);
+      i = kucuk.indexOf(k, i + k.length);
+    }
+  }
+  if (!konumlar.length) return icerik.slice(0, pencere) + "…";
+  konumlar.sort((a, b) => a - b);
+  // Kelimelerin en sık bir arada geçtiği yerler önce gelsin.
+  const puan = (i: number) => konumlar.filter((j) => Math.abs(j - i) < pencere / 2).length;
+  const secilen: number[] = [];
+  for (const i of [...konumlar].sort((a, b) => puan(b) - puan(a))) {
+    if (secilen.length >= enCok) break;
+    if (secilen.every((j) => Math.abs(j - i) >= pencere)) secilen.push(i);
+  }
+  return secilen
+    .sort((a, b) => a - b)
+    .map((i) => {
+      const bas = Math.max(0, i - pencere / 2);
+      return `${bas > 0 ? "…" : ""}${icerik.slice(bas, bas + pencere).trim()}${bas + pencere < icerik.length ? "…" : ""}`;
+    })
+    .join("\n\n");
 }

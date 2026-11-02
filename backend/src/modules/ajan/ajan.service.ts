@@ -3,11 +3,14 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   AJAN_ANAHTAR_ONEKI,
   AJAN_SINIRLARI,
+  ajanAramaKelimeleri,
   ajanBagliMi,
+  ajanBellekAlintisi,
   ajanBostaNeYapsin,
   ajanIsAsiliMi,
   ajanKirp,
   ajanKonuAnahtari,
+  ajanOgretilenleriSigdir,
   ajanSonucunuTemizle,
   type AjanBilgi,
   type AjanDurumu,
@@ -27,6 +30,9 @@ import { AKIS_TAVANI, LISTE_TAVANI } from "../../common/liste-tavani";
 
 /** Mac'in işi alırken gördüğü öğretilen bilgi sayısı (modelin bağlamı küçük). */
 const OGRETILEN_PAKET_TAVANI = 30;
+
+/** Bellek listesinde bir kaydın gösterilen başı. */
+const LISTEDE_ICERIK = 2000;
 const SOHBET_GECMISI = 12;
 const KONU_DURUMLARI: AjanKonuDurumu[] = ["bekliyor", "ogreniliyor", "ogrenildi", "atlandi"];
 
@@ -262,12 +268,12 @@ export class AjanService {
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
     if (error) throw error;
-    return (data ?? []).map(bilgiSatiri);
+    return (data ?? []).map(listeSatiri);
   }
 
   async ogret(userId: string, body: { baslik?: unknown; icerik?: unknown }): Promise<AjanBilgi> {
     await this.assertIzinli(userId);
-    const icerik = ajanKirp(body.icerik, AJAN_SINIRLARI.bilgi);
+    const icerik = ajanKirp(body.icerik, AJAN_SINIRLARI.ogretilen);
     if (!icerik) throw new BadRequestException("Öğretilecek metin boş olamaz.");
     const baslik = ajanKirp(body.baslik, AJAN_SINIRLARI.baslik) || icerik.split("\n")[0].slice(0, 80);
     const { data, error } = await this.db
@@ -276,7 +282,7 @@ export class AjanService {
       .select()
       .single();
     if (error) throw error;
-    return bilgiSatiri(data);
+    return listeSatiri(data);
   }
 
   async bilgiSil(userId: string, id: string): Promise<void> {
@@ -422,22 +428,28 @@ export class AjanService {
       const { data } = await this.db.from("ajan_konulari").select("konu").eq("user_id", userId).order("created_at", { ascending: false }).limit(100);
       mevcutKonular = (data ?? []).map((k: any) => k.konu);
     }
-    return { is, ad: a.ad, ogretilenler: ogretilen ?? [], sonMesajlar, mevcutKonular };
+    return { is, ad: a.ad, ogretilenler: ajanOgretilenleriSigdir(ogretilen ?? []), sonMesajlar, mevcutKonular };
   }
 
-  /** Bellekte arama (Mac'in "bellekte_ara" aracı). Basit metin eşleşmesi; MVP için yeterli. */
+  /**
+   * Bellekte arama (Mac'in "bellekte_ara" aracı). Basit metin eşleşmesi; MVP
+   * için yeterli. Kelimelerden BİRİ geçen kayıt gelir (model "Pro paket fiyatı"
+   * diye cümle arıyor, belgede o cümle yok), uzun belgeden de yalnızca
+   * kelimelerin geçtiği yerlerin çevresi döner.
+   */
   async bellekteAra(userId: string, sorgu: unknown): Promise<{ baslik: string; icerik: string }[]> {
-    const q = ajanKirp(sorgu, 100).replace(/[%_,()]/g, " ").trim();
-    if (!q) return [];
+    const kelimeler = ajanAramaKelimeleri(ajanKirp(sorgu, 100));
+    if (!kelimeler.length) return [];
+    const kosul = kelimeler.flatMap((k) => [`baslik.ilike.%${k}%`, `icerik.ilike.%${k}%`]).join(",");
     const { data, error } = await this.db
       .from("ajan_bilgileri")
       .select("baslik, icerik")
       .eq("user_id", userId)
-      .or(`baslik.ilike.%${q}%,icerik.ilike.%${q}%`)
+      .or(kosul)
       .order("created_at", { ascending: false })
       .limit(8);
     if (error) throw error;
-    return (data ?? []).map((b: any) => ({ baslik: b.baslik, icerik: String(b.icerik).slice(0, 1500) }));
+    return (data ?? []).map((b: any) => ({ baslik: b.baslik, icerik: ajanBellekAlintisi(String(b.icerik), kelimeler) }));
   }
 
   async isBitir(userId: string, id: string, ham: unknown): Promise<{ ok: true }> {
@@ -613,7 +625,12 @@ function isSatiri(r: any): AjanIs {
 }
 
 function bilgiSatiri(r: any): AjanBilgi {
-  return { id: r.id, tur: r.tur, baslik: r.baslik, icerik: r.icerik, kaynaklar: Array.isArray(r.kaynaklar) ? r.kaynaklar : [], createdAt: r.created_at };
+  return { id: r.id, tur: r.tur, baslik: r.baslik, icerik: r.icerik, uzunluk: String(r.icerik ?? "").length, kaynaklar: Array.isArray(r.kaynaklar) ? r.kaynaklar : [], createdAt: r.created_at };
+}
+
+/** Listede belgenin yalnızca başı: 100 sayfalık metni her açılışta tarayıcıya taşımaya gerek yok. */
+function listeSatiri(r: any): AjanBilgi {
+  return { ...bilgiSatiri(r), icerik: String(r.icerik).slice(0, LISTEDE_ICERIK) };
 }
 
 function konuSatiri(r: any): AjanKonu {

@@ -13,7 +13,7 @@ doğrudan çalıştırıyor. Testleri kök `npm test` koşturur, tip denetimi
 - **Sohbet:** Ofisteki ajan robotuna tıklayınca açılan panelden yazdığın mesaja yanıt verir.
   "Bunu unutma" dediğini öğretilenlere kaydeder.
 - **Araştırma:** "Araştır"a yazdığın konuyu internette arar, 3-5 kaynak okur, Markdown rapor yazar.
-- **Sürekli öğrenme:** Elinde iş yokken (en çok 20 dakikada bir) öğrenme listesinden bir konu alır,
+- **Sürekli öğrenme:** Elinde iş yokken (en çok 5 dakikada bir) öğrenme listesinden bir konu alır,
   okur ve kısa not çıkarır. Liste boşalınca öğrettiklerine bakıp kendine yeni konular ekler.
 - **Öneri:** Bir iş yapmasını istersen (ör. yapılacak eklemek) yalnızca önerir. Projelio'ya
   sen onaylayınca eklenir.

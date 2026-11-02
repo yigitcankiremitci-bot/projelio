@@ -137,8 +137,10 @@ export const AJAN_ASILI_IS_MS = 30 * 60_000;
 /**
  * Boşta öğrenme adımları arası en kısa süre. Mac'in fanını sürekli
  * döndürmesin, belleği de bir günde yüzlerce yüzeysel notla dolmasın.
+ * İlk sürümde 20 dk'ydı; ilk denemede fazla yavaş bulundu (2026-11-02).
+ * Sohbet her zaman önce alındığı için kısa aralık mesajları bekletmez.
  */
-export const AJAN_OGRENME_ARALIGI_MS = 20 * 60_000;
+export const AJAN_OGRENME_ARALIGI_MS = 5 * 60_000;
 
 /** Bekleyen konu kalmayınca ajanın kendine yeni liste çıkarma aralığı. */
 export const AJAN_LISTE_ARALIGI_MS = 6 * 60 * 60_000;

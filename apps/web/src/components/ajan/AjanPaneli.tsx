@@ -497,7 +497,7 @@ function Liste({ c, durum, tazele, onDurum }: { c: ThemeColors; durum: AjanDurum
           checked={!!durum?.ogrenmeAcik}
           onChange={async (e) => onDurum(await ajanApi.ayarlar({ ogrenmeAcik: e.target.checked }))}
         />
-        Boş kaldığında bu listeden öğrenmeye devam etsin (en çok 20 dakikada bir konu)
+        Boş kaldığında bu listeden öğrenmeye devam etsin (en çok 5 dakikada bir konu)
       </label>
       <form
         onSubmit={(e) => {

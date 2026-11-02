@@ -6,7 +6,6 @@ import {
   AJAN_LISTE_ARALIGI_MS,
   AJAN_OGRENME_ARALIGI_MS,
   AJAN_SINIRLARI,
-  AJAN_YOGUN_LISTE_ARALIGI_MS,
   AJAN_YOGUN_OGRENME_ARALIGI_MS,
   ajanAramaKelimeleri,
   ajanBagliMi,
@@ -68,12 +67,6 @@ describe("ajanBostaNeYapsin yoğun modda", () => {
     assert.equal(ajanBostaNeYapsin({ ...temel, sonOgrenme: az, yogun: true }), "ogrenme");
     assert.equal(ajanBostaNeYapsin({ ...temel, sonOgrenme: az }), null);
     assert.equal(ajanBostaNeYapsin({ ...temel, sonOgrenme: once(AJAN_YOGUN_OGRENME_ARALIGI_MS - 1000), yogun: true }), null);
-  });
-
-  test("liste yoğun modda daha sık tazelenir", () => {
-    const g = { ...temel, bekleyenKonuVar: false, sonListe: once(AJAN_YOGUN_LISTE_ARALIGI_MS + 1000) };
-    assert.equal(ajanBostaNeYapsin({ ...g, yogun: true }), "liste");
-    assert.equal(ajanBostaNeYapsin(g), null);
   });
 });
 

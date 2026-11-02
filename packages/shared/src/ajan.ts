@@ -144,8 +144,14 @@ export const AJAN_ASILI_IS_MS = 30 * 60_000;
  */
 export const AJAN_OGRENME_ARALIGI_MS = 5 * 60_000;
 
-/** Bekleyen konu kalmayınca ajanın kendine yeni liste çıkarma aralığı. */
-export const AJAN_LISTE_ARALIGI_MS = 6 * 60 * 60_000;
+/**
+ * Bekleyen konu kalmayınca ajanın kendine yeni liste çıkarma aralığı. İlk
+ * sürümde 6 saatti (konu tekrarı korkusuyla); ajan çoğu zaman boş bekledi.
+ * Kullanıcının kararı (2026-11-02): 10 dk — öğrendikçe tekrar ihtimali
+ * azalıyor, aynı konu zaten ikinci kez eklenemiyor (ajanKonuAnahtari).
+ * Yoğun modda da aynı: daha kısası ayrıca gerekmiyor.
+ */
+export const AJAN_LISTE_ARALIGI_MS = 10 * 60_000;
 
 /**
  * Yoğun mod: Mac prizde ve kullanıcı başında değil (ajan/src/mac.ts). Fan ve
@@ -154,8 +160,6 @@ export const AJAN_LISTE_ARALIGI_MS = 6 * 60 * 60_000;
  * onlarca aramayla yorup geçici engel yemesin, sohbete de yer kalsın.
  */
 export const AJAN_YOGUN_OGRENME_ARALIGI_MS = 60_000;
-/** Yoğun modda liste daha sık tazelenir; yoksa liste bir saatte biter, ajan saatlerce boş bekler. */
-export const AJAN_YOGUN_LISTE_ARALIGI_MS = 30 * 60_000;
 
 /** Anahtarın görünür öneki: kullanıcı Lio'nun ya da başka bir şeyin anahtarıyla karıştırmasın. */
 export const AJAN_ANAHTAR_ONEKI = "ajan_";
@@ -213,7 +217,7 @@ export function ajanBostaNeYapsin(g: {
   const gecti = (t: string | null, ms: number) => !t || simdi - Date.parse(t) >= ms;
   if (!gecti(g.sonOgrenme, g.yogun ? AJAN_YOGUN_OGRENME_ARALIGI_MS : AJAN_OGRENME_ARALIGI_MS)) return null;
   if (g.bekleyenKonuVar) return "ogrenme";
-  return gecti(g.sonListe, g.yogun ? AJAN_YOGUN_LISTE_ARALIGI_MS : AJAN_LISTE_ARALIGI_MS) ? "liste" : null;
+  return gecti(g.sonListe, AJAN_LISTE_ARALIGI_MS) ? "liste" : null;
 }
 
 /** Metni kırpar; boşlukları sadeleştirmez (rapor markdown'ı bozulmasın). */

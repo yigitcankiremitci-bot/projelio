@@ -397,11 +397,12 @@ export class AjanService {
    * Mac'e sıradaki işi verir. Kuyruk boşsa ve öğrenme açıksa kendi öğrenme
    * işini kendisi yaratır: "sürekli öğrenen ajan" bu fonksiyondan ibaret.
    */
-  async isAl(userId: string): Promise<AjanIsPaketi | null> {
+  /** `yogun`: Mac prizde ve kullanıcı başında değil (Mac kendisi söyler, bkz. ajan/src/mac.ts). */
+  async isAl(userId: string, secenek: { yogun?: boolean } = {}): Promise<AjanIsPaketi | null> {
     await this.asililariGeriAl(userId);
     let is = await this.siradakiniKap(userId);
     if (!is) {
-      const bosta = await this.bostaIsUret(userId);
+      const bosta = await this.bostaIsUret(userId, !!secenek.yogun);
       if (bosta) is = await this.siradakiniKap(userId);
     }
     if (!is) return null;
@@ -556,7 +557,7 @@ export class AjanService {
     return null;
   }
 
-  private async bostaIsUret(userId: string): Promise<boolean> {
+  private async bostaIsUret(userId: string, yogun: boolean): Promise<boolean> {
     const a = await this.ayarlar(userId);
     const sonu = async (tur: AjanIsTuru) => {
       const { data } = await this.db.from("ajan_isleri").select("created_at").eq("user_id", userId).eq("tur", tur).order("created_at", { ascending: false }).limit(1);
@@ -576,6 +577,7 @@ export class AjanService {
       // Liste hazırlamak da bir öğrenme adımı sayılır: ikisi arka arkaya koşmasın.
       sonOgrenme: [await sonu("ogrenme"), await sonu("liste")].filter(Boolean).sort().pop() ?? null,
       sonListe: await sonu("liste"),
+      yogun,
     });
     if (karar === "ogrenme" && konu?.[0]) {
       const k = konu[0] as any;

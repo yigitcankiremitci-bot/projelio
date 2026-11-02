@@ -51,8 +51,8 @@ export class Projelio {
     return this.istek("/ajan/isci/nabiz", { method: "POST", body: JSON.stringify({ durum, not, model }) });
   }
 
-  async isAl(): Promise<IsPaketi | null> {
-    return (await this.istek<{ paket: IsPaketi | null }>("/ajan/isci/is-al", { method: "POST", body: "{}" })).paket;
+  async isAl(yogun: boolean): Promise<IsPaketi | null> {
+    return (await this.istek<{ paket: IsPaketi | null }>("/ajan/isci/is-al", { method: "POST", body: JSON.stringify({ yogun }) })).paket;
   }
 
   bellekteAra(q: string) {

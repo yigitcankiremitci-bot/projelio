@@ -13,7 +13,7 @@ doğrudan çalıştırıyor. Testleri kök `npm test` koşturur, tip denetimi
 - **Sohbet:** Ofisteki ajan robotuna tıklayınca açılan panelden yazdığın mesaja yanıt verir.
   "Bunu unutma" dediğini öğretilenlere kaydeder.
 - **Araştırma:** "Araştır"a yazdığın konuyu internette arar, 3-5 kaynak okur, Markdown rapor yazar.
-- **Sürekli öğrenme:** Elinde iş yokken (en çok 5 dakikada bir) öğrenme listesinden bir konu alır,
+- **Sürekli öğrenme:** Elinde iş yokken öğrenme listesinden bir konu alır (en çok 5 dakikada bir; Mac prizdeyken ve 5 dakikadır kullanılmıyorken ara vermeden),
   okur ve kısa not çıkarır. Liste boşalınca öğrettiklerine bakıp kendine yeni konular ekler.
 - **Öneri:** Bir iş yapmasını istersen (ör. yapılacak eklemek) yalnızca önerir. Projelio'ya
   sen onaylayınca eklenir.
@@ -60,3 +60,9 @@ Kaldırmak için: `bash ajan/kur.sh --kaldir`.
 
 - Mac uyuyunca ajan da durur. İşler sırada bekler, yarım kalan iş 30 dakika sonra kuyruğa döner.
 - Model Mac'te çalıştığı için bir araştırma raporu birkaç dakika sürer.
+
+## Gece boyunca öğrensin istersen
+
+Ajan Mac'in uyku ayarına dokunmaz; Mac uyuyunca ajan da durur. Prizdeyken
+uyumasın istersen: Sistem Ayarları > Pil > Seçenekler > "Ekran kapalıyken güç
+adaptörüne takılıyken otomatik uykuyu engelle". Kapak kapalıyken MacBook yine uyur.

@@ -14,6 +14,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { isiYurut } from "./ajan.ts";
 import { Projelio } from "./api.ts";
+import { yogunCalisabilirMi } from "./mac.ts";
 import { ollamaHazirMi, sohbet, type OllamaAyar } from "./ollama.ts";
 import { sayfaOku, webAra } from "./web.ts";
 
@@ -65,7 +66,8 @@ async function birTur(): Promise<boolean> {
     not = sorun;
     return false;
   }
-  const paket = await projelio.isAl();
+  const yogun = await yogunCalisabilirMi();
+  const paket = await projelio.isAl(yogun);
   if (!paket) {
     not = null;
     return false;
@@ -73,7 +75,7 @@ async function birTur(): Promise<boolean> {
   durum = "calisiyor";
   not = `${ETIKET[paket.is.tur]}: ${paket.is.girdi.split("\n")[0].slice(0, 120)}`;
   void nabizAt();
-  gunluk("iş alındı", paket.is.tur, paket.is.id);
+  gunluk("iş alındı", paket.is.tur, paket.is.id, yogun ? "(prizde, boşta)" : "");
   const basla = Date.now();
   try {
     const sonuc = await isiYurut(paket, {

@@ -140,8 +140,8 @@ export class AjanIsciController {
   }
 
   @Post("is-al")
-  async isAl(@Headers("authorization") yetki: string) {
-    return { paket: await this.service.isAl(await this.service.isciyiBul(yetki)) };
+  async isAl(@Headers("authorization") yetki: string, @Body() body: any) {
+    return { paket: await this.service.isAl(await this.service.isciyiBul(yetki), { yogun: body?.yogun === true }) };
   }
 
   @Get("bellek")

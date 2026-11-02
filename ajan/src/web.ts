@@ -155,7 +155,18 @@ export function braveSonuclari(j: any, sinir: number): AramaSonucu[] {
  * sitenin açık isteğine aykırı; bu yüzden yalnızca anahtarlı API ya da
  * kullanıcının kendi motoru.
  */
+/**
+ * Aramalar arası en kısa süre. Yoğun modda (bkz. mac.ts) ajan saatte yüzü aşkın
+ * arama yapabilir; arka arkaya ateşlenen istekler SearXNG'nin arkasındaki
+ * motorlardan (Google, Brave) geçici engel getirir ve sonuçlar boş gelmeye başlar.
+ */
+export const ARAMA_ARALIGI_MS = 5000;
+let sonArama = 0;
+
 export async function webAra(sorgu: string, sinir = 6): Promise<AramaSonucu[]> {
+  const bekle = sonArama + ARAMA_ARALIGI_MS - Date.now();
+  if (bekle > 0) await new Promise((r) => setTimeout(r, bekle));
+  sonArama = Date.now();
   const searx = process.env.SEARXNG_URL;
   if (searx) {
     const u = new URL("/search", searx);

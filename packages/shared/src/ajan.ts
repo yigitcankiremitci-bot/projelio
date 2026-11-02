@@ -147,6 +147,16 @@ export const AJAN_OGRENME_ARALIGI_MS = 5 * 60_000;
 /** Bekleyen konu kalmayınca ajanın kendine yeni liste çıkarma aralığı. */
 export const AJAN_LISTE_ARALIGI_MS = 6 * 60 * 60_000;
 
+/**
+ * Yoğun mod: Mac prizde ve kullanıcı başında değil (ajan/src/mac.ts). Fan ve
+ * pil dert değil, aralık neredeyse kalkar. Tamamen sıfır değil: arka arkaya
+ * gelen işler SearXNG'nin arkasındaki motorları (Google, Brave) dakikada
+ * onlarca aramayla yorup geçici engel yemesin, sohbete de yer kalsın.
+ */
+export const AJAN_YOGUN_OGRENME_ARALIGI_MS = 60_000;
+/** Yoğun modda liste daha sık tazelenir; yoksa liste bir saatte biter, ajan saatlerce boş bekler. */
+export const AJAN_YOGUN_LISTE_ARALIGI_MS = 30 * 60_000;
+
 /** Anahtarın görünür öneki: kullanıcı Lio'nun ya da başka bir şeyin anahtarıyla karıştırmasın. */
 export const AJAN_ANAHTAR_ONEKI = "ajan_";
 
@@ -194,14 +204,16 @@ export function ajanBostaNeYapsin(g: {
   bekleyenKonuVar: boolean;
   sonOgrenme: string | null;
   sonListe: string | null;
+  /** Mac prizde ve kullanıcı başında değil. */
+  yogun?: boolean;
   simdi?: number;
 }): "ogrenme" | "liste" | null {
   if (!g.ogrenmeAcik) return null;
   const simdi = g.simdi ?? Date.now();
   const gecti = (t: string | null, ms: number) => !t || simdi - Date.parse(t) >= ms;
-  if (!gecti(g.sonOgrenme, AJAN_OGRENME_ARALIGI_MS)) return null;
+  if (!gecti(g.sonOgrenme, g.yogun ? AJAN_YOGUN_OGRENME_ARALIGI_MS : AJAN_OGRENME_ARALIGI_MS)) return null;
   if (g.bekleyenKonuVar) return "ogrenme";
-  return gecti(g.sonListe, AJAN_LISTE_ARALIGI_MS) ? "liste" : null;
+  return gecti(g.sonListe, g.yogun ? AJAN_YOGUN_LISTE_ARALIGI_MS : AJAN_LISTE_ARALIGI_MS) ? "liste" : null;
 }
 
 /** Metni kırpar; boşlukları sadeleştirmez (rapor markdown'ı bozulmasın). */

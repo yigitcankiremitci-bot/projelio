@@ -185,6 +185,13 @@ describe("fikirler", () => {
     assert.equal(s.oneriler?.length, 1);
   });
 
+  test("ısrar edilen uydurma sayı kaydedilir ama dayanakta işaretlenir", async () => {
+    const f = cagri("fikir_oner", { baslik: "Paket", fayda: "2000 TL gelir", adimlar: ["a", "b"], dayanak: "Rapor" });
+    const { model } = sahteModel([f, f, { role: "assistant", content: "Bitti." }]);
+    const s = await isiYurut(paket("fikir", "fikir çıkar"), { ...web, model });
+    assert.equal(s.oneriler?.[0].tur === "fikir" && s.oneriler[0].veri.dayanak, "Rapor · Dikkat: faydadaki 2000 kaynakta geçmiyor, ajanın tahmini.");
+  });
+
   test("uydurma sayı denetimi: tek haneliler serbest", () => {
     assert.deepEqual(uydurmaSayilar("3 müşteriye %25 indirim, 150 TL", "fiyat 150 TL"), ["25"]);
   });

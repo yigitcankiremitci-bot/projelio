@@ -236,9 +236,16 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
         const adimlar = adimlariAyir(a.adimlar);
         if (!dize(a.baslik) || !dize(a.fayda) || adimlar.length < 2)
           return "Fikir KAYDEDİLMEDİ: başlık, somut fayda ve en az 2 (tercihen 3-5) somut adım gerekli. Düzeltip fikir_oner'i yeniden çağır.";
-        const uydurma = uydurmaSayilar(dize(a.fayda), mesajlar.map((m) => m.content).join("\n"));
-        if (uydurma.length && !sayiGeriCevrildi) {
-          sayiGeriCevrildi = true;
+        // Kaynak = talimat, kullanıcı ve araç sonuçları; modelin kendi yazdıkları ve fikir
+        // aracının yanıtları DEĞİL (geri çevirme mesajı sayıyı içerdiği için onu "bilinen" yapıyordu).
+        const kaynakMetni = mesajlar
+          .filter((m) => m.role === "system" || m.role === "user" || (m.role === "tool" && m.tool_name !== "fikir_oner"))
+          .map((m) => m.content)
+          .join("\n");
+        const uydurma = uydurmaSayilar(dize(a.fayda), kaynakMetni);
+        const fikirAnahtari = dize(a.baslik).toLocaleLowerCase("tr");
+        if (uydurma.length && !sayiGeriCevrilen.has(fikirAnahtari)) {
+          sayiGeriCevrilen.add(fikirAnahtari);
           return `Fikir KAYDEDİLMEDİ: faydadaki ${uydurma.join(", ")} sayısı öğrendiklerinde ya da okuduğun kaynaklarda geçmiyor. Sayıyı kaldırıp faydayı sayısız ya da kaynaktaki sayıyla yeniden yaz ve fikir_oner'i yeniden çağır.`;
         }
         // Aynı fikir ikinci kez: ilk gerçek denemede (2026-11-02) model aynı başlığı iki kez önerdi.
@@ -247,7 +254,9 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
           return "Bu fikri zaten önerdin. Farklı bir fikir öner ya da bitir.";
         const etki = ["yuksek", "orta", "dusuk"].includes(dize(a.etki)) ? (dize(a.etki) as Fikir["etki"]) : "orta";
         const emek = ["kucuk", "orta", "buyuk"].includes(dize(a.emek)) ? (dize(a.emek) as Fikir["emek"]) : "orta";
-        sonuc.oneriler!.push({ tur: "fikir", veri: { baslik: dize(a.baslik), fayda: dize(a.fayda), adimlar, etki, emek, dayanak: dize(a.dayanak) || undefined } });
+        const uyari = uydurma.length ? `Dikkat: faydadaki ${uydurma.join(", ")} kaynakta geçmiyor, ajanın tahmini.` : "";
+        const dayanak = [dize(a.dayanak), uyari].filter(Boolean).join(" · ") || undefined;
+        sonuc.oneriler!.push({ tur: "fikir", veri: { baslik: dize(a.baslik), fayda: dize(a.fayda), adimlar, etki, emek, dayanak } });
         return "Fikir kullanıcının onayına gönderildi.";
       }
       case "rapor_yaz":
@@ -269,8 +278,10 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
   let yazdi = false;
   let geriCevrildi = false;
   let fikirIstendi = false;
-  // İş başına bir kez: model ısrar ederse fikir sayısıyla kaydedilir (iş tümden boşa gitmesin).
-  let sayiGeriCevrildi = false;
+  // Fikir başına bir kez. Üçüncü gerçek denemede (2026-11-02) model geri çevrildikten
+  // sonraki fikirlerde yine uydurdu: ısrar ederse fikir kaydedilir ama sayıların
+  // kaynakta olmadığı dayanağa açıkça yazılır — kullanıcı tahmini bilgi sanmasın.
+  const sayiGeriCevrilen = new Set<string>();
   for (let adim = 0; adim < EN_COK_ADIM[p.is.tur]; adim++) {
     // Son adımda araç verilmez: model ne bulduysa onu yazmak zorunda kalır.
     const sonAdim = adim === EN_COK_ADIM[p.is.tur] - 1;

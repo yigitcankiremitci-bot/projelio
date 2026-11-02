@@ -88,7 +88,9 @@ async function birTur(): Promise<boolean> {
       },
     });
     await projelio.bitir(paket.is.id, sonuc);
-    gunluk("iş bitti", paket.is.id, `${Math.round((Date.now() - basla) / 1000)} sn`);
+    // Sonucun özeti: liste işi sessizce boş dönünce (2026-11-02) günlükten anlaşılmıyordu.
+    const ozet = [sonuc.konular?.length && `${sonuc.konular.length} konu`, sonuc.bilgiler?.length && `${sonuc.bilgiler.length} not`, sonuc.rapor && "rapor", sonuc.mesaj && "mesaj"].filter(Boolean).join(", ") || "boş sonuç";
+    gunluk("iş bitti", paket.is.id, `${Math.round((Date.now() - basla) / 1000)} sn`, `· ${ozet}`, paket.is.tur === "liste" ? `· öğretilen ${paket.ogretilenler.length}, mevcut konu ${paket.mevcutKonular.length}` : "");
   } catch (e: any) {
     gunluk("iş hata verdi", paket.is.id, e?.message ?? e);
     await projelio.bitir(paket.is.id, { hata: String(e?.message ?? e).slice(0, 400) }).catch(() => {});

@@ -9,7 +9,7 @@
 // departmanlarında zaten yer alıyor.
 
 import type { Job, JobMember, Project, Task } from "@projelio/shared";
-import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI, type IstasyonBilgisi } from "./ofisOyunu";
+import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI, RAF_KAPASITESI, type IstasyonBilgisi, type Plaket } from "./ofisOyunu";
 
 export interface StudyoIsi {
   job: Job;
@@ -17,7 +17,7 @@ export interface StudyoIsi {
   uyeler: JobMember[];
   /** İşte açık modül anahtarları. */
   moduller: string[];
-  /** İşin arşivlenmemiş projeleri (bitenler kupa rafına sayılır). */
+  /** İşin arşivlenmemiş projeleri (bitenler kupa rafında plaket olur). */
   projeler: Project[];
   /** Bitmemiş projelerin görevleri (alt görevler dahil: aktif görev alt görev olabilir). */
   gorevler: Task[];
@@ -75,6 +75,12 @@ export function studyoOdalari(
     const acik = gorevler.filter((t) => t.status !== "completed" && !t.archivedAt);
     const canli = projeler.filter((p) => !p.archivedAt && p.status !== "archived");
     const biten = canli.filter((p) => p.status === "completed");
+    // Projede bitiş anı tutulmuyor: teslim günü (yoksa açılış) en yakın olan en yeni sayılır.
+    const plaketTarihi = (p: Project) => (p.deadline || p.createdAt || "").slice(0, 10);
+    const plaketler: Plaket[] = [...biten]
+      .sort((a, b) => plaketTarihi(b).localeCompare(plaketTarihi(a)))
+      .slice(0, RAF_KAPASITESI)
+      .map((p) => ({ projeId: p.id, ad: p.title, kapak: p.coverImageUrl || undefined, tarih: plaketTarihi(p) || undefined }));
     const suren = canli.filter((p) => p.status !== "completed");
     // Kişi "üzerinde çalışıyorum" dediği görevin projesinin istasyonunda durur
     // (proje bu işin süren projelerinden biriyse).
@@ -108,7 +114,7 @@ export function studyoOdalari(
           }),
         // İşin Bütçe sekmesi sahibine odada kasa olarak durur.
         ...(job.ownerId === opt.benId ? [{ key: KASA_MODULU, ad: "Kasa" }] : []),
-        ...(biten.length ? [{ key: KUPA_RAFI, ad: `Biten projeler (${biten.length})`, bilgi: { biten: 0, toplam: 0, kupa: biten.length } }] : []),
+        ...(biten.length ? [{ key: KUPA_RAFI, ad: `Biten projeler (${biten.length})`, bilgi: { biten: 0, toplam: 0, kupa: biten.length, plaketler } }] : []),
         ...moduller.map((key) => ({ key, ad: opt.modulAdi(key) ?? key })),
       ],
       kisiler,

@@ -299,6 +299,8 @@ export default function OfisOyunu({
   const [resimler, setResimler] = useState<Partial<Record<EsyaTuru, string>>>({});
   /** Kameranın girdiği oda: tıklanınca sayfaya gitmek yerine odaya girilir. */
   const [icerdekiOda, setIcerdekiOda] = useState<string | null>(null);
+  /** Kupa rafının karşısında göz hizasında mıyız (gezinme kapalı, yalnızca plaketler). */
+  const [rafta, setRafta] = useState(false);
   /** Oda paneli kapatılabilir; kapatmak kamerayı odadan çıkarmaz (yalnızca "Ofise dön" ve Esc çıkarır). */
   const [panelAcik, setPanelAcik] = useState(false);
   // Oda düzenleri: ekipte ortak (sunucu); uç yoksa geçici olarak tarayıcıda.
@@ -409,8 +411,10 @@ export default function OfisOyunu({
   useEffect(() => {
     if (!sahteTamEkran) return;
     const tus = (e: KeyboardEvent) => {
-      // Odadayken Esc önce odadan çıkarır; tam ekrandan ikinci Esc ile çıkılır.
-      if (e.key === "Escape" && !motorRef.current?.icerdekiOda) setSahteTamEkran(false);
+      // Odadayken (ya da raftayken) Esc önce oradan çıkarır; tam ekrandan ikinci
+      // Esc ile çıkılır. Motorun dinleyicisi önce çalışıp Esc'i işlediyse
+      // defaultPrevented'dır: o anda odadan çoktan çıkılmış görünür.
+      if (e.key === "Escape" && !e.defaultPrevented && !motorRef.current?.icerdekiOda && !motorRef.current?.raftaMi) setSahteTamEkran(false);
     };
     window.addEventListener("keydown", tus);
     document.body.style.overflow = "hidden";
@@ -594,6 +598,11 @@ export default function OfisOyunu({
       setMagaza(false);
     };
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
+    motor.onRafDegisti = (acik) => {
+      setRafta(acik);
+      // Raf ekranın ortasında: oda paneli önünü kapatmasın.
+      if (acik) setPanelAcik(false);
+    };
     motor.onModulTikla = (odaId, key) => durumRef.current.onModulAc(odaId, key);
     motor.onLioTikla = () => openLio();
     motor.onAjanTikla = () => setAjanAcik(true);
@@ -671,7 +680,9 @@ export default function OfisOyunu({
     m.temalariAyarla(new Map(departmanlar.flatMap((d) => (d.tema ? [[d.id, d.tema] as [string, string]] : []))));
     // Stüdyonun proje istasyonları: ilerleme/teslim değişince panoları tazelenir.
     m.istasyonlariAyarla(
-      new Map(departmanlar.flatMap((d) => (d.moduller ?? []).flatMap((x) => (x.bilgi ? [[x.key, x.bilgi] as [string, IstasyonBilgisi]] : []))))
+      new Map(
+        departmanlar.flatMap((d) => (d.moduller ?? []).flatMap((x) => (x.bilgi ? [[`${d.id}|${x.key}`, x.bilgi] as [string, IstasyonBilgisi]] : [])))
+      )
     );
     m.kur(plan, etiketler, sahneKisileri);
   }, [plan, etiketler, sahneKisileri, departmanlar, veriHazir]);
@@ -1089,7 +1100,16 @@ export default function OfisOyunu({
         />
       )}
 
-      {icerdekiOda && !panelAcik && !duzenlenen && (
+      {rafta && !duzenlenen && (
+        <div className="of-hud of-oda-mini">
+          <span className="of-raf-ipucu">Bir plakete tıkla, projeyi aç</span>
+          <button type="button" className="of-btn" onClick={() => motorRef.current?.raftanCik()}>
+            Raftan çık
+          </button>
+        </div>
+      )}
+
+      {icerdekiOda && !panelAcik && !duzenlenen && !rafta && (
         <div className="of-hud of-oda-mini">
           <button type="button" className="of-btn" onClick={() => setPanelAcik(true)}>
             {etiketler[icerdekiOda]?.ad ?? "Oda"}

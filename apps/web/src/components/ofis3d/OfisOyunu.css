@@ -819,6 +819,15 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.of-raf-ipucu {
+  align-self: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--yn-card) 92%, transparent);
+  color: var(--yn-ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
 
 /* Oda düzenleyicisi çubuğu */
 .of-duzen {

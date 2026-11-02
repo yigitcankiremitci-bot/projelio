@@ -240,7 +240,7 @@ export const KASA_MODULU = "__kasa";
 
 /**
  * Stüdyoda (bkz. lib/studyoOfisi.ts) işin her aktif projesi odada bir iş
- * istasyonudur; biten projeler kupa rafında durur. İkisi de kasa gibi modül
+ * istasyonudur; biten projeler kupa rafında plaket olarak durur. İkisi de kasa gibi modül
  * eşyası yolundan gider (odada kalır, taşınır, kaydedilir): proje istasyonunun
  * anahtarı "proje_<proje kimliği>".
  */
@@ -260,7 +260,22 @@ export interface IstasyonBilgisi {
   yaklasti?: boolean;
   /** Kupa rafı: biten proje sayısı. */
   kupa?: number;
+  /** Kupa rafı: rafta plaket olarak duran biten projeler (en yenisi önce). */
+  plaketler?: Plaket[];
 }
+
+/** Kupa rafında biten bir projenin plaketi: kapağı ve adı yazılı. */
+export interface Plaket {
+  projeId: string;
+  ad: string;
+  /** Projenin coverImageUrl'i (fotoğraf ya da "preset:<key>"); boşsa kimlikten türetilir. */
+  kapak?: string;
+  /** Plaketin altında yazan tarih (YYYY-MM-DD): teslim günü, yoksa açılış. */
+  tarih?: string;
+}
+
+/** Kupa rafına sığan plaket sayısı (3 raf × 4); fazlası sergi odasına (ileride). */
+export const RAF_KAPASITESI = 12;
 
 /** Anahtarın odadaki eşyası (proje istasyonları dahil); yoksa undefined. */
 export function modulEsyasiTuru(key: string): ModulEsyasi | undefined {

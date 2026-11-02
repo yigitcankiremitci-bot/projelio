@@ -380,11 +380,17 @@ export class OfisMotoru {
   onOdadanCikildi?: () => void;
   /** Odadaki bir modül eşyasına tıklanınca (modül sayfası açılır). */
   onModulTikla?: (odaId: string, modulKey: string) => void;
+  /** Kupa rafına yaklaşılınca (true) ve raftan geri çekilince (false). */
+  onRafDegisti?: (acik: boolean) => void;
   /** Ofiste gezen Lio robotuna tıklanınca (Lio sohbeti açılır). */
   onLioTikla?: () => void;
   /** Ajan robotuna tıklanınca (ajan paneli açılır). */
   onAjanTikla?: () => void;
-  /** Stüdyoda proje istasyonlarının ve kupa rafının bilgisi (anahtar: modül anahtarı). */
+  /**
+   * Stüdyoda proje istasyonlarının ve kupa rafının bilgisi. Anahtar "oda|modül":
+   * kupa rafının anahtarı her işte aynı, yalnızca modül anahtarıyla tutulunca
+   * bütün odaların rafı son işin projelerini gösteriyordu.
+   */
   private istasyonBilgileri = new Map<string, IstasyonBilgisi>();
   /** Stüdyoda odanın döşemesi (oda kimliği → tema). */
   private odaTemalari = new Map<string, string>();
@@ -461,7 +467,7 @@ export class OfisMotoru {
   private fare = new THREE.Vector2();
   private fareVar = false;
   private basilan: { x: number; y: number } | null = null;
-  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio" | "ajan"; id: string } | null = null;
+  private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio" | "ajan" | "plaket"; id: string } | null = null;
   /** Tıklanıp seçilen kişi: bir sonraki zemin tıklamasında oraya yürür. */
   private seciliKisiId: string | null = null;
   /** Ortalıkta gezen Lio robotu (ilk kurulumda bir kez yaratılır). */
@@ -471,7 +477,22 @@ export class OfisMotoru {
   private ajanBilgisi: AjanRobotBilgisi | null = null;
   private kisiEtiketi: CSS2DObject;
   private girisAnimasyonu = 0;
-  private gecis: { t: number; hedefBas: THREE.Vector3; hedefSon: THREE.Vector3; konumBas: THREE.Vector3; konumSon: THREE.Vector3 } | null = null;
+  private gecis: {
+    t: number;
+    hedefBas: THREE.Vector3;
+    hedefSon: THREE.Vector3;
+    konumBas: THREE.Vector3;
+    konumSon: THREE.Vector3;
+    /** Geçiş bitince (raftan dönüşte kamera sınırları ancak o zaman geri gelir). */
+    bitince?: () => void;
+  } | null = null;
+  /**
+   * Kupa rafının karşısında göz hizasındaysak: rafın anahtarı ve yaklaşmadan
+   * önceki kamera. Bu sırada gezinme kapalıdır; yalnızca plaketlere tıklanır.
+   */
+  private rafta: { id: string; konum: THREE.Vector3; hedef: THREE.Vector3 } | null = null;
+  /** Rafta üzerine gelinen plaket (hafifçe büyür). */
+  private ustPlaket: THREE.Object3D | null = null;
   /** Kameranın içine girdiği oda (yoksa bütün ofis görünüyor). */
   icerdekiOda: string | null = null;
   /** Ofisin kadraja oturduğu kamera uzaklığı (bkz. kadrajla). */
@@ -1193,6 +1214,69 @@ export class OfisMotoru {
     this.gecisBaslat(merkez, this.uzaklik);
   }
 
+  /**
+   * Kupa rafının tam karşısına, göz hizasına iner: raf kadrajı doldurur ve
+   * plaketlerin kapakları, adları okunur. Kuşbakışı gezinmenin sınırları
+   * (eğim, yön, uzaklık) bu bakışı yasaklıyor; rafta oldukça gevşetilir ve
+   * gezinme kapanır — dönüşte geçiş bitince eski hâline gelir.
+   */
+  rafaYaklas(id: string): void {
+    const o = this.modulNesneleri.get(id);
+    if (!o || this.rafta) return;
+    const kutuB = new THREE.Box3().setFromObject(o);
+    const merkez = kutuB.getCenter(new THREE.Vector3());
+    // Rafın önü yerel +z (bkz. modulEsyalari): dünyadaki yatay karşılığı.
+    const on = new THREE.Vector3(0, 0, 1).applyQuaternion(o.getWorldQuaternion(new THREE.Quaternion()));
+    on.y = 0;
+    on.normalize();
+    // Raf dikeyde de yatayda da sığsın (kenarlarda biraz pay).
+    const tan = Math.tan(THREE.MathUtils.degToRad(KAMERA_ACI / 2));
+    const boy = kutuB.max.y - kutuB.min.y;
+    const d = Math.max((boy / 2 + 0.14) / tan, (0.9 / 2 + 0.1) / (tan * this.kamera.aspect));
+    // Ayakta duran birinin bakışı: göz rafın üstünde, raf hafif aşağıda.
+    const konum = merkez.clone().addScaledVector(on, d);
+    konum.y = kutuB.min.y + 1.35;
+    this.rafta = { id, konum: this.kamera.position.clone(), hedef: this.kontrol.target.clone() };
+    this.ustteyiAyarla(null);
+    const k = this.kontrol;
+    k.enabled = false;
+    k.minPolarAngle = 0;
+    k.maxPolarAngle = Math.PI;
+    k.minAzimuthAngle = -Infinity;
+    k.maxAzimuthAngle = Infinity;
+    k.minDistance = 0.1;
+    k.maxDistance = Infinity;
+    const yon = konum.clone().sub(merkez);
+    this.gecisBaslat(merkez, yon.length(), yon.normalize());
+    this.onRafDegisti?.(true);
+  }
+
+  /** Raftan geri çekilir: kamera yaklaşmadan önceki yerine döner. */
+  raftanCik(): void {
+    const r = this.rafta;
+    if (!r) return;
+    this.rafta = null;
+    this.ustteyiAyarla(null);
+    const yon = r.konum.clone().sub(r.hedef);
+    this.gecisBaslat(r.hedef, yon.length(), yon.normalize());
+    this.gecis!.bitince = () => {
+      const k = this.kontrol;
+      k.minPolarAngle = 0.35;
+      k.maxPolarAngle = 1.2;
+      k.minAzimuthAngle = KAMERA_YATAY - 0.75;
+      k.maxAzimuthAngle = KAMERA_YATAY + 0.75;
+      k.minDistance = this.uzaklik * 0.22;
+      k.maxDistance = this.uzaklik * 1.6;
+      k.enabled = true;
+    };
+    this.onRafDegisti?.(false);
+  }
+
+  /** Kupa rafının karşısında mıyız. */
+  get raftaMi(): boolean {
+    return this.rafta !== null;
+  }
+
   private kamerayiYerlestir(animasyon: boolean): void {
     if (!this.plan) return;
     this.olcekle();
@@ -1419,7 +1503,7 @@ export class OfisMotoru {
       for (const y of oda.moduller) {
         const tur = modulEsyasiTuru(y.key);
         if (!tur) continue;
-        const o = modulEsyasi(tur, { ad: this.modulAdlari.get(y.key), bilgi: this.istasyonBilgileri.get(y.key) });
+        const o = modulEsyasi(tur, { ad: this.modulAdlari.get(y.key), bilgi: this.istasyonBilgileri.get(`${oda.id}|${y.key}`) });
         this.nesneKoy(oda, `modul:${y.key}`, o, y.x, y.z, y.don);
         o.traverse((c) => (c.userData.modul = `${oda.id}|${y.key}`));
         this.modulNesneleri.set(`${oda.id}|${y.key}`, o);
@@ -1773,7 +1857,10 @@ export class OfisMotoru {
       const e = g.t < 0.5 ? 4 * g.t * g.t * g.t : 1 - Math.pow(-2 * g.t + 2, 3) / 2;
       this.kontrol.target.lerpVectors(g.hedefBas, g.hedefSon, e);
       this.kamera.position.lerpVectors(g.konumBas, g.konumSon, e);
-      if (g.t >= 1) this.gecis = null;
+      if (g.t >= 1) {
+        this.gecis = null;
+        g.bitince?.();
+      }
     } else if (this.girisAnimasyonu > 0) {
       this.girisAnimasyonu = Math.max(0, this.girisAnimasyonu - dt * 0.9);
       const e = 1 - Math.pow(this.girisAnimasyonu, 3);
@@ -2808,8 +2895,9 @@ export class OfisMotoru {
     this.basilan = { x: e.clientX, y: e.clientY };
     // Ok tuşları çalışsın diye sahne odak alır (sayfa kaymaz).
     this.kap.focus({ preventScroll: true });
-    // Kullanıcı kamerayı tutunca süren geçiş bırakılır.
-    this.gecis = null;
+    // Kullanıcı kamerayı tutunca süren geçiş bırakılır — rafa iniş/dönüş
+    // hariç: orada gezinme kapalı, kamera yarı yolda asılı kalırdı.
+    if (!this.rafta && !this.gecis?.bitince) this.gecis = null;
     this.girisAnimasyonu = 0;
   };
 
@@ -2850,13 +2938,17 @@ export class OfisMotoru {
       return;
     }
     if (!u) return;
-    if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
+    if (u.tur === "plaket") {
+      const [odaId, projeId] = u.id.split("|");
+      this.onModulTikla?.(odaId, `${PROJE_ONEKI}${projeId}`);
+    } else if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
     else if (u.tur === "oda") this.onOdaTikla?.(u.id);
     else if (u.tur === "lio") this.onLioTikla?.();
     else if (u.tur === "ajan") this.onAjanTikla?.();
     else if (u.tur === "modul") {
       const [odaId, key] = u.id.split("|");
-      this.onModulTikla?.(odaId, key);
+      if (key === KUPA_RAFI) this.rafaYaklas(u.id);
+      else this.onModulTikla?.(odaId, key);
     }
   };
 
@@ -2875,11 +2967,18 @@ export class OfisMotoru {
       return;
     }
     if (!this.yerlestirme) {
+      // preventDefault: aynı Esc, sayfanın tam ekran dinleyicisini de tetiklemesin (bkz. OfisOyunu).
+      if (e.key === "Escape" && this.rafta) {
+        e.preventDefault();
+        this.raftanCik();
+        return;
+      }
       if (e.key === "Escape" && this.seciliKisiId) {
         this.kisiSec(null);
         return;
       }
       if (e.key === "Escape" && this.icerdekiOda) {
+        e.preventDefault();
         this.odadanCik();
         this.onOdadanCikildi?.();
       }
@@ -2923,6 +3022,14 @@ export class OfisMotoru {
       return;
     }
     this.isin.setFromCamera(this.fare, this.kamera);
+    if (this.rafta) {
+      // Raftayken yalnızca plaketler tıklanır.
+      const raf = this.modulNesneleri.get(this.rafta.id);
+      const p = raf ? this.isin.intersectObject(raf, true)[0]?.object : undefined;
+      const odaId = this.rafta.id.split("|")[0];
+      this.ustteyiAyarla(p?.userData.plaket ? { tur: "plaket", id: `${odaId}|${p.userData.plaket as string}` } : null);
+      return;
+    }
     const hedefler: THREE.Object3D[] = [
       ...this.kisiGrubu.children,
       ...(this.lio ? [this.lio.obj] : []),
@@ -2960,6 +3067,10 @@ export class OfisMotoru {
     }
     if (eski?.tur === "esya") this.esyaNesneleri.get(eski.id)?.scale.setScalar(1);
     if (eski?.tur === "modul") this.modulNesneleri.get(eski.id)?.scale.setScalar(1);
+    if (eski?.tur === "plaket" && this.ustPlaket) {
+      this.ustPlaket.scale.setScalar(1);
+      this.ustPlaket = null;
+    }
     this.ustteki = yeni;
     this.kisiEtiketi.visible = false;
     this.kap.style.cursor = "";
@@ -2970,6 +3081,30 @@ export class OfisMotoru {
       this.kap.style.cursor = "pointer";
     } else if (yeni.tur === "esya") {
       this.esyaNesneleri.get(yeni.id)?.scale.setScalar(1.08);
+      this.kap.style.cursor = "pointer";
+    } else if (yeni.tur === "plaket" && this.rafta) {
+      // Plaket: hafifçe büyür, üstünde projenin adı ve "aç" ipucu.
+      const projeId = yeni.id.split("|")[1];
+      let m: THREE.Object3D | undefined;
+      this.modulNesneleri.get(this.rafta.id)?.traverse((c) => {
+        if (c.userData.plaket === projeId) m = c;
+      });
+      if (m) {
+        this.ustPlaket = m;
+        m.scale.setScalar(1.06);
+        const bilgi = this.istasyonBilgileri.get(this.rafta.id)?.plaketler?.find((p) => p.projeId === projeId);
+        const el = this.kisiEtiketi.element;
+        el.textContent = "";
+        const b = document.createElement("b");
+        b.textContent = bilgi?.ad ?? "Proje";
+        el.appendChild(b);
+        const s = document.createElement("small");
+        s.textContent = "Tıkla, projeyi aç";
+        el.appendChild(s);
+        this.sahne.add(this.kisiEtiketi);
+        this.kisiEtiketi.position.copy(m.getWorldPosition(new THREE.Vector3())).add(new THREE.Vector3(0, 0.2, 0));
+        this.kisiEtiketi.visible = true;
+      }
       this.kap.style.cursor = "pointer";
     } else if (yeni.tur === "modul") {
       // Modül eşyası: hafifçe büyür, üstünde modülün adı ve "aç" ipucu.
@@ -2984,7 +3119,7 @@ export class OfisMotoru {
         const s = document.createElement("small");
         const key = yeni.id.split("|")[1];
         s.textContent =
-          key === KASA_MODULU ? "Tıkla, kasayı aç" : key.startsWith(PROJE_ONEKI) ? "Tıkla, projeyi aç" : key === KUPA_RAFI ? "Biten projeler" : "Tıkla, modülü aç";
+          key === KASA_MODULU ? "Tıkla, kasayı aç" : key.startsWith(PROJE_ONEKI) ? "Tıkla, projeyi aç" : key === KUPA_RAFI ? "Tıkla, rafa yaklaş" : "Tıkla, modülü aç";
         el.appendChild(s);
         this.sahne.add(this.kisiEtiketi);
         this.kisiEtiketi.position.set(o.position.x, 2.05, o.position.z);

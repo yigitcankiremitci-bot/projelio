@@ -7,7 +7,9 @@
 // böylece eşya hangi modülü temsil ettiğini bir bakışta anlatır.
 
 import * as THREE from "three";
-import type { IstasyonBilgisi, ModulEsyasi } from "../../lib/ofisOyunu";
+import type { IstasyonBilgisi, ModulEsyasi, Plaket } from "../../lib/ofisOyunu";
+import { RAF_KAPASITESI } from "../../lib/ofisOyunu";
+import { findCoverPreset, isCoverPreset, presetForSeed } from "../../lib/covers";
 import { esyaModeli, kutu, malzeme } from "./modeller";
 import { varlik } from "./varliklar";
 
@@ -667,50 +669,135 @@ function projeIstasyonu(ad: string, b: IstasyonBilgisi): THREE.Group {
   return g;
 }
 
-/** Biten projelerin rafı: her biten proje bir kupa ya da altın plak (en çok 8). */
-function kupaRafi(adet: number): THREE.Group {
+/**
+ * Kapağın tuvaldeki karşılığı. Hazır kapaklar CSS gradyanı olduğu için tuvale
+ * doğrudan çizilemez: son (taban) linear-gradient'in iki rengi alınır — desenli
+ * kapakların (dalga, ızgara) üst katmanları düşer, ana renk kalır.
+ */
+function kapakRenkleri(kapak: string | undefined, tohum: string): [string, string] {
+  const preset = findCoverPreset(kapak) ?? (kapak && !isCoverPreset(kapak) ? undefined : presetForSeed(tohum));
+  const arka = preset?.background ?? presetForSeed(tohum).background;
+  const eslesmeler = [...arka.matchAll(/linear-gradient\(135deg,\s*(#[0-9A-Fa-f]{6})[^,]*,\s*(#[0-9A-Fa-f]{6})/g)];
+  const son = eslesmeler[eslesmeler.length - 1];
+  return son ? [son[1], son[2]] : ["#4A5567", "#1C222C"];
+}
+
+/** Plaketin önü: ahşap çerçeve, üstte projenin kapağı, altta pirinç ad levhası. */
+function plaketYuzu(p: Plaket): THREE.CanvasTexture {
+  let gorsel: HTMLImageElement | null = null;
+  const ciz = (x: CanvasRenderingContext2D, w: number, h: number) => {
+    const cerceve = x.createLinearGradient(0, 0, w, h);
+    cerceve.addColorStop(0, "#5A3E2B");
+    cerceve.addColorStop(1, "#2E1F15");
+    x.fillStyle = cerceve;
+    x.fillRect(0, 0, w, h);
+    // Kapak alanı
+    const k = { x: 26, y: 26, w: w - 52, h: Math.round(h * 0.6) };
+    const [r1, r2] = kapakRenkleri(p.kapak, p.projeId);
+    const grad = x.createLinearGradient(k.x, k.y, k.x + k.w, k.y + k.h);
+    grad.addColorStop(0, r1);
+    grad.addColorStop(1, r2);
+    x.fillStyle = grad;
+    x.fillRect(k.x, k.y, k.w, k.h);
+    if (gorsel) {
+      // "cover" kırpması: kapak alanını doldurur, taşan kenar kesilir.
+      const o = Math.max(k.w / gorsel.naturalWidth, k.h / gorsel.naturalHeight);
+      const gw = k.w / o;
+      const gh = k.h / o;
+      x.drawImage(gorsel, (gorsel.naturalWidth - gw) / 2, (gorsel.naturalHeight - gh) / 2, gw, gh, k.x, k.y, k.w, k.h);
+    } else {
+      // Fotoğrafsız kapakta projenin baş harfi: plaketler yalnızca renkle ayırt edilmesin.
+      x.fillStyle = "rgba(255,255,255,0.82)";
+      x.font = `700 ${Math.round(k.h * 0.5)}px ${YAZI}`;
+      x.textAlign = "center";
+      x.textBaseline = "middle";
+      x.fillText((p.ad.trim()[0] ?? "P").toLocaleUpperCase("tr"), k.x + k.w / 2, k.y + k.h / 2);
+      x.textAlign = "start";
+      x.textBaseline = "alphabetic";
+    }
+    x.strokeStyle = "rgba(0,0,0,0.35)";
+    x.lineWidth = 4;
+    x.strokeRect(k.x, k.y, k.w, k.h);
+    // Pirinç ad levhası
+    const l = { x: 30, y: k.y + k.h + 24, w: w - 60, h: h - (k.y + k.h + 24) - 26 };
+    const pirinc = x.createLinearGradient(0, l.y, 0, l.y + l.h);
+    pirinc.addColorStop(0, "#E9C77B");
+    pirinc.addColorStop(0.5, "#C99A45");
+    pirinc.addColorStop(1, "#A57A30");
+    x.fillStyle = pirinc;
+    x.beginPath();
+    x.roundRect(l.x, l.y, l.w, l.h, 8);
+    x.fill();
+    x.fillStyle = "#3A2A12";
+    x.textAlign = "center";
+    x.font = `700 36px ${YAZI}`;
+    const satirlar = sar(x, p.ad, l.w - 24, 2);
+    const ust = l.y + (p.tarih ? 56 : 70) - (satirlar.length - 1) * 20;
+    satirlar.forEach((t, i) => x.fillText(t, w / 2, ust + i * 40));
+    if (p.tarih) {
+      x.font = `600 26px ${YAZI}`;
+      x.fillStyle = "#5A4220";
+      x.fillText(`${kisaTarih(p.tarih)} ${p.tarih.slice(0, 4)}`, w / 2, l.y + l.h - 22);
+    }
+    x.textAlign = "start";
+  };
+  const t = doku(380, 600, ciz);
+  if (p.kapak && !isCoverPreset(p.kapak)) {
+    // Fotoğraf sonradan gelir; WebGL dokusu için CORS izni gerekir. Gelmezse
+    // (izin yok, bağlantı koptu) plaket kapağın rengiyle kalır.
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.decoding = "async";
+    img.onload = () => {
+      gorsel = img;
+      const c = t.image as HTMLCanvasElement;
+      ciz(c.getContext("2d")!, c.width, c.height);
+      t.needsUpdate = true;
+    };
+    img.src = p.kapak;
+  }
+  return t;
+}
+
+/** Plaket ölçüsü (m): raf başına dört tane sığar. */
+const PLAKET = { w: 0.19, h: 0.3, kalin: 0.022 };
+/** Plaketlerin dizildiği raflar: üstten aşağı (en yenisi göz hizasına yakın üstte). */
+const PLAKET_RAFLARI = [0.84, 0.44, 0.04];
+
+/**
+ * Biten projelerin rafı: her biten proje kapağı ve adı yazılı bir plaket (en
+ * çok RAF_KAPASITESI). Plaketin her parçası userData.plaket'te projenin
+ * kimliğini taşır: motor, rafa yaklaşıldığında tıklananı projeye götürür.
+ */
+function kupaRafi(plaketler: Plaket[], adet: number): THREE.Group {
   const g = new THREE.Group();
   const ahsap = malzeme("#8A6446");
-  const altin = malzeme("#D4A24C", { metal: 0.8, parlak: 0.65 });
   // Gövde: iki yan, arka, üç raf.
   for (const x of [-0.42, 0.42]) g.add(yerlestir(kutu(0.04, 1.2, 0.34, ahsap, 0.01), x, 0.6, 0));
   g.add(yerlestir(kutu(0.88, 1.2, 0.02, ahsap, 0.005), 0, 0.6, -0.16));
-  const raflar = [0.04, 0.44, 0.84, 1.2];
-  for (const y of raflar) g.add(yerlestir(kutu(0.88, 0.035, 0.34, ahsap, 0.01), 0, y, 0));
-  const n = Math.min(adet, 8);
-  for (let i = 0; i < n; i++) {
-    // İlk dördü orta rafa, sonrakiler üst rafa; her raf kendi içinde ortalanır.
+  for (const y of [0.04, 0.44, 0.84, 1.2]) g.add(yerlestir(kutu(0.88, 0.035, 0.34, ahsap, 0.01), 0, y, 0));
+  // Eski veride yalnızca sayı olabilir: kapaksız, adsız plaketler sayı kadar dizilir.
+  const liste = (plaketler.length ? plaketler : Array.from({ length: adet }, (_, i) => ({ projeId: `bos-${i}`, ad: "" }))).slice(
+    0,
+    RAF_KAPASITESI
+  );
+  const kenar = malzeme("#3A2819", { parlak: 0.3 });
+  liste.forEach((p, i) => {
     const sira = Math.floor(i / 4);
-    const rafta = Math.min(4, n - sira * 4);
-    const x = ((i % 4) - (rafta - 1) / 2) * 0.2;
-    const y = raflar[1 + sira] + 0.02;
-    const odul = new THREE.Group();
-    odul.position.set(x, y, 0);
-    odul.scale.setScalar(1.45);
-    if (i % 2 === 0) {
-      // Kupa: ayak, gövde, iki kulp.
-      odul.add(yerlestir(kutu(0.08, 0.03, 0.08, malzeme("#3E4858"), 0.005), 0, 0.015, 0.02));
-      odul.add(yerlestir(silindir(0.012, 0.012, 0.08, altin, 8), 0, 0.07, 0.02));
-      odul.add(yerlestir(silindir(0.055, 0.025, 0.1, altin, 18), 0, 0.16, 0.02));
-      for (const s of [-1, 1]) {
-        const kulp = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.006, 6, 14), altin);
-        kulp.position.set(s * 0.06, 0.17, 0.02);
-        kulp.rotation.y = Math.PI / 2;
-        odul.add(kulp);
-      }
-    } else {
-      // Çerçeveli altın plak (arkaya yaslı).
-      const cerceve = kutu(0.17, 0.2, 0.02, malzeme("#1C222C"), 0.005);
-      cerceve.position.set(0, 0.11, -0.08);
-      cerceve.rotation.x = -0.12;
-      odul.add(cerceve);
-      const plak = silindir(0.065, 0.065, 0.006, altin, 28);
-      plak.rotation.x = Math.PI / 2 - 0.12;
-      plak.position.set(0, 0.115, -0.065);
-      odul.add(plak);
-    }
-    g.add(odul);
-  }
+    const rafta = Math.min(4, liste.length - sira * 4);
+    const x = ((i % 4) - (rafta - 1) / 2) * (PLAKET.w + 0.015);
+    const y = PLAKET_RAFLARI[sira] + 0.0175;
+    const on = new THREE.MeshStandardMaterial({ map: plaketYuzu(p), roughness: 0.55 });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(PLAKET.w, PLAKET.h, PLAKET.kalin), [kenar, kenar, kenar, kenar, on, kenar]);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    // Arkaya yaslı: alt kenar rafın ortasında, üstü arka panele doğru yatık.
+    const egim = 0.13;
+    m.rotation.x = -egim;
+    m.position.set(x, y + (PLAKET.h / 2) * Math.cos(egim), -0.06 - (PLAKET.h / 2) * Math.sin(egim));
+    if (p.ad) m.userData.plaket = p.projeId;
+    g.add(m);
+  });
   return g;
 }
 
@@ -751,6 +838,6 @@ export function modulEsyasi(tur: ModulEsyasi, ek: { ad?: string; bilgi?: Istasyo
     case "projeIstasyonu":
       return projeIstasyonu(ek.ad ?? "Proje", ek.bilgi ?? { biten: 0, toplam: 0 });
     case "kupaRafi":
-      return kupaRafi(ek.bilgi?.kupa ?? 0);
+      return kupaRafi(ek.bilgi?.plaketler ?? [], ek.bilgi?.kupa ?? 0);
   }
 }

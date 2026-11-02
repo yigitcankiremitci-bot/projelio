@@ -11,7 +11,7 @@
 // çubuğunu gizler (bu sayfa kendi menüsünü çiziyor). Tüm okuma/yazma mevcut
 // uçlardan; backend'de değişiklik yok. Görev seçme kuralları lib/sakin.ts'te.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { Department, DepartmentMember, Job, JobMember, Organization, PersonalBoardItem, Project, ProjeEtkinligi, Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
@@ -34,6 +34,9 @@ import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { serbestIsMi, studyoOdalari, type StudyoIsi } from "../lib/studyoOfisi";
 import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI } from "../lib/ofisOyunu";
 import "./Yeni.css";
+
+// Proje sayfası büyük: yalnızca ofisteki bir panodan açılınca yüklenir.
+const ProjectDetail = lazy(() => import("./ProjectDetail"));
 
 type Ton = "mor" | "mavi" | "turuncu" | "kirmizi" | "yesil" | "pembe" | "gri";
 
@@ -124,6 +127,8 @@ export default function Yeni() {
   const [kasaAcik, setKasaAcik] = useState<string | null>(null);
   // Ofisten tıklanan modül sayfaya gitmeden, neredeyse tam ekran modalde açılır.
   const [acikModul, setAcikModul] = useState<{ odaId: string; key: string } | null>(null);
+  /** Ofisteki proje panosundan (ya da kupa rafındaki plaketten) açılan proje: sayfaya gitmeden modalda. */
+  const [acikProje, setAcikProje] = useState<string | null>(null);
   // Stüdyom: serbest çalışanın işleri ofiste oda olur (bkz. lib/studyoOfisi.ts).
   // Şirketi olmayan kullanıcı doğrudan stüdyoyu görür.
   const [studyo, setStudyo] = useState(false);
@@ -632,7 +637,7 @@ export default function Yeni() {
                 key === KASA_MODULU
                   ? setKasaAcik(studyo ? odaId : "org")
                   : key.startsWith(PROJE_ONEKI)
-                    ? navigate(`/projects/${key.slice(PROJE_ONEKI.length)}`)
+                    ? setAcikProje(key.slice(PROJE_ONEKI.length))
                     : key === KUPA_RAFI
                       ? navigate(`/jobs/${odaId}`)
                       : isOpenableModule(key, Boolean(MODULE_RECORD_CONFIGS[key])) && kartModaldaAcilir(key)
@@ -641,6 +646,13 @@ export default function Yeni() {
               }
               onModulKapat={orgId && !studyo ? (key) => modulKapat(orgId, key) : undefined}
             />
+            {acikProje && (
+              <Modal title="Proje" onClose={() => setAcikProje(null)} maxWidth={1100} mobileFullScreen>
+                <Suspense fallback={null}>
+                  <ProjectDetail gomuluId={acikProje} />
+                </Suspense>
+              </Modal>
+            )}
             {acikModul &&
               (() => {
                 const m = [...katalog, ...serbestKatalog].find((x) => x.key === acikModul.key);

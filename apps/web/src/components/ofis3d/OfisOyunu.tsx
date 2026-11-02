@@ -311,7 +311,7 @@ export default function OfisOyunu({
   /** Kameranın girdiği oda: tıklanınca sayfaya gitmek yerine odaya girilir. */
   const [icerdekiOda, setIcerdekiOda] = useState<string | null>(null);
   /** Kupa rafının karşısında göz hizasında mıyız (gezinme kapalı, yalnızca plaketler). */
-  const [rafta, setRafta] = useState(false);
+  const [rafta, setRafta] = useState<false | "raf" | "pano">(false);
   /** Kişilerin seçtiği karakter görünümleri (migration 182); kaydı olmayan adından türetilir. */
   const [gorunumler, setGorunumler] = useState<Record<string, KarakterGorunumu>>({});
   /** Kendi karakterini düzenlerken taslak (null: kayıtlı görünüm yok, adından türetilen). */
@@ -1262,9 +1262,21 @@ export default function OfisOyunu({
 
       {rafta && !duzenlenen && (
         <div className="of-hud of-oda-mini">
-          <span className="of-raf-ipucu">Bir plakete tıkla, projeyi aç</span>
+          <span className="of-raf-ipucu">
+            {rafta === "pano" ? "Panoya yine tıkla, projeyi aç · ‹ › ile yandaki panoya geç" : "Bir plakete tıkla, projeyi aç"}
+          </span>
+          {rafta === "pano" && (motorRef.current?.panoSayisi ?? 0) > 1 && (
+            <>
+              <button type="button" className="of-btn" aria-label="Soldaki pano" onClick={() => motorRef.current?.yandakiPano(-1)}>
+                ‹
+              </button>
+              <button type="button" className="of-btn" aria-label="Sağdaki pano" onClick={() => motorRef.current?.yandakiPano(1)}>
+                ›
+              </button>
+            </>
+          )}
           <button type="button" className="of-btn" onClick={() => motorRef.current?.raftanCik()}>
-            Raftan çık
+            {rafta === "pano" ? "Geri dön" : "Raftan çık"}
           </button>
         </div>
       )}

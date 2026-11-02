@@ -37,9 +37,15 @@ import { useT } from "../lib/i18n";
 import { gorevDurumHatasiniBildir, altGorevHatasiniBildir } from "../lib/taskBlockNotice";
 import { bicimDili } from "../lib/i18n/depo";
 
-export default function ProjectDetail() {
+/**
+ * `gomuluId`: sayfa değil modal içinde (3D ofisteki proje panosundan) açılınca
+ * proje kimliği. O zaman adres ofis sayfasınındır: kimlik ve sekme adresten
+ * okunmaz/yazılmaz, sekme bileşenin kendi durumunda kalır.
+ */
+export default function ProjectDetail({ gomuluId }: { gomuluId?: string } = {}) {
   const t = useT();
-  const { id } = useParams();
+  const params = useParams();
+  const id = gomuluId ?? params.id;
   // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
   useLiveRoom(id ? `project:${id}` : null);
   const location = useLocation();
@@ -69,7 +75,11 @@ export default function ProjectDetail() {
   //
   // Geçerli sekme listesi yetkiye göre daralır; ?tab=budget ile doğrudan gelinse
   // bile yetki yoksa Görev/Çıktı'ya düşer (asıl kısıt zaten sunucuda).
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [adresParametreleri, setAdresParametreleri] = useSearchParams();
+  const [gomuluParametreler, setGomuluParametreler] = useState(() => new URLSearchParams());
+  const searchParams = gomuluId ? gomuluParametreler : adresParametreleri;
+  const setSearchParams = (v: Record<string, string>, ayar: { replace: boolean }) =>
+    gomuluId ? setGomuluParametreler(new URLSearchParams(v)) : setAdresParametreleri(v, ayar);
   const tabParam = searchParams.get("tab");
   // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Project.hiddenTabs).
   const hiddenTabs = project?.hiddenTabs;
@@ -488,7 +498,7 @@ export default function ProjectDetail() {
   );
 
   return (
-    <div style={{ minHeight: "100vh", background: c.background }}>
+    <div style={{ minHeight: gomuluId ? undefined : "100vh", background: c.background }}>
       {!project && (
         <div style={{ padding: 28 }}>
           <Link to="/" style={{ fontSize: 15, color: c.textSecondary, marginBottom: 4, display: "inline-block" }}>

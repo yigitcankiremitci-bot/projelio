@@ -6,11 +6,22 @@
  */
 
 export interface IsPaketi {
-  is: { id: string; tur: "sohbet" | "arastirma" | "ogrenme" | "liste"; girdi: string };
+  is: { id: string; tur: "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon"; girdi: string };
   ad: string;
   ogretilenler: { baslik: string; icerik: string }[];
   sonMesajlar: { rol: "kullanici" | "ajan"; metin: string }[];
   mevcutKonular: string[];
+  /** Fikir/araştırma/otomasyonda: son öğrendikleri, raporlar, önceki fikirlere verilen yanıtlar. */
+  baglam?: string;
+}
+
+export interface Fikir {
+  baslik: string;
+  fayda: string;
+  adimlar: string[];
+  etki: "yuksek" | "orta" | "dusuk";
+  emek: "kucuk" | "orta" | "buyuk";
+  dayanak?: string;
 }
 
 export interface Kaynak {
@@ -24,7 +35,7 @@ export interface IsSonucu {
   rapor?: { baslik: string; ozet?: string; icerik: string; kaynaklar?: Kaynak[] };
   bilgiler?: { baslik: string; icerik: string; kaynaklar?: Kaynak[] }[];
   konular?: { konu: string; neden?: string }[];
-  oneriler?: { tur: "yapilacak"; veri: { baslik: string; aciklama?: string; bitis?: string } }[];
+  oneriler?: ({ tur: "yapilacak"; veri: { baslik: string; aciklama?: string; bitis?: string } } | { tur: "fikir"; veri: Fikir })[];
 }
 
 export class Projelio {

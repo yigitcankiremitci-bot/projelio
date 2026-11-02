@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { AJAN_SINIRLARI, type AjanBilgi, type AjanDurumu, type AjanIs, type AjanKonu, type AjanMesaj, type AjanOneri, type AjanRapor, type AjanRaporOzeti, type ThemeColors } from "@projelio/shared";
-import { ajanApi } from "../../api/ajan";
+import { AJAN_OTOMASYON_SABLONLARI, AJAN_SINIRLARI, ajanOtomasyonZamani, type AjanBilgi, type AjanFikirVerisi, type AjanOtomasyon, type AjanOtomasyonSikligi, type AjanDurumu, type AjanIs, type AjanKonu, type AjanMesaj, type AjanOneri, type AjanRapor, type AjanRaporOzeti, type ThemeColors } from "@projelio/shared";
+import { ajanApi, type OtomasyonGirdisi } from "../../api/ajan";
 import { ignoreAbort } from "../../api/client";
 import { markdownBloklari, type SatirIci } from "../../lib/ajanMetin";
 import { useThemeColors } from "../../theme/useThemeColors";
@@ -18,10 +18,12 @@ import Modal from "../Modal";
  * kanalı bu MVP için fazla).
  */
 
-type Sekme = "sohbet" | "raporlar" | "ogrettiklerim" | "liste" | "mac";
+type Sekme = "sohbet" | "fikirler" | "otomasyonlar" | "raporlar" | "ogrettiklerim" | "liste" | "mac";
 
 const SEKMELER: { id: Sekme; ad: string }[] = [
   { id: "sohbet", ad: "Sohbet" },
+  { id: "fikirler", ad: "Fikirler" },
+  { id: "otomasyonlar", ad: "Otomasyonlar" },
   { id: "raporlar", ad: "Raporlar" },
   { id: "ogrettiklerim", ad: "Bellek" },
   { id: "liste", ad: "Öğrenme listesi" },
@@ -71,7 +73,7 @@ export default function AjanPaneli({ onClose, onDurum }: { onClose: () => void; 
     <Modal title={ad} subtitle={durumMetni(durum)} onClose={onClose} maxWidth={1040} mobileFullScreen>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
         {SEKMELER.map((s) => {
-          const rozet = s.id === "raporlar" ? durum?.okunmamisRapor : s.id === "sohbet" ? durum?.bekleyenOneri : 0;
+          const rozet = s.id === "raporlar" ? durum?.okunmamisRapor : s.id === "sohbet" ? durum?.bekleyenOneri : s.id === "fikirler" ? durum?.bekleyenFikir : 0;
           return (
             <button key={s.id} type="button" onClick={() => setSekme(s.id)} style={sekmeStili(c, sekme === s.id)}>
               {s.ad}
@@ -85,6 +87,8 @@ export default function AjanPaneli({ onClose, onDurum }: { onClose: () => void; 
       ) : (
         <>
           {sekme === "sohbet" && <Sohbet c={c} durum={durum} tazele={tazele} />}
+          {sekme === "fikirler" && <Fikirler c={c} tazele={tazele} />}
+          {sekme === "otomasyonlar" && <Otomasyonlar c={c} durum={durum} />}
           {sekme === "raporlar" && <Raporlar c={c} durum={durum} tazele={tazele} />}
           {sekme === "ogrettiklerim" && <Bellek c={c} />}
           {sekme === "liste" && <Liste c={c} durum={durum} tazele={tazele} onDurum={setDurum} />}
@@ -156,7 +160,7 @@ function Sohbet({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | null
   const bekliyor = mesajlar.length > 0 && mesajlar[mesajlar.length - 1].rol === "kullanici";
   return (
     <div>
-      {oneriler.map((o) => (
+      {oneriler.flatMap((o) => (o.tur === "yapilacak" ? [o] : [])).map((o) => (
         <div key={o.id} style={{ ...kart(c), borderColor: c.accent, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
             <small style={{ color: c.textSecondary }}>Yapılacaklarına eklemek istiyor</small>
@@ -365,7 +369,14 @@ function Raporlar({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | nu
   );
 }
 
-const IS_ADI: Record<AjanIs["tur"], string> = { sohbet: "Sohbet", arastirma: "Araştırma", ogrenme: "Öğrenme", liste: "Liste hazırlama" };
+const IS_ADI: Record<AjanIs["tur"], string> = {
+  sohbet: "Sohbet",
+  arastirma: "Araştırma",
+  ogrenme: "Öğrenme",
+  liste: "Liste hazırlama",
+  fikir: "Fikir üretme",
+  otomasyon: "Otomasyon",
+};
 
 // ------------------------------------------------------------------ Bellek
 
@@ -648,6 +659,360 @@ function Mac({ c, durum, onDurum }: { c: ThemeColors; durum: AjanDurumu | null; 
 }
 
 // ------------------------------------------------------------------ ortak
+
+// ------------------------------------------------------------------ Fikirler
+
+const ETKI_ADI: Record<AjanFikirVerisi["etki"], string> = { yuksek: "Etkisi yüksek", orta: "Etkisi orta", dusuk: "Etkisi düşük" };
+const EMEK_ADI: Record<AjanFikirVerisi["emek"], string> = { kucuk: "Emeği az", orta: "Emeği orta", buyuk: "Emeği çok" };
+
+function Fikirler({ c, tazele }: { c: ThemeColors; tazele: number }) {
+  const [fikirler, setFikirler] = useState<AjanOneri[]>([]);
+  const [hata, setHata] = useState<string | null>(null);
+  const [redId, setRedId] = useState<string | null>(null);
+  const [redNotu, setRedNotu] = useState("");
+  const [gecmisAcik, setGecmisAcik] = useState(false);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    ajanApi.fikirler(ac.signal).then(setFikirler).catch(ignoreAbort);
+    return () => ac.abort();
+  }, [tazele]);
+
+  const yanitlandi = (id: string, durum: AjanOneri["durum"], not?: string) =>
+    setFikirler((l) => l.map((f) => (f.id === id ? { ...f, durum, yanitNotu: not ?? f.yanitNotu } : f)));
+
+  const eylem = async (is: () => Promise<unknown>, sonra: () => void) => {
+    setHata(null);
+    try {
+      await is();
+      sonra();
+    } catch (e: any) {
+      setHata(e?.message ?? "Yapılamadı.");
+    }
+  };
+
+  const fikirKartlari = fikirler.flatMap((f) => (f.tur === "fikir" ? [f] : []));
+  const bekleyen = fikirKartlari.filter((f) => f.durum === "bekliyor");
+  const gecmis = fikirKartlari.filter((f) => f.durum !== "bekliyor");
+  return (
+    <div>
+      <p style={{ color: c.textSecondary, marginTop: 0 }}>
+        Ajan araştırmalarını ve öğrendiklerini şirketin için bitirilebilir işlere çevirir. Beğendiğini yapılacaklarına ekle; istemediğini nedeniyle
+        reddet: ajan bundan neyin işine yaradığını öğrenir.
+      </p>
+      {hata && <Hata c={c} metin={hata} />}
+      {bilgi && <p style={{ color: c.textSecondary }}>{bilgi}</p>}
+      {!bekleyen.length && (
+        <p style={{ color: c.textSecondary }}>
+          Şimdilik yeni fikir yok. Ajan birkaç konu öğrendikçe, her araştırmanın ve otomasyonun sonunda fikir çıkarır.
+        </p>
+      )}
+      {bekleyen.map((f) => (
+        <div key={f.id} style={{ ...kart(c), borderColor: c.accent }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+            <b style={{ flex: 1, minWidth: 200 }}>{f.veri.baslik}</b>
+            <span style={cipStili(c)}>{ETKI_ADI[f.veri.etki]}</span>
+            <span style={cipStili(c)}>{EMEK_ADI[f.veri.emek]}</span>
+          </div>
+          <div style={{ marginTop: 6 }}>{f.veri.fayda}</div>
+          <ol style={{ margin: "6px 0", paddingLeft: 20 }}>
+            {f.veri.adimlar.map((a, i) => (
+              <li key={i}>{a}</li>
+            ))}
+          </ol>
+          {f.veri.dayanak && <small style={{ color: c.textSecondary, display: "block" }}>Dayanak: {f.veri.dayanak}</small>}
+          {f.yanitNotu && <small style={{ color: c.textSecondary, display: "block" }}>{f.yanitNotu}</small>}
+          {redId === f.id ? (
+            <form
+              style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                void eylem(
+                  () => ajanApi.reddet(f.id, redNotu.trim() || undefined),
+                  () => {
+                    yanitlandi(f.id, "reddedildi", redNotu.trim() || undefined);
+                    setRedId(null);
+                    setRedNotu("");
+                  }
+                );
+              }}
+            >
+              <input
+                autoFocus
+                value={redNotu}
+                onChange={(e) => setRedNotu(e.target.value)}
+                placeholder="Neden istemiyorsun? (isteğe bağlı, ajan öğrenir) Ör. bütçemiz yok, zaten yapıyoruz"
+                maxLength={500}
+                style={{ ...giris(c), flex: 1, minWidth: 220 }}
+              />
+              <button type="submit" style={dugme(c)}>
+                Reddet
+              </button>
+              <button type="button" style={dugme(c)} onClick={() => setRedId(null)}>
+                Vazgeç
+              </button>
+            </form>
+          ) : (
+            <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                style={dugme(c, true)}
+                onClick={() => void eylem(() => ajanApi.onayla(f.id), () => yanitlandi(f.id, "onaylandi"))}
+              >
+                Yapılacaklarıma ekle
+              </button>
+              <button
+                type="button"
+                style={dugme(c)}
+                onClick={() =>
+                  void eylem(
+                    () => ajanApi.fikriArastir(f.id),
+                    () => {
+                      setFikirler((l) => l.map((x) => (x.id === f.id ? { ...x, yanitNotu: "Araştırmaya gönderildi" } : x)));
+                      setBilgi("Araştırma sıraya girdi; rapor Raporlar sekmesine düşecek.");
+                    }
+                  )
+                }
+              >
+                Nasıl yapılır, araştır
+              </button>
+              <button type="button" style={dugme(c)} onClick={() => setRedId(f.id)}>
+                İlgilenmiyorum
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      {!!gecmis.length && (
+        <>
+          <button type="button" style={{ ...dugme(c), marginTop: 8 }} onClick={() => setGecmisAcik((a) => !a)}>
+            {gecmisAcik ? "Geçmişi gizle" : `Geçmiş (${gecmis.length})`}
+          </button>
+          {gecmisAcik &&
+            gecmis.map((f) => (
+              <div key={f.id} style={{ ...kart(c), marginTop: 8, opacity: 0.8 }}>
+                <b>{f.durum === "onaylandi" ? "✓ " : "✗ "}{f.veri.baslik}</b>
+                <small style={{ color: c.textSecondary, display: "block" }}>
+                  {f.durum === "onaylandi" ? "Yapılacaklarına eklendi" : `Reddedildi${f.yanitNotu ? `: ${f.yanitNotu}` : ""}`} · {tarih(f.createdAt)}
+                </small>
+              </div>
+            ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ Otomasyonlar
+
+const GUN_ADLARI = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const BOS_OTOMASYON: OtomasyonGirdisi = { ad: "", talimat: "", siklik: "haftalik", saat: 9, gun: 1 };
+
+function Otomasyonlar({ c, durum }: { c: ThemeColors; durum: AjanDurumu | null }) {
+  const [liste, setListe] = useState<AjanOtomasyon[]>([]);
+  const [form, setForm] = useState<OtomasyonGirdisi | null>(null);
+  const [duzenlenen, setDuzenlenen] = useState<string | null>(null);
+  const [hata, setHata] = useState<string | null>(null);
+  const [bilgi, setBilgi] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    ajanApi.otomasyonlar(ac.signal).then(setListe).catch(ignoreAbort);
+    return () => ac.abort();
+  }, []);
+
+  const yap = async (is: () => Promise<unknown>) => {
+    setHata(null);
+    setBilgi(null);
+    try {
+      await is();
+    } catch (e: any) {
+      setHata(e?.message ?? "Yapılamadı.");
+    }
+  };
+
+  const kaydet = () =>
+    yap(async () => {
+      if (!form) return;
+      if (duzenlenen) {
+        const o = await ajanApi.otomasyonGuncelle(duzenlenen, form);
+        setListe((l) => l.map((x) => (x.id === o.id ? o : x)));
+      } else {
+        const o = await ajanApi.otomasyonEkle(form);
+        setListe((l) => [...l, o]);
+      }
+      setForm(null);
+      setDuzenlenen(null);
+    });
+
+  if (form)
+    return (
+      <div>
+        {!duzenlenen && (
+          <>
+            <small style={{ color: c.textSecondary }}>Hazır şablondan başla ya da kendin yaz:</small>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0 12px" }}>
+              {AJAN_OTOMASYON_SABLONLARI.map((s) => (
+                <button key={s.ad} type="button" style={sekmeStili(c, form.ad === s.ad)} onClick={() => setForm({ ...s })}>
+                  {s.ad}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        <input
+          value={form.ad}
+          onChange={(e) => setForm({ ...form, ad: e.target.value })}
+          placeholder="Ad, ör. Haftalık rakip takibi"
+          maxLength={AJAN_SINIRLARI.otomasyonAdi}
+          style={{ ...giris(c), width: "100%", marginBottom: 6 }}
+        />
+        <textarea
+          value={form.talimat}
+          onChange={(e) => setForm({ ...form, talimat: e.target.value })}
+          placeholder="Ajan ne yapsın? Ör. Rakiplerimizin bu haftaki kampanyalarını bul, kısa rapor yaz ve bizim uygulayabileceğimiz 3 iş öner."
+          rows={4}
+          maxLength={AJAN_SINIRLARI.talimat}
+          style={{ ...giris(c), width: "100%", resize: "vertical" }}
+        />
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+          <select
+            value={form.siklik}
+            onChange={(e) => setForm({ ...form, siklik: e.target.value as AjanOtomasyonSikligi, gun: 1 })}
+            style={giris(c)}
+            aria-label="Sıklık"
+          >
+            <option value="gunluk">Her gün</option>
+            <option value="haftalik">Her hafta</option>
+            <option value="aylik">Her ay</option>
+          </select>
+          {form.siklik === "haftalik" && (
+            <select value={form.gun} onChange={(e) => setForm({ ...form, gun: Number(e.target.value) })} style={giris(c)} aria-label="Gün">
+              {GUN_ADLARI.map((g, i) => (
+                <option key={g} value={i + 1}>
+                  {g}
+                </option>
+              ))}
+            </select>
+          )}
+          {form.siklik === "aylik" && (
+            <select value={form.gun} onChange={(e) => setForm({ ...form, gun: Number(e.target.value) })} style={giris(c)} aria-label="Ayın günü">
+              {Array.from({ length: 28 }, (_, i) => (
+                <option key={i} value={i + 1}>
+                  Ayın {i + 1}. günü
+                </option>
+              ))}
+            </select>
+          )}
+          <select value={form.saat} onChange={(e) => setForm({ ...form, saat: Number(e.target.value) })} style={giris(c)} aria-label="Saat">
+            {Array.from({ length: 24 }, (_, i) => (
+              <option key={i} value={i}>
+                {String(i).padStart(2, "0")}:00
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+          <button type="button" style={dugme(c, true)} disabled={!form.ad.trim() || !form.talimat.trim()} onClick={() => void kaydet()}>
+            Kaydet
+          </button>
+          <button
+            type="button"
+            style={dugme(c)}
+            onClick={() => {
+              setForm(null);
+              setDuzenlenen(null);
+            }}
+          >
+            Vazgeç
+          </button>
+        </div>
+        {hata && <Hata c={c} metin={hata} />}
+      </div>
+    );
+
+  return (
+    <div>
+      <p style={{ color: c.textSecondary, marginTop: 0 }}>
+        Ajana düzenli görev ver: zamanı gelince kendisi araştırır, rapor yazar ve şirketin için iş bitirici fikirler çıkarır. Saatler Türkiye
+        saatidir. Mac o saatte kapalıysa görev sırada bekler, Mac açılınca bir kez çalışır.
+      </p>
+      <button type="button" style={dugme(c, true)} onClick={() => setForm({ ...BOS_OTOMASYON })}>
+        + Otomasyon kur
+      </button>
+      {hata && <Hata c={c} metin={hata} />}
+      {bilgi && <p style={{ color: c.textSecondary }}>{bilgi}</p>}
+      {!liste.length && <p style={{ color: c.textSecondary }}>Henüz otomasyon yok. Hazır şablonlardan biriyle başlayabilirsin.</p>}
+      {liste.map((o) => (
+        <div key={o.id} style={{ ...kart(c), marginTop: 8, opacity: o.acik ? 1 : 0.6 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+            <b style={{ flex: 1, minWidth: 180 }}>{o.ad}</b>
+            <small style={{ color: c.textSecondary }}>{ajanOtomasyonZamani(o)}</small>
+          </div>
+          <div style={{ whiteSpace: "pre-wrap", marginTop: 4, color: c.textSecondary }}>{o.talimat}</div>
+          <small style={{ color: c.textSecondary, display: "block", marginTop: 4 }}>
+            {o.acik ? `Sıradaki: ${tarih(o.sonraki)}` : "Duraklatıldı"}
+            {o.sonCalisma ? ` · Son çalışma: ${tarih(o.sonCalisma)}` : ""}
+          </small>
+          <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              style={dugme(c)}
+              onClick={() =>
+                void yap(async () => {
+                  await ajanApi.otomasyonCalistir(o.id);
+                  setBilgi(durum?.bagli ? `"${o.ad}" sıraya girdi; bitince rapor ve fikirler gelecek.` : `"${o.ad}" sıraya girdi; Mac açılınca çalışacak.`);
+                })
+              }
+            >
+              Şimdi çalıştır
+            </button>
+            <button
+              type="button"
+              style={dugme(c)}
+              onClick={() =>
+                void yap(async () => {
+                  const g = await ajanApi.otomasyonGuncelle(o.id, { acik: !o.acik });
+                  setListe((l) => l.map((x) => (x.id === g.id ? g : x)));
+                })
+              }
+            >
+              {o.acik ? "Duraklat" : "Devam ettir"}
+            </button>
+            <button
+              type="button"
+              style={dugme(c)}
+              onClick={() => {
+                setDuzenlenen(o.id);
+                setForm({ ad: o.ad, talimat: o.talimat, siklik: o.siklik, saat: o.saat, gun: o.gun });
+              }}
+            >
+              Düzenle
+            </button>
+            <button
+              type="button"
+              style={dugme(c)}
+              onClick={() =>
+                void yap(async () => {
+                  if (!window.confirm(`"${o.ad}" silinsin mi?`)) return;
+                  await ajanApi.otomasyonSil(o.id);
+                  setListe((l) => l.filter((x) => x.id !== o.id));
+                })
+              }
+            >
+              Sil
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function cipStili(c: ThemeColors): CSSProperties {
+  return { border: `1px solid ${c.border}`, borderRadius: 999, padding: "1px 8px", fontSize: 12, color: c.textSecondary, whiteSpace: "nowrap" };
+}
 
 function Markdown({ c, metin }: { c: ThemeColors; metin: string }) {
   const parca = (p: SatirIci, i: number): ReactNode =>

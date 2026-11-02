@@ -7,6 +7,8 @@ import {
   ajanBagliMi,
   ajanBellekAlintisi,
   ajanBostaNeYapsin,
+  ajanFikirAciklamasi,
+  ajanSonrakiCalisma,
   ajanIsAsiliMi,
   ajanKirp,
   ajanKonuAnahtari,
@@ -21,6 +23,8 @@ import {
   type AjanKonuDurumu,
   type AjanMesaj,
   type AjanOneri,
+  type AjanOtomasyon,
+  type AjanOtomasyonSikligi,
   type AjanRapor,
   type AjanRaporOzeti,
 } from "@projelio/shared";
@@ -35,6 +39,9 @@ const OGRETILEN_PAKET_TAVANI = 30;
 const LISTEDE_ICERIK = 2000;
 const SOHBET_GECMISI = 12;
 const KONU_DURUMLARI: AjanKonuDurumu[] = ["bekliyor", "ogreniliyor", "ogrenildi", "atlandi"];
+const SIKLIKLAR: AjanOtomasyonSikligi[] = ["gunluk", "haftalik", "aylik"];
+/** Fikir/araştırma/otomasyon işinde ajana giden bağlamın tavanı (qwen3:8b'nin 16K'sı paylaşılıyor). */
+const BAGLAM_BUTCESI = 7000;
 
 export function anahtarOzeti(anahtar: string): string {
   return createHash("sha256").update(anahtar).digest("hex");
@@ -116,7 +123,7 @@ export class AjanService {
   async durum(userId: string): Promise<AjanDurumu> {
     const bos: AjanDurumu = {
       izinli: false, ad: "Ajan", bagli: false, kurulu: false, calisiyor: false, not: null, model: null,
-      sonNabiz: null, ogrenmeAcik: false, bekleyenIs: 0, okunmamisRapor: 0, bekleyenOneri: 0,
+      sonNabiz: null, ogrenmeAcik: false, bekleyenIs: 0, okunmamisRapor: 0, bekleyenOneri: 0, bekleyenFikir: 0,
     };
     if (!(await this.izinli(userId))) return bos;
     const a = await this.ayarlar(userId);
@@ -124,10 +131,15 @@ export class AjanService {
       const { count } = await this.db.from(tablo).select("id", { count: "exact", head: true }).eq("user_id", userId).eq(sutun, deger as any);
       return count ?? 0;
     };
-    const [bekleyenIs, okunmamisRapor, bekleyenOneri] = await Promise.all([
+    const oneriSay = async (tur: string) => {
+      const { count } = await this.db.from("ajan_onerileri").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("durum", "bekliyor").eq("tur", tur);
+      return count ?? 0;
+    };
+    const [bekleyenIs, okunmamisRapor, bekleyenOneri, bekleyenFikir] = await Promise.all([
       say("ajan_isleri", "durum", "bekliyor"),
       say("ajan_raporlari", "okundu", false),
-      say("ajan_onerileri", "durum", "bekliyor"),
+      oneriSay("yapilacak"),
+      oneriSay("fikir"),
     ]);
     const bagli = ajanBagliMi(a.son_nabiz);
     return {
@@ -143,6 +155,7 @@ export class AjanService {
       bekleyenIs,
       okunmamisRapor,
       bekleyenOneri,
+      bekleyenFikir,
     };
   }
 
@@ -331,6 +344,7 @@ export class AjanService {
     if (error) throw error;
   }
 
+  /** Sohbette onay bekleyen yapılacak önerileri. Fikirlerin kendi sekmesi var (fikirler). */
   async oneriler(userId: string): Promise<AjanOneri[]> {
     await this.assertIzinli(userId);
     const { data, error } = await this.db
@@ -338,22 +352,57 @@ export class AjanService {
       .select("*")
       .eq("user_id", userId)
       .eq("durum", "bekliyor")
+      .eq("tur", "yapilacak")
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
     if (error) throw error;
-    return (data ?? []).map((o: any) => ({ id: o.id, tur: o.tur, veri: o.veri, durum: o.durum, createdAt: o.created_at }));
+    return (data ?? []).map(oneriSatiri);
+  }
+
+  /** Bekleyen fikirler önce, sonra yanıtlanmış olanlar (geçmiş). */
+  async fikirler(userId: string): Promise<AjanOneri[]> {
+    await this.assertIzinli(userId);
+    const { data, error } = await this.db
+      .from("ajan_onerileri")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("tur", "fikir")
+      .order("created_at", { ascending: false })
+      .limit(LISTE_TAVANI);
+    if (error) throw error;
+    const liste = (data ?? []).map(oneriSatiri);
+    return [...liste.filter((o) => o.durum === "bekliyor"), ...liste.filter((o) => o.durum !== "bekliyor")];
+  }
+
+  /** Fikri araştırmaya gönderir: ajan nasıl hayata geçeceğini araştırıp rapor yazar. Fikir beklemede kalır. */
+  async fikriArastir(userId: string, id: string): Promise<AjanIs> {
+    await this.assertIzinli(userId);
+    const { data } = await this.db.from("ajan_onerileri").select("*").eq("user_id", userId).eq("id", id).eq("tur", "fikir").maybeSingle<any>();
+    if (!data) throw new NotFoundException("Fikir bulunamadı.");
+    const f = data.veri ?? {};
+    await this.db.from("ajan_onerileri").update({ yanit_notu: "Araştırmaya gönderildi" }).eq("id", id);
+    return this.isAc(
+      userId,
+      "arastirma",
+      ajanKirp(
+        `Şu fikri hayata geçirmek için araştır: "${f.baslik}". Beklenen fayda: ${f.fayda}. ` +
+          `Benzer örnekleri, maliyeti, gereken araçları ve riskleri bul; adım adım uygulanabilir bir plan yaz.`,
+        AJAN_SINIRLARI.girdi
+      )
+    );
   }
 
   /**
    * Öneriyi yanıtlar. Onayda işi yapan BU servis ve kullanıcının kendi
    * yetkisiyle: yapılacak, kişinin kendi listesine (PersonalTodosService) girer.
    */
-  async oneriYanitla(userId: string, id: string, onay: boolean): Promise<void> {
+  async oneriYanitla(userId: string, id: string, onay: boolean, not?: unknown): Promise<void> {
     await this.assertIzinli(userId);
     // Önce durumu çevir: iki sekmeden aynı anda basılırsa yapılacak iki kez açılmasın.
+    // Gerekçe fikirde ajana geri gider: "neden istemediğini" sonraki fikirlerde görür.
     const { data, error } = await this.db
       .from("ajan_onerileri")
-      .update({ durum: onay ? "onaylandi" : "reddedildi" })
+      .update({ durum: onay ? "onaylandi" : "reddedildi", yanit_notu: ajanKirp(not, 500) || null, yanit_at: new Date().toISOString() })
       .eq("user_id", userId)
       .eq("id", id)
       .eq("durum", "bekliyor")
@@ -374,6 +423,66 @@ export class AjanService {
         throw e;
       }
     }
+    if (data.tur === "fikir") {
+      try {
+        await this.yapilacaklar.create(userId, { title: data.veri?.baslik, description: ajanFikirAciklamasi(data.veri) });
+      } catch (e) {
+        await this.db.from("ajan_onerileri").update({ durum: "bekliyor" }).eq("id", id);
+        throw e;
+      }
+    }
+  }
+
+  // ============================================================ otomasyonlar
+
+  async otomasyonlar(userId: string): Promise<AjanOtomasyon[]> {
+    await this.assertIzinli(userId);
+    const { data, error } = await this.db.from("ajan_otomasyonlari").select("*").eq("user_id", userId).order("created_at", { ascending: true }).limit(LISTE_TAVANI);
+    if (error) throw error;
+    return (data ?? []).map(otomasyonSatiri);
+  }
+
+  async otomasyonEkle(userId: string, body: Record<string, unknown>): Promise<AjanOtomasyon> {
+    await this.assertIzinli(userId);
+    const { count } = await this.db.from("ajan_otomasyonlari").select("id", { count: "exact", head: true }).eq("user_id", userId);
+    if ((count ?? 0) >= AJAN_SINIRLARI.otomasyon) throw new BadRequestException("Otomasyon sınırına ulaştın; birini silip yeniden dene.");
+    const v = otomasyonGirdisi(body, null);
+    const { data, error } = await this.db
+      .from("ajan_otomasyonlari")
+      .insert({ user_id: userId, ...v, sonraki: ajanSonrakiCalisma(v) })
+      .select()
+      .single();
+    if (error) throw error;
+    return otomasyonSatiri(data);
+  }
+
+  async otomasyonGuncelle(userId: string, id: string, body: Record<string, unknown>): Promise<AjanOtomasyon> {
+    await this.assertIzinli(userId);
+    const { data: eski } = await this.db.from("ajan_otomasyonlari").select("*").eq("user_id", userId).eq("id", id).maybeSingle<any>();
+    if (!eski) throw new NotFoundException("Otomasyon bulunamadı.");
+    const v = otomasyonGirdisi(body, eski);
+    const { data, error } = await this.db
+      .from("ajan_otomasyonlari")
+      .update({ ...v, sonraki: ajanSonrakiCalisma(v), updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return otomasyonSatiri(data);
+  }
+
+  async otomasyonSil(userId: string, id: string): Promise<void> {
+    await this.assertIzinli(userId);
+    const { error } = await this.db.from("ajan_otomasyonlari").delete().eq("user_id", userId).eq("id", id);
+    if (error) throw error;
+  }
+
+  /** "Şimdi çalıştır": zamanını beklemeden sıraya koyar; düzenli zamanı değişmez. */
+  async otomasyonCalistir(userId: string, id: string): Promise<AjanIs> {
+    await this.assertIzinli(userId);
+    const { data } = await this.db.from("ajan_otomasyonlari").select("*").eq("user_id", userId).eq("id", id).maybeSingle<any>();
+    if (!data) throw new NotFoundException("Otomasyon bulunamadı.");
+    return this.otomasyonIsiAc(userId, data);
   }
 
   // ============================================================ Mac (işçi)
@@ -400,6 +509,7 @@ export class AjanService {
   /** `yogun`: Mac prizde ve kullanıcı başında değil (Mac kendisi söyler, bkz. ajan/src/mac.ts). */
   async isAl(userId: string, secenek: { yogun?: boolean } = {}): Promise<AjanIsPaketi | null> {
     await this.asililariGeriAl(userId);
+    await this.vadesiGelenOtomasyonlar(userId);
     let is = await this.siradakiniKap(userId);
     if (!is) {
       const bosta = await this.bostaIsUret(userId, !!secenek.yogun);
@@ -429,7 +539,8 @@ export class AjanService {
       const { data } = await this.db.from("ajan_konulari").select("konu").eq("user_id", userId).order("created_at", { ascending: false }).limit(100);
       mevcutKonular = (data ?? []).map((k: any) => k.konu);
     }
-    return { is, ad: a.ad, ogretilenler: ajanOgretilenleriSigdir(ogretilen ?? []), sonMesajlar, mevcutKonular };
+    const baglam = ["fikir", "arastirma", "otomasyon"].includes(is.tur) ? await this.baglamMetni(userId) : undefined;
+    return { is, ad: a.ad, ogretilenler: ajanOgretilenleriSigdir(ogretilen ?? []), sonMesajlar, mevcutKonular, baglam };
   }
 
   /**
@@ -483,8 +594,10 @@ export class AjanService {
         )
       );
     if (s.konular?.length) await this.konulariEkle(userId, s.konular, "ajan", 0);
-    if (s.oneriler?.length)
-      await this.zorunlu(this.db.from("ajan_onerileri").insert(s.oneriler.map((o) => ({ user_id: userId, is_id: id, tur: o.tur, veri: o.veri }))));
+    // Aynı fikir ikinci kez önüne gelmesin: bekleyen ya da reddedilmiş bir fikirle aynı başlık atılır.
+    const oneriler = s.oneriler?.length ? await this.yeniFikirleriAyikla(userId, s.oneriler) : [];
+    if (oneriler.length)
+      await this.zorunlu(this.db.from("ajan_onerileri").insert(oneriler.map((o) => ({ user_id: userId, is_id: id, tur: o.tur, veri: o.veri }))));
 
     if (is.konu_id)
       await this.db
@@ -518,6 +631,70 @@ export class AjanService {
     return isSatiri(data);
   }
 
+  private async yeniFikirleriAyikla(userId: string, oneriler: NonNullable<ReturnType<typeof ajanSonucunuTemizle>["oneriler"]>) {
+    if (!oneriler.some((o) => o.tur === "fikir")) return oneriler;
+    const { data } = await this.db.from("ajan_onerileri").select("veri").eq("user_id", userId).eq("tur", "fikir").in("durum", ["bekliyor", "reddedildi"]).limit(LISTE_TAVANI);
+    const gorulen = new Set((data ?? []).map((o: any) => ajanKonuAnahtari(String(o.veri?.baslik ?? ""))));
+    return oneriler.filter((o) => {
+      if (o.tur !== "fikir") return true;
+      const anahtar = ajanKonuAnahtari(o.veri.baslik);
+      if (gorulen.has(anahtar)) return false;
+      gorulen.add(anahtar);
+      return true;
+    });
+  }
+
+  /** Vadesi gelen otomasyonlar sıraya girer; sonraki zaman hemen ilerletilir (iki yoklama aynısını açmasın). */
+  private async vadesiGelenOtomasyonlar(userId: string): Promise<void> {
+    const simdi = new Date().toISOString();
+    const { data } = await this.db.from("ajan_otomasyonlari").select("*").eq("user_id", userId).eq("acik", true).lte("sonraki", simdi).limit(5);
+    for (const o of data ?? []) {
+      // Koşullu güncelleme: eş zamanlı iki is-al'den yalnızca biri işi açar.
+      const { data: kapilan } = await this.db
+        .from("ajan_otomasyonlari")
+        .update({ sonraki: ajanSonrakiCalisma(o), son_calisma: simdi })
+        .eq("id", o.id)
+        .eq("sonraki", o.sonraki)
+        .select()
+        .maybeSingle<any>();
+      if (kapilan) await this.otomasyonIsiAc(userId, o);
+    }
+  }
+
+  private async otomasyonIsiAc(userId: string, o: any): Promise<AjanIs> {
+    const { data, error } = await this.db
+      .from("ajan_isleri")
+      .insert({ user_id: userId, tur: "otomasyon", girdi: ajanKirp(`${o.ad}\n\n${o.talimat}`, AJAN_SINIRLARI.talimat), otomasyon_id: o.id })
+      .select()
+      .single();
+    if (error) throw error;
+    return isSatiri(data);
+  }
+
+  /**
+   * Ajanın öğrendiğini KULLANMASI için pakete giren özet: son notlar, son
+   * raporlar, önceki fikirlere verilen yanıtlar. Ret gerekçesi bilerek var:
+   * kullanıcı "bunu neden istemediğini" söyledikçe fikirler ona göre değişir.
+   */
+  private async baglamMetni(userId: string): Promise<string> {
+    const [notlar, raporlar, fikirler] = await Promise.all([
+      this.db.from("ajan_bilgileri").select("baslik, icerik").eq("user_id", userId).eq("tur", "ogrenilen").order("created_at", { ascending: false }).limit(15),
+      this.db.from("ajan_raporlari").select("baslik, ozet").eq("user_id", userId).order("created_at", { ascending: false }).limit(5),
+      this.db.from("ajan_onerileri").select("veri, durum, yanit_notu").eq("user_id", userId).eq("tur", "fikir").order("created_at", { ascending: false }).limit(25),
+    ]);
+    const bolumler: string[] = [];
+    if (notlar.data?.length) bolumler.push(`Son öğrendiklerin:\n${notlar.data.map((n: any) => `- ${n.baslik}: ${String(n.icerik).slice(0, 350)}`).join("\n")}`);
+    if (raporlar.data?.length) bolumler.push(`Son raporların:\n${raporlar.data.map((r: any) => `- ${r.baslik}${r.ozet ? `: ${r.ozet}` : ""}`).join("\n")}`);
+    const f = fikirler.data ?? [];
+    const kabul = f.filter((x: any) => x.durum === "onaylandi").map((x: any) => `- ${x.veri?.baslik}`);
+    const ret = f.filter((x: any) => x.durum === "reddedildi").map((x: any) => `- ${x.veri?.baslik}${x.yanit_notu ? ` (neden: ${x.yanit_notu})` : ""}`);
+    const bekleyen = f.filter((x: any) => x.durum === "bekliyor").map((x: any) => `- ${x.veri?.baslik}`);
+    if (kabul.length) bolumler.push(`Kullanıcının BEĞENİP işe çevirdiği fikirler (bu tarzda devam et):\n${kabul.join("\n")}`);
+    if (ret.length) bolumler.push(`Kullanıcının REDDETTİĞİ fikirler (benzerini önerme, gerekçeye dikkat et):\n${ret.join("\n")}`);
+    if (bekleyen.length) bolumler.push(`Zaten önerdiğin, yanıt bekleyen fikirler (tekrarlama):\n${bekleyen.join("\n")}`);
+    return bolumler.join("\n\n").slice(0, BAGLAM_BUTCESI);
+  }
+
   private async asililariGeriAl(userId: string): Promise<void> {
     const { data } = await this.db.from("ajan_isleri").select("id, alindi_at").eq("user_id", userId).eq("durum", "calisiyor").limit(20);
     const asili = (data ?? []).filter((i: any) => ajanIsAsiliMi(i.alindi_at)).map((i: any) => i.id);
@@ -530,7 +707,8 @@ export class AjanService {
    * ise ekranın başındaki birini bekletir.
    */
   private async siradakiniKap(userId: string): Promise<AjanIs | null> {
-    for (const turler of [["sohbet"], ["arastirma", "ogrenme", "liste"]]) {
+    // Kullanıcının istedikleri (araştırma, otomasyon) ajanın kendi işlerinden önce.
+    for (const turler of [["sohbet"], ["arastirma", "otomasyon"], ["fikir", "ogrenme", "liste"]]) {
       const { data } = await this.db
         .from("ajan_isleri")
         .select("id")
@@ -571,14 +749,24 @@ export class AjanService {
       .order("oncelik", { ascending: false })
       .order("created_at", { ascending: true })
       .limit(1);
+    const sonFikir = await sonu("fikir");
+    let yeniNot = this.db.from("ajan_bilgileri").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("tur", "ogrenilen");
+    if (sonFikir) yeniNot = yeniNot.gt("created_at", sonFikir);
+    const { count: yeniNotSayisi } = await yeniNot;
     const karar = ajanBostaNeYapsin({
       ogrenmeAcik: a.ogrenme_acik,
       bekleyenKonuVar: !!konu?.length,
-      // Liste hazırlamak da bir öğrenme adımı sayılır: ikisi arka arkaya koşmasın.
-      sonOgrenme: [await sonu("ogrenme"), await sonu("liste")].filter(Boolean).sort().pop() ?? null,
+      // Liste ve fikir de birer öğrenme adımı sayılır: arka arkaya koşmasınlar.
+      sonOgrenme: [await sonu("ogrenme"), await sonu("liste"), sonFikir].filter(Boolean).sort().pop() ?? null,
       sonListe: await sonu("liste"),
+      yeniNot: yeniNotSayisi ?? 0,
+      sonFikir,
       yogun,
     });
+    if (karar === "fikir") {
+      await this.isAc(userId, "fikir", "Son öğrendiklerini ve araştırmalarını şirketim için iş bitirici fikirlere dönüştür.");
+      return true;
+    }
     if (karar === "ogrenme" && konu?.[0]) {
       const k = konu[0] as any;
       await this.isAc(userId, "ogrenme", k.neden ? `${k.konu}\n(Neden: ${k.neden})` : k.konu, k.id);
@@ -633,6 +821,35 @@ function bilgiSatiri(r: any): AjanBilgi {
 /** Listede belgenin yalnızca başı: 100 sayfalık metni her açılışta tarayıcıya taşımaya gerek yok. */
 function listeSatiri(r: any): AjanBilgi {
   return { ...bilgiSatiri(r), icerik: String(r.icerik).slice(0, LISTEDE_ICERIK) };
+}
+
+function oneriSatiri(o: any): AjanOneri {
+  return { id: o.id, tur: o.tur, veri: o.veri, durum: o.durum, yanitNotu: o.yanit_notu ?? null, createdAt: o.created_at };
+}
+
+function otomasyonSatiri(r: any): AjanOtomasyon {
+  return {
+    id: r.id, ad: r.ad, talimat: r.talimat, siklik: r.siklik, saat: r.saat, gun: r.gun, acik: r.acik,
+    sonCalisma: r.son_calisma, sonraki: r.sonraki, createdAt: r.created_at,
+  };
+}
+
+/** Gövdeden otomasyon alanları; `eski` verilirse eksik alanlar ondan gelir (kısmi güncelleme). */
+function otomasyonGirdisi(b: Record<string, unknown>, eski: any) {
+  const ad = b.ad !== undefined ? ajanKirp(b.ad, AJAN_SINIRLARI.otomasyonAdi) : eski?.ad;
+  const talimat = b.talimat !== undefined ? ajanKirp(b.talimat, AJAN_SINIRLARI.talimat) : eski?.talimat;
+  const siklik = (b.siklik ?? eski?.siklik) as AjanOtomasyonSikligi;
+  const tamsayi = (v: unknown, enAz: number, enCok: number, varsayilan: number) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) ? Math.max(enAz, Math.min(enCok, n)) : varsayilan;
+  };
+  const saat = tamsayi(b.saat ?? eski?.saat, 0, 23, 9);
+  const gun = tamsayi(b.gun ?? eski?.gun, 1, siklik === "haftalik" ? 7 : 28, 1);
+  const acik = b.acik !== undefined ? b.acik === true : eski?.acik ?? true;
+  if (!ad) throw new BadRequestException("Otomasyonun adı boş olamaz.");
+  if (!talimat) throw new BadRequestException("Otomasyonun talimatı boş olamaz.");
+  if (!SIKLIKLAR.includes(siklik)) throw new BadRequestException("Geçersiz sıklık.");
+  return { ad, talimat, siklik, saat, gun, acik };
 }
 
 function konuSatiri(r: any): AjanKonu {

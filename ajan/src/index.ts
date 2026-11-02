@@ -58,7 +58,14 @@ async function nabizAt(): Promise<void> {
   }
 }
 
-const ETIKET = { sohbet: "Yanıtlıyor", arastirma: "Araştırıyor", ogrenme: "Öğreniyor", liste: "Öğrenme listesini hazırlıyor" } as const;
+const ETIKET = {
+  sohbet: "Yanıtlıyor",
+  arastirma: "Araştırıyor",
+  ogrenme: "Öğreniyor",
+  liste: "Öğrenme listesini hazırlıyor",
+  fikir: "Öğrendiklerinden fikir çıkarıyor",
+  otomasyon: "Otomasyon",
+} as const;
 
 async function birTur(): Promise<boolean> {
   const sorun = await ollamaHazirMi(ollama);
@@ -89,7 +96,8 @@ async function birTur(): Promise<boolean> {
     });
     await projelio.bitir(paket.is.id, sonuc);
     // Sonucun özeti: liste işi sessizce boş dönünce (2026-11-02) günlükten anlaşılmıyordu.
-    const ozet = [sonuc.konular?.length && `${sonuc.konular.length} konu`, sonuc.bilgiler?.length && `${sonuc.bilgiler.length} not`, sonuc.rapor && "rapor", sonuc.mesaj && "mesaj"].filter(Boolean).join(", ") || "boş sonuç";
+    const fikirSayisi = sonuc.oneriler?.filter((o) => o.tur === "fikir").length;
+    const ozet = [sonuc.konular?.length && `${sonuc.konular.length} konu`, sonuc.bilgiler?.length && `${sonuc.bilgiler.length} not`, fikirSayisi && `${fikirSayisi} fikir`, sonuc.rapor && "rapor", sonuc.mesaj && "mesaj"].filter(Boolean).join(", ") || "boş sonuç";
     gunluk("iş bitti", paket.is.id, `${Math.round((Date.now() - basla) / 1000)} sn`, `· ${ozet}`, paket.is.tur === "liste" ? `· öğretilen ${paket.ogretilenler.length}, mevcut konu ${paket.mevcutKonular.length}` : "");
   } catch (e: any) {
     gunluk("iş hata verdi", paket.is.id, e?.message ?? e);

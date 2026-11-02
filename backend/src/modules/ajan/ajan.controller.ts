@@ -117,10 +117,47 @@ export class AjanController {
     return { ok: true };
   }
 
+  /** Gövdede isteğe bağlı `not`: fikrin neden istenmediği, ajana geri gider. */
   @Post("oneriler/:id/reddet")
-  async reddet(@Param("id") id: string, @Req() req: any) {
-    await this.service.oneriYanitla(req.user.userId, id, false);
+  async reddet(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    await this.service.oneriYanitla(req.user.userId, id, false, body?.not);
     return { ok: true };
+  }
+
+  @Get("fikirler")
+  fikirler(@Req() req: any) {
+    return this.service.fikirler(req.user.userId);
+  }
+
+  @Post("fikirler/:id/arastir")
+  fikriArastir(@Param("id") id: string, @Req() req: any) {
+    return this.service.fikriArastir(req.user.userId, id);
+  }
+
+  @Get("otomasyonlar")
+  otomasyonlar(@Req() req: any) {
+    return this.service.otomasyonlar(req.user.userId);
+  }
+
+  @Post("otomasyonlar")
+  otomasyonEkle(@Body() body: any, @Req() req: any) {
+    return this.service.otomasyonEkle(req.user.userId, body ?? {});
+  }
+
+  @Patch("otomasyonlar/:id")
+  otomasyonGuncelle(@Param("id") id: string, @Body() body: any, @Req() req: any) {
+    return this.service.otomasyonGuncelle(req.user.userId, id, body ?? {});
+  }
+
+  @Delete("otomasyonlar/:id")
+  async otomasyonSil(@Param("id") id: string, @Req() req: any) {
+    await this.service.otomasyonSil(req.user.userId, id);
+    return { ok: true };
+  }
+
+  @Post("otomasyonlar/:id/calistir")
+  otomasyonCalistir(@Param("id") id: string, @Req() req: any) {
+    return this.service.otomasyonCalistir(req.user.userId, id);
   }
 }
 

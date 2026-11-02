@@ -10,6 +10,11 @@ import {
   ajanAramaKelimeleri,
   ajanBagliMi,
   ajanBellekAlintisi,
+  ajanAdimlariAyir,
+  ajanFikriTemizle,
+  ajanSonrakiCalisma,
+  AJAN_FIKIR_ARALIGI_MS,
+  AJAN_FIKIR_ESIGI,
   ajanBostaNeYapsin,
   ajanIsAsiliMi,
   ajanKonuAnahtari,
@@ -155,5 +160,55 @@ describe("uzun öğretilenler", () => {
 
   test("öğretilen sınırı 100 sayfaya yeter", () => {
     assert.ok(AJAN_SINIRLARI.ogretilen >= 100 * 3000);
+  });
+});
+
+describe("fikirler", () => {
+  test("faydası ve en az 2 adımı olmayan fikir düşer", () => {
+    assert.equal(ajanFikriTemizle({ baslik: "Sosyal medyayı kullan", fayda: "Görünürlük", adimlar: ["Paylaş"] }), null);
+    assert.equal(ajanFikriTemizle({ baslik: "X", adimlar: ["a", "b"] }), null);
+    const f = ajanFikriTemizle({ baslik: "Teklif şablonu", fayda: "Teklif süresi yarıya iner", adimlar: ["Şablonu yaz", "3 müşteriye dene"], etki: "yuksek", emek: "uydurma" });
+    assert.deepEqual(f, { baslik: "Teklif şablonu", fayda: "Teklif süresi yarıya iner", adimlar: ["Şablonu yaz", "3 müşteriye dene"], etki: "yuksek", emek: "orta", dayanak: undefined });
+  });
+
+  test("model adımları tek metin yazarsa ayrılır", () => {
+    assert.deepEqual(ajanAdimlariAyir("1. Listeyi çıkar 2. Fiyatı belirle 3) Duyur"), ["Listeyi çıkar", "Fiyatı belirle", "Duyur"]);
+    assert.deepEqual(ajanAdimlariAyir("- A\n- B"), ["A", "B"]);
+    assert.equal(ajanFikriTemizle({ baslik: "x", fayda: "y", adimlar: "Ara; Yaz" })?.adimlar.length, 2);
+  });
+
+  test("sonuçtaki fikir ve yapılacak birlikte temizlenir", () => {
+    const s = ajanSonucunuTemizle({ oneriler: [{ tur: "fikir", veri: { baslik: "a", fayda: "b", adimlar: ["c", "d"] } }, { tur: "fikir", veri: { baslik: "boş" } }, { tur: "yapilacak", veri: { baslik: "Ara" } }, { tur: "sil" }] });
+    assert.deepEqual(s.oneriler?.map((o) => o.tur), ["fikir", "yapilacak"]);
+  });
+
+  test("yeterince yeni not birikince boşta fikir üretir, sık değil", () => {
+    const temel = { ogrenmeAcik: true, bekleyenKonuVar: true, sonOgrenme: null, sonListe: null, simdi: SIMDI };
+    assert.equal(ajanBostaNeYapsin({ ...temel, yeniNot: AJAN_FIKIR_ESIGI }), "fikir");
+    assert.equal(ajanBostaNeYapsin({ ...temel, yeniNot: AJAN_FIKIR_ESIGI - 1 }), "ogrenme");
+    assert.equal(ajanBostaNeYapsin({ ...temel, yeniNot: 50, sonFikir: once(AJAN_FIKIR_ARALIGI_MS - 1000) }), "ogrenme");
+  });
+});
+
+describe("ajanSonrakiCalisma (Türkiye saati)", () => {
+  // 2026-11-02 pazartesi 10:00 UTC = 13:00 Türkiye.
+  test("günlük: bugünün saati geçtiyse yarın", () => {
+    assert.equal(ajanSonrakiCalisma({ siklik: "gunluk", saat: 9, gun: 1 }, SIMDI), "2026-11-03T06:00:00.000Z");
+    assert.equal(ajanSonrakiCalisma({ siklik: "gunluk", saat: 18, gun: 1 }, SIMDI), "2026-11-02T15:00:00.000Z");
+  });
+
+  test("haftalık: aynı gün saati geçtiyse gelecek hafta", () => {
+    assert.equal(ajanSonrakiCalisma({ siklik: "haftalik", saat: 9, gun: 1 }, SIMDI), "2026-11-09T06:00:00.000Z");
+    assert.equal(ajanSonrakiCalisma({ siklik: "haftalik", saat: 9, gun: 5 }, SIMDI), "2026-11-06T06:00:00.000Z");
+  });
+
+  test("aylık: ayın günü geçtiyse gelecek ay, yıl sonu taşar", () => {
+    assert.equal(ajanSonrakiCalisma({ siklik: "aylik", saat: 10, gun: 1 }, SIMDI), "2026-12-01T07:00:00.000Z");
+    assert.equal(ajanSonrakiCalisma({ siklik: "aylik", saat: 10, gun: 1 }, Date.parse("2026-12-05T00:00:00Z")), "2027-01-01T07:00:00.000Z");
+  });
+
+  test("Türkiye gece yarısından sonra UTC hâlâ dündeyken doğru gün", () => {
+    // 2026-11-02 22:30 UTC = 3 Kasım 01:30 Türkiye; günlük 09:00 → 3 Kasım 06:00 UTC.
+    assert.equal(ajanSonrakiCalisma({ siklik: "gunluk", saat: 9, gun: 1 }, Date.parse("2026-11-02T22:30:00Z")), "2026-11-03T06:00:00.000Z");
   });
 });

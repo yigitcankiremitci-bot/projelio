@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { iddiaVarMi, isiYurut, type Yardimcilar } from "./ajan.ts";
+import { adimlariAyir, iddiaVarMi, isiYurut, type Yardimcilar } from "./ajan.ts";
 import type { IsPaketi } from "./api.ts";
 import type { Mesaj } from "./ollama.ts";
 
@@ -128,5 +128,55 @@ describe("iddiaVarMi", () => {
 
   test("sıradan yanıtlar iddia sayılmaz", () => {
     for (const m of ["Merhaba, nasıl yardımcı olabilirim?", "Bunu kaydetmemi ister misin?", "Ekleyebilirim, onaylar mısın?"]) assert.equal(iddiaVarMi(m), false, m);
+  });
+});
+
+describe("fikirler", () => {
+  test("araştırmada rapordan sonra fikir istenir ve fikir öneriye girer", async () => {
+    const { model, gorulen } = sahteModel([
+      cagri("web_ara", { sorgu: "x" }),
+      cagri("sayfa_oku", { adres: "https://ornek.com/a" }),
+      cagri("rapor_yaz", { baslik: "R", icerik: "# R" }),
+      cagri("fikir_oner", { baslik: "Giriş paketi aç", fayda: "Daha çok küçük müşteri", adimlar: "1. Paketi belirle 2. Sayfaya ekle 3. Duyur", etki: "yuksek", emek: "kucuk" }),
+      { role: "assistant", content: "Bitti." },
+    ]);
+    const s = await isiYurut(paket("arastirma", "fiyatlar"), { ...web, model });
+    assert.ok(gorulen[3].mesajlar.some((m) => m.role === "user" && /fikir_oner ile öner/.test(m.content)));
+    assert.deepEqual(s.oneriler, [
+      { tur: "fikir", veri: { baslik: "Giriş paketi aç", fayda: "Daha çok küçük müşteri", adimlar: ["Paketi belirle", "Sayfaya ekle", "Duyur"], etki: "yuksek", emek: "kucuk", dayanak: undefined } },
+    ]);
+  });
+
+  test("adımsız fikir aracın içinde geri çevrilir", async () => {
+    const { model, gorulen } = sahteModel([
+      cagri("fikir_oner", { baslik: "Sosyal medyayı kullan", fayda: "Görünürlük", adimlar: "Paylaş" }),
+      { role: "assistant", content: "Tamam." },
+    ]);
+    const s = await isiYurut({ ...paket("fikir", "fikir çıkar"), baglam: "Son öğrendiklerin:\n- A: b" }, { ...web, model });
+    const ret = gorulen[1].mesajlar.find((m) => m.role === "tool" && m.tool_name === "fikir_oner");
+    assert.match(ret?.content ?? "", /KAYDEDİLMEDİ/);
+    assert.equal(s.oneriler?.length, 0);
+    assert.match(gorulen[0].mesajlar[0].content, /Son öğrendiklerin/);
+    assert.match(gorulen[0].mesajlar[0].content, /Genel öğüt YASAK/);
+  });
+
+  test("otomasyon rapor yazmazsa son metin rapor olur, başlık talimatın ilk satırı", async () => {
+    const { model } = sahteModel([{ role: "assistant", content: "Haftalık özet: ..." }]);
+    const s = await isiYurut(paket("otomasyon", "Haftalık rakip takibi\n\nRakipleri tara"), { ...web, model });
+    assert.equal(s.rapor?.baslik, "Haftalık rakip takibi");
+  });
+
+  test("aynı fikir ikinci kez gelmez, 3 fikirde iş biter", async () => {
+    const f = (baslik: string) => cagri("fikir_oner", { baslik, fayda: "Fayda", adimlar: ["a", "b", "c"] });
+    const { model, gorulen } = sahteModel([f("Teklif şablonu"), f("teklif  şablonu!"), f("İkinci"), f("Üçüncü"), f("Dördüncü")]);
+    const s = await isiYurut(paket("fikir", "fikir çıkar"), { ...web, model });
+    assert.deepEqual(s.oneriler?.map((o) => o.veri.baslik), ["Teklif şablonu", "İkinci", "Üçüncü"]);
+    assert.equal(gorulen.length, 4);
+  });
+
+  test("adımlar dizi, satır ya da numaralı metin olabilir", () => {
+    assert.deepEqual(adimlariAyir(["a", " b "]), ["a", "b"]);
+    assert.deepEqual(adimlariAyir("- a\n- b"), ["a", "b"]);
+    assert.deepEqual(adimlariAyir("1) a 2) b"), ["a", "b"]);
   });
 });

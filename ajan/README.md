@@ -15,6 +15,11 @@ doğrudan çalıştırıyor. Testleri kök `npm test` koşturur, tip denetimi
 - **Araştırma:** "Araştır"a yazdığın konuyu internette arar, 3-5 kaynak okur, Markdown rapor yazar.
 - **Sürekli öğrenme:** Elinde iş yokken öğrenme listesinden bir konu alır (en çok 5 dakikada bir; Mac prizdeyken ve 5 dakikadır kullanılmıyorken ara vermeden),
   okur ve kısa not çıkarır. Liste boşalınca öğrettiklerine bakıp kendine yeni konular ekler.
+- **Fikirler:** Her araştırmanın ve otomasyonun sonunda, ayrıca yeterince yeni şey öğrenince, öğrendiklerini
+  şirketin için iş bitirici fikirlere çevirir (fayda + somut adımlar). Beğendiğin yapılacaklarına girer;
+  reddettiğinin gerekçesini sonraki fikirlerde dikkate alır.
+- **Otomasyonlar:** Günlük/haftalık/aylık görev kurarsın ("her pazartesi rakipleri tara"); zamanı gelince
+  kendisi çalışır. Mac kapalıysa görev sırada bekler.
 - **Öneri:** Bir iş yapmasını istersen (ör. yapılacak eklemek) yalnızca önerir. Projelio'ya
   sen onaylayınca eklenir.
 

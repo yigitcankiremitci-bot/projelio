@@ -1,4 +1,4 @@
-import type { AjanBilgi, AjanDurumu, AjanIs, AjanKonu, AjanKonuDurumu, AjanMesaj, AjanOneri, AjanRapor, AjanRaporOzeti } from "@projelio/shared";
+import type { AjanBilgi, AjanDurumu, AjanIs, AjanKonu, AjanKonuDurumu, AjanMesaj, AjanOneri, AjanOtomasyon, AjanOtomasyonSikligi, AjanRapor, AjanRaporOzeti } from "@projelio/shared";
 import { api } from "./client";
 
 /** Ajan MVP (migration 177). Uçlar yalnızca AJAN_EPOSTALARI'ndaki hesaplara açık. */
@@ -29,5 +29,22 @@ export const ajanApi = {
 
   oneriler: (signal?: AbortSignal) => api.get<AjanOneri[]>("/ajan/oneriler", signal),
   onayla: (id: string) => api.post<{ ok: true }>(`/ajan/oneriler/${id}/onayla`, {}),
-  reddet: (id: string) => api.post<{ ok: true }>(`/ajan/oneriler/${id}/reddet`, {}),
+  reddet: (id: string, not?: string) => api.post<{ ok: true }>(`/ajan/oneriler/${id}/reddet`, { not }),
+
+  fikirler: (signal?: AbortSignal) => api.get<AjanOneri[]>("/ajan/fikirler", signal),
+  fikriArastir: (id: string) => api.post<AjanIs>(`/ajan/fikirler/${id}/arastir`, {}),
+
+  otomasyonlar: (signal?: AbortSignal) => api.get<AjanOtomasyon[]>("/ajan/otomasyonlar", signal),
+  otomasyonEkle: (g: OtomasyonGirdisi) => api.post<AjanOtomasyon>("/ajan/otomasyonlar", g),
+  otomasyonGuncelle: (id: string, g: Partial<OtomasyonGirdisi> & { acik?: boolean }) => api.patch<AjanOtomasyon>(`/ajan/otomasyonlar/${id}`, g),
+  otomasyonSil: (id: string) => api.delete<{ ok: true }>(`/ajan/otomasyonlar/${id}`),
+  otomasyonCalistir: (id: string) => api.post<AjanIs>(`/ajan/otomasyonlar/${id}/calistir`, {}),
 };
+
+export interface OtomasyonGirdisi {
+  ad: string;
+  talimat: string;
+  siklik: AjanOtomasyonSikligi;
+  saat: number;
+  gun: number;
+}

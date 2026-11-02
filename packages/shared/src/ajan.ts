@@ -9,7 +9,11 @@
  * "çalışıyor" derdi.
  */
 
-export type AjanIsTuru = "sohbet" | "arastirma" | "ogrenme" | "liste";
+/**
+ * fikir: boşta, yeni öğrendiklerinden iş bitirici fikir çıkarma.
+ * otomasyon: kullanıcının kurduğu zamanlanmış görev (migration 178).
+ */
+export type AjanIsTuru = "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon";
 export type AjanIsDurumu = "bekliyor" | "calisiyor" | "bitti" | "hata";
 export type AjanKonuDurumu = "bekliyor" | "ogreniliyor" | "ogrenildi" | "atlandi";
 export type AjanBilgiTuru = "ogretilen" | "ogrenilen";
@@ -77,11 +81,45 @@ export interface AjanYapilacakVerisi {
   bitis?: string;
 }
 
-export interface AjanOneri {
+export type AjanFikirEtkisi = "yuksek" | "orta" | "dusuk";
+export type AjanFikirEmegi = "kucuk" | "orta" | "buyuk";
+
+/**
+ * Ajanın şirkete önerdiği iş. "Sosyal medyayı etkin kullanın" gibi genel öğüt
+ * değil, bitirilebilir bir iş olsun diye fayda ve somut adımlar ZORUNLU
+ * (ajanSonucunuTemizle en az 2 adım ister).
+ */
+export interface AjanFikirVerisi {
+  baslik: string;
+  /** Şirkete faydası: gelir, maliyet, zaman, müşteri. */
+  fayda: string;
+  adimlar: string[];
+  etki: AjanFikirEtkisi;
+  emek: AjanFikirEmegi;
+  /** Dayandığı rapor/öğrenme/kaynak, kısa. */
+  dayanak?: string;
+}
+
+export type AjanOneri =
+  | { id: string; tur: "yapilacak"; veri: AjanYapilacakVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string }
+  | { id: string; tur: "fikir"; veri: AjanFikirVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string };
+
+export type AjanOneriDurumu = "bekliyor" | "onaylandi" | "reddedildi";
+
+export type AjanOtomasyonSikligi = "gunluk" | "haftalik" | "aylik";
+
+export interface AjanOtomasyon {
   id: string;
-  tur: "yapilacak";
-  veri: AjanYapilacakVerisi;
-  durum: "bekliyor" | "onaylandi" | "reddedildi";
+  ad: string;
+  talimat: string;
+  siklik: AjanOtomasyonSikligi;
+  /** Türkiye saatiyle 0-23. */
+  saat: number;
+  /** haftalik: 1 (pazartesi) - 7 (pazar); aylik: 1-28. */
+  gun: number;
+  acik: boolean;
+  sonCalisma: string | null;
+  sonraki: string;
   createdAt: string;
 }
 
@@ -100,7 +138,10 @@ export interface AjanDurumu {
   ogrenmeAcik: boolean;
   bekleyenIs: number;
   okunmamisRapor: number;
+  /** Onay bekleyen yapılacak önerileri (sohbette görünür). */
   bekleyenOneri: number;
+  /** Yanıt bekleyen fikirler (Fikirler sekmesi). */
+  bekleyenFikir: number;
 }
 
 /** Mac'in işi alırken gördüğü paket. */
@@ -113,6 +154,12 @@ export interface AjanIsPaketi {
   sonMesajlar: { rol: "kullanici" | "ajan"; metin: string }[];
   /** Liste işinde ajan yeni konu önerirken tekrar etmesin diye. */
   mevcutKonular: string[];
+  /**
+   * Fikir, araştırma ve otomasyon işlerinde: son öğrendikleri, son raporlar ve
+   * kullanıcının önceki fikirlere verdiği yanıtlar. Ajan öğrendiğini burada
+   * KULLANIR; kabul/ret geçmişi ona neyin işe yaradığını öğretir.
+   */
+  baglam?: string;
 }
 
 /** Mac'in işi bitirirken gönderdiği sonuç. Hepsi isteğe bağlı. */
@@ -122,7 +169,7 @@ export interface AjanIsSonucu {
   rapor?: { baslik: string; ozet?: string; icerik: string; kaynaklar?: AjanKaynak[] };
   bilgiler?: { baslik: string; icerik: string; kaynaklar?: AjanKaynak[] }[];
   konular?: { konu: string; neden?: string }[];
-  oneriler?: { tur: "yapilacak"; veri: AjanYapilacakVerisi }[];
+  oneriler?: ({ tur: "yapilacak"; veri: AjanYapilacakVerisi } | { tur: "fikir"; veri: AjanFikirVerisi })[];
 }
 
 // ------------------------------------------------------------------ kurallar
@@ -183,6 +230,12 @@ export const AJAN_SINIRLARI = {
   not: 200,
   ad: 40,
   kaynak: 20,
+  fikirAdimi: 300,
+  fikirAdimSayisi: 8,
+  talimat: 4000,
+  otomasyonAdi: 120,
+  /** Kullanıcı başına en çok otomasyon: her biri Mac'te dakikalarca iş demek. */
+  otomasyon: 20,
   /** Tek bir sonuçta kabul edilen en çok kayıt (model çılgınca not yağdırmasın). */
   sonucKalemi: 10,
 } as const;
@@ -210,12 +263,17 @@ export function ajanBostaNeYapsin(g: {
   sonListe: string | null;
   /** Mac prizde ve kullanıcı başında değil. */
   yogun?: boolean;
+  /** Son fikir işinden beri biriken yeni not sayısı ve o işin zamanı. */
+  yeniNot?: number;
+  sonFikir?: string | null;
   simdi?: number;
-}): "ogrenme" | "liste" | null {
+}): "ogrenme" | "liste" | "fikir" | null {
   if (!g.ogrenmeAcik) return null;
   const simdi = g.simdi ?? Date.now();
   const gecti = (t: string | null, ms: number) => !t || simdi - Date.parse(t) >= ms;
   if (!gecti(g.sonOgrenme, g.yogun ? AJAN_YOGUN_OGRENME_ARALIGI_MS : AJAN_OGRENME_ARALIGI_MS)) return null;
+  // Öğrenmek amaç değil: yeterince not birikince önce onları işe çevir.
+  if ((g.yeniNot ?? 0) >= AJAN_FIKIR_ESIGI && gecti(g.sonFikir ?? null, AJAN_FIKIR_ARALIGI_MS)) return "fikir";
   if (g.bekleyenKonuVar) return "ogrenme";
   return gecti(g.sonListe, AJAN_LISTE_ARALIGI_MS) ? "liste" : null;
 }
@@ -277,19 +335,23 @@ export function ajanSonucunuTemizle(ham: unknown): AjanIsSonucu {
       .slice(0, n)
       .map((k: any) => ({ konu: ajanKirp(k?.konu, AJAN_SINIRLARI.konu), neden: ajanKirp(k?.neden, AJAN_SINIRLARI.neden) || undefined }))
       .filter((k: { konu: string }) => k.konu);
-  if (Array.isArray(h.oneriler))
-    s.oneriler = h.oneriler
-      .slice(0, n)
-      .filter((o: any) => o?.tur === "yapilacak")
-      .map((o: any) => ({
-        tur: "yapilacak" as const,
-        veri: {
+  if (Array.isArray(h.oneriler)) {
+    const oneriler: NonNullable<AjanIsSonucu["oneriler"]> = [];
+    for (const o of h.oneriler.slice(0, n)) {
+      if (o?.tur === "yapilacak") {
+        const veri = {
           baslik: ajanKirp(o?.veri?.baslik, AJAN_SINIRLARI.baslik),
           aciklama: ajanKirp(o?.veri?.aciklama, AJAN_SINIRLARI.ozet) || undefined,
           bitis: tarihMi(o?.veri?.bitis) ? o.veri.bitis : undefined,
-        },
-      }))
-      .filter((o: { veri: AjanYapilacakVerisi }) => o.veri.baslik);
+        };
+        if (veri.baslik) oneriler.push({ tur: "yapilacak", veri });
+      } else if (o?.tur === "fikir") {
+        const veri = ajanFikriTemizle(o?.veri);
+        if (veri) oneriler.push({ tur: "fikir", veri });
+      }
+    }
+    s.oneriler = oneriler;
+  }
   return s;
 }
 
@@ -370,3 +432,126 @@ export function ajanBellekAlintisi(icerik: string, kelimeler: string[], pencere 
     })
     .join("\n\n");
 }
+
+// ------------------------------------------------------------------ fikirler
+
+const ETKILER: AjanFikirEtkisi[] = ["yuksek", "orta", "dusuk"];
+const EMEKLER: AjanFikirEmegi[] = ["kucuk", "orta", "buyuk"];
+
+/**
+ * Fikri doğrular. Faydası ya da en az 2 somut adımı olmayan fikir düşer:
+ * kullanıcının istediği "iş bitirici" fikir, adımı olmayan bir öğüt değil.
+ */
+export function ajanFikriTemizle(v: any): AjanFikirVerisi | null {
+  const baslik = ajanKirp(v?.baslik, AJAN_SINIRLARI.baslik);
+  const fayda = ajanKirp(v?.fayda, AJAN_SINIRLARI.ozet);
+  const adimlar = (Array.isArray(v?.adimlar) ? v.adimlar : typeof v?.adimlar === "string" ? ajanAdimlariAyir(v.adimlar) : [])
+    .map((a: unknown) => ajanKirp(a, AJAN_SINIRLARI.fikirAdimi))
+    .filter(Boolean)
+    .slice(0, AJAN_SINIRLARI.fikirAdimSayisi);
+  if (!baslik || !fayda || adimlar.length < 2) return null;
+  return {
+    baslik,
+    fayda,
+    adimlar,
+    etki: ETKILER.includes(v?.etki) ? v.etki : "orta",
+    emek: EMEKLER.includes(v?.emek) ? v.emek : "orta",
+    dayanak: ajanKirp(v?.dayanak, AJAN_SINIRLARI.baslik) || undefined,
+  };
+}
+
+/** Modelin tek metin olarak yazdığı adımları ayırır: "1. … 2. …", satırlar ya da ";". */
+export function ajanAdimlariAyir(metin: string): string[] {
+  const satirlar = metin.split(/\n|;/).map((x) => x.trim()).filter(Boolean);
+  const parcalar = satirlar.length > 1 ? satirlar : metin.split(/\s(?=\d+[.)]\s)/);
+  return parcalar.map((x) => x.replace(/^\s*(\d+[.)]|[-*•])\s*/, "").trim()).filter(Boolean);
+}
+
+/** Onaylanan fikrin yapılacak açıklaması: fayda + adım listesi. */
+export function ajanFikirAciklamasi(f: AjanFikirVerisi): string {
+  return `${f.fayda}\n\nAdımlar:\n${f.adimlar.map((a, i) => `${i + 1}. ${a}`).join("\n")}${f.dayanak ? `\n\nDayanak: ${f.dayanak}` : ""}`;
+}
+
+/** Bu kadar yeni not birikince ajan onlardan fikir çıkarır. */
+export const AJAN_FIKIR_ESIGI = 5;
+/** İki fikir işi arası en kısa süre: aynı notlardan aynı fikirler çıkmasın. */
+export const AJAN_FIKIR_ARALIGI_MS = 3 * 60 * 60_000;
+
+// ------------------------------------------------------------------ otomasyonlar
+
+/**
+ * Türkiye 2016'dan beri yıl boyu UTC+3; yaz saati yok. Otomasyon saatleri
+ * kullanıcının duvar saatidir, sunucu UTC'de çalışır.
+ */
+const TR_OFSET_MS = 3 * 60 * 60_000;
+
+/**
+ * Otomasyonun `simdi`den SONRAKİ ilk çalışma anı. Mac kapalıyken kaçan
+ * çalışmalar birikmez: Mac açılınca bir kez koşar, sonraki yine buradan.
+ */
+export function ajanSonrakiCalisma(o: { siklik: AjanOtomasyonSikligi; saat: number; gun: number }, simdi = Date.now()): string {
+  const yerel = new Date(simdi + TR_OFSET_MS); // UTC alanları = Türkiye saati
+  const aday = (y: number, a: number, g: number) => Date.UTC(y, a, g, o.saat, 0, 0) - TR_OFSET_MS;
+  const Y = yerel.getUTCFullYear();
+  const A = yerel.getUTCMonth();
+  const G = yerel.getUTCDate();
+  if (o.siklik === "gunluk") {
+    const t = aday(Y, A, G);
+    return new Date(t > simdi ? t : aday(Y, A, G + 1)).toISOString();
+  }
+  if (o.siklik === "haftalik") {
+    const bugunHafta = ((yerel.getUTCDay() + 6) % 7) + 1; // 1 = pazartesi
+    let fark = (o.gun - bugunHafta + 7) % 7;
+    if (fark === 0 && aday(Y, A, G) <= simdi) fark = 7;
+    return new Date(aday(Y, A, G + fark)).toISOString();
+  }
+  const t = aday(Y, A, o.gun);
+  return new Date(t > simdi ? t : aday(Y, A + 1, o.gun)).toISOString();
+}
+
+export function ajanOtomasyonZamani(o: { siklik: AjanOtomasyonSikligi; saat: number; gun: number }): string {
+  const saat = `${String(o.saat).padStart(2, "0")}:00`;
+  if (o.siklik === "gunluk") return `Her gün ${saat}`;
+  if (o.siklik === "haftalik") return `Her ${["pazartesi", "salı", "çarşamba", "perşembe", "cuma", "cumartesi", "pazar"][o.gun - 1]} ${saat}`;
+  return `Her ayın ${o.gun}. günü ${saat}`;
+}
+
+/** Panelde tek tıkla kurulan hazır otomasyonlar. Talimatlar iş bitirici çıktıya yönlendirir. */
+export const AJAN_OTOMASYON_SABLONLARI: { ad: string; talimat: string; siklik: AjanOtomasyonSikligi; saat: number; gun: number }[] = [
+  {
+    ad: "Haftalık rakip takibi",
+    talimat:
+      "Öğrettiğim rakipleri ve sektörümüzü tara: son bir haftadaki yeni ürün, fiyat, kampanya ve duyuruları bul. Kısa bir rapor yaz; " +
+      "rakiplerin yaptığından bizim hemen uygulayabileceğimiz 2-3 iş bitirici fikir öner.",
+    siklik: "haftalik",
+    saat: 9,
+    gun: 1,
+  },
+  {
+    ad: "Günlük sektör özeti",
+    talimat:
+      "Sektörümüzle ilgili bugünkü önemli haberleri ve gelişmeleri bul. 5 maddelik kısa bir özet rapor yaz; " +
+      "işimizi doğrudan etkileyen bir gelişme varsa onu fırsata çeviren bir fikir öner.",
+    siklik: "gunluk",
+    saat: 8,
+    gun: 1,
+  },
+  {
+    ad: "Haftalık müşteri kazanma fikirleri",
+    talimat:
+      "Öğrendiklerine ve öğrettiklerime bakarak bu hafta yeni müşteri kazanmak ya da mevcut müşteriye daha fazla satmak için " +
+      "bir hafta içinde bitirilebilecek 3 somut iş öner. Gerekirse internette örnek ve veri ara.",
+    siklik: "haftalik",
+    saat: 10,
+    gun: 5,
+  },
+  {
+    ad: "Aylık maliyet ve verim taraması",
+    talimat:
+      "İşimizde zaman ya da para kaybettiren süreçleri düşün; daha ucuz araçları, otomasyon yollarını ve iyi uygulamaları araştır. " +
+      "Rapor yaz ve tasarruf sağlayacak 2-3 iş bitirici fikir öner.",
+    siklik: "aylik",
+    saat: 10,
+    gun: 1,
+  },
+];

@@ -189,6 +189,9 @@ const OTUR_MENTESE = new THREE.Vector3();
 const OTUR_SIRT = new THREE.Vector3();
 const OTUR_X = new THREE.Vector3();
 const OTUR_M = new THREE.Matrix4();
+const OTUR_BALDIR = new THREE.Vector3();
+const OTUR_KALCA = [new THREE.Vector3(), new THREE.Vector3()];
+const OTUR_DIZ = [new THREE.Vector3(), new THREE.Vector3()];
 
 /**
  * Departman yöneticisinin masası: ekip masasının genişletilmiş hâli (geniş ve
@@ -2222,15 +2225,28 @@ export class OfisMotoru {
     const ileri = OTUR_ILERI.set(Math.sin(yon), 0, Math.cos(yon));
     // Kişinin solu (modelin +x'i; sol kol kemikleri o yanda).
     const sol = OTUR_SOL.set(ileri.z, 0, -ileri.x);
+    // Bilek zemine ne kadar inebilir: masa sandalyesinde (pozun ayarlandığı
+    // yükseklik) baldır boyu kadar; alçak oturakta (kanepe) fark kadar az.
+    // Baldır yine dik insin denirse ayak zeminin içine giriyordu; dik inemeyen
+    // baldır öne açılır, diz kalkar.
+    const baldir = k.k3.boylar.baldir * olcek;
+    const inebilir = baldir + (n.position.y - (ZEMIN_Y - OTURMA_INIS));
+    const cos = baldir ? THREE.MathUtils.clamp(inebilir / baldir, 0.3, 1) : 1;
+    const baldirYonu = OTUR_BALDIR.copy(ASAGI).multiplyScalar(cos).addScaledVector(ileri, Math.sqrt(1 - cos * cos));
+    let i = 0;
     for (const [ust, alt, ayak] of [
       [b.ustSol, b.altSol, b.ayakSol],
       [b.ustSag, b.altSag, b.ayakSag],
     ] as const) {
+      const dizi = i++;
       if (!ust || !alt) continue;
       kemigiYonelt(ust, ileri);
-      kemigiYonelt(alt, ASAGI);
+      kemigiYonelt(alt, baldirYonu);
+      // Eller dizlere konacak: kalça ve diz yerleri (kanepede yanlarda kalan eller kolçağa giriyordu).
+      ust.getWorldPosition(OTUR_KALCA[dizi]);
+      alt.getWorldPosition(OTUR_DIZ[dizi]);
       if (ayak?.parent && k.k3.boylar.baldir) {
-        const bilek = alt.getWorldPosition(OTUR_A).addScaledVector(ASAGI, k.k3.boylar.baldir * olcek);
+        const bilek = alt.getWorldPosition(OTUR_A).addScaledVector(baldirYonu, baldir);
         ayak.position.copy(ayak.parent.worldToLocal(bilek));
         ayak.updateMatrixWorld(true);
       }
@@ -2255,11 +2271,31 @@ export class OfisMotoru {
       const a = THREE.MathUtils.degToRad(derece);
       kemigiYonelt(kemik, OTUR_YON.copy(YUKARI).multiplyScalar(Math.cos(a)).addScaledVector(ileri, Math.sin(a)));
     }
-    // Masa dışında eller animasyondaki gibi yanlarda kalır.
-    if (!yaz) return;
     const kol = k.k3.kollar;
     const { ustKol, onKol } = k.k3.boylar;
     if (!ustKol || !onKol) return;
+    if (!yaz) {
+      // Masa dışında eller uyluğun üstünde, dizlere yakın; avuç aşağı.
+      for (const [ust, alt, bilek, yan, dizi] of [
+        [kol.ustSol, kol.altSol, kol.bilekSol, 1, 0],
+        [kol.ustSag, kol.altSag, kol.bilekSag, -1, 1],
+      ] as const) {
+        if (!ust || !alt || !bilek) continue;
+        const omuz = ust.getWorldPosition(OTUR_OMUZ);
+        // Uyluğun kalınlığı kadar yukarıda (baldır boyuyla orantılı; karakterler farklı boyda).
+        const hedef = OTUR_HEDEF.lerpVectors(OTUR_KALCA[dizi], OTUR_DIZ[dizi], 0.7).addScaledVector(YUKARI, baldir * 0.3);
+        const kutup = OTUR_YON.copy(ASAGI).addScaledVector(sol, yan * 0.8).addScaledVector(ileri, -0.5);
+        ikiKemik(omuz, hedef, ustKol * olcek, onKol * olcek, kutup, OTUR_DIRSEK);
+        const ustYon = OTUR_A.subVectors(OTUR_DIRSEK, omuz);
+        const onYon = OTUR_B.subVectors(hedef, OTUR_DIRSEK);
+        const mentese = OTUR_MENTESE.crossVectors(ustYon, onYon).multiplyScalar(-yan);
+        if (mentese.lengthSq() < 1e-8) mentese.copy(YUKARI);
+        kemigiKoy(ust, ustYon, mentese.normalize());
+        kemigiKoy(alt, onYon, OTUR_ICE.copy(mentese).add(YUKARI));
+        kemigiKoy(bilek, OTUR_YON.copy(ileri).addScaledVector(ASAGI, 0.2), YUKARI);
+      }
+      return;
+    }
     const masa = k.oda.masalar[k.masaNo];
     // Klavyenin ortası koltuktan bu kadar ileride (yönetici masası daha derin).
     const klavye = (masa ? koltukUzakligi(masa) : KOLTUK_UZAKLIK) - KLAVYE_MASADAN;

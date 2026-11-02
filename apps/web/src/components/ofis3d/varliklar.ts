@@ -57,6 +57,14 @@ const TANIMLAR = {
   inceMonstera: ["bitkiler/bitki_2.glb", { boy: 1.75 }],
   salonBitkisi: ["bitkiler/bitki_3.glb", { boy: 1.25 }],
   buyukKaktus: ["bitkiler/bitki_4.glb", { boy: 1.6 }],
+  // Mağazanın ikinci dalgası: paketlerde duran ama sahnede kullanılmayan modeller.
+  haliYuvarlak: ["kenney/rugRound.glb", 1.8],
+  ikiliKanepe: ["kenney/loungeSofa.glb", 1.8],
+  koseKoltuk: ["kenney/loungeSofaCorner.glb", 1.8],
+  tasarimKanepe: ["kenney/loungeDesignSofa.glb", 1.8],
+  modernLamba: ["kenney/lampRoundFloor.glb", 1.8],
+  ortaSehpa: ["kenney/tableCoffee.glb", 1.8],
+  copKovasi: ["kenney/trashcan.glb", 1.2],
 } as const satisfies Record<string, readonly [string, number | { boy: number }]>;
 
 export type VarlikAdi = keyof typeof TANIMLAR;

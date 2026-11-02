@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   GERI_SATIS_ORANI,
   KATALOG,
+  KATEGORILER,
   kaydiCoz,
   kayitAnahtari,
   katalogEsyasi,
@@ -21,6 +22,7 @@ import {
   KUPA_RAFI,
   PROJE_ONEKI,
   type IstasyonBilgisi,
+  type EsyaKategorisi,
   type EsyaTuru,
   type OfisKaydi,
   type YerlesikEsya,
@@ -146,17 +148,54 @@ const SIMGE: Record<EsyaTuru, string> = {
   inceMonstera: "🪴",
   salonBitkisi: "🪴",
   buyukKaktus: "🌵",
+  kaktusKucuk: "🌵",
+  bitkiliSehpa: "🌱",
+  agacBuyuk: "🌳",
   puf: "🛋️",
-  lamba: "💡",
-  hali: "🟣",
+  kanepe: "🛋️",
+  armut: "🫘",
+  dinlenmeKoltugu: "🪑",
+  ikiliKanepe: "🛋️",
+  tasarimKanepe: "🛋️",
+  koseKoltuk: "🛋️",
   kitaplik: "📚",
   dolap: "🗄️",
-  kahve: "☕",
-  kanepe: "🛋️",
+  yanSehpa: "🪵",
+  ortaSehpa: "🪵",
+  alcakSehpa: "🪵",
+  alcakRaf: "🗃️",
+  askilik: "🧥",
+  copKovasi: "🗑️",
+  calismaKosesi: "💻",
+  masaTakimi: "🍽️",
+  lamba: "💡",
+  modernLamba: "💡",
+  hali: "🟣",
+  haliYuvarlak: "🟠",
+  haliCizgili: "🟫",
+  kure: "🌍",
+  saat: "🕰️",
+  somine: "🔥",
+  havuz: "⛲",
   akvaryum: "🐠",
-  langirt: "⚽",
-  oyun: "🕹️",
+  roket: "🚀",
   heykel: "🏆",
+  radyoSehpasi: "📻",
+  hoparlorler: "🔊",
+  satranc: "♟️",
+  boksTorbasi: "🥊",
+  medya: "📺",
+  kosuBandi: "🏃",
+  langirt: "⚽",
+  masaTenisi: "🏓",
+  oyun: "🕹️",
+  piyano: "🎹",
+  bilardo: "🎱",
+  suSebili: "🚰",
+  buzdolabi: "🧊",
+  kahve: "☕",
+  barTezgahi: "🍸",
+  otomat: "🥤",
 };
 
 /** Departman (stüdyoda iş) adından etiket simgesi ve rengi — referans görseldeki oda kartları gibi. */
@@ -215,6 +254,7 @@ export default function OfisOyunu({
   const anahtar = kayitAnahtari(kapsam);
   const [kayit, setKayit] = useState<OfisKaydi>(() => kaydiOku(anahtar));
   const [magaza, setMagaza] = useState(false);
+  const [magazaKategorisi, setMagazaKategorisi] = useState<EsyaKategorisi>(KATEGORILER[0].key);
   const [duzenle, setDuzenle] = useState(false);
   const [yerlestirilen, setYerlestirilen] = useState<{ tur: EsyaTuru; id?: string } | null>(null);
   const [secili, setSecili] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -935,8 +975,23 @@ export default function OfisOyunu({
           </button>
         </div>
         <p className="of-m-not">Ekibin bitirdiği her görev ofise {kazanilanPuan(1)} puan kazandırır.</p>
+        <div className="of-m-sekmeler" role="tablist" aria-label="Eşya türü">
+          {KATEGORILER.map((k) => (
+            <button
+              key={k.key}
+              type="button"
+              role="tab"
+              aria-selected={magazaKategorisi === k.key}
+              className={magazaKategorisi === k.key ? "on" : ""}
+              onClick={() => setMagazaKategorisi(k.key)}
+              tabIndex={magaza ? 0 : -1}
+            >
+              {k.ad}
+            </button>
+          ))}
+        </div>
         <div className="of-m-liste">
-          {KATALOG.map((k) => {
+          {KATALOG.filter((k) => k.kategori === magazaKategorisi).map((k) => {
             const kilitli = seviye.seviye < k.seviye;
             const yetmez = puan < k.fiyat;
             return (

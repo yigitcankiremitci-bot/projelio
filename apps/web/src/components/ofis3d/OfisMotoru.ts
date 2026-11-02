@@ -21,6 +21,7 @@ import {
   adSayisi,
   aralik,
   GEZINME,
+  haliMi,
   izgarayaOturt,
   katalogEsyasi,
   yolHakki,
@@ -896,7 +897,7 @@ export class OfisMotoru {
     model.updateWorldMatrix(true, true);
     const kutu = new THREE.Box3().setFromObject(model).expandByScalar(-0.04);
     if (this.duvarKutulari().some((d) => d.intersectsBox(kutu))) return true;
-    if (yalnizDuvar || e.tur === "hali") return false;
+    if (yalnizDuvar || haliMi(e.tur)) return false;
     return this.zeminEsyalari.some((o) => new THREE.Box3().setFromObject(o).intersectsBox(kutu));
   }
 
@@ -1267,7 +1268,7 @@ export class OfisMotoru {
     o.rotation.y = don;
     this.yapi.add(o);
     if (o.userData.guncelle) this.hareketliler.push(o);
-    const hali = typeof ad === "string" ? ad.startsWith("hali") : !!ad.userData.hali;
+    const hali = typeof ad === "string" ? haliMi(ad) : !!ad.userData.hali;
     if (y <= ZEMIN_Y + 0.05 && !hali) this.zeminEsyalari.push(o);
     return o;
   }
@@ -1507,7 +1508,7 @@ export class OfisMotoru {
       const katalog = katalogEsyasi(d.tur as EsyaTuru);
       if (!katalog && !varlikVar(d.tur)) continue;
       const o = katalog ? esyaModeli(d.tur as EsyaTuru) : varlik(d.tur as VarlikAdi);
-      if (d.tur === "hali") o.userData.hali = true;
+      if (haliMi(d.tur)) o.userData.hali = true;
       o.userData.model = d.tur;
       this.nesneKoy(oda, id, o, oda.x + d.dx, oda.z + d.dz, d.don);
     }
@@ -2126,7 +2127,7 @@ export class OfisMotoru {
 
   /** Yürüyüşe engel her şeyin zemindeki kutusu (oda eşyaları + mağazadan konanlar, halılar hariç). */
   private engelKutulari(): THREE.Box3[] {
-    const halilar = new Set(this.esyalar.filter((e) => e.tur === "hali").map((e) => e.id));
+    const halilar = new Set(this.esyalar.filter((e) => haliMi(e.tur)).map((e) => e.id));
     const nesneler = [
       ...this.zeminEsyalari,
       ...[...this.esyaNesneleri].filter(([id, n]) => !halilar.has(id) && n.visible).map(([, n]) => n),
@@ -2218,7 +2219,7 @@ export class OfisMotoru {
 
   /** Çakışmada sayılan zemin eşyası mı (oda düzenindekiler ve halı olmayan mağaza eşyaları). */
   private zeminMi(obj: THREE.Object3D): boolean {
-    return this.zeminEsyalari.includes(obj) || (!!obj.userData.esyaId && obj.userData.tur !== "hali");
+    return this.zeminEsyalari.includes(obj) || (!!obj.userData.esyaId && !haliMi(String(obj.userData.tur ?? "")));
   }
 
   /** Modül eşyası odasından çıkmaz; diğerleri ortak alana da çıkabilir (bkz. bolgesi). */
@@ -2308,7 +2309,7 @@ export class OfisMotoru {
     const ortak = this.plan?.odalar.find((o) => o.tur === "ortak");
     // Ortak alanın eşyası her odaya girebildiği için her yerdekiler sayılır.
     const bolgeler = oda.tur === "ortak" ? (this.plan?.odalar ?? [oda]) : ortak ? [oda, ortak] : [oda];
-    const halilar = new Set(this.esyalar.filter((e) => e.tur === "hali").map((e) => e.id));
+    const halilar = new Set(this.esyalar.filter((e) => haliMi(e.tur)).map((e) => e.id));
     const digerleri = [
       ...this.zeminEsyalari,
       ...[...this.esyaNesneleri].filter(([id, n]) => !halilar.has(id) && n.visible).map(([, n]) => n),
@@ -2417,7 +2418,7 @@ export class OfisMotoru {
     if (!oda) return null;
     const o = esyaModeli(tur);
     o.position.set(oda.x + oda.w / 2, ZEMIN_Y, oda.z + oda.d / 2);
-    const yer = this.bosYer(o, oda, "ek:yeni", oda, { x: oda.x + oda.w / 2, z: oda.z + oda.d / 2 }, tur !== "hali");
+    const yer = this.bosYer(o, oda, "ek:yeni", oda, { x: oda.x + oda.w / 2, z: oda.z + oda.d / 2 }, !haliMi(tur));
     return yer ? { dx: Math.round((yer.x - oda.x) * 100) / 100, dz: Math.round((yer.z - oda.z) * 100) / 100 } : null;
   }
 

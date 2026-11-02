@@ -1165,6 +1165,32 @@
   color: var(--yn-ink-3, var(--yn-ink-3));
   font-size: 12.5px;
 }
+.of-m-sekmeler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -4px 0 12px;
+}
+.of-m-sekmeler button {
+  padding: 5px 11px;
+  border: 1px solid var(--yn-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--yn-ink-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.of-m-sekmeler button:hover,
+.of-m-sekmeler button:focus-visible {
+  border-color: var(--yn-accent);
+}
+.of-m-sekmeler button.on {
+  border-color: var(--yn-accent);
+  background: var(--yn-accent-soft);
+  color: var(--yn-accent-dark);
+}
 .of-m-liste {
   flex: 1;
   overflow: auto;

@@ -949,23 +949,78 @@ export function ofisSeviyesi(kazanilan: number): { seviye: number; ilerleme: num
 // ------------------------------------------------------------------ mağaza
 
 export type EsyaTuru =
+  // bitkiler
   | "bitki"
   | "agac"
   | "monstera"
   | "inceMonstera"
   | "salonBitkisi"
   | "buyukKaktus"
+  | "kaktusKucuk"
+  | "bitkiliSehpa"
+  | "agacBuyuk"
+  // oturma
   | "puf"
-  | "lamba"
+  | "kanepe"
+  | "armut"
+  | "dinlenmeKoltugu"
+  | "ikiliKanepe"
+  | "tasarimKanepe"
+  | "koseKoltuk"
+  // mobilya
   | "kitaplik"
   | "dolap"
-  | "kahve"
+  | "yanSehpa"
+  | "ortaSehpa"
+  | "alcakSehpa"
+  | "alcakRaf"
+  | "askilik"
+  | "copKovasi"
+  | "calismaKosesi"
+  | "masaTakimi"
+  // dekor
+  | "lamba"
+  | "modernLamba"
   | "hali"
-  | "kanepe"
+  | "haliYuvarlak"
+  | "haliCizgili"
+  | "kure"
+  | "saat"
+  | "somine"
+  | "havuz"
   | "akvaryum"
+  | "roket"
+  | "heykel"
+  // eğlence
+  | "radyoSehpasi"
+  | "hoparlorler"
+  | "satranc"
+  | "boksTorbasi"
+  | "medya"
+  | "kosuBandi"
   | "langirt"
+  | "masaTenisi"
   | "oyun"
-  | "heykel";
+  | "piyano"
+  | "bilardo"
+  // mutfak
+  | "suSebili"
+  | "buzdolabi"
+  | "kahve"
+  | "barTezgahi"
+  | "otomat";
+
+export type EsyaKategorisi = "bitki" | "oturma" | "mobilya" | "dekor" | "eglence" | "mutfak";
+
+/** Mağazadaki sekmeler, sırasıyla. */
+export const KATEGORILER: { key: EsyaKategorisi; ad: string }[] = [
+  { key: "bitki", ad: "Bitkiler" },
+  { key: "oturma", ad: "Oturma" },
+  { key: "mobilya", ad: "Mobilya" },
+  { key: "dekor", ad: "Dekor" },
+  { key: "eglence", ad: "Eğlence" },
+  { key: "mutfak", ad: "Mutfak" },
+];
 
 export interface KatalogEsyasi {
   tur: EsyaTuru;
@@ -976,29 +1031,83 @@ export interface KatalogEsyasi {
   d: number;
   /** Bu seviyeye gelmeden alınamaz — mağazada ilerleme hissi için. */
   seviye: number;
+  kategori: EsyaKategorisi;
 }
 
 export const KATALOG: KatalogEsyasi[] = [
-  // Ölçüler hazır modellerin (components/ofis3d/varliklar.ts) ölçeklenmiş ayak izi.
-  { tur: "bitki", ad: "Saksı bitkisi", fiyat: 30, w: 0.5, d: 0.55, seviye: 1 },
-  { tur: "puf", ad: "Koltuk", fiyat: 45, w: 1.3, d: 1.15, seviye: 1 },
-  { tur: "lamba", ad: "Ayaklı lamba", fiyat: 50, w: 0.65, d: 0.65, seviye: 1 },
-  { tur: "hali", ad: "Oval halı", fiyat: 60, w: 2.1, d: 1.4, seviye: 1 },
-  { tur: "agac", ad: "Kaktüs", fiyat: 70, w: 0.7, d: 0.7, seviye: 2 },
+  // Ölçüler hazır modellerin (components/ofis3d/varliklar.ts) ölçeklenmiş ayak
+  // izi; kodla çizilenlerinki (modeller.ts) çizimle aynı. Kategori içinde ucuzdan
+  // pahalıya.
+  { tur: "kaktusKucuk", ad: "Mini kaktüs", fiyat: 20, w: 0.35, d: 0.35, seviye: 1, kategori: "bitki" },
+  { tur: "bitki", ad: "Saksı bitkisi", fiyat: 30, w: 0.5, d: 0.55, seviye: 1, kategori: "bitki" },
+  { tur: "bitkiliSehpa", ad: "Bitkili sehpa", fiyat: 55, w: 0.95, d: 0.4, seviye: 1, kategori: "bitki" },
+  { tur: "agac", ad: "Kaktüs", fiyat: 70, w: 0.7, d: 0.7, seviye: 2, kategori: "bitki" },
   // Büyük bitkiler: yapraklar yukarıda yayıldığı için ayak izi saksının kendisi.
-  { tur: "salonBitkisi", ad: "Salon bitkisi", fiyat: 80, w: 0.8, d: 0.8, seviye: 1 },
-  { tur: "inceMonstera", ad: "Uzun monstera", fiyat: 95, w: 0.7, d: 0.7, seviye: 2 },
-  { tur: "buyukKaktus", ad: "Büyük kaktüs", fiyat: 110, w: 0.8, d: 0.8, seviye: 2 },
-  { tur: "monstera", ad: "Gür monstera", fiyat: 130, w: 0.9, d: 0.9, seviye: 3 },
-  { tur: "kitaplik", ad: "Kitaplık", fiyat: 90, w: 0.75, d: 0.5, seviye: 2 },
-  { tur: "dolap", ad: "Dekor dolabı", fiyat: 100, w: 1.45, d: 0.75, seviye: 2 },
-  { tur: "kahve", ad: "Kahve köşesi", fiyat: 110, w: 1.45, d: 0.45, seviye: 2 },
-  { tur: "kanepe", ad: "Kanepe", fiyat: 140, w: 2.1, d: 1.15, seviye: 3 },
-  { tur: "akvaryum", ad: "Akvaryum", fiyat: 220, w: 1.4, d: 0.6, seviye: 4 },
-  { tur: "langirt", ad: "Langırt masası", fiyat: 260, w: 1.5, d: 0.9, seviye: 4 },
-  { tur: "oyun", ad: "Oyun makinesi", fiyat: 320, w: 0.9, d: 0.8, seviye: 5 },
-  { tur: "heykel", ad: "Projelio heykeli", fiyat: 500, w: 1, d: 1, seviye: 6 },
+  { tur: "salonBitkisi", ad: "Salon bitkisi", fiyat: 80, w: 0.8, d: 0.8, seviye: 1, kategori: "bitki" },
+  { tur: "inceMonstera", ad: "Uzun monstera", fiyat: 95, w: 0.7, d: 0.7, seviye: 2, kategori: "bitki" },
+  { tur: "buyukKaktus", ad: "Büyük kaktüs", fiyat: 110, w: 0.8, d: 0.8, seviye: 2, kategori: "bitki" },
+  { tur: "agacBuyuk", ad: "Saksı ağacı", fiyat: 120, w: 0.7, d: 0.75, seviye: 3, kategori: "bitki" },
+  { tur: "monstera", ad: "Gür monstera", fiyat: 130, w: 0.9, d: 0.9, seviye: 3, kategori: "bitki" },
+
+  { tur: "armut", ad: "Armut koltuk", fiyat: 40, w: 0.9, d: 0.9, seviye: 1, kategori: "oturma" },
+  { tur: "puf", ad: "Koltuk", fiyat: 45, w: 1.3, d: 1.15, seviye: 1, kategori: "oturma" },
+  { tur: "dinlenmeKoltugu", ad: "Dinlenme koltuğu", fiyat: 55, w: 0.9, d: 0.8, seviye: 1, kategori: "oturma" },
+  { tur: "ikiliKanepe", ad: "İkili kanepe", fiyat: 120, w: 1.8, d: 0.8, seviye: 2, kategori: "oturma" },
+  { tur: "kanepe", ad: "Kanepe", fiyat: 140, w: 2.1, d: 1.15, seviye: 3, kategori: "oturma" },
+  { tur: "tasarimKanepe", ad: "Tasarım kanepe", fiyat: 160, w: 2.05, d: 0.8, seviye: 3, kategori: "oturma" },
+  { tur: "koseKoltuk", ad: "Köşe koltuk", fiyat: 210, w: 1.8, d: 1.8, seviye: 4, kategori: "oturma" },
+
+  { tur: "copKovasi", ad: "Çöp kovası", fiyat: 10, w: 0.4, d: 0.45, seviye: 1, kategori: "mobilya" },
+  { tur: "askilik", ad: "Askılık", fiyat: 35, w: 0.6, d: 0.6, seviye: 1, kategori: "mobilya" },
+  { tur: "yanSehpa", ad: "Yan sehpa", fiyat: 40, w: 0.95, d: 0.4, seviye: 1, kategori: "mobilya" },
+  { tur: "ortaSehpa", ad: "Orta sehpa", fiyat: 65, w: 1.2, d: 0.75, seviye: 1, kategori: "mobilya" },
+  { tur: "alcakSehpa", ad: "Alçak sehpa", fiyat: 70, w: 1.5, d: 0.95, seviye: 2, kategori: "mobilya" },
+  { tur: "alcakRaf", ad: "Alçak raf", fiyat: 75, w: 1.45, d: 0.4, seviye: 2, kategori: "mobilya" },
+  { tur: "kitaplik", ad: "Kitaplık", fiyat: 90, w: 0.75, d: 0.5, seviye: 2, kategori: "mobilya" },
+  { tur: "dolap", ad: "Dekor dolabı", fiyat: 100, w: 1.45, d: 0.75, seviye: 2, kategori: "mobilya" },
+  { tur: "calismaKosesi", ad: "Çalışma köşesi", fiyat: 150, w: 1.3, d: 1.2, seviye: 3, kategori: "mobilya" },
+  { tur: "masaTakimi", ad: "Masa takımı", fiyat: 180, w: 1.75, d: 1.8, seviye: 3, kategori: "mobilya" },
+
+  { tur: "modernLamba", ad: "Modern lambader", fiyat: 40, w: 0.35, d: 0.35, seviye: 1, kategori: "dekor" },
+  { tur: "lamba", ad: "Ayaklı lamba", fiyat: 50, w: 0.65, d: 0.65, seviye: 1, kategori: "dekor" },
+  { tur: "haliYuvarlak", ad: "Yuvarlak halı", fiyat: 55, w: 1.7, d: 1.7, seviye: 1, kategori: "dekor" },
+  { tur: "hali", ad: "Oval halı", fiyat: 60, w: 2.1, d: 1.4, seviye: 1, kategori: "dekor" },
+  { tur: "haliCizgili", ad: "Çizgili halı", fiyat: 75, w: 2.6, d: 1.75, seviye: 2, kategori: "dekor" },
+  { tur: "kure", ad: "Yer küresi", fiyat: 85, w: 0.8, d: 0.7, seviye: 2, kategori: "dekor" },
+  { tur: "saat", ad: "Ayaklı saat", fiyat: 150, w: 0.6, d: 0.4, seviye: 3, kategori: "dekor" },
+  { tur: "akvaryum", ad: "Akvaryum", fiyat: 220, w: 1.4, d: 0.6, seviye: 4, kategori: "dekor" },
+  { tur: "somine", ad: "Şömine", fiyat: 240, w: 1.5, d: 0.6, seviye: 4, kategori: "dekor" },
+  { tur: "havuz", ad: "Süs havuzu", fiyat: 280, w: 1.4, d: 1.4, seviye: 5, kategori: "dekor" },
+  { tur: "roket", ad: "Roket maketi", fiyat: 420, w: 0.9, d: 0.9, seviye: 6, kategori: "dekor" },
+  { tur: "heykel", ad: "Projelio heykeli", fiyat: 500, w: 1, d: 1, seviye: 6, kategori: "dekor" },
+
+  { tur: "radyoSehpasi", ad: "Radyo sehpası", fiyat: 50, w: 0.95, d: 0.4, seviye: 1, kategori: "eglence" },
+  { tur: "hoparlorler", ad: "Hoparlör çifti", fiyat: 60, w: 0.95, d: 0.3, seviye: 2, kategori: "eglence" },
+  { tur: "satranc", ad: "Satranç masası", fiyat: 120, w: 1.3, d: 0.7, seviye: 2, kategori: "eglence" },
+  { tur: "boksTorbasi", ad: "Boks torbası", fiyat: 130, w: 0.8, d: 0.8, seviye: 3, kategori: "eglence" },
+  { tur: "medya", ad: "Medya ünitesi", fiyat: 170, w: 1.85, d: 0.4, seviye: 3, kategori: "eglence" },
+  { tur: "kosuBandi", ad: "Koşu bandı", fiyat: 200, w: 0.8, d: 1.7, seviye: 4, kategori: "eglence" },
+  { tur: "langirt", ad: "Langırt masası", fiyat: 260, w: 1.5, d: 0.9, seviye: 4, kategori: "eglence" },
+  { tur: "masaTenisi", ad: "Masa tenisi", fiyat: 280, w: 2.2, d: 1.3, seviye: 4, kategori: "eglence" },
+  { tur: "oyun", ad: "Oyun makinesi", fiyat: 320, w: 0.9, d: 0.8, seviye: 5, kategori: "eglence" },
+  { tur: "piyano", ad: "Piyano", fiyat: 340, w: 1.5, d: 1.0, seviye: 5, kategori: "eglence" },
+  { tur: "bilardo", ad: "Bilardo masası", fiyat: 380, w: 2.3, d: 1.3, seviye: 5, kategori: "eglence" },
+
+  { tur: "suSebili", ad: "Su sebili", fiyat: 45, w: 0.45, d: 0.45, seviye: 1, kategori: "mutfak" },
+  { tur: "buzdolabi", ad: "Mini buzdolabı", fiyat: 90, w: 0.6, d: 0.6, seviye: 2, kategori: "mutfak" },
+  { tur: "kahve", ad: "Kahve köşesi", fiyat: 110, w: 1.45, d: 0.45, seviye: 2, kategori: "mutfak" },
+  { tur: "barTezgahi", ad: "Bar tezgâhı", fiyat: 130, w: 2.45, d: 0.45, seviye: 3, kategori: "mutfak" },
+  { tur: "otomat", ad: "İçecek otomatı", fiyat: 190, w: 0.95, d: 0.8, seviye: 4, kategori: "mutfak" },
 ];
+
+/**
+ * Halı mı: halı yerde serili durur, üstüne eşya konabilir ve yalnızca başka
+ * halılarla çakışamaz. Hazır modellerin adları da aynı önekle başlıyor
+ * (haliOval, haliCizgili), sahnedeki sabit dekor da bu kurala uyar.
+ */
+export function haliMi(tur: string): boolean {
+  return tur.startsWith("hali");
+}
 
 export function katalogEsyasi(tur: EsyaTuru): KatalogEsyasi | undefined {
   return KATALOG.find((k) => k.tur === tur);
@@ -1044,9 +1153,9 @@ export function yerlestirilebilir(
 ): boolean {
   const alan = esyaAlani(aday);
   if (!plan.odalar.some((o) => icinde(alan, o, 0.2))) return false;
-  const hali = aday.tur === "hali";
+  const hali = haliMi(aday.tur);
   if (!hali && plan.engeller.some((e) => kesisir(alan, e))) return false;
-  return !esyalar.some((e) => e.id !== haric && (e.tur === "hali") === hali && kesisir(alan, esyaAlani(e)));
+  return !esyalar.some((e) => e.id !== haric && haliMi(e.tur) === hali && kesisir(alan, esyaAlani(e)));
 }
 
 /** Zemindeki bir noktayı eşya ızgarasına oturtur (çeyrek metre). */

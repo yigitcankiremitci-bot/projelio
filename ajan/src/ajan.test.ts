@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { adimlariAyir, iddiaVarMi, isiYurut, type Yardimcilar } from "./ajan.ts";
+import { adimlariAyir, iddiaVarMi, isiYurut, uydurmaSayilar, type Yardimcilar } from "./ajan.ts";
 import type { IsPaketi } from "./api.ts";
 import type { Mesaj } from "./ollama.ts";
 
@@ -172,6 +172,21 @@ describe("fikirler", () => {
     const s = await isiYurut(paket("fikir", "fikir çıkar"), { ...web, model });
     assert.deepEqual(s.oneriler?.map((o) => o.veri.baslik), ["Teklif şablonu", "İkinci", "Üçüncü"]);
     assert.equal(gorulen.length, 4);
+  });
+
+  test("kaynakta geçmeyen sayı bir kez geri çevrilir", async () => {
+    const { model, gorulen } = sahteModel([
+      cagri("fikir_oner", { baslik: "Teklif şablonu", fayda: "150+ ajansa 40 saat kazandırır", adimlar: ["a", "b"] }),
+      cagri("fikir_oner", { baslik: "Teklif şablonu", fayda: "Teklif süresini 4-6 saatten 1 saate indirir", adimlar: ["a", "b"] }),
+      { role: "assistant", content: "Bitti." },
+    ]);
+    const s = await isiYurut({ ...paket("fikir", "fikir çıkar"), baglam: "Ajanslar teklife haftada 4-6 saat harcıyor." }, { ...web, model });
+    assert.match(gorulen[1].mesajlar.find((m) => m.role === "tool")?.content ?? "", /150, 40 sayısı/);
+    assert.equal(s.oneriler?.length, 1);
+  });
+
+  test("uydurma sayı denetimi: tek haneliler serbest", () => {
+    assert.deepEqual(uydurmaSayilar("3 müşteriye %25 indirim, 150 TL", "fiyat 150 TL"), ["25"]);
   });
 
   test("adımlar dizi, satır ya da numaralı metin olabilir", () => {

@@ -162,6 +162,17 @@ export function iddiaVarMi(metin: string): boolean {
   return IDDIA.test(metin.toLocaleLowerCase("tr"));
 }
 
+/**
+ * Metindeki sayılardan, `bilinen` metinde hiç geçmeyenler. "150+ ajans", "40 saat"
+ * gibi uydurmaları yakalamak için: ikinci gerçek denemede (2026-11-02) model
+ * "sayı uydurma" kuralına rağmen fikrin faydasına kaynakta olmayan sayılar yazdı.
+ * Tek haneli sayılar (adım sayısı, "3 müşteri") serbest: onlar tahmin değil plan.
+ */
+export function uydurmaSayilar(metin: string, bilinen: string): string[] {
+  const gecenler = new Set(bilinen.match(/\d+(?:[.,]\d+)?/g) ?? []);
+  return [...new Set(metin.match(/\d+(?:[.,]\d+)?/g) ?? [])].filter((n) => n.replace(/[.,]/g, "").length > 1 && !gecenler.has(n));
+}
+
 const YAZAN_ARACLAR = new Set(["bilgi_kaydet", "konu_ekle", "yapilacak_oner", "rapor_yaz", "fikir_oner"]);
 
 /** Modelin tek metin yazdığı adımları ayırır: "1. … 2. …", satırlar ya da ";" (sunucudaki ajanAdimlariAyir ile aynı). */
@@ -225,6 +236,11 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
         const adimlar = adimlariAyir(a.adimlar);
         if (!dize(a.baslik) || !dize(a.fayda) || adimlar.length < 2)
           return "Fikir KAYDEDİLMEDİ: başlık, somut fayda ve en az 2 (tercihen 3-5) somut adım gerekli. Düzeltip fikir_oner'i yeniden çağır.";
+        const uydurma = uydurmaSayilar(dize(a.fayda), mesajlar.map((m) => m.content).join("\n"));
+        if (uydurma.length && !sayiGeriCevrildi) {
+          sayiGeriCevrildi = true;
+          return `Fikir KAYDEDİLMEDİ: faydadaki ${uydurma.join(", ")} sayısı öğrendiklerinde ya da okuduğun kaynaklarda geçmiyor. Sayıyı kaldırıp faydayı sayısız ya da kaynaktaki sayıyla yeniden yaz ve fikir_oner'i yeniden çağır.`;
+        }
         // Aynı fikir ikinci kez: ilk gerçek denemede (2026-11-02) model aynı başlığı iki kez önerdi.
         const anahtar = dize(a.baslik).toLocaleLowerCase("tr").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
         if (sonuc.oneriler!.some((o) => o.tur === "fikir" && o.veri.baslik.toLocaleLowerCase("tr").replace(/[^\p{L}\p{N}]+/gu, " ").trim() === anahtar))
@@ -253,6 +269,8 @@ export async function isiYurut(p: IsPaketi, y: Yardimcilar): Promise<IsSonucu> {
   let yazdi = false;
   let geriCevrildi = false;
   let fikirIstendi = false;
+  // İş başına bir kez: model ısrar ederse fikir sayısıyla kaydedilir (iş tümden boşa gitmesin).
+  let sayiGeriCevrildi = false;
   for (let adim = 0; adim < EN_COK_ADIM[p.is.tur]; adim++) {
     // Son adımda araç verilmez: model ne bulduysa onu yazmak zorunda kalır.
     const sonAdim = adim === EN_COK_ADIM[p.is.tur] - 1;

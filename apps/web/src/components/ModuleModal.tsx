@@ -11,6 +11,8 @@ import ModuleTeamPanel from "./ModuleTeamPanel";
 interface Props extends ModuleSurfaceProps {
   /** Katalogdaki tek cümlelik açıklama — başlığın altında görünür. */
   description?: string;
+  /** Neredeyse tam ekran açılsın (bkz. Modal.nearlyFullScreen). */
+  nearlyFullScreen?: boolean;
   onClose: () => void;
 }
 
@@ -29,7 +31,7 @@ interface Props extends ModuleSurfaceProps {
  *
  * Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §2.4
  */
-export default function ModuleModal({ description, onClose, access: verilenYetki, ...surface }: Props) {
+export default function ModuleModal({ description, nearlyFullScreen, onClose, access: verilenYetki, ...surface }: Props) {
   const c = useThemeColors();
   const { moduleKey, organizationId, departmentId, jobId } = surface;
 
@@ -69,7 +71,7 @@ export default function ModuleModal({ description, onClose, access: verilenYetki
   const genislik = moduleSurface(moduleKey) === "page" ? 1100 : moduleModalWidth(moduleKey);
 
   return (
-    <Modal title={surface.moduleName} subtitle={description} onClose={onClose} maxWidth={genislik} mobileFullScreen>
+    <Modal title={surface.moduleName} subtitle={description} onClose={onClose} maxWidth={genislik} mobileFullScreen nearlyFullScreen={nearlyFullScreen}>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <ModuleSurface {...surface} access={access} />
         <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 16 }}>

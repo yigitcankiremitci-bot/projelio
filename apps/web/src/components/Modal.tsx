@@ -79,6 +79,12 @@ interface Props {
    * çalışır.
    */
   footer?: ReactNode;
+  /**
+   * Geniş ekranda da neredeyse tam ekran açılsın mı (kenarlardan 20px içeride).
+   * /yeni anasayfasında ofisten açılan modüller için: modül sayfasının
+   * tamamı modalin içinde çalışılıyor, 1100px'e sıkışmasın.
+   */
+  nearlyFullScreen?: boolean;
 }
 
 export default function Modal({
@@ -89,6 +95,7 @@ export default function Modal({
   subtitle,
   mobileFullScreen = false,
   footer,
+  nearlyFullScreen = false,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -204,9 +211,9 @@ export default function Modal({
         style={{
           outline: "none",
           width: "100%",
-          maxWidth: fullScreen ? "none" : maxWidth,
-          maxHeight: fullScreen ? "none" : "85vh",
-          height: fullScreen ? "100%" : undefined,
+          maxWidth: fullScreen || nearlyFullScreen ? "none" : maxWidth,
+          maxHeight: fullScreen ? "none" : nearlyFullScreen ? "100%" : "85vh",
+          height: fullScreen || nearlyFullScreen ? "100%" : undefined,
           overflowY: "auto",
           // Modalin sonuna gelince tekerlek ARKADAKİ sayfayı kaydırmaya devam
           // ediyordu ("scroll chaining"). Kullanıcı modalde çalışırken arkadaki

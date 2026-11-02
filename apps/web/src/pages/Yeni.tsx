@@ -27,6 +27,10 @@ import { useUndo } from "../lib/undo";
 import Modal from "../components/Modal";
 import OrgBudgetPanel from "../components/OrgBudgetPanel";
 import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
+import ModuleModal from "../components/ModuleModal";
+import { isOpenableModule } from "../lib/entityModules";
+import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
+import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { serbestIsMi, studyoOdalari, type StudyoIsi } from "../lib/studyoOfisi";
 import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI } from "../lib/ofisOyunu";
 import "./Yeni.css";
@@ -109,7 +113,7 @@ export default function Yeni() {
   const [orgGorevleri, setOrgGorevleri] = useState<Task[] | null>(null);
   const [uyeler, setUyeler] = useState<Record<string, DepartmentMember[]>>({});
   // Modüller: katalog (hangi modül hangi departmanın) + şirkette açık olanlar.
-  const [katalog, setKatalog] = useState<{ key: string; name: string; departmentKeys?: string[] }[]>([]);
+  const [katalog, setKatalog] = useState<{ key: string; name: string; description?: string; departmentKeys?: string[] }[]>([]);
   const [acikModuller, setAcikModuller] = useState<Set<string> | null>(null);
   // Yönetim odasındaki kasa yalnızca şirketin Kasa sekmesini görebilene konur.
   // null: henüz bilinmiyor (ofis açılışı bunu da bekler, bkz. ofisHazir).
@@ -118,12 +122,14 @@ export default function Yeni() {
   const [uyelerHazir, setUyelerHazir] = useState(false);
   // Açık kasa: şirketin kasası ("org") ya da stüdyoda bir işin bütçesi (iş kimliği).
   const [kasaAcik, setKasaAcik] = useState<string | null>(null);
+  // Ofisten tıklanan modül sayfaya gitmeden, neredeyse tam ekran modalde açılır.
+  const [acikModul, setAcikModul] = useState<{ odaId: string; key: string } | null>(null);
   // Stüdyom: serbest çalışanın işleri ofiste oda olur (bkz. lib/studyoOfisi.ts).
   // Şirketi olmayan kullanıcı doğrudan stüdyoyu görür.
   const [studyo, setStudyo] = useState(false);
   const [serbestIsler, setSerbestIsler] = useState<Job[] | null>(null);
   const [studyoIsleri, setStudyoIsleri] = useState<StudyoIsi[] | null>(null);
-  const [serbestKatalog, setSerbestKatalog] = useState<{ key: string; name: string }[]>([]);
+  const [serbestKatalog, setSerbestKatalog] = useState<{ key: string; name: string; description?: string }[]>([]);
   const [projeler, setProjeler] = useState<Project[] | null>(null);
   const [projeGorevMap, setProjeGorevMap] = useState<Record<string, Task[]>>({});
   const [etkinlikler, setEtkinlikler] = useState<Etkinlik[] | null>(null);
@@ -244,7 +250,7 @@ export default function Yeni() {
 
   useEffect(() => {
     api
-      .get<{ key: string; name: string; departmentKeys?: string[] }[]>("/module-catalog")
+      .get<{ key: string; name: string; description?: string; departmentKeys?: string[] }[]>("/module-catalog")
       .then((d) => setKatalog(d ?? []))
       .catch(() => setKatalog([]))
       .finally(() => setKatalogHazir(true));
@@ -255,7 +261,7 @@ export default function Yeni() {
     if (!studyo || !serbestIsler || studyoIsleri) return;
     let iptal = false;
     api
-      .get<{ key: string; name: string }[]>("/module-catalog?freelancer=true")
+      .get<{ key: string; name: string; description?: string }[]>("/module-catalog?freelancer=true")
       .then((d) => !iptal && setSerbestKatalog(d ?? []))
       .catch(() => undefined);
     Promise.all(
@@ -629,10 +635,32 @@ export default function Yeni() {
                     ? navigate(`/projects/${key.slice(PROJE_ONEKI.length)}`)
                     : key === KUPA_RAFI
                       ? navigate(`/jobs/${odaId}`)
-                      : navigate(studyo ? `/jobs/${odaId}/modules/${key}` : `/departments/${odaId}/modules/${key}`)
+                      : isOpenableModule(key, Boolean(MODULE_RECORD_CONFIGS[key])) && kartModaldaAcilir(key)
+                        ? setAcikModul({ odaId, key })
+                        : navigate(studyo ? `/jobs/${odaId}/modules/${key}` : `/departments/${odaId}/modules/${key}`)
               }
               onModulKapat={orgId && !studyo ? (key) => modulKapat(orgId, key) : undefined}
             />
+            {acikModul &&
+              (() => {
+                const m = [...katalog, ...serbestKatalog].find((x) => x.key === acikModul.key);
+                return (
+                  <ModuleModal
+                    moduleKey={acikModul.key}
+                    moduleName={m?.name ?? acikModul.key}
+                    description={m?.description}
+                    nearlyFullScreen
+                    {...(studyo
+                      ? { jobId: acikModul.odaId }
+                      : {
+                          organizationId: orgId,
+                          departmentId: acikModul.odaId,
+                          departmentKey: departmanlar?.find((d) => d.id === acikModul.odaId)?.catalogKey,
+                        })}
+                    onClose={() => setAcikModul(null)}
+                  />
+                );
+              })()}
             {kasaAcik === "org" && orgId && (
               <Modal title="Kasa" subtitle={seciliOrg?.name} onClose={() => setKasaAcik(null)} maxWidth={1100} mobileFullScreen>
                 <OrgBudgetPanel organizationId={orgId} />

@@ -278,6 +278,13 @@ export interface Karakter3D {
     ayakSol?: THREE.Bone;
     ayakSag?: THREE.Bone;
   };
+  /** Otururken öne eğilmek için omurga kemikleri (karından boyna). */
+  govde: {
+    karin?: THREE.Bone;
+    bel?: THREE.Bone;
+    gogus?: THREE.Bone;
+    boyun?: THREE.Bone;
+  };
   /** Otururken elleri klavyeye uzatmak için kol kemikleri. */
   kollar: {
     ustSol?: THREE.Bone;
@@ -287,6 +294,12 @@ export interface Karakter3D {
     bilekSol?: THREE.Bone;
     bilekSag?: THREE.Bone;
   };
+  /**
+   * Dinlenme pozunda ölçülen boylar (karakterin ölçeğinde; 0: ölçülemedi).
+   * Oturma pozu bunlarla kurulur: baldır her karede animasyondan ölçülünce
+   * ayak bileği iki yükseklik arasında zıplıyor, ayaklar titriyordu.
+   */
+  boylar: { baldir: number; ustKol: number; onKol: number };
   /** Karakter modeli kadın mı (yol verme kuralı için; kişinin verisinden değil, görünen modelden). */
   kadin: boolean;
 }
@@ -320,6 +333,19 @@ export async function karakter(sayi: number): Promise<Karakter3D> {
   };
   // GLTFLoader kemik adlarındaki noktayı siler: "UpperLeg.L" → "UpperLegL".
   const kemik = (n: string) => (kopya.getObjectByName(n) ?? kopya.getObjectByName(n.replace(".", ""))) as THREE.Bone | undefined;
+  const iskeletler: THREE.Skeleton[] = [];
+  kopya.traverse((c) => {
+    if ((c as THREE.SkinnedMesh).isSkinnedMesh) iskeletler.push((c as THREE.SkinnedMesh).skeleton);
+  });
+  // İki kemik arası, bağlama (dinlenme) pozunda: kemiğin ters bağlama matrisinin tersi onun yeri.
+  const boy = (a: string, b: string): number => {
+    const ka = kemik(a);
+    const kb = kemik(b);
+    const sk = iskeletler.find((s) => ka && kb && s.bones.includes(ka) && s.bones.includes(kb));
+    if (!sk || !ka || !kb) return 0;
+    const yer = (k: THREE.Bone) => new THREE.Vector3().setFromMatrixPosition(sk.boneInverses[sk.bones.indexOf(k)].clone().invert());
+    return yer(ka).distanceTo(yer(kb)) * KARAKTER_OLCEK;
+  };
   return {
     kadin: ad.startsWith("kadin"),
     nesne,
@@ -333,6 +359,8 @@ export async function karakter(sayi: number): Promise<Karakter3D> {
       ayakSol: kemik("Foot.L"),
       ayakSag: kemik("Foot.R"),
     },
+    govde: { karin: kemik("Abdomen"), bel: kemik("Torso"), gogus: kemik("Chest"), boyun: kemik("Neck") },
+    boylar: { baldir: boy("LowerLeg.L", "Foot.L"), ustKol: boy("UpperArm.L", "LowerArm.L"), onKol: boy("LowerArm.L", "Wrist.L") },
     kollar: {
       ustSol: kemik("UpperArm.L"),
       ustSag: kemik("UpperArm.R"),

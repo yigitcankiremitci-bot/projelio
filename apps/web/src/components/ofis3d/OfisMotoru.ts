@@ -43,7 +43,7 @@ import { temaEsyalari } from "./studyoEsyalari";
 import type { IsTemasi } from "../../lib/studyoOfisi";
 import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI, TOPLANTI_MASASI, modulEsyasiTuru, type IstasyonBilgisi } from "../../lib/ofisOyunu";
 import type { NesneDuzeni } from "@projelio/shared";
-import { izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
+import { bosNokta, izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
 
 export interface OdaEtiketi {
   ad: string;
@@ -103,6 +103,10 @@ interface Karakter {
   kacis: THREE.Vector3;
   /** Duvara dayanıp ilerleyemediği süre (saniye); uzarsa yol yeniden aranır. */
   takili?: number;
+  /** Kullanıcı tıklayıp bir yere götürdü: orada daha uzun durur, sonra masasına döner. */
+  goturuldu?: boolean;
+  /** Masada yazma animasyonunun saati (saniye; herkes aynı anda aynı tuşa basmasın diye rastgele başlar). */
+  yazma: number;
 }
 
 const IKONLAR: Record<string, string> = {
@@ -131,7 +135,19 @@ const KAMERA_YATAY = 0.17;
 const KAMERA_EGIM = 0.88;
 /** Oturan kişinin kalçası sandalyenin oturağına insin diye modelin indirileceği miktar. */
 const OTURMA_INIS = 0.36;
+/**
+ * Oturan kişi sandalyede bu kadar öne kayar: karakterlerin kolu kısa,
+ * sandalyenin ortasından klavyeye uzanamıyordu (kollar aşağı sarkıyordu).
+ */
+const OTURMA_ONE = 0.16;
+/** Klavye masanın ortasından sandalyeye doğru bu kadar önde (bkz. masa modelleri: klavye z −0,12). */
+const KLAVYE_MASADAN = 0.12;
+/** Bileğin yüksekliği: masanın üstü (0,645) + klavye + biraz pay; el tuşlara paralel durur. */
+const BILEK_Y = ZEMIN_Y + 0.645 + 0.075;
+/** Bilek klavyenin ortasından bu kadar geride: parmaklar tuşların üstüne gelsin. */
+const BILEK_GERI = 0.12;
 const ASAGI = new THREE.Vector3(0, -1, 0);
+const YUKARI = new THREE.Vector3(0, 1, 0);
 // Her karede her oturan için yeniden yaratılmasın diye.
 const OTUR_ILERI = new THREE.Vector3();
 const OTUR_A = new THREE.Vector3();
@@ -142,6 +158,14 @@ const OTUR_Y = new THREE.Vector3();
 const OTUR_ICE = new THREE.Vector3();
 const KISI_ESKI = new THREE.Vector3();
 const OTUR_YON = new THREE.Vector3();
+const OTUR_SOL = new THREE.Vector3();
+const OTUR_OMUZ = new THREE.Vector3();
+const OTUR_HEDEF = new THREE.Vector3();
+const OTUR_DIRSEK = new THREE.Vector3();
+const OTUR_MENTESE = new THREE.Vector3();
+const OTUR_SIRT = new THREE.Vector3();
+const OTUR_X = new THREE.Vector3();
+const OTUR_M = new THREE.Matrix4();
 
 /**
  * Departman yöneticisinin masası: ekip masasının genişletilmiş hâli (geniş ve
@@ -190,6 +214,38 @@ function kemigiYonelt(kemik: THREE.Object3D, yon: THREE.Vector3): void {
   const yeniDunya = OTUR_Q2.setFromUnitVectors(simdiki, yon).multiply(dunya);
   kemik.quaternion.copy(kemik.parent.getWorldQuaternion(OTUR_Q).invert().multiply(yeniDunya));
   kemik.updateMatrixWorld(true);
+}
+
+/**
+ * Kemiği dünyada tam yönüne koyar: uzunluk ekseni (yerel +Y) `yon`e, yerel +Z
+ * `sirt`a (yona dik kısmına) baksın. Quaternius kollarında +Z elin sırtı
+ * (T pozunda yukarı): avuç içini aşağı çevirmek için yalnız yön yetmiyor.
+ */
+function kemigiKoy(kemik: THREE.Object3D, yon: THREE.Vector3, sirt: THREE.Vector3): void {
+  if (!kemik.parent) return;
+  const y = OTUR_Y.copy(yon).normalize();
+  const z = OTUR_SIRT.copy(sirt).addScaledVector(y, -sirt.dot(y));
+  if (z.lengthSq() < 1e-6) return kemigiYonelt(kemik, OTUR_SIRT.copy(y));
+  z.normalize();
+  const x = OTUR_X.crossVectors(y, z);
+  const dunya = OTUR_Q2.setFromRotationMatrix(OTUR_M.makeBasis(x, y, z));
+  kemik.quaternion.copy(kemik.parent.getWorldQuaternion(OTUR_Q).invert().multiply(dunya));
+  kemik.updateMatrixWorld(true);
+}
+
+/**
+ * İki kemikli kol: omuz `s`, el `t`, kol boyları `a` ve `b`; dirsek `kutup`
+ * yönüne bükülür. Dirseğin yeri `dirsek`e yazılır. El yetişmiyorsa kol hedefe
+ * doğru uzanır, `t` yetişilen yere çekilir.
+ */
+function ikiKemik(s: THREE.Vector3, t: THREE.Vector3, a: number, b: number, kutup: THREE.Vector3, dirsek: THREE.Vector3): void {
+  const u = OTUR_X.subVectors(t, s);
+  const d = THREE.MathUtils.clamp(u.length(), Math.abs(a - b) + 1e-3, (a + b) * 0.995);
+  u.normalize();
+  t.copy(s).addScaledVector(u, d);
+  const cos = THREE.MathUtils.clamp((a * a + d * d - b * b) / (2 * a * d), -1, 1);
+  const dik = OTUR_SIRT.copy(kutup).addScaledVector(u, -kutup.dot(u)).normalize();
+  dirsek.copy(s).addScaledVector(u, a * cos).addScaledVector(dik, a * Math.sqrt(1 - cos * cos));
 }
 
 // ------------------------------------------------------------------ dokular
@@ -406,6 +462,8 @@ export class OfisMotoru {
   private fareVar = false;
   private basilan: { x: number; y: number } | null = null;
   private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio" | "ajan"; id: string } | null = null;
+  /** Tıklanıp seçilen kişi: bir sonraki zemin tıklamasında oraya yürür. */
+  private seciliKisiId: string | null = null;
   /** Ortalıkta gezen Lio robotu (ilk kurulumda bir kez yaratılır). */
   private lio: LioRobotu | null = null;
   /** Ajan robotu: yalnızca ajanı açık hesapta, ajaniAyarla ile görünür. */
@@ -1659,6 +1717,7 @@ export class OfisMotoru {
           kahvede: false,
           yolVer: 0,
           kacis: new THREE.Vector3(),
+          yazma: Math.random() * 20,
         };
         this.eylemeGec(k, "Idle_Neutral", 0);
         // Herkes aynı anda nefes almasın.
@@ -1675,6 +1734,8 @@ export class OfisMotoru {
     this.ustteyiAyarla(null);
     this.karakterler = yeni.filter((k): k is Karakter => !!k);
     for (const k of this.karakterler) if (k.k3.nesne.parent !== this.kisiGrubu) this.kisiGrubu.add(k.k3.nesne);
+    if (this.seciliKisiId && !this.karakterler.some((k) => k.veri.id === this.seciliKisiId)) this.kisiSec(null);
+    else if (this.seciliKisiId) this.kisiSec(this.seciliKisiId, false);
   }
 
   private halkaRengi(halka: THREE.Mesh, v: SahneKisisi): void {
@@ -1737,10 +1798,17 @@ export class OfisMotoru {
     for (const k of this.karakterler) {
       const eski = KISI_ESKI.copy(k.k3.nesne.position);
       this.karakteriOynat(k, dt);
-      if (k.durum !== "oturuyor") this.duvardanGecirme(k, eski, dt);
+      // Koltuğa giden son adım serbest: masa duvara dayalıysa koltuk duvarın
+      // dibinde kalıyor, son adımda durdurulan kişi koltuğun önünde takılıyordu.
+      const koltugaIniyor = k.donus && k.adim >= k.yol.length - 1;
+      if (k.durum !== "oturuyor" && !koltugaIniyor) this.duvardanGecirme(k, eski, dt);
     }
     this.lioyuOynat(dt, t);
     this.ajaniOynat(dt, t);
+    if (this.seciliKisiId) {
+      const s = this.karakterler.find((k) => k.veri.id === this.seciliKisiId);
+      s?.halka.scale.setScalar(1.2 + 0.18 * Math.sin(t * 6));
+    }
 
     for (let i = this.parcaciklar.length - 1; i >= 0; i--) {
       const p = this.parcaciklar[i];
@@ -1789,7 +1857,12 @@ export class OfisMotoru {
       n.rotation.y = k.koltukYonu;
       if (k.ayakta) n.position.set(k.koltuk.x, ZEMIN_Y, k.koltuk.z);
       else {
-        n.position.set(k.koltuk.x, k.koltuk.y - OTURMA_INIS, k.koltuk.z);
+        n.position.set(
+          k.koltuk.x + OTURMA_ONE * Math.sin(k.koltukYonu),
+          k.koltuk.y - OTURMA_INIS,
+          k.koltuk.z + OTURMA_ONE * Math.cos(k.koltukYonu)
+        );
+        k.yazma += dt;
         this.oturt(k);
       }
       k.sayac -= dt;
@@ -1800,14 +1873,18 @@ export class OfisMotoru {
     if (k.durum === "bekliyor") {
       k.sayac -= dt;
       if (k.sayac <= 0) {
-        // Dönüş yolu: gidişin tersi, koltukta biter.
-        k.yol = k.yol.slice().reverse();
-        k.yol.push(k.koltuk.clone());
-        k.adim = 0;
-        k.donus = true;
-        k.durum = "yuruyor";
-        k.kahvede = false;
-        this.eylemeGec(k, "Walk");
+        // Dönüş: bulunduğu yerden koltuğa yeni yol (götürüldüğü yer gidiş yolunun
+        // üstünde değil). Bulunamazsa gidişin tersi; ikisi de koltukta biter.
+        k.goturuldu = false;
+        if (!this.yuru(k, k.koltuk, true)) {
+          k.yol = k.yol.slice().reverse();
+          k.yol.push(k.koltuk.clone());
+          k.adim = 0;
+          k.donus = true;
+          k.durum = "yuruyor";
+          k.kahvede = false;
+          this.eylemeGec(k, "Walk");
+        }
       }
       return;
     }
@@ -1821,7 +1898,7 @@ export class OfisMotoru {
         this.eylemeGec(k, "Idle_Neutral");
       } else {
         k.durum = "bekliyor";
-        k.sayac = aralik(GEZINME.ayakta);
+        k.sayac = aralik(k.goturuldu ? GEZINME.goturulunce : GEZINME.ayakta);
         // Kahve köşesinde kahve alır, ortada biriyle karşılaşmış gibi el sallar ya da dinlenir.
         this.eylemeGec(k, k.kahvede ? "Interact" : Math.random() < 0.35 ? "Wave" : "Idle");
         if (k.kahvede) n.rotation.y = this.kahveYeri().don + Math.PI; // bara dön
@@ -1909,45 +1986,82 @@ export class OfisMotoru {
    * yerel rotateX ile bükmek bacağı geriye, sandalyenin etrafına kıvırıyordu;
    * yönler dünyada verilir. Ayaklar Root'a bağlı (IK düzeni): animasyon onları
    * yerde, ayaktaki yerinde tutar — baldırın ucuna ayrıca taşınır, yoksa baldır
-   * ayağa doğru geriye uzayıp sandalyeye sarılıyordu.
+   * ayağa doğru geriye uzayıp sandalyeye sarılıyordu. Baldır boyu dinlenme
+   * pozundan gelir: her karede animasyondan ölçülünce (ayağı bir önceki karede
+   * biz taşımış olabiliyoruz) bilek iki yükseklik arasında zıplıyordu.
+   *
+   * Gövde klavyeye doğru biraz öne eğilir; eller klavyenin üstünde, ona
+   * paralel ve avuç içi aşağı. Yerleri iki kemikli IK ile bulunur, yazarken
+   * yavaşça tuşlar arasında gezinip iner kalkar (bkz. `yazma`).
    */
   private oturt(k: Karakter): void {
     const b = k.k3.bacaklar;
     const n = k.k3.nesne;
+    const olcek = n.scale.x;
     n.updateMatrixWorld(true);
     const ileri = OTUR_ILERI.set(Math.sin(k.koltukYonu), 0, Math.cos(k.koltukYonu));
+    // Kişinin solu (modelin +x'i; sol kol kemikleri o yanda).
+    const sol = OTUR_SOL.set(ileri.z, 0, -ileri.x);
     for (const [ust, alt, ayak] of [
       [b.ustSol, b.altSol, b.ayakSol],
       [b.ustSag, b.altSag, b.ayakSag],
     ] as const) {
       if (!ust || !alt) continue;
-      // Baldır boyu: animasyonun pozunda diz ile ayak bileği arası.
-      const baldir = ayak ? alt.getWorldPosition(OTUR_A).distanceTo(ayak.getWorldPosition(OTUR_B)) : 0;
       kemigiYonelt(ust, ileri);
       kemigiYonelt(alt, ASAGI);
-      if (ayak?.parent) {
-        const bilek = alt.getWorldPosition(OTUR_A).addScaledVector(ASAGI, baldir);
+      if (ayak?.parent && k.k3.boylar.baldir) {
+        const bilek = alt.getWorldPosition(OTUR_A).addScaledVector(ASAGI, k.k3.boylar.baldir * olcek);
         ayak.position.copy(ayak.parent.worldToLocal(bilek));
         ayak.updateMatrixWorld(true);
       }
     }
-    // Eller klavyede: üst kol hafif öne-aşağı (dirsek gövdenin yanında), ön kol
-    // masaya doğru ileri ve biraz içe, bilek tuşlara eğik. İçe yön iki omzun
-    // ortasına göre bulunur; böylece sağ/sol işaretiyle uğraşılmaz.
+    // Öne eğilme: omurga aşağıdan yukarı giderek öne yatar, boyun biraz dikleşir (gözler ekranda).
+    const g = k.k3.govde;
+    for (const [kemik, derece] of [
+      [g.karin, 10],
+      [g.bel, 22],
+      [g.gogus, 30],
+      [g.boyun, 8],
+    ] as const) {
+      if (!kemik) continue;
+      const a = THREE.MathUtils.degToRad(derece);
+      kemigiYonelt(kemik, OTUR_YON.copy(YUKARI).multiplyScalar(Math.cos(a)).addScaledVector(ileri, Math.sin(a)));
+    }
     const kol = k.k3.kollar;
-    if (kol.ustSol && kol.ustSag) {
-      const orta = kol.ustSol.getWorldPosition(OTUR_A).add(kol.ustSag.getWorldPosition(OTUR_B)).multiplyScalar(0.5);
-      for (const [ust, alt, bilek] of [
-        [kol.ustSol, kol.altSol, kol.bilekSol],
-        [kol.ustSag, kol.altSag, kol.bilekSag],
-      ] as const) {
-        if (!ust || !alt) continue;
-        const omuz = ust.getWorldPosition(OTUR_B);
-        const ice = OTUR_ICE.set(orta.x - omuz.x, 0, orta.z - omuz.z).normalize();
-        kemigiYonelt(ust, OTUR_YON.copy(ileri).multiplyScalar(0.35).addScaledVector(ASAGI, 0.94).normalize());
-        kemigiYonelt(alt, OTUR_YON.copy(ileri).addScaledVector(ASAGI, 0.12).addScaledVector(ice, 0.3).normalize());
-        if (bilek) kemigiYonelt(bilek, OTUR_YON.copy(ileri).addScaledVector(ASAGI, 0.4).addScaledVector(ice, 0.1).normalize());
-      }
+    const { ustKol, onKol } = k.k3.boylar;
+    if (!ustKol || !onKol) return;
+    const masa = k.oda.masalar[k.masaNo];
+    // Klavyenin ortası koltuktan bu kadar ileride (yönetici masası daha derin).
+    const klavye = (masa ? koltukUzakligi(masa) : KOLTUK_UZAKLIK) - KLAVYE_MASADAN;
+    const t = k.yazma;
+    // Arada bir duraklar: yazmanın gücü yavaşça kabarıp söner.
+    const guc = THREE.MathUtils.smoothstep(Math.sin(t * 0.45) + Math.sin(t * 0.17 + 1.3), -0.6, 0.4);
+    for (const [ust, alt, bilek, yan] of [
+      [kol.ustSol, kol.altSol, kol.bilekSol, 1],
+      [kol.ustSag, kol.altSag, kol.bilekSag, -1],
+    ] as const) {
+      if (!ust || !alt || !bilek) continue;
+      const faz = yan > 0 ? 0 : 2.1;
+      // Tuşlara basış: kısa iniş, yavaş kalkış; iki el sırayla.
+      const bas = Math.pow(Math.max(0, Math.sin(t * 5.2 + faz)), 3) * guc;
+      const omuz = ust.getWorldPosition(OTUR_OMUZ);
+      const hedef = OTUR_HEDEF.set(k.koltuk.x, BILEK_Y, k.koltuk.z)
+        .addScaledVector(ileri, klavye - BILEK_GERI + 0.012 * Math.sin(t * 0.6 + faz * 1.7))
+        .addScaledVector(sol, yan * 0.1 + 0.03 * Math.sin(t * 0.8 + faz) * guc);
+      hedef.y -= 0.012 * bas;
+      // Dirsek aşağı, biraz dışa ve geriye bükülür (gövdenin yanında).
+      const kutup = OTUR_YON.copy(ASAGI).addScaledVector(sol, yan * 0.7).addScaledVector(ileri, -0.4);
+      ikiKemik(omuz, hedef, ustKol * olcek, onKol * olcek, kutup, OTUR_DIRSEK);
+      // Dirseğin menteşesi: üst kolun yerel +Z'si (T pozunda elin sırtı ile aynı yan).
+      const ustYon = OTUR_A.subVectors(OTUR_DIRSEK, omuz);
+      const onYon = OTUR_B.subVectors(hedef, OTUR_DIRSEK);
+      const mentese = OTUR_MENTESE.crossVectors(ustYon, onYon).multiplyScalar(-yan);
+      if (mentese.lengthSq() < 1e-8) mentese.copy(YUKARI);
+      kemigiKoy(ust, ustYon, mentese.normalize());
+      // Ön kol menteşeden avuç aşağı yarı yolda döner: bilekte bükülme yumuşak kalsın.
+      kemigiKoy(alt, onYon, OTUR_ICE.copy(mentese).add(YUKARI));
+      // El klavyeye paralel, parmaklar ileri ve hafifçe içe; basarken parmak uçları iner.
+      kemigiKoy(bilek, OTUR_YON.copy(ileri).addScaledVector(sol, -yan * 0.15).addScaledVector(ASAGI, 0.03 + 0.25 * bas), YUKARI);
     }
   }
 
@@ -2015,21 +2129,6 @@ export class OfisMotoru {
     if (!plan) return;
     const ortak = plan.odalar.find((o) => o.tur === "ortak");
     if (!ortak) return;
-    const { kapi, kapiYonu: y } = k.oda;
-    const ic = new THREE.Vector3(kapi.x - y.x * 0.7, ZEMIN_Y, kapi.z - y.z * 0.7);
-    const dis = new THREE.Vector3(kapi.x + y.x * 0.8, ZEMIN_Y, kapi.z + y.z * 0.8);
-    // Sandalyeden geri çekilip masa sırasının kapı tarafındaki ucundan dolaşır.
-    const kalkis = k.koltuk.clone();
-    // Sandalyeden geriye (masanın tersine) bir adım; masa döndürülmüş olabilir.
-    kalkis.x -= 0.4 * Math.sin(k.koltukYonu);
-    kalkis.z -= 0.4 * Math.cos(k.koltukYonu);
-    const masaX = k.oda.masalar.map((m) => m.x);
-    // Kümenin kapıya yakın ucundan dolaşılır (kapı kuzey/güney duvarındaysa kapının olduğu yana).
-    const masaOrta = masaX.reduce((t, v) => t + v, 0) / masaX.length;
-    const sagdan = y.x > 0 || (y.x === 0 && kapi.x >= masaOrta);
-    const uc = sagdan ? Math.max(...masaX) + 1.0 : Math.min(...masaX) - 1.0;
-    const kenarX = Math.min(k.oda.x + k.oda.w - 0.4, Math.max(k.oda.x + 0.4, uc));
-    const kenar = new THREE.Vector3(kenarX, ZEMIN_Y, kalkis.z);
     const kahve = Math.random() < 0.45;
     let hedef: THREE.Vector3;
     if (kahve) {
@@ -2046,26 +2145,66 @@ export class OfisMotoru {
         Math.min(ortak.z + ortak.d - 1.6, Math.max(ortak.z + 1.6, k.oda.kapi.z + (Math.random() - 0.5) * 3))
       );
     }
-    // Kapı bir koridor girintisine açılıyor olabilir: önce ortak alanın içine
-    // (kapıya en yakın noktasına) girilir, sonra hedefe yürünür — duvarlardan geçmesin.
-    const giris = new THREE.Vector3(
-      Math.min(ortak.x + ortak.w - 0.6, Math.max(ortak.x + 0.6, dis.x)),
-      ZEMIN_Y,
-      Math.min(ortak.z + ortak.d - 0.6, Math.max(ortak.z + 0.6, dis.z))
-    );
-    // Yol ızgarada bulunur: duvarlar kapıdan, eşyaların (taşınmış olanlar ve
-    // mağazadan konanlar dahil) etrafından dolaşılır. Bulunamazsa (ör. kapının
-    // önü kapatılmış) eski sabit ara noktalara düşülür.
-    const izgara = this.izgara();
-    const bulunan = izgara ? yolBul(izgara, kalkis, hedef) : null;
-    k.yol = bulunan
-      ? [kalkis, ...bulunan.map((p) => new THREE.Vector3(p.x, ZEMIN_Y, p.z))]
-      : [kalkis, kenar, new THREE.Vector3(kenarX, ZEMIN_Y, ic.z), ic, dis, giris, hedef];
-    k.adim = 0;
-    k.donus = false;
+    // Yol bulunamazsa (oda duvarlarla kapalı) kalkmaz, bir süre sonra yine dener.
+    // Önceden sabit ara noktalara (koltuğun arkası, masa sırasının ucu, kapı)
+    // düşülüyordu: masa duvara yakın taşınmışsa o noktalar duvarın içinde
+    // kalıyor, kişi duvarla masa arasında takılıp kalıyordu.
+    if (!this.yuru(k, hedef)) {
+      k.sayac = aralik(k.veri.cevrimici ? GEZINME.masadaCevrimici : GEZINME.masadaDiger);
+      return;
+    }
     k.kahvede = kahve;
+  }
+
+  /**
+   * Bulunduğu yerden (oturuyorsa koltuğundan) hedefe ızgarada yol bulup yürür:
+   * koltuktan masanın ayak izi içinden en kısa yoldan kalkılır, duvarlar
+   * kapıdan, eşyalar (taşınmış ve mağazadan konanlar dahil) etrafından dolaşılır.
+   * Dönüşte yol koltukta biter; başka hedef eşyanın içindeyse yanına gidilir.
+   * Yol yoksa false (kişi olduğu gibi kalır).
+   */
+  private yuru(k: Karakter, hedef: THREE.Vector3, donus = false): boolean {
+    const izgara = this.izgara();
+    if (!izgara) return false;
+    const bas = k.durum === "oturuyor" ? k.koltuk : k.k3.nesne.position;
+    const son = donus ? hedef : bosNokta(izgara, hedef);
+    const bulunan = son ? yolBul(izgara, bas, son) : null;
+    if (!bulunan) return false;
+    k.yol = bulunan.map((p) => new THREE.Vector3(p.x, ZEMIN_Y, p.z));
+    if (donus) k.yol.push(k.koltuk.clone());
+    k.adim = 0;
+    k.donus = donus;
     k.durum = "yuruyor";
+    k.kahvede = false;
+    k.yolVer = 0;
+    k.takili = 0;
     this.eylemeGec(k, "Walk");
+    return true;
+  }
+
+  /** Kişiyi seçer (halkası parlar ve atar) ya da seçimi bırakır. */
+  private kisiSec(id: string | null, bildir = true): void {
+    const eski = this.karakterler.find((k) => k.veri.id === this.seciliKisiId);
+    if (eski) {
+      eski.halka.scale.setScalar(1);
+      this.halkaRengi(eski.halka, eski.veri);
+    }
+    this.seciliKisiId = id;
+    // Üstündeki kişinin etiketi ("götür" / "vazgeç") yenilensin.
+    const u = this.ustteki;
+    if (u?.tur === "kisi") {
+      this.ustteyiAyarla(null);
+      this.ustteyiAyarla(u);
+    }
+    const k = this.karakterler.find((c) => c.veri.id === id);
+    if (!k) {
+      this.seciliKisiId = null;
+      return;
+    }
+    const m = k.halka.material as THREE.MeshBasicMaterial;
+    m.color.set(marka().vurgu);
+    m.opacity = 1;
+    if (bildir) this.onUyari?.(`${k.veri.ad} nereye gitsin? Zemine tıkla (Esc: vazgeç)`);
   }
 
   // ------------------------------------------------------------ fare
@@ -2694,6 +2833,22 @@ export class OfisMotoru {
     }
     this.isinla();
     const u = this.ustteki;
+    // Kişiye tıklanınca seçilir (yeniden tıklamak bırakır); ardından tıklanan
+    // yere yürür, bir süre orada durup kendiliğinden masasına döner.
+    if (u?.tur === "kisi") {
+      this.kisiSec(this.seciliKisiId === u.id ? null : u.id);
+      return;
+    }
+    if (this.seciliKisiId) {
+      const k = this.karakterler.find((c) => c.veri.id === this.seciliKisiId);
+      const p = this.zemineDegen();
+      this.kisiSec(null);
+      if (k && p) {
+        if (this.yuru(k, p)) k.goturuldu = true;
+        else this.onUyari?.("Oraya yürüyerek gidilemiyor");
+      }
+      return;
+    }
     if (!u) return;
     if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
     else if (u.tur === "oda") this.onOdaTikla?.(u.id);
@@ -2720,6 +2875,10 @@ export class OfisMotoru {
       return;
     }
     if (!this.yerlestirme) {
+      if (e.key === "Escape" && this.seciliKisiId) {
+        this.kisiSec(null);
+        return;
+      }
       if (e.key === "Escape" && this.icerdekiOda) {
         this.odadanCik();
         this.onOdadanCikildi?.();
@@ -2788,6 +2947,8 @@ export class OfisMotoru {
       }
     }
     this.ustteyiAyarla(yeni);
+    // Seçili kişi götürülecekken zemin hedef imleci gösterir.
+    if (this.seciliKisiId && yeni?.tur !== "kisi") this.kap.style.cursor = "crosshair";
   }
 
   private ustteyiAyarla(yeni: OfisMotoru["ustteki"]): void {
@@ -2876,11 +3037,11 @@ export class OfisMotoru {
         const b = document.createElement("b");
         b.textContent = k.veri.ben ? `${k.veri.ad} (sen)` : k.veri.ad;
         el.appendChild(b);
-        if (k.veri.cevrimici) {
-          const s = document.createElement("small");
-          s.textContent = "çevrimiçi";
-          el.appendChild(s);
-        }
+        const s = document.createElement("small");
+        const ipucu = this.seciliKisiId === k.veri.id ? "Tıkla, vazgeç" : "Tıkla, bir yere götür";
+        s.textContent = k.veri.cevrimici ? `çevrimiçi · ${ipucu}` : ipucu;
+        el.appendChild(s);
+        this.kap.style.cursor = "pointer";
         k.k3.nesne.add(this.kisiEtiketi);
         this.kisiEtiketi.position.set(0, 2.0, 0);
         this.kisiEtiketi.visible = true;

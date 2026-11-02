@@ -6,6 +6,13 @@
 // zemin bir ızgaraya bölünür: duvarlar (kapı boşlukları hariç) ve eşyaların
 // ayak izleri dolu sayılır, yol A* ile bulunur ve görüş hattıyla sadeleştirilir.
 //
+// Eşyanın ayak izi (ve duvarın kişi payı) "sıkışık": geçilebilir ama pahalı.
+// Yalnızca duvarın kendisi geçilmez. Önceden eşya da geçilmezdi; masası
+// duvara yakın taşınan kişinin koltuğu kapalı bir cebe düşüyor, başlangıç
+// noktası en yakın boş hücreye — duvarın öbür yanına, ofisin dışına —
+// oturtuluyor, yol bulunamıyor ve kişi duvarla masa arasında kalıyordu.
+// Şimdi koltuktan eşyanın içinden en kısa yoldan çıkılır, sonra boşta yürünür.
+//
 // Saf modül: three.js'e bağlı değil, eşya ayak izlerini motor çıkarıp verir.
 
 import type { Dikdortgen, Duvar } from "./ofisOyunu";
@@ -21,7 +28,7 @@ export interface YolIzgarasi {
   hucre: number;
   gw: number;
   gd: number;
-  /** 1: geçilemez. */
+  /** 0: boş, 1: sıkışık (eşya ya da duvar dibi; pahalı ama geçilir), 2: duvar (geçilmez). */
   dolu: Uint8Array;
 }
 
@@ -42,17 +49,18 @@ export function izgaraKur(sinir: Dikdortgen, duvarlar: Duvar[], engeller: Dikdor
   const hucre = ayar.hucre ?? 0.2;
   const yaricap = ayar.yaricap ?? 0.18;
   const yariDuvar = (ayar.duvarKalinlik ?? 0.16) / 2 + yaricap;
+  const cekirdek = (ayar.duvarKalinlik ?? 0.16) / 2 + DUVAR_PAYI;
   const gw = Math.max(1, Math.ceil(sinir.w / hucre));
   const gd = Math.max(1, Math.ceil(sinir.d / hucre));
   const iz: YolIzgarasi = { x0: sinir.x, z0: sinir.z, hucre, gw, gd, dolu: new Uint8Array(gw * gd) };
 
-  const doldur = (x1: number, z1: number, x2: number, z2: number) => {
+  const doldur = (x1: number, z1: number, x2: number, z2: number, deger: number) => {
     // Hücre ortası dikdörtgenin içindeyse dolu.
     const i1 = Math.max(0, Math.ceil((x1 - iz.x0) / hucre - 0.5));
     const i2 = Math.min(gw - 1, Math.floor((x2 - iz.x0) / hucre - 0.5));
     const j1 = Math.max(0, Math.ceil((z1 - iz.z0) / hucre - 0.5));
     const j2 = Math.min(gd - 1, Math.floor((z2 - iz.z0) / hucre - 0.5));
-    for (let j = j1; j <= j2; j++) for (let i = i1; i <= i2; i++) iz.dolu[j * gw + i] = 1;
+    for (let j = j1; j <= j2; j++) for (let i = i1; i <= i2; i++) iz.dolu[j * gw + i] = Math.max(iz.dolu[j * gw + i], deger);
   };
 
   for (const d of duvarlar) {
@@ -69,13 +77,29 @@ export function izgaraKur(sinir: Dikdortgen, duvarlar: Duvar[], engeller: Dikdor
     for (const [a, b] of parcalar) {
       if (b - a <= 0) continue;
       // Uçlar da yarıçap kadar uzar: kapı pervazına sürtünmeden geçilsin.
-      if (yatay) doldur(a - yaricap, sabit - yariDuvar, b + yaricap, sabit + yariDuvar);
-      else doldur(sabit - yariDuvar, a - yaricap, sabit + yariDuvar, b + yaricap);
+      if (yatay) {
+        doldur(a - yaricap, sabit - yariDuvar, b + yaricap, sabit + yariDuvar, SIKISIK);
+        doldur(a - DUVAR_PAYI, sabit - cekirdek, b + DUVAR_PAYI, sabit + cekirdek, DUVAR);
+      } else {
+        doldur(sabit - yariDuvar, a - yaricap, sabit + yariDuvar, b + yaricap, SIKISIK);
+        doldur(sabit - cekirdek, a - DUVAR_PAYI, sabit + cekirdek, b + DUVAR_PAYI, DUVAR);
+      }
     }
   }
-  for (const e of engeller) doldur(e.x - yaricap, e.z - yaricap, e.x + e.w + yaricap, e.z + e.d + yaricap);
+  for (const e of engeller) doldur(e.x - yaricap, e.z - yaricap, e.x + e.w + yaricap, e.z + e.d + yaricap, SIKISIK);
   return iz;
 }
+
+export const SIKISIK = 1;
+export const DUVAR = 2;
+/** Sıkışık hücreye adım bu kat pahalı: boş bir dolaşma yolu varsa hep o seçilir. */
+const SIKISIK_MALIYET = 12;
+/**
+ * Duvarın geçilmez çekirdeği: kalınlığın yarısı + bu pay. Motor yürüyeni
+ * duvar yüzüne 0,14'ten fazla yaklaştırmıyor; geçilebilir hücre ortaları
+ * bundan uzakta kalsın, yoksa kişi yolun üstünde duvara dayanıp kalır.
+ */
+const DUVAR_PAYI = 0.15;
 
 const hucreOf = (iz: YolIzgarasi, p: Nokta): [number, number] => [
   Math.min(iz.gw - 1, Math.max(0, Math.floor((p.x - iz.x0) / iz.hucre))),
@@ -83,17 +107,20 @@ const hucreOf = (iz: YolIzgarasi, p: Nokta): [number, number] => [
 ];
 const merkez = (iz: YolIzgarasi, i: number, j: number): Nokta => ({ x: iz.x0 + (i + 0.5) * iz.hucre, z: iz.z0 + (j + 0.5) * iz.hucre });
 
-/** Noktaya en yakın boş hücre (genişleyen halkalarla); hiç yoksa null. */
-export function enYakinBos(iz: YolIzgarasi, p: Nokta, enCok = 12): [number, number] | null {
+/**
+ * Noktaya en yakın, doluluğu `enCokDolu`yu aşmayan hücre (genişleyen
+ * halkalarla); hiç yoksa null. Varsayılan: duvar olmayan (sıkışık da olur).
+ */
+export function enYakinBos(iz: YolIzgarasi, p: Nokta, enCok = 12, enCokDolu = SIKISIK): [number, number] | null {
   const [ci, cj] = hucreOf(iz, p);
-  if (!iz.dolu[cj * iz.gw + ci]) return [ci, cj];
+  if (iz.dolu[cj * iz.gw + ci] <= enCokDolu) return [ci, cj];
   let en: [number, number] | null = null;
   let enD = Infinity;
   for (let r = 1; r <= enCok; r++) {
     for (let j = cj - r; j <= cj + r; j++)
       for (let i = ci - r; i <= ci + r; i++) {
         if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r) continue;
-        if (i < 0 || j < 0 || i >= iz.gw || j >= iz.gd || iz.dolu[j * iz.gw + i]) continue;
+        if (i < 0 || j < 0 || i >= iz.gw || j >= iz.gd || iz.dolu[j * iz.gw + i] > enCokDolu) continue;
         const m = merkez(iz, i, j);
         const d = (m.x - p.x) ** 2 + (m.z - p.z) ** 2;
         if (d < enD) {
@@ -104,6 +131,12 @@ export function enYakinBos(iz: YolIzgarasi, p: Nokta, enCok = 12): [number, numb
     if (en) return en;
   }
   return null;
+}
+
+/** Noktaya en yakın tümüyle boş hücrenin ortası (tıklanan yere götürürken: eşyanın içine değil yanına). */
+export function bosNokta(iz: YolIzgarasi, p: Nokta): Nokta | null {
+  const h = enYakinBos(iz, p, 12, 0);
+  return h ? merkez(iz, h[0], h[1]) : null;
 }
 
 /** İki nokta arası boş mu (yarım hücre adımlarla örnekler). */
@@ -119,8 +152,9 @@ export function gorusVar(iz: YolIzgarasi, a: Nokta, b: Nokta): boolean {
 }
 
 /**
- * `bas`tan `son`a yol: ilk ve son nokta en yakın boş hücreye oturtulmuş
- * hâlleridir (kişi koltuktan kalkarken masanın ayak izi içinde olabilir).
+ * `bas`tan `son`a yol: ilk ve son nokta duvar olmayan en yakın hücreye
+ * oturtulmuş hâlleridir. Koltuk masanın ayak izi içinde: oradan sıkışık
+ * hücrelerden en kısa yoldan çıkılır.
  * Dönen noktalar yürünecek ara hedeflerdir, ilki bas'ın oturtulmuşu. Yol
  * yoksa null.
  */
@@ -190,10 +224,10 @@ export function yolBul(iz: YolIzgarasi, bas: Nokta, son: Nokta): Nokta[] | null 
         const nj = j + dj;
         if (ni < 0 || nj < 0 || ni >= gw || nj >= gd) continue;
         const nk = nj * gw + ni;
-        if (dolu[nk] || kapali[nk]) continue;
-        // Çaprazda köşe kesilmez: iki komşu da boş olmalı.
-        if (di && dj && (dolu[j * gw + ni] || dolu[nj * gw + i])) continue;
-        const yeni = g[k] + (di && dj ? Math.SQRT2 : 1);
+        if (dolu[nk] >= DUVAR || kapali[nk]) continue;
+        // Çaprazda köşe kesilmez: iki komşu da hücrenin kendisinden dolu olmamalı.
+        if (di && dj && (dolu[j * gw + ni] > dolu[nk] || dolu[nj * gw + i] > dolu[nk])) continue;
+        const yeni = g[k] + (di && dj ? Math.SQRT2 : 1) * (dolu[nk] ? SIKISIK_MALIYET : 1);
         if (yeni < g[nk]) {
           g[nk] = yeni;
           onceki[nk] = k;
@@ -205,7 +239,8 @@ export function yolBul(iz: YolIzgarasi, bas: Nokta, son: Nokta): Nokta[] | null 
   const hucreler: Nokta[] = [];
   for (let k = hedef; k !== -1; k = onceki[k]) hucreler.push(merkez(iz, k % gw, Math.floor(k / gw)));
   hucreler.reverse();
-  // Görüş hattıyla sadeleştir: her noktadan görülebilen en uzak noktaya atla.
+  // Görüş hattıyla sadeleştir: her noktadan görülebilen en uzak noktaya atla
+  // (görüş yalnızca boş hücrelerde; sıkışık kısım hücre hücre yürünür).
   const yol: Nokta[] = [hucreler[0]];
   let i = 0;
   while (i < hucreler.length - 1) {

@@ -964,6 +964,8 @@ export default function OfisOyunu({
           <b>Sürükle</b> kaydır · <b>Sağ tık</b> ya da <b>iki parmakla tıkla-sürükle</b> döndür
           <br />
           <b>Tekerlek</b> yaklaş · <b>Ok tuşları</b> gez · <b>Odaya tıkla</b> içeri gir
+          <br />
+          <b>Kişiye, sonra bir yere tıkla</b> oraya yürüsün
         </div>
       )}
 

@@ -897,6 +897,8 @@ export const GEZINME = {
   masadaDiger: [120, 300] as const,
   /** Kahve köşesinde ya da ortak alanda ayakta durma. */
   ayakta: [4, 9] as const,
+  /** Kullanıcının tıklayıp götürdüğü yerde durma; sonra kendiliğinden masasına döner. */
+  goturulunce: [25, 40] as const,
 };
 
 export function aralik([en, cok]: readonly [number, number], r = Math.random()): number {

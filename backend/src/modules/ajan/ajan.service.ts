@@ -8,6 +8,10 @@ import {
   ajanBellekAlintisi,
   ajanBostaNeYapsin,
   ajanFikirAciklamasi,
+  ajanHassasAlanlariAt,
+  ajanProjelioAraciMi,
+  AJAN_SIRKET_ARALIGI_MS,
+  AJAN_SIRKET_BUTCESI,
   ajanSonrakiCalisma,
   ajanIsAsiliMi,
   ajanKirp,
@@ -30,6 +34,7 @@ import {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
+import { AiAssistantService } from "../ai-assistant/ai-assistant.service";
 import { AKIS_TAVANI, LISTE_TAVANI } from "../../common/liste-tavani";
 
 /** Mac'in işi alırken gördüğü öğretilen bilgi sayısı (modelin bağlamı küçük). */
@@ -63,7 +68,8 @@ export function anahtarOzeti(anahtar: string): string {
 export class AjanService {
   constructor(
     private supabase: SupabaseService,
-    private yapilacaklar: PersonalTodosService
+    private yapilacaklar: PersonalTodosService,
+    private lio: AiAssistantService
   ) {}
 
   private get db() {
@@ -138,7 +144,7 @@ export class AjanService {
     const [bekleyenIs, okunmamisRapor, bekleyenOneri, bekleyenFikir] = await Promise.all([
       say("ajan_isleri", "durum", "bekliyor"),
       say("ajan_raporlari", "okundu", false),
-      oneriSay("yapilacak"),
+      oneriSay("yapilacak").then(async (n) => n + (await oneriSay("lio"))),
       oneriSay("fikir"),
     ]);
     const bagli = ajanBagliMi(a.son_nabiz);
@@ -344,7 +350,7 @@ export class AjanService {
     if (error) throw error;
   }
 
-  /** Sohbette onay bekleyen yapılacak önerileri. Fikirlerin kendi sekmesi var (fikirler). */
+  /** Sohbette onay bekleyen yapılacak ve Lio'ya devir önerileri. Fikirlerin kendi sekmesi var (fikirler). */
   async oneriler(userId: string): Promise<AjanOneri[]> {
     await this.assertIzinli(userId);
     const { data, error } = await this.db
@@ -352,7 +358,7 @@ export class AjanService {
       .select("*")
       .eq("user_id", userId)
       .eq("durum", "bekliyor")
-      .eq("tur", "yapilacak")
+      .in("tur", ["yapilacak", "lio"])
       .order("created_at", { ascending: false })
       .limit(LISTE_TAVANI);
     if (error) throw error;
@@ -485,6 +491,81 @@ export class AjanService {
     return this.otomasyonIsiAc(userId, data);
   }
 
+  // ============================================================ şirket
+
+  /** Ajanın şirket hakkında bildiği: panelde gösterilir, kullanıcı neyin gittiğini görsün. */
+  async sirket(userId: string, tazele = false): Promise<{ metin: string; tarih: string | null }> {
+    await this.assertIzinli(userId);
+    return this.sirketProfili(userId, tazele);
+  }
+
+  /**
+   * Şirketin Projelio'daki profili. Lio'nun salt okunur araçlarından, kullanıcının
+   * yetkisiyle; hassas alanlar ayıklanır. Günde bir tazelenir (her iş için yeniden
+   * çıkarmak onlarca sorgu demek), şirket inceleme işinde zorla tazelenir.
+   */
+  private async sirketProfili(userId: string, zorla: boolean): Promise<{ metin: string; tarih: string | null }> {
+    const a = await this.ayarlar(userId);
+    const taze = a.sirket_ozeti_at && Date.now() - Date.parse(a.sirket_ozeti_at) < AJAN_SIRKET_ARALIGI_MS;
+    if (!zorla && taze) return { metin: a.sirket_ozeti ?? "", tarih: a.sirket_ozeti_at };
+    const oku = async (arac: string, girdi: Record<string, unknown> = {}) => {
+      try {
+        return ajanHassasAlanlariAt(await this.lio.ajanIcinOku(userId, arac, girdi));
+      } catch {
+        return null; // yetki yoksa ya da modül kapalıysa o parça atlanır
+      }
+    };
+    const kisa = (v: unknown, n: number) => {
+      const m = JSON.stringify(v ?? null);
+      return m.length > n ? m.slice(0, n) + "…" : m;
+    };
+    const parcalar: string[] = [];
+    const sirketler = ((await oku("list_organizations")) as any[]) ?? [];
+    if (sirketler.length) parcalar.push(`Şirketler: ${kisa(sirketler, 600)}`);
+    for (const o of sirketler.slice(0, 3)) {
+      const id = o.organizationId;
+      const [kart, departmanlar, urunler, musteriler] = await Promise.all([
+        oku("get_info_card", { scopeType: "organization", scopeId: id }),
+        oku("list_departments", { organizationId: id }),
+        oku("list_products", { organizationId: id, limit: 25 }),
+        oku("list_customers", { organizationId: id }),
+      ]);
+      parcalar.push(`[${o.ad}] Bilgi kartı: ${kisa(kart, 700)}`);
+      if (Array.isArray(departmanlar) && departmanlar.length) parcalar.push(`[${o.ad}] Departmanlar: ${kisa(departmanlar.map((d: any) => d.name ?? d.ad), 300)}`);
+      if (Array.isArray(urunler) && urunler.length) parcalar.push(`[${o.ad}] Ürün/hizmetler (${urunler.length}): ${kisa(urunler, 700)}`);
+      if (Array.isArray(musteriler) && musteriler.length)
+        parcalar.push(`[${o.ad}] Müşteriler (${musteriler.length}${musteriler.length >= 50 ? "+" : ""}): ${kisa(musteriler.map((m: any) => m.ad), 400)}`);
+    }
+    const [isler, projeler, durum] = await Promise.all([oku("list_jobs"), oku("list_projects"), oku("get_workspace_summary")]);
+    if (Array.isArray(isler) && isler.length) parcalar.push(`İşler (${isler.length}): ${kisa(isler.map((j: any) => j.title), 400)}`);
+    if (Array.isArray(projeler) && projeler.length) {
+      const aktif = projeler.filter((p: any) => p.status === "active");
+      parcalar.push(`Projeler (aktif ${aktif.length}/${projeler.length}): ${kisa((aktif.length ? aktif : projeler).slice(0, 25), 700)}`);
+    }
+    if (durum) parcalar.push(`Genel durum: ${kisa(durum, 500)}`);
+    const metin = parcalar.join("\n").slice(0, AJAN_SIRKET_BUTCESI);
+    const tarih = new Date().toISOString();
+    await this.db.from("ajan_ayarlari").update({ sirket_ozeti: metin, sirket_ozeti_at: tarih }).eq("user_id", userId);
+    return { metin, tarih };
+  }
+
+  /** Mac'in projelio_oku aracı: izinli okuma aracı + kimlik/sorgu, hassas alanlar ayıklanmış, kırpılmış. */
+  async projeliodaOku(userId: string, arac: unknown, kimlik: unknown, sorgu: unknown): Promise<{ sonuc: string }> {
+    if (!ajanProjelioAraciMi(arac)) throw new BadRequestException("Ajan bu aracı kullanamaz.");
+    const id = ajanKirp(kimlik, 80) || undefined;
+    const girdi: Record<string, unknown> = { query: ajanKirp(sorgu, 100) || undefined };
+    if (arac === "get_info_card") Object.assign(girdi, { scopeType: "organization", scopeId: id });
+    else if (arac === "list_projects") girdi.jobId = id;
+    else if (arac === "list_tasks") girdi.projectId = id;
+    else girdi.organizationId = id;
+    try {
+      const v = ajanHassasAlanlariAt(await this.lio.ajanIcinOku(userId, arac, girdi));
+      return { sonuc: JSON.stringify(v).slice(0, 6000) };
+    } catch (e: any) {
+      return { sonuc: `Okunamadı: ${String(e?.message ?? e).slice(0, 200)}` };
+    }
+  }
+
   // ============================================================ Mac (işçi)
 
   async nabiz(userId: string, body: { durum?: unknown; not?: unknown; model?: unknown }): Promise<{ ok: true }> {
@@ -539,8 +620,10 @@ export class AjanService {
       const { data } = await this.db.from("ajan_konulari").select("konu").eq("user_id", userId).order("created_at", { ascending: false }).limit(100);
       mevcutKonular = (data ?? []).map((k: any) => k.konu);
     }
-    const baglam = ["fikir", "arastirma", "otomasyon"].includes(is.tur) ? await this.baglamMetni(userId) : undefined;
-    return { is, ad: a.ad, ogretilenler: ajanOgretilenleriSigdir(ogretilen ?? []), sonMesajlar, mevcutKonular, baglam };
+    const baglam = ["fikir", "arastirma", "otomasyon", "sirket"].includes(is.tur) ? await this.baglamMetni(userId) : undefined;
+    // Liste işi dışında her işte: ajan şirketi bilerek konuşsun, araştırsın, önersin.
+    const sirket = is.tur === "liste" ? undefined : (await this.sirketProfili(userId, is.tur === "sirket")).metin || undefined;
+    return { is, ad: a.ad, ogretilenler: ajanOgretilenleriSigdir(ogretilen ?? []), sonMesajlar, mevcutKonular, baglam, sirket };
   }
 
   /**
@@ -750,6 +833,7 @@ export class AjanService {
       .order("created_at", { ascending: true })
       .limit(1);
     const sonFikir = await sonu("fikir");
+    const sonSirket = await sonu("sirket");
     let yeniNot = this.db.from("ajan_bilgileri").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("tur", "ogrenilen");
     if (sonFikir) yeniNot = yeniNot.gt("created_at", sonFikir);
     const { count: yeniNotSayisi } = await yeniNot;
@@ -757,12 +841,17 @@ export class AjanService {
       ogrenmeAcik: a.ogrenme_acik,
       bekleyenKonuVar: !!konu?.length,
       // Liste ve fikir de birer öğrenme adımı sayılır: arka arkaya koşmasınlar.
-      sonOgrenme: [await sonu("ogrenme"), await sonu("liste"), sonFikir].filter(Boolean).sort().pop() ?? null,
+      sonOgrenme: [await sonu("ogrenme"), await sonu("liste"), sonFikir, sonSirket].filter(Boolean).sort().pop() ?? null,
       sonListe: await sonu("liste"),
       yeniNot: yeniNotSayisi ?? 0,
       sonFikir,
+      sonSirket,
       yogun,
     });
+    if (karar === "sirket") {
+      await this.isAc(userId, "sirket", "Şirketimin Projelio'daki profilini incele: neler var, neler eksik, nerede fırsat ya da risk görüyorsun?");
+      return true;
+    }
     if (karar === "fikir") {
       await this.isAc(userId, "fikir", "Son öğrendiklerini ve araştırmalarını şirketim için iş bitirici fikirlere dönüştür.");
       return true;

@@ -31,6 +31,9 @@ export const ajanApi = {
   onayla: (id: string) => api.post<{ ok: true }>(`/ajan/oneriler/${id}/onayla`, {}),
   reddet: (id: string, not?: string) => api.post<{ ok: true }>(`/ajan/oneriler/${id}/reddet`, { not }),
 
+  sirket: (signal?: AbortSignal) => api.get<{ metin: string; tarih: string | null }>("/ajan/sirket", signal),
+  sirketTazele: () => api.post<{ metin: string; tarih: string | null }>("/ajan/sirket/tazele", {}),
+
   fikirler: (signal?: AbortSignal) => api.get<AjanOneri[]>("/ajan/fikirler", signal),
   fikriArastir: (id: string) => api.post<AjanIs>(`/ajan/fikirler/${id}/arastir`, {}),
 

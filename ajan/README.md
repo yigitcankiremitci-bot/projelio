@@ -20,6 +20,10 @@ doğrudan çalıştırıyor. Testleri kök `npm test` koşturur, tip denetimi
   reddettiğinin gerekçesini sonraki fikirlerde dikkate alır.
 - **Otomasyonlar:** Günlük/haftalık/aylık görev kurarsın ("her pazartesi rakipleri tara"); zamanı gelince
   kendisi çalışır. Mac kapalıysa görev sırada bekler.
+- **Şirketi tanır:** Projelio'daki şirketlerini, bilgi kartını, departmanları, işleri, projeleri, ürünleri ve
+  müşterileri okur (günde bir; IBAN, vergi/kimlik no, telefon, e-posta, adres gitmez) ve her işte bunu bilerek çalışır.
+- **İşlemi Lio'ya devreder:** Görev açmak, müşteri eklemek gibi işlemleri kendisi yapmaz; Lio'ya talimat hazırlar,
+  sen onaylayınca Lio açılır ve talimat yazı kutusuna gelir.
 - **Öneri:** Bir iş yapmasını istersen (ör. yapılacak eklemek) yalnızca önerir. Projelio'ya
   sen onaylayınca eklenir.
 

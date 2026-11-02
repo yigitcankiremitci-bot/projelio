@@ -13,6 +13,9 @@ import {
   ajanAdimlariAyir,
   ajanFikriTemizle,
   ajanSonrakiCalisma,
+  ajanHassasAlanlariAt,
+  ajanProjelioAraciMi,
+  AJAN_SIRKET_ARALIGI_MS,
   AJAN_FIKIR_ARALIGI_MS,
   AJAN_FIKIR_ESIGI,
   ajanBostaNeYapsin,
@@ -210,5 +213,39 @@ describe("ajanSonrakiCalisma (Türkiye saati)", () => {
   test("Türkiye gece yarısından sonra UTC hâlâ dündeyken doğru gün", () => {
     // 2026-11-02 22:30 UTC = 3 Kasım 01:30 Türkiye; günlük 09:00 → 3 Kasım 06:00 UTC.
     assert.equal(ajanSonrakiCalisma({ siklik: "gunluk", saat: 9, gun: 1 }, Date.parse("2026-11-02T22:30:00Z")), "2026-11-03T06:00:00.000Z");
+  });
+});
+
+describe("şirketi tanıma", () => {
+  test("hassas alanlar her derinlikte atılır, bilgi kartı ek alanı da", () => {
+    const ham = {
+      ad: "Projelio",
+      kunye: { unvan: "Projelio Yazılım", vergiNo: "123", iban: "TR00", adres: { sehir: "İstanbul" }, telefon: "0555" },
+      ekBilgiler: [{ alan: "Kurumsal e-posta", deger: "a@b.c" }, { alan: "Çalışan sayısı", deger: "8" }],
+      musteriler: [{ ad: "Acme", eposta: "x@y.z", sehir: "Ankara" }],
+    };
+    assert.deepEqual(ajanHassasAlanlariAt(ham), {
+      ad: "Projelio",
+      kunye: { unvan: "Projelio Yazılım" },
+      ekBilgiler: [{ alan: "Kurumsal e-posta" }, { alan: "Çalışan sayısı", deger: "8" }],
+      musteriler: [{ ad: "Acme", sehir: "Ankara" }],
+    });
+  });
+
+  test("yalnızca izinli okuma araçları", () => {
+    assert.equal(ajanProjelioAraciMi("list_products"), true);
+    assert.equal(ajanProjelioAraciMi("create_task"), false);
+    assert.equal(ajanProjelioAraciMi("toString"), false);
+  });
+
+  test("boşta önce şirketi tanır, günde bir", () => {
+    const temel = { ogrenmeAcik: true, bekleyenKonuVar: true, sonOgrenme: null, sonListe: null, simdi: SIMDI };
+    assert.equal(ajanBostaNeYapsin({ ...temel, sonSirket: null }), "sirket");
+    assert.equal(ajanBostaNeYapsin({ ...temel, sonSirket: once(AJAN_SIRKET_ARALIGI_MS - 1000) }), "ogrenme");
+  });
+
+  test("Lio devri: başlık ve talimat şart", () => {
+    const s = ajanSonucunuTemizle({ oneriler: [{ tur: "lio", veri: { baslik: "Görev aç", talimat: "X projesine görev aç" } }, { tur: "lio", veri: { baslik: "boş" } }] });
+    assert.deepEqual(s.oneriler, [{ tur: "lio", veri: { baslik: "Görev aç", talimat: "X projesine görev aç" } }]);
   });
 });

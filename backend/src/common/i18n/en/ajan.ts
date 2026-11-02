@@ -4,6 +4,7 @@ import type { TranslationDict } from "@projelio/shared";
 export const ajan: TranslationDict = {
   "Ad boş olamaz.": "Name can't be empty.",
   "Ajan anahtarı geçersiz.": "Invalid agent key.",
+  "Ajan bu aracı kullanamaz.": "The agent can't use this tool.",
   "Ajan bu hesapta kapalı.": "The agent is turned off for this account.",
   "Ajan şimdilik yalnızca izinli hesaplara açık.": "The agent is only available to selected accounts for now.",
   "Araştırma konusu boş olamaz.": "Research topic can't be empty.",

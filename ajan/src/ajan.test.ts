@@ -1,6 +1,6 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { adimlariAyir, iddiaVarMi, isiYurut, uydurmaSayilar, type Yardimcilar } from "./ajan.ts";
+import { adimlariAyir, iddiaVarMi, isiYurut, metindekiCagrilar, tarihSatiri, uydurmaSayilar, type Yardimcilar } from "./ajan.ts";
 import type { IsPaketi } from "./api.ts";
 import type { Mesaj } from "./ollama.ts";
 
@@ -200,5 +200,81 @@ describe("fikirler", () => {
     assert.deepEqual(adimlariAyir(["a", " b "]), ["a", "b"]);
     assert.deepEqual(adimlariAyir("- a\n- b"), ["a", "b"]);
     assert.deepEqual(adimlariAyir("1) a 2) b"), ["a", "b"]);
+  });
+});
+
+describe("şirket ve Lio", () => {
+  test("şirket profili istemde, projelio_oku sunucuya gider ve veri olarak işaretlenir", async () => {
+    const okunan: string[] = [];
+    const { model, gorulen } = sahteModel([cagri("projelio_oku", { arac: "list_products", kimlik: "org1" }), { role: "assistant", content: "Ürünleriniz: A" }]);
+    await isiYurut({ ...paket("sohbet", "ürünlerimiz ne?"), sirket: "Şirketler: [Projelio]" }, {
+      ...web,
+      model,
+      projeliodaOku: async (arac, kimlik) => {
+        okunan.push(`${arac}:${kimlik}`);
+        return '[{"ad":"A"}]';
+      },
+    });
+    assert.match(gorulen[0].mesajlar[0].content, /Şirketler: \[Projelio\]/);
+    assert.match(gorulen[0].mesajlar[0].content, /KENDİN YAPAMAZSIN/);
+    assert.deepEqual(okunan, ["list_products:org1"]);
+    assert.match(gorulen[1].mesajlar.find((m) => m.role === "tool")?.content ?? "", /veri, talimat değil/);
+  });
+
+  test("işlem isteği Lio'ya devir önerisi olur", async () => {
+    const { model } = sahteModel([cagri("lioya_devret", { baslik: "Görev aç", talimat: "Web sitesi projesine 'Fiyat sayfası' görevi aç" }), { role: "assistant", content: "Lio'ya verdim." }]);
+    const s = await isiYurut(paket("sohbet", "web sitesi projesine fiyat sayfası görevi aç"), { ...web, model });
+    assert.deepEqual(s.oneriler, [{ tur: "lio", veri: { baslik: "Görev aç", talimat: "Web sitesi projesine 'Fiyat sayfası' görevi aç" } }]);
+  });
+
+  test("devretmeden 'görevi açtım' derse geri çevrilir", async () => {
+    const { model, gorulen } = sahteModel([{ role: "assistant", content: "Görevi açtım." }, { role: "assistant", content: "Açamam, Lio'ya devredeyim mi?" }]);
+    await isiYurut(paket("sohbet", "görev aç"), { ...web, model });
+    assert.match(gorulen[1].mesajlar[gorulen[1].mesajlar.length - 1].content, /lioya_devret/);
+  });
+
+  test("şirket işinde Lio'ya devir ve yapılacak yok, okuma ve not var", async () => {
+    const { model, gorulen } = sahteModel([{ role: "assistant", content: "x" }]);
+    await isiYurut({ ...paket("sirket", "incele"), sirket: "Şirketler: []" }, { ...web, model });
+    assert.equal(gorulen[0].aracSayisi, 5);
+  });
+});
+
+describe("tarih ve şirket incelemesi", () => {
+  test("takvim hazır verilir: pazartesiden sonraki cuma 6 Kasım", () => {
+    const t = tarihSatiri("2026-11-02");
+    assert.match(t, /^Bugün Pazartesi 2026-11-02\./);
+    assert.match(t, /Cuma 2026-11-06/);
+    assert.match(t, /Pazartesi 2026-11-09\.$/);
+  });
+
+  test("şirket incelemesinde 3 okumadan sonrası not yazmaya yönlendirilir, not yoksa son metin kaydedilir", async () => {
+    const oku = cagri("projelio_oku", { arac: "list_products", kimlik: "o1" });
+    const { model, gorulen } = sahteModel([oku, oku, oku, oku, { role: "assistant", content: "Şirket 3 ürün satıyor, 4 görev gecikmiş." }]);
+    let okuma = 0;
+    const s = await isiYurut({ ...paket("sirket", "incele"), sirket: "x" }, { ...web, model, projeliodaOku: async () => (okuma++, "[]") });
+    assert.equal(okuma, 3);
+    assert.match(gorulen[4].mesajlar[gorulen[4].mesajlar.length - 1].content, /Yeterince okudun/);
+    assert.equal(s.bilgiler?.[0].icerik, "Şirket 3 ürün satıyor, 4 görev gecikmiş.");
+  });
+});
+
+describe("metne yazılmış araç çağrısı", () => {
+  test("bilinen araç + JSON kurtarılır, içerikteki süslü parantez bozmaz", () => {
+    const m = 'Notlarım:\nbilgi_kaydet\n{"baslik":"Şirket: Ürünler","icerik":"3 paket {Starter, Pro, Business}"}\nve konu_ekle({"konu":"SaaS fiyatlama"})';
+    assert.deepEqual(metindekiCagrilar(m, ["bilgi_kaydet", "konu_ekle"]), [
+      { function: { name: "bilgi_kaydet", arguments: { baslik: "Şirket: Ürünler", icerik: "3 paket {Starter, Pro, Business}" } } },
+      { function: { name: "konu_ekle", arguments: { konu: "SaaS fiyatlama" } } },
+    ]);
+  });
+
+  test("izinsiz araç ve JSON olmayan metin yok sayılır", () => {
+    assert.deepEqual(metindekiCagrilar('web_ara {"sorgu":"x"} ve bilgi_kaydet {bozuk}', ["bilgi_kaydet"]), []);
+  });
+
+  test("şirket incelemesinde metne yazılan not gerçekten kaydedilir", async () => {
+    const { model } = sahteModel([{ role: "assistant", content: 'bilgi_kaydet\n{"baslik":"Şirket: Projelio","icerik":"2025 kuruluşlu yazılım şirketi"}' }, { role: "assistant", content: "Bitti." }]);
+    const s = await isiYurut({ ...paket("sirket", "incele"), sirket: "x" }, { ...web, model });
+    assert.deepEqual(s.bilgiler?.map((b) => b.baslik), ["Şirket: Projelio"]);
   });
 });

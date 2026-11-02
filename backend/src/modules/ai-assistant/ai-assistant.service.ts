@@ -108,6 +108,7 @@ import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { WhatsappLioService } from "../whatsapp/whatsapp-lio.service";
 import type { LioActivityPayload } from "@projelio/shared";
+import { ajanProjelioAraciMi } from "@projelio/shared";
 import {
   BASE_PROMPT_TOKENS,
   CREDIT_CONFIRM_THRESHOLD,
@@ -4493,6 +4494,18 @@ export class AiAssistantService {
         .slice(0, 10)
         .map((t) => ({ itemId: t.itemId, title: t.title, dueDate: shortDate(t.effectiveDueDate) })),
     };
+  }
+
+  /**
+   * Ajanın (modules/ajan) şirketi tanıması için Lio'nun SALT OKUNUR araçları.
+   * Model çağrısı yok, Lio Bakiyesi harcamaz; yetki araçların kendi kurallarından
+   * geçer. Rol bilerek en kısıtlısı: ajan, kullanıcının ekranda göreceğinden
+   * fazlasını hiçbir koşulda görmesin. İzin listesi AJAN_PROJELIO_ARACLARI —
+   * yazan bir araç (create_*, update_*) buradan ASLA çalıştırılamaz.
+   */
+  async ajanIcinOku(userId: string, arac: string, girdi: Record<string, any>): Promise<unknown> {
+    if (!ajanProjelioAraciMi(arac)) throw new ForbiddenException("Ajan bu aracı kullanamaz.");
+    return this.executeTool(arac, girdi, userId, "freelancer");
   }
 
   // --- Araç çalıştırıcı ----------------------------------------------------

@@ -6,13 +6,15 @@
  */
 
 export interface IsPaketi {
-  is: { id: string; tur: "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon"; girdi: string };
+  is: { id: string; tur: "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon" | "sirket"; girdi: string };
   ad: string;
   ogretilenler: { baslik: string; icerik: string }[];
   sonMesajlar: { rol: "kullanici" | "ajan"; metin: string }[];
   mevcutKonular: string[];
   /** Fikir/araştırma/otomasyonda: son öğrendikleri, raporlar, önceki fikirlere verilen yanıtlar. */
   baglam?: string;
+  /** Şirketin Projelio'daki profili (sunucu çıkarır, hassas alanlar yok). */
+  sirket?: string;
 }
 
 export interface Fikir {
@@ -35,7 +37,7 @@ export interface IsSonucu {
   rapor?: { baslik: string; ozet?: string; icerik: string; kaynaklar?: Kaynak[] };
   bilgiler?: { baslik: string; icerik: string; kaynaklar?: Kaynak[] }[];
   konular?: { konu: string; neden?: string }[];
-  oneriler?: ({ tur: "yapilacak"; veri: { baslik: string; aciklama?: string; bitis?: string } } | { tur: "fikir"; veri: Fikir })[];
+  oneriler?: ({ tur: "yapilacak"; veri: { baslik: string; aciklama?: string; bitis?: string } } | { tur: "fikir"; veri: Fikir } | { tur: "lio"; veri: { baslik: string; talimat: string } })[];
 }
 
 export class Projelio {
@@ -68,6 +70,11 @@ export class Projelio {
 
   bellekteAra(q: string) {
     return this.istek<{ baslik: string; icerik: string }[]>(`/ajan/isci/bellek?q=${encodeURIComponent(q)}`);
+  }
+
+  async projeliodaOku(arac: string, kimlik: string, sorgu: string): Promise<string> {
+    const q = new URLSearchParams({ arac, kimlik, sorgu });
+    return (await this.istek<{ sonuc: string }>(`/ajan/isci/projelio?${q}`)).sonuc;
   }
 
   bitir(id: string, sonuc: IsSonucu) {

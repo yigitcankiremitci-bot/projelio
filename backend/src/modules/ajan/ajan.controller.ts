@@ -124,6 +124,17 @@ export class AjanController {
     return { ok: true };
   }
 
+  /** Ajanın şirket hakkında bildiği profil; `tazele` ile yeniden çıkarılır. */
+  @Get("sirket")
+  sirket(@Req() req: any) {
+    return this.service.sirket(req.user.userId);
+  }
+
+  @Post("sirket/tazele")
+  sirketTazele(@Req() req: any) {
+    return this.service.sirket(req.user.userId, true);
+  }
+
   @Get("fikirler")
   fikirler(@Req() req: any) {
     return this.service.fikirler(req.user.userId);
@@ -184,6 +195,12 @@ export class AjanIsciController {
   @Get("bellek")
   async bellek(@Headers("authorization") yetki: string, @Query("q") q: string) {
     return this.service.bellekteAra(await this.service.isciyiBul(yetki), q);
+  }
+
+  /** Şirketin Projelio'daki verisini okur (yalnızca izinli Lio okuma araçları). */
+  @Get("projelio")
+  async projelio(@Headers("authorization") yetki: string, @Query("arac") arac: string, @Query("kimlik") kimlik: string, @Query("sorgu") sorgu: string) {
+    return this.service.projeliodaOku(await this.service.isciyiBul(yetki), arac, kimlik, sorgu);
   }
 
   @Post("isler/:id/bitir")

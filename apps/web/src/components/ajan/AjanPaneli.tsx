@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { AJAN_OTOMASYON_SABLONLARI, AJAN_SINIRLARI, ajanOtomasyonZamani, type AjanBilgi, type AjanFikirVerisi, type AjanOtomasyon, type AjanOtomasyonSikligi, type AjanDurumu, type AjanIs, type AjanKonu, type AjanMesaj, type AjanOneri, type AjanRapor, type AjanRaporOzeti, type ThemeColors } from "@projelio/shared";
 import { ajanApi, type OtomasyonGirdisi } from "../../api/ajan";
+import { askLioDraft } from "../../lib/askLio";
 import { ignoreAbort } from "../../api/client";
 import { markdownBloklari, type SatirIci } from "../../lib/ajanMetin";
 import { useThemeColors } from "../../theme/useThemeColors";
@@ -86,8 +87,8 @@ export default function AjanPaneli({ onClose, onDurum }: { onClose: () => void; 
         <p style={{ color: c.textSecondary }}>Ajan şimdilik yalnızca izinli hesaplara açık.</p>
       ) : (
         <>
-          {sekme === "sohbet" && <Sohbet c={c} durum={durum} tazele={tazele} />}
-          {sekme === "fikirler" && <Fikirler c={c} tazele={tazele} />}
+          {sekme === "sohbet" && <Sohbet c={c} durum={durum} tazele={tazele} onLio={onClose} />}
+          {sekme === "fikirler" && <Fikirler c={c} tazele={tazele} onLio={onClose} />}
           {sekme === "otomasyonlar" && <Otomasyonlar c={c} durum={durum} />}
           {sekme === "raporlar" && <Raporlar c={c} durum={durum} tazele={tazele} />}
           {sekme === "ogrettiklerim" && <Bellek c={c} />}
@@ -110,7 +111,17 @@ function durumMetni(d: AjanDurumu | null): string {
 
 // ------------------------------------------------------------------ Sohbet
 
-function Sohbet({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | null; tazele: number }) {
+/**
+ * Ajanın Lio'ya devrettiği işi Lio'da açar. Talimat yazı kutusuna gelir, GÖNDERİLMEZ:
+ * Lio bakiyeden harcar ve işlem yapar; son sözü kullanıcı söylesin. Ajan paneli
+ * kapanır, çünkü Lio paneli pencerelerin altında açılıyor (Z.aiPanel < Z.modal).
+ */
+function lioyaVer(talimat: string, kapat: () => void) {
+  kapat();
+  askLioDraft(talimat);
+}
+
+function Sohbet({ c, durum, tazele, onLio }: { c: ThemeColors; durum: AjanDurumu | null; tazele: number; onLio: () => void }) {
   const [mesajlar, setMesajlar] = useState<AjanMesaj[]>([]);
   const [oneriler, setOneriler] = useState<AjanOneri[]>([]);
   const [yazi, setYazi] = useState("");
@@ -160,6 +171,28 @@ function Sohbet({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | null
   const bekliyor = mesajlar.length > 0 && mesajlar[mesajlar.length - 1].rol === "kullanici";
   return (
     <div>
+      {oneriler.flatMap((o) => (o.tur === "lio" ? [o] : [])).map((o) => (
+        <div key={o.id} style={{ ...kart(c), borderColor: c.accent, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <small style={{ color: c.textSecondary }}>Lio'ya devretmek istiyor</small>
+            <div style={{ fontWeight: 600 }}>{o.veri.baslik}</div>
+            <small style={{ color: c.textSecondary, whiteSpace: "pre-wrap" }}>{o.veri.talimat}</small>
+          </div>
+          <button
+            type="button"
+            style={dugme(c, true)}
+            onClick={async () => {
+              await yanitla(o, true);
+              lioyaVer(o.veri.talimat, onLio);
+            }}
+          >
+            Lio'ya ver
+          </button>
+          <button type="button" style={dugme(c)} onClick={() => yanitla(o, false)}>
+            Hayır
+          </button>
+        </div>
+      ))}
       {oneriler.flatMap((o) => (o.tur === "yapilacak" ? [o] : [])).map((o) => (
         <div key={o.id} style={{ ...kart(c), borderColor: c.accent, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 200 }}>
@@ -376,6 +409,7 @@ const IS_ADI: Record<AjanIs["tur"], string> = {
   liste: "Liste hazırlama",
   fikir: "Fikir üretme",
   otomasyon: "Otomasyon",
+  sirket: "Şirketi inceleme",
 };
 
 // ------------------------------------------------------------------ Bellek
@@ -414,6 +448,7 @@ function Bellek({ c }: { c: ThemeColors }) {
         Öğrettiklerin her işte ajana kural olarak gider: nasıl yazacağı, neye önem vereceği, işin hakkında bilmesi gerekenler.
         Uzun bir belge de yapıştırabilirsin (100 sayfaya kadar): ajan onu baştan sona ezberlemez, gerektiğinde içinde arayıp ilgili yerini okur.
       </p>
+      <SirketProfili c={c} />
       <input value={baslik} onChange={(e) => setBaslik(e.target.value)} placeholder="Başlık (isteğe bağlı)" maxLength={200} style={{ ...giris(c), width: "100%", marginBottom: 6 }} />
       <textarea value={icerik} onChange={(e) => setIcerik(e.target.value)} placeholder="Ör. Projelio küçük ajanslar ve serbest çalışanlar için bir iş yönetimi uygulaması. Rakiplerimiz: …" rows={3} maxLength={AJAN_SINIRLARI.ogretilen} style={{ ...giris(c), width: "100%", resize: "vertical" }} />
       {icerik.length > 2000 && (
@@ -660,12 +695,57 @@ function Mac({ c, durum, onDurum }: { c: ThemeColors; durum: AjanDurumu | null; 
 
 // ------------------------------------------------------------------ ortak
 
+/** Ajanın Projelio'dan çıkardığı şirket profili: kullanıcı ajana neyin gittiğini görsün. */
+function SirketProfili({ c }: { c: ThemeColors }) {
+  const [profil, setProfil] = useState<{ metin: string; tarih: string | null } | null>(null);
+  const [acik, setAcik] = useState(false);
+  const [yukleniyor, setYukleniyor] = useState(false);
+  useEffect(() => {
+    const ac = new AbortController();
+    ajanApi.sirket(ac.signal).then(setProfil).catch(ignoreAbort);
+    return () => ac.abort();
+  }, []);
+  return (
+    <div style={{ ...kart(c), marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <b style={{ flex: 1, minWidth: 200 }}>Şirket hakkında bildikleri</b>
+        <button type="button" style={dugme(c)} onClick={() => setAcik((a) => !a)}>
+          {acik ? "Gizle" : "Göster"}
+        </button>
+        <button
+          type="button"
+          style={dugme(c)}
+          disabled={yukleniyor}
+          onClick={async () => {
+            setYukleniyor(true);
+            await ajanApi.sirketTazele().then(setProfil).catch(() => undefined);
+            setYukleniyor(false);
+            setAcik(true);
+          }}
+        >
+          {yukleniyor ? "Tazeleniyor…" : "Şimdi tazele"}
+        </button>
+      </div>
+      <small style={{ color: c.textSecondary, display: "block", marginTop: 4 }}>
+        Ajan şirketlerini, bilgi kartını, departmanları, işleri, projeleri, ürünleri ve müşterileri Projelio'dan okur (günde bir tazelenir). IBAN, vergi ve
+        kimlik numarası, telefon, e-posta ve adres ajana gitmez. İşlem gereken işleri kendisi yapmaz, Lio'ya devreder.
+        {profil?.tarih ? ` Son tazelenme: ${tarih(profil.tarih)}.` : ""}
+      </small>
+      {acik && (
+        <pre style={{ whiteSpace: "pre-wrap", fontSize: 12, marginTop: 8, color: c.textSecondary, maxHeight: 300, overflowY: "auto" }}>
+          {profil?.metin || "Henüz çıkarılmadı. Ajan boşta kalınca şirketi inceler; hemen görmek için Şimdi tazele."}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ Fikirler
 
 const ETKI_ADI: Record<AjanFikirVerisi["etki"], string> = { yuksek: "Etkisi yüksek", orta: "Etkisi orta", dusuk: "Etkisi düşük" };
 const EMEK_ADI: Record<AjanFikirVerisi["emek"], string> = { kucuk: "Emeği az", orta: "Emeği orta", buyuk: "Emeği çok" };
 
-function Fikirler({ c, tazele }: { c: ThemeColors; tazele: number }) {
+function Fikirler({ c, tazele, onLio }: { c: ThemeColors; tazele: number; onLio: () => void }) {
   const [fikirler, setFikirler] = useState<AjanOneri[]>([]);
   const [hata, setHata] = useState<string | null>(null);
   const [redId, setRedId] = useState<string | null>(null);
@@ -761,6 +841,21 @@ function Fikirler({ c, tazele }: { c: ThemeColors; tazele: number }) {
                 onClick={() => void eylem(() => ajanApi.onayla(f.id), () => yanitlandi(f.id, "onaylandi"))}
               >
                 Yapılacaklarıma ekle
+              </button>
+              <button
+                type="button"
+                style={dugme(c)}
+                title="Lio açılır, talimat hazır gelir; göndermek sana kalır"
+                onClick={() =>
+                  lioyaVer(
+                    `Şu işi Projelio'da hayata geçirmeme yardım et: "${f.veri.baslik}". Amaç: ${f.veri.fayda}\n` +
+                      `Adımlar:\n${f.veri.adimlar.map((a, i) => `${i + 1}. ${a}`).join("\n")}\n` +
+                      "Bunun için uygun yere (proje/görev) gerekenleri aç; emin olmadığın yerde bana sor.",
+                    onLio
+                  )
+                }
+              >
+                Lio'ya yaptır
               </button>
               <button
                 type="button"

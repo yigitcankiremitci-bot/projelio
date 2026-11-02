@@ -12,8 +12,9 @@
 /**
  * fikir: boşta, yeni öğrendiklerinden iş bitirici fikir çıkarma.
  * otomasyon: kullanıcının kurduğu zamanlanmış görev (migration 178).
+ * sirket: boşta, şirketin Projelio'daki profilini inceleyip not/fikir çıkarma (179).
  */
-export type AjanIsTuru = "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon";
+export type AjanIsTuru = "sohbet" | "arastirma" | "ogrenme" | "liste" | "fikir" | "otomasyon" | "sirket";
 export type AjanIsDurumu = "bekliyor" | "calisiyor" | "bitti" | "hata";
 export type AjanKonuDurumu = "bekliyor" | "ogreniliyor" | "ogrenildi" | "atlandi";
 export type AjanBilgiTuru = "ogretilen" | "ogrenilen";
@@ -100,9 +101,21 @@ export interface AjanFikirVerisi {
   dayanak?: string;
 }
 
+/**
+ * Lio'ya devredilen iş. Ajan Projelio'da işlem yapmaz (migration 179): görev,
+ * proje, müşteri, kayıt açmak/değiştirmek gerekiyorsa talimatı Lio'ya yazar.
+ * Onayda Lio açılır, talimat yazı kutusuna gelir; göndermek kullanıcıdadır.
+ */
+export interface AjanLioVerisi {
+  baslik: string;
+  /** Lio'nun tek başına anlayacağı talimat. */
+  talimat: string;
+}
+
 export type AjanOneri =
   | { id: string; tur: "yapilacak"; veri: AjanYapilacakVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string }
-  | { id: string; tur: "fikir"; veri: AjanFikirVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string };
+  | { id: string; tur: "fikir"; veri: AjanFikirVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string }
+  | { id: string; tur: "lio"; veri: AjanLioVerisi; durum: AjanOneriDurumu; yanitNotu: string | null; createdAt: string };
 
 export type AjanOneriDurumu = "bekliyor" | "onaylandi" | "reddedildi";
 
@@ -160,6 +173,8 @@ export interface AjanIsPaketi {
    * KULLANIR; kabul/ret geçmişi ona neyin işe yaradığını öğretir.
    */
   baglam?: string;
+  /** Şirketin Projelio'daki profili (hassas alanlar ayıklanmış); her işte gider. */
+  sirket?: string;
 }
 
 /** Mac'in işi bitirirken gönderdiği sonuç. Hepsi isteğe bağlı. */
@@ -169,7 +184,7 @@ export interface AjanIsSonucu {
   rapor?: { baslik: string; ozet?: string; icerik: string; kaynaklar?: AjanKaynak[] };
   bilgiler?: { baslik: string; icerik: string; kaynaklar?: AjanKaynak[] }[];
   konular?: { konu: string; neden?: string }[];
-  oneriler?: ({ tur: "yapilacak"; veri: AjanYapilacakVerisi } | { tur: "fikir"; veri: AjanFikirVerisi })[];
+  oneriler?: ({ tur: "yapilacak"; veri: AjanYapilacakVerisi } | { tur: "fikir"; veri: AjanFikirVerisi } | { tur: "lio"; veri: AjanLioVerisi })[];
 }
 
 // ------------------------------------------------------------------ kurallar
@@ -266,12 +281,16 @@ export function ajanBostaNeYapsin(g: {
   /** Son fikir işinden beri biriken yeni not sayısı ve o işin zamanı. */
   yeniNot?: number;
   sonFikir?: string | null;
+  /** Son şirket inceleme işi; hiç yoksa ilk boşta şirketi tanır. */
+  sonSirket?: string | null;
   simdi?: number;
-}): "ogrenme" | "liste" | "fikir" | null {
+}): "ogrenme" | "liste" | "fikir" | "sirket" | null {
   if (!g.ogrenmeAcik) return null;
   const simdi = g.simdi ?? Date.now();
   const gecti = (t: string | null, ms: number) => !t || simdi - Date.parse(t) >= ms;
   if (!gecti(g.sonOgrenme, g.yogun ? AJAN_YOGUN_OGRENME_ARALIGI_MS : AJAN_OGRENME_ARALIGI_MS)) return null;
+  // Önce şirketi tanı: her şey ona göre öğrenilir ve önerilir. Alan verilmezse (eski çağıran) atlanır.
+  if (g.sonSirket !== undefined && gecti(g.sonSirket, AJAN_SIRKET_ARALIGI_MS)) return "sirket";
   // Öğrenmek amaç değil: yeterince not birikince önce onları işe çevir.
   if ((g.yeniNot ?? 0) >= AJAN_FIKIR_ESIGI && gecti(g.sonFikir ?? null, AJAN_FIKIR_ARALIGI_MS)) return "fikir";
   if (g.bekleyenKonuVar) return "ogrenme";
@@ -345,6 +364,9 @@ export function ajanSonucunuTemizle(ham: unknown): AjanIsSonucu {
           bitis: tarihMi(o?.veri?.bitis) ? o.veri.bitis : undefined,
         };
         if (veri.baslik) oneriler.push({ tur: "yapilacak", veri });
+      } else if (o?.tur === "lio") {
+        const veri = { baslik: ajanKirp(o?.veri?.baslik, AJAN_SINIRLARI.baslik), talimat: ajanKirp(o?.veri?.talimat, AJAN_SINIRLARI.mesaj) };
+        if (veri.baslik && veri.talimat) oneriler.push({ tur: "lio", veri });
       } else if (o?.tur === "fikir") {
         const veri = ajanFikriTemizle(o?.veri);
         if (veri) oneriler.push({ tur: "fikir", veri });
@@ -555,3 +577,57 @@ export const AJAN_OTOMASYON_SABLONLARI: { ad: string; talimat: string; siklik: A
     gun: 1,
   },
 ];
+
+// ------------------------------------------------------------------ şirketi tanıma
+
+/**
+ * Ajanın Projelio'da okuyabildiği Lio araçları. YALNIZCA okuma: ajan işlem
+ * yapmaz, Lio'ya devreder. Hepsi Lio'daki yetki kurallarından geçer (kullanıcının
+ * göremediğini ajan da göremez). Mac'teki projelio_oku aracı bu listeden seçer.
+ */
+export const AJAN_PROJELIO_ARACLARI = {
+  get_workspace_summary: "Genel durum: gecikmiş ve bu hafta biten görevler, bana atananlar.",
+  list_organizations: "Şirketler (organizationId, ad, tür, açıklama).",
+  get_info_card: "Şirketin bilgi kartı: künye, belgeler, ek bilgiler. kimlik = organizationId.",
+  list_departments: "Departmanlar. kimlik = organizationId (isteğe bağlı).",
+  list_jobs: "İşler.",
+  list_projects: "Projeler ve durumları. kimlik = jobId (isteğe bağlı).",
+  list_tasks: "Bir projenin görevleri. kimlik = projectId.",
+  list_products: "Ürün ve hizmetler. kimlik = organizationId; sorgu ile süzülür.",
+  list_customers: "Müşteriler. kimlik = organizationId; sorgu ile süzülür.",
+  list_modules: "Şirkette açık modüller.",
+} as const;
+
+export type AjanProjelioAraci = keyof typeof AJAN_PROJELIO_ARACLARI;
+
+export function ajanProjelioAraciMi(v: unknown): v is AjanProjelioAraci {
+  return typeof v === "string" && Object.prototype.hasOwnProperty.call(AJAN_PROJELIO_ARACLARI, v);
+}
+
+/**
+ * Ajana ASLA gitmeyen alanlar. Ajanın anahtarı bir Mac'te düz dosyada duruyor
+ * ve model okuduğu web sayfalarından yönlendirilebiliyor; fikir üretmek için
+ * IBAN'a, vergi numarasına, müşterinin telefonuna gerek yok.
+ */
+const HASSAS_ANAHTAR = /iban|vergi|tax|mersis|sicil|tckn|kimlik|tc_?no|telefon|phone|gsm|e-?posta|email|mail|adres|address|sifre|parola|password|token|secret|hesap_?no|account_?no|kart/i;
+
+export function ajanHassasAlanlariAt(v: unknown, derinlik = 0): unknown {
+  if (derinlik > 8) return undefined;
+  if (Array.isArray(v)) return v.map((x) => ajanHassasAlanlariAt(x, derinlik + 1));
+  if (v && typeof v === "object") {
+    const sonuc: Record<string, unknown> = {};
+    for (const [k, deger] of Object.entries(v as Record<string, unknown>)) {
+      if (HASSAS_ANAHTAR.test(k)) continue;
+      // Bilgi kartının ek alanları {alan, deger} biçiminde: anahtar değil ALAN adı hassas olabilir.
+      if (typeof (deger as any) !== "object" && k === "deger" && HASSAS_ANAHTAR.test(String((v as any).alan ?? ""))) continue;
+      sonuc[k] = ajanHassasAlanlariAt(deger, derinlik + 1);
+    }
+    return sonuc;
+  }
+  return v;
+}
+
+/** Şirket profilinin tazelenme aralığı ve ajanın onu inceleme işi. */
+export const AJAN_SIRKET_ARALIGI_MS = 24 * 60 * 60_000;
+/** Profilin pakete giren payı: öğretilenler ve bağlamla aynı 16K bağlamı paylaşıyor. */
+export const AJAN_SIRKET_BUTCESI = 4000;

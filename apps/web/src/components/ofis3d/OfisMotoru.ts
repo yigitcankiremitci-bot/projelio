@@ -37,12 +37,12 @@ import {
   type YerlesikEsya,
 } from "../../lib/ofisOyunu";
 import { esyaModeli, kutu, malzeme, tahta } from "./modeller";
-import { karakter, varlik, varlikVar, varliklariYukle, type Karakter3D, type VarlikAdi } from "./varliklar";
+import { OTURAKLAR, karakter, varlik, varlikVar, varliklariYukle, type Karakter3D, type VarlikAdi } from "./varliklar";
 import { modulEsyasi } from "./modulEsyalari";
 import { temaEsyalari } from "./studyoEsyalari";
 import type { IsTemasi } from "../../lib/studyoOfisi";
 import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI, TOPLANTI_MASASI, modulEsyasiTuru, type IstasyonBilgisi } from "../../lib/ofisOyunu";
-import type { NesneDuzeni } from "@projelio/shared";
+import type { KarakterGorunumu, NesneDuzeni } from "@projelio/shared";
 import { bosNokta, izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
 
 export interface OdaEtiketi {
@@ -75,7 +75,18 @@ interface Yerlestirme {
   don: number;
 }
 
-type Durum = "oturuyor" | "yuruyor" | "bekliyor";
+/** "konukta": kendi masası dışında bir oturakta (kanepe, toplantı sandalyesi…) oturuyor. */
+type Durum = "oturuyor" | "yuruyor" | "bekliyor" | "konukta";
+
+/** Kullanıcının kişiyi götürüp oturttuğu yer (bkz. oturagaGotur). */
+interface Oturak {
+  /** Kalçanın zemindeki izdüşümü (OTURMA_ONE eklenmeden; masadaki koltuk gibi). */
+  yer: THREE.Vector3;
+  /** Oturan kişinin baktığı yön (oturağın önü). */
+  yon: number;
+  /** Oturağın yerden yüksekliği (m). */
+  yukseklik: number;
+}
 type Eylem = keyof Karakter3D["eylemler"];
 
 interface Karakter {
@@ -105,6 +116,10 @@ interface Karakter {
   takili?: number;
   /** Kullanıcı tıklayıp bir yere götürdü: orada daha uzun durur, sonra masasına döner. */
   goturuldu?: boolean;
+  /** Götürüldüğü (ya da götürülmekte olduğu) oturak; varken yolun sonunda oturur. */
+  oturak?: Oturak;
+  /** Karakterin kurulduğu görünümün imzası (seçilen görünüm değişince yeniden kurulur). */
+  gorunumImza: string;
   /** Masada yazma animasyonunun saati (saniye; herkes aynı anda aynı tuşa basmasın diye rastgele başlar). */
   yazma: number;
 }
@@ -135,6 +150,8 @@ const KAMERA_YATAY = 0.17;
 const KAMERA_EGIM = 0.88;
 /** Oturan kişinin kalçası sandalyenin oturağına insin diye modelin indirileceği miktar. */
 const OTURMA_INIS = 0.36;
+/** Masa sandalyesinin oturak yüksekliği: OTURMA_INIS buna göre ayarlı, başka oturaklarda fark kadar inilir. */
+const SANDALYE_YUKSEKLIGI = 0.46;
 /**
  * Oturan kişi sandalyede bu kadar öne kayar: karakterlerin kolu kısa,
  * sandalyenin ortasından klavyeye uzanamıyordu (kollar aşağı sarkıyordu).
@@ -386,6 +403,8 @@ export class OfisMotoru {
   onLioTikla?: () => void;
   /** Ajan robotuna tıklanınca (ajan paneli açılır). */
   onAjanTikla?: () => void;
+  /** Seçili kendi karakterinin üstündeki "düzenle" işaretine tıklanınca. */
+  onKarakterDuzenle?: () => void;
   /**
    * Stüdyoda proje istasyonlarının ve kupa rafının bilgisi. Anahtar "oda|modül":
    * kupa rafının anahtarı her işte aynı, yalnızca modül anahtarıyla tutulunca
@@ -470,6 +489,10 @@ export class OfisMotoru {
   private ustteki: { tur: "oda" | "kisi" | "esya" | "modul" | "lio" | "ajan" | "plaket"; id: string } | null = null;
   /** Tıklanıp seçilen kişi: bir sonraki zemin tıklamasında oraya yürür. */
   private seciliKisiId: string | null = null;
+  /** Seçili kişinin başının üstündeki işaret; kendi karakterindeyse "düzenle" düğmesi. */
+  private kisiIsareti!: CSS2DObject;
+  /** Kişilerin seçtiği karakter görünümleri (kişi kimliği → görünüm); olmayan adından türetilir. */
+  private gorunumler = new Map<string, KarakterGorunumu>();
   /** Ortalıkta gezen Lio robotu (ilk kurulumda bir kez yaratılır). */
   private lio: LioRobotu | null = null;
   /** Ajan robotu: yalnızca ajanı açık hesapta, ajaniAyarla ile görünür. */
@@ -580,6 +603,17 @@ export class OfisMotoru {
     this.kisiEtiketi = new CSS2DObject(div);
     this.kisiEtiketi.visible = false;
     this.sahne.add(this.kisiEtiketi);
+
+    const isaret = document.createElement("div");
+    isaret.className = "of-kisi-isaret";
+    // Etiket katmanı tıklamaları geçirir; düğme kendi tıklamasını alır ve sahneye iletmez.
+    isaret.addEventListener("pointerdown", (e) => e.stopPropagation());
+    isaret.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if ((e.target as HTMLElement).closest("button")) this.onKarakterDuzenle?.();
+    });
+    this.kisiIsareti = new CSS2DObject(isaret);
+    this.kisiIsareti.visible = false;
 
     const tuval = this.renderer.domElement;
     tuval.addEventListener("pointermove", this.fareHareket);
@@ -1272,6 +1306,15 @@ export class OfisMotoru {
     this.onRafDegisti?.(false);
   }
 
+  /** Kamerayı kişiye yaklaştırır (karakterini düzenlerken önizleme görünsün). */
+  kisiyeOdaklan(id: string): void {
+    const k = this.karakterler.find((c) => c.veri.id === id);
+    if (!k || this.rafta) return;
+    const p = k.k3.nesne.position.clone();
+    p.y = 0.9;
+    this.gecisBaslat(p, Math.max(5, this.kontrol.minDistance));
+  }
+
   /** Kupa rafının karşısında mıyız. */
   get raftaMi(): boolean {
     return this.rafta !== null;
@@ -1765,8 +1808,9 @@ export class OfisMotoru {
           return { ...onceki, veri: v, koltuk, koltukYonu, masaNo, oda, ayakta };
         }
         let k3: Karakter3D;
+        const gorunum = this.gorunumler.get(v.id);
         try {
-          k3 = await karakter(adSayisi(v.ad));
+          k3 = await karakter(adSayisi(v.ad), gorunum);
         } catch {
           return null;
         }
@@ -1802,6 +1846,7 @@ export class OfisMotoru {
           yolVer: 0,
           kacis: new THREE.Vector3(),
           yazma: Math.random() * 20,
+          gorunumImza: JSON.stringify(gorunum ?? null),
         };
         this.eylemeGec(k, "Idle_Neutral", 0);
         // Herkes aynı anda nefes almasın.
@@ -1820,6 +1865,47 @@ export class OfisMotoru {
     for (const k of this.karakterler) if (k.k3.nesne.parent !== this.kisiGrubu) this.kisiGrubu.add(k.k3.nesne);
     if (this.seciliKisiId && !this.karakterler.some((k) => k.veri.id === this.seciliKisiId)) this.kisiSec(null);
     else if (this.seciliKisiId) this.kisiSec(this.seciliKisiId, false);
+    // Kurulum sürerken görünümler gelmiş olabilir: eski görünümle kurulanlar yenilenir.
+    for (const k of this.karakterler) if (k.gorunumImza !== JSON.stringify(this.gorunumler.get(k.veri.id) ?? null)) void this.karakteriYenile(k);
+  }
+
+  /**
+   * Kişilerin seçtiği karakter görünümleri (bkz. shared karakterGorunumu.ts).
+   * Görünümü değişen kişinin karakteri olduğu yerde yeniden kurulur; düzenleyicide
+   * seçim yaparken önizleme de buradan geçer.
+   */
+  gorunumleriAyarla(gorunumler: Map<string, KarakterGorunumu>): void {
+    this.gorunumler = new Map(gorunumler);
+    for (const k of this.karakterler) if (k.gorunumImza !== JSON.stringify(this.gorunumler.get(k.veri.id) ?? null)) void this.karakteriYenile(k);
+  }
+
+  /** Karakterin modelini yeni görünümle değiştirir: yeri, duruşu, halkası ve işaretleri korunur. */
+  private async karakteriYenile(k: Karakter): Promise<void> {
+    const gorunum = this.gorunumler.get(k.veri.id);
+    const imza = JSON.stringify(gorunum ?? null);
+    k.gorunumImza = imza;
+    let yeni: Karakter3D;
+    try {
+      yeni = await karakter(adSayisi(k.veri.ad), gorunum);
+    } catch {
+      return;
+    }
+    // Beklerken bir daha değiştiyse (önizlemede hızlı tıklama) bu kurulum bayattır.
+    if (k.gorunumImza !== imza || !this.karakterler.includes(k)) return;
+    const eski = k.k3;
+    yeni.nesne.position.copy(eski.nesne.position);
+    yeni.nesne.rotation.copy(eski.nesne.rotation);
+    yeni.nesne.scale.copy(eski.nesne.scale);
+    // Halka ve üstündeki etiketler yeni modele taşınır.
+    for (const c of [...eski.nesne.children]) if (c === k.halka || c instanceof CSS2DObject) yeni.nesne.add(c);
+    yeni.nesne.traverse((c) => (c.userData.kisiId = k.veri.id));
+    eski.karisici.stopAllAction();
+    this.kisiGrubu.remove(eski.nesne);
+    this.kisiGrubu.add(yeni.nesne);
+    k.k3 = yeni;
+    const eylem = k.eylem ?? "Idle_Neutral";
+    k.eylem = null;
+    this.eylemeGec(k, eylem, 0);
   }
 
   private halkaRengi(halka: THREE.Mesh, v: SahneKisisi): void {
@@ -1888,7 +1974,9 @@ export class OfisMotoru {
       // Koltuğa giden son adım serbest: masa duvara dayalıysa koltuk duvarın
       // dibinde kalıyor, son adımda durdurulan kişi koltuğun önünde takılıyordu.
       const koltugaIniyor = k.donus && k.adim >= k.yol.length - 1;
-      if (k.durum !== "oturuyor" && !koltugaIniyor) this.duvardanGecirme(k, eski, dt);
+      // Oturağa giden son adım da öyle: kanepe duvara dayalı olabilir.
+      const oturagaIniyor = !!k.oturak && k.adim >= k.yol.length - 1;
+      if (k.durum !== "oturuyor" && k.durum !== "konukta" && !koltugaIniyor && !oturagaIniyor) this.duvardanGecirme(k, eski, dt);
     }
     this.lioyuOynat(dt, t);
     this.ajaniOynat(dt, t);
@@ -1950,10 +2038,32 @@ export class OfisMotoru {
           k.koltuk.z + OTURMA_ONE * Math.cos(k.koltukYonu)
         );
         k.yazma += dt;
-        this.oturt(k);
+        this.oturt(k, k.koltukYonu, true);
       }
       k.sayac -= dt;
       if (k.sayac <= 0) this.yolaCik(k);
+      return;
+    }
+
+    if (k.durum === "konukta" && k.oturak) {
+      const o = k.oturak;
+      n.rotation.y = o.yon;
+      n.position.set(
+        o.yer.x + OTURMA_ONE * Math.sin(o.yon),
+        ZEMIN_Y - OTURMA_INIS + (o.yukseklik - SANDALYE_YUKSEKLIGI),
+        o.yer.z + OTURMA_ONE * Math.cos(o.yon)
+      );
+      this.oturt(k, o.yon, false);
+      k.sayac -= dt;
+      if (k.sayac <= 0) {
+        // Kalkıp masasına döner (yol bulunamazsa biraz daha oturur).
+        k.oturak = undefined;
+        k.goturuldu = false;
+        if (!this.yuru(k, k.koltuk, true)) {
+          k.oturak = o;
+          k.sayac = aralik(GEZINME.ayakta);
+        }
+      }
       return;
     }
 
@@ -1981,6 +2091,11 @@ export class OfisMotoru {
       if (k.donus) {
         k.durum = "oturuyor";
         k.sayac = aralik(k.veri.cevrimici ? GEZINME.masadaCevrimici : GEZINME.masadaDiger);
+        k.yol = [];
+        this.eylemeGec(k, "Idle_Neutral");
+      } else if (k.oturak) {
+        k.durum = "konukta";
+        k.sayac = aralik(GEZINME.goturulunce);
         k.yol = [];
         this.eylemeGec(k, "Idle_Neutral");
       } else {
@@ -2017,7 +2132,7 @@ export class OfisMotoru {
     // ayakta durana (ya da yol vermek için bekleyene) çarpmamak için etrafından dolaşılır.
     const kacin = new THREE.Vector3();
     for (const o of this.karakterler) {
-      if (o === k || o.durum === "oturuyor") continue;
+      if (o === k || o.durum === "oturuyor" || o.durum === "konukta") continue;
       const op = o.k3.nesne.position;
       const dx = op.x - n.position.x;
       const dz = op.z - n.position.z;
@@ -2055,7 +2170,7 @@ export class OfisMotoru {
   private ayrik(k: Karakter): void {
     const n = k.k3.nesne.position;
     for (const o of this.karakterler) {
-      if (o === k || o.durum === "oturuyor") continue;
+      if (o === k || o.durum === "oturuyor" || o.durum === "konukta") continue;
       const op = o.k3.nesne.position;
       const dx = n.x - op.x;
       const dz = n.z - op.z;
@@ -2081,12 +2196,12 @@ export class OfisMotoru {
    * paralel ve avuç içi aşağı. Yerleri iki kemikli IK ile bulunur, yazarken
    * yavaşça tuşlar arasında gezinip iner kalkar (bkz. `yazma`).
    */
-  private oturt(k: Karakter): void {
+  private oturt(k: Karakter, yon: number, yaz: boolean): void {
     const b = k.k3.bacaklar;
     const n = k.k3.nesne;
     const olcek = n.scale.x;
     n.updateMatrixWorld(true);
-    const ileri = OTUR_ILERI.set(Math.sin(k.koltukYonu), 0, Math.cos(k.koltukYonu));
+    const ileri = OTUR_ILERI.set(Math.sin(yon), 0, Math.cos(yon));
     // Kişinin solu (modelin +x'i; sol kol kemikleri o yanda).
     const sol = OTUR_SOL.set(ileri.z, 0, -ileri.x);
     for (const [ust, alt, ayak] of [
@@ -2104,16 +2219,26 @@ export class OfisMotoru {
     }
     // Öne eğilme: omurga aşağıdan yukarı giderek öne yatar, boyun biraz dikleşir (gözler ekranda).
     const g = k.k3.govde;
-    for (const [kemik, derece] of [
-      [g.karin, 10],
-      [g.bel, 22],
-      [g.gogus, 30],
-      [g.boyun, 8],
-    ] as const) {
+    // Masada klavyeye eğilir; kanepede, toplantıda dik oturur (hafifçe yaslanmış).
+    for (const [kemik, derece] of (yaz
+      ? [
+          [g.karin, 10],
+          [g.bel, 22],
+          [g.gogus, 30],
+          [g.boyun, 8],
+        ]
+      : [
+          [g.karin, 0],
+          [g.bel, -4],
+          [g.gogus, 0],
+          [g.boyun, 4],
+        ]) as [THREE.Bone | undefined, number][]) {
       if (!kemik) continue;
       const a = THREE.MathUtils.degToRad(derece);
       kemigiYonelt(kemik, OTUR_YON.copy(YUKARI).multiplyScalar(Math.cos(a)).addScaledVector(ileri, Math.sin(a)));
     }
+    // Masa dışında eller animasyondaki gibi yanlarda kalır.
+    if (!yaz) return;
     const kol = k.k3.kollar;
     const { ustKol, onKol } = k.k3.boylar;
     if (!ustKol || !onKol) return;
@@ -2269,6 +2394,83 @@ export class OfisMotoru {
     return true;
   }
 
+  /**
+   * İmlecin altındaki oturulabilir eşya (bkz. varliklar OTURAKLAR): masa
+   * sandalyesi, toplantı sandalyesi, koltuk, kanepe, mağazadan alınanlar dahil.
+   * Önde başka bir eşya varsa (ör. sandalyenin önündeki masa) o kazanır.
+   */
+  private oturakBul(): { obj: THREE.Object3D; nokta: THREE.Vector3 } | null {
+    this.isin.setFromCamera(this.fare, this.kamera);
+    const hedefler: THREE.Object3D[] = [...[...this.nesneler.values()].map((n) => n.obj), ...[...this.esyaNesneleri.values()].filter((o) => o.visible)];
+    const v = this.isin.intersectObjects(hedefler, true)[0];
+    for (let o: THREE.Object3D | null = v?.object ?? null; o; o = o.parent) {
+      if (o.userData.varlik && OTURAKLAR[o.userData.varlik as VarlikAdi]) return { obj: o, nokta: v!.point };
+    }
+    return null;
+  }
+
+  /**
+   * Kişiyi oturağın önüne yürütüp oturtur. Kanepede tıklanan yere en yakın
+   * oturağa oturulur. Başkasının oturduğu yere ya da birinin masasına oturulmaz;
+   * kendi masa sandalyesine tıklanırsa masasına döner.
+   */
+  private oturagaGotur(k: Karakter, obj: THREE.Object3D, nokta: THREE.Vector3): void {
+    const tanim = OTURAKLAR[obj.userData.varlik as VarlikAdi]!;
+    obj.updateMatrixWorld(true);
+    // Eşyanın kendi ekseninde ölçüsü (dönükse dünyadaki kutu yanıltır). Önü yerel +z.
+    const ters = obj.matrixWorld.clone().invert();
+    const kutuL = new THREE.Box3();
+    const m4 = new THREE.Matrix4();
+    obj.traverse((c) => {
+      const mesh = c as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+      kutuL.union(mesh.geometry.boundingBox!.clone().applyMatrix4(m4.multiplyMatrices(ters, mesh.matrixWorld)));
+    });
+    if (kutuL.isEmpty()) return;
+    const olcek = obj.getWorldScale(new THREE.Vector3());
+    const yerel = obj.worldToLocal(nokta.clone());
+    const orta = kutuL.getCenter(new THREE.Vector3());
+    // Kişi başına ~0,7 m: kenarlardan yarım oturak içeride kalır.
+    const pay = 0.35 / olcek.x;
+    const x = tanim.uzun ? THREE.MathUtils.clamp(yerel.x, kutuL.min.x + pay, Math.max(kutuL.min.x + pay, kutuL.max.x - pay)) : orta.x;
+    // Derin oturaklarda (kanepe) kalça arkaya, sırtlığa yakın oturur.
+    const derin = (kutuL.max.z - kutuL.min.z) * olcek.z;
+    const z = orta.z - Math.max(0, derin - 0.6) * 0.4 / olcek.z;
+    const yer = obj.localToWorld(new THREE.Vector3(x, 0, z));
+    yer.y = ZEMIN_Y;
+    const on = new THREE.Vector3(0, 0, 1).applyQuaternion(obj.getWorldQuaternion(new THREE.Quaternion()));
+    on.y = 0;
+    on.normalize();
+    const yon = Math.atan2(on.x, on.z);
+    const yakin = (a: THREE.Vector3) => Math.hypot(a.x - yer.x, a.z - yer.z) < 0.4;
+    // Masa sandalyesi: sahibinin yeri.
+    const sahibi = this.karakterler.find((o) => !o.ayakta && yakin(o.koltuk));
+    if (sahibi === k) {
+      k.oturak = undefined;
+      k.goturuldu = false;
+      if (k.durum !== "oturuyor" && !this.yuru(k, k.koltuk, true)) this.onUyari?.("Masasına yürüyerek gidilemiyor");
+      return;
+    }
+    if (sahibi) {
+      this.onUyari?.(`Orası ${sahibi.veri.ad} adlı kişinin masası`);
+      return;
+    }
+    if (this.karakterler.some((o) => o !== k && o.oturak && yakin(o.oturak.yer))) {
+      this.onUyari?.("Orada biri oturuyor");
+      return;
+    }
+    // Önce oturağın önüne (en yakın boş yere), son adımda oturağın üstüne.
+    k.oturak = undefined;
+    if (!this.yuru(k, yer.clone().addScaledVector(on, 0.55))) {
+      this.onUyari?.("Oraya yürüyerek gidilemiyor");
+      return;
+    }
+    k.yol.push(yer.clone());
+    k.oturak = { yer, yon, yukseklik: tanim.yukseklik * olcek.y };
+    k.goturuldu = true;
+  }
+
   /** Kişiyi seçer (halkası parlar ve atar) ya da seçimi bırakır. */
   private kisiSec(id: string | null, bildir = true): void {
     const eski = this.karakterler.find((k) => k.veri.id === this.seciliKisiId);
@@ -2284,6 +2486,8 @@ export class OfisMotoru {
       this.ustteyiAyarla(u);
     }
     const k = this.karakterler.find((c) => c.veri.id === id);
+    this.kisiIsareti.removeFromParent();
+    this.kisiIsareti.visible = false;
     if (!k) {
       this.seciliKisiId = null;
       return;
@@ -2291,7 +2495,20 @@ export class OfisMotoru {
     const m = k.halka.material as THREE.MeshBasicMaterial;
     m.color.set(marka().vurgu);
     m.opacity = 1;
-    if (bildir) this.onUyari?.(`${k.veri.ad} nereye gitsin? Zemine tıkla (Esc: vazgeç)`);
+    // Başının üstünde işaret: kendi karakterindeyse düzenleme düğmesi, başkasında yalnızca ok.
+    const el = this.kisiIsareti.element;
+    el.textContent = "";
+    el.classList.toggle("ben", k.veri.ben);
+    if (k.veri.ben) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = "Karakterini düzenle";
+      el.appendChild(b);
+    }
+    k.k3.nesne.add(this.kisiIsareti);
+    this.kisiIsareti.position.set(0, 2.55, 0);
+    this.kisiIsareti.visible = true;
+    if (bildir) this.onUyari?.(`${k.veri.ad} nereye gitsin? Zemine ya da oturacağı yere tıkla (Esc: vazgeç)`);
   }
 
   // ------------------------------------------------------------ fare
@@ -2929,11 +3146,19 @@ export class OfisMotoru {
     }
     if (this.seciliKisiId) {
       const k = this.karakterler.find((c) => c.veri.id === this.seciliKisiId);
-      const p = this.zemineDegen();
+      // Sandalyeye, koltuğa, kanepeye tıklandıysa oraya oturur; değilse zemindeki noktaya yürür.
+      const oturak = this.oturakBul();
+      const p = oturak ? null : this.zemineDegen();
       this.kisiSec(null);
-      if (k && p) {
+      if (k && oturak) this.oturagaGotur(k, oturak.obj, oturak.nokta);
+      else if (k && p) {
+        const eski = k.oturak;
+        k.oturak = undefined;
         if (this.yuru(k, p)) k.goturuldu = true;
-        else this.onUyari?.("Oraya yürüyerek gidilemiyor");
+        else {
+          k.oturak = eski;
+          this.onUyari?.("Oraya yürüyerek gidilemiyor");
+        }
       }
       return;
     }

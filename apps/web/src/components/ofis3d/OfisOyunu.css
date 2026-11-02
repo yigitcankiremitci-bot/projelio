@@ -1387,3 +1387,133 @@
     animation: none;
   }
 }
+
+/* Seçili kişinin başının üstündeki işaret; kendi karakterinde "düzenle" düğmesi. */
+.of-kisi-isaret {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  animation: of-isaret-zipla 1.2s ease-in-out infinite;
+}
+.of-kisi-isaret::after {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 11px solid var(--yn-accent);
+}
+.of-kisi-isaret button {
+  pointer-events: auto;
+  margin-bottom: 4px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--yn-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(26, 31, 41, 0.25);
+}
+.of-kisi-isaret button:hover {
+  filter: brightness(1.08);
+}
+@keyframes of-isaret-zipla {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .of-kisi-isaret {
+    animation: none;
+  }
+}
+
+/* Karakter düzenleyicisi: solda — sağ altta Lio düğmesi "Kaydet"in üstüne biniyordu. */
+.of-karakter {
+  left: 16px;
+  top: 74px;
+  width: min(300px, calc(100% - 32px));
+  max-height: calc(100% - 96px);
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--yn-card) 96%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 40px rgba(26, 31, 41, 0.18);
+  border: 1px solid color-mix(in srgb, var(--yn-accent) 35%, transparent);
+  animation: of-kay 0.3s ease both;
+}
+.of-kd-bas {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--yn-ink);
+}
+.of-kd-bas small {
+  color: var(--yn-ink-3);
+  font-size: 12px;
+}
+.of-kd-grup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.of-kd-baslik {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--yn-ink-2);
+}
+.of-kd-modeller {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.of-kd-model {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--yn-ink) 14%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--yn-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.of-kd-model.secili {
+  border-color: var(--yn-accent);
+  background: color-mix(in srgb, var(--yn-accent) 14%, transparent);
+  font-weight: 700;
+}
+.of-kd-renkler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.of-kd-renk {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid color-mix(in srgb, var(--yn-ink) 12%, transparent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.of-kd-renk.varsayilan {
+  background: linear-gradient(135deg, transparent 45%, var(--yn-ink-3) 45% 55%, transparent 55%), var(--yn-card);
+}
+.of-kd-renk.secili {
+  border-color: var(--yn-accent);
+  box-shadow: 0 0 0 2px var(--yn-card), 0 0 0 4px var(--yn-accent);
+}
+.of-kd-alt {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

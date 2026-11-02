@@ -1,9 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  karakterGorunumuTemizle,
   odaDuzeniTemizle,
   odaDuzenleyebilir,
   studyoDuzenKaydi,
   studyoOdaDuzenleyebilir,
+  type KarakterGorunumu,
   type OdaDuzeni,
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
@@ -139,5 +141,30 @@ export class OfisDuzeniService {
     await this.studyoYetkisiniDogrula(odaId, userId);
     const { error } = await this.supabase.client.from("studyo_oda_duzenleri").delete().eq("anahtar", studyoDuzenKaydi(odaId, userId).anahtar);
     if (error) throw error;
+  }
+
+  // ------------------------------------------------------------ Karakterler (migration 182)
+
+  async karakterler(ids: string[]): Promise<Record<string, KarakterGorunumu>> {
+    if (!ids.length) return {};
+    const { data, error } = await this.supabase.client.from("ofis_karakterleri").select("user_id, gorunum").in("user_id", ids);
+    if (error) throw error;
+    const sonuc: Record<string, KarakterGorunumu> = {};
+    for (const r of data ?? []) {
+      // Eski bir kayıt (sonradan kaldırılan model) karakteri bozmasın: adından türetilene düşer.
+      const g = karakterGorunumuTemizle(r.gorunum);
+      if (g) sonuc[r.user_id] = g;
+    }
+    return sonuc;
+  }
+
+  async karakterKaydet(userId: string, ham: unknown): Promise<KarakterGorunumu> {
+    const gorunum = karakterGorunumuTemizle(ham);
+    if (!gorunum) throw new BadRequestException("Geçersiz karakter");
+    const { error } = await this.supabase.client
+      .from("ofis_karakterleri")
+      .upsert({ user_id: userId, gorunum, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) throw error;
+    return gorunum;
   }
 }

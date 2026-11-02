@@ -21,6 +21,7 @@ import {
   KASA_MODULU,
   KUPA_RAFI,
   PROJE_ONEKI,
+  adSayisi,
   type IstasyonBilgisi,
   type EsyaKategorisi,
   type EsyaTuru,
@@ -30,7 +31,15 @@ import {
 import { openLio } from "../../lib/askLio";
 import { isTemasi } from "../../lib/studyoOfisi";
 import { OfisMotoru, type OdaEtiketi, type SahneKisisi } from "./OfisMotoru";
-import { odaDuzeniTemizle, type NesneDuzeni, type OdaDuzeni } from "@projelio/shared";
+import {
+  KARAKTER_MODELLERI,
+  karakterGorunumuTemizle,
+  odaDuzeniTemizle,
+  type KarakterGorunumu,
+  type NesneDuzeni,
+  type OdaDuzeni,
+} from "@projelio/shared";
+import KarakterDuzenleyici from "./KarakterDuzenleyici";
 import { api, ApiError } from "../../api/client";
 import { ajanApi } from "../../api/ajan";
 import AjanPaneli from "../ajan/AjanPaneli";
@@ -139,6 +148,8 @@ function nesneAdi(nesneId: string, modulAdlari: Map<string, string>): string {
 
 /** Ekip düzeni ucu canlıya çıkmadıysa (404) düzen geçici olarak burada tutulur. */
 const yerelDuzenAnahtari = (kapsam: string) => `projelio:ofis-duzeni:${kapsam}`;
+/** Karakter ucu henüz yayında değilken (404) kendi karakterin tarayıcıda tutulur. */
+const yerelKarakterAnahtari = (kisi: string) => `projelio:ofis-karakter:${kisi}`;
 
 // Küçük resimler (motorun çizdiği) gelene kadar ve metin içinde kullanılan yedek simgeler.
 const SIMGE: Record<EsyaTuru, string> = {
@@ -301,6 +312,11 @@ export default function OfisOyunu({
   const [icerdekiOda, setIcerdekiOda] = useState<string | null>(null);
   /** Kupa rafının karşısında göz hizasında mıyız (gezinme kapalı, yalnızca plaketler). */
   const [rafta, setRafta] = useState(false);
+  /** Kişilerin seçtiği karakter görünümleri (migration 182); kaydı olmayan adından türetilir. */
+  const [gorunumler, setGorunumler] = useState<Record<string, KarakterGorunumu>>({});
+  /** Kendi karakterini düzenlerken taslak (null: kayıtlı görünüm yok, adından türetilen). */
+  const [karakterTaslagi, setKarakterTaslagi] = useState<{ g: KarakterGorunumu | null } | null>(null);
+  const [karakterKaydediliyor, setKarakterKaydediliyor] = useState(false);
   /** Oda paneli kapatılabilir; kapatmak kamerayı odadan çıkarmaz (yalnızca "Ofise dön" ve Esc çıkarır). */
   const [panelAcik, setPanelAcik] = useState(false);
   // Oda düzenleri: ekipte ortak (sunucu); uç yoksa geçici olarak tarayıcıda.
@@ -566,8 +582,84 @@ export default function OfisOyunu({
   }, [ajanDurumu, yukleniyor]);
 
   // Motor bir kez kurulur; geri çağırmalar her zaman güncel duruma ref'ten bakar.
-  const durumRef = useRef({ kayit, puan, anahtar, onModulAc });
-  durumRef.current = { kayit, puan, anahtar, onModulAc };
+  // Ofisteki kişilerin karakter görünümleri: kişi listesi değişince yeniden sorulur.
+  const kisiKimlikleri = useMemo(() => [...new Set(sahneKisileri.map((k) => k.id))].sort().join(","), [sahneKisileri]);
+  useEffect(() => {
+    if (!kisiKimlikleri) return;
+    const ac = new AbortController();
+    api
+      .get<Record<string, unknown>>(`/ofis-duzeni/karakterler?kisiler=${encodeURIComponent(kisiKimlikleri)}`, ac.signal)
+      .then((y) => {
+        const temiz: Record<string, KarakterGorunumu> = {};
+        for (const [id, g] of Object.entries(y ?? {})) {
+          const t = karakterGorunumuTemizle(g);
+          if (t) temiz[id] = t;
+        }
+        setGorunumler(temiz);
+      })
+      .catch((e) => {
+        if (ac.signal.aborted || !benId) return;
+        // Uç henüz yayında değil: yalnızca kendi karakterin bu tarayıcıdan gelir.
+        if (e instanceof ApiError && e.status === 404) {
+          try {
+            const t = karakterGorunumuTemizle(JSON.parse(localStorage.getItem(yerelKarakterAnahtari(benId)) ?? "null"));
+            setGorunumler(t ? { [benId]: t } : {});
+          } catch {
+            setGorunumler({});
+          }
+        }
+      });
+    return () => ac.abort();
+  }, [kisiKimlikleri, benId]);
+
+  // Düzenlerken taslak sahnedeki kendi karakterine uygulanır (önizleme); vazgeçince kayıtlıya döner.
+  useEffect(() => {
+    const m = new Map(Object.entries(gorunumler));
+    if (karakterTaslagi && benId) {
+      if (karakterTaslagi.g) m.set(benId, karakterTaslagi.g);
+      else m.delete(benId);
+    }
+    motorRef.current?.gorunumleriAyarla(m);
+  }, [gorunumler, karakterTaslagi, benId]);
+
+  const benAdi = sahneKisileri.find((k) => k.ben)?.ad ?? "";
+  const varsayilanModel = KARAKTER_MODELLERI[adSayisi(benAdi) % KARAKTER_MODELLERI.length].dosya;
+
+  function karakteriDuzenle() {
+    if (!benId) return;
+    setKarakterTaslagi({ g: gorunumler[benId] ?? null });
+    setPanelAcik(false);
+    setMagaza(false);
+    motorRef.current?.kisiyeOdaklan(benId);
+  }
+
+  async function karakteriKaydet() {
+    if (!benId || !karakterTaslagi) return;
+    const g = karakterTaslagi.g ?? { model: varsayilanModel };
+    setKarakterKaydediliyor(true);
+    try {
+      const kayitli = karakterGorunumuTemizle(await api.post<unknown>("/ofis-duzeni/karakter", g)) ?? g;
+      setGorunumler((o) => ({ ...o, [benId]: kayitli }));
+      setKarakterTaslagi(null);
+      bildir("Karakterin kaydedildi");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        try {
+          localStorage.setItem(yerelKarakterAnahtari(benId), JSON.stringify(g));
+        } catch {
+          // Tarayıcı depolaması kapalı: bu oturumluk kalır.
+        }
+        setGorunumler((o) => ({ ...o, [benId]: g }));
+        setKarakterTaslagi(null);
+        bildir("Karakterin bu tarayıcıda kaydedildi");
+      } else bildir(e instanceof ApiError ? e.message : "Karakter kaydedilemedi");
+    } finally {
+      setKarakterKaydediliyor(false);
+    }
+  }
+
+  const durumRef = useRef({ kayit, puan, anahtar, onModulAc, karakteriDuzenle });
+  durumRef.current = { kayit, puan, anahtar, onModulAc, karakteriDuzenle };
 
   useEffect(() => {
     const kap = kapRef.current;
@@ -598,6 +690,7 @@ export default function OfisOyunu({
       setMagaza(false);
     };
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
+    motor.onKarakterDuzenle = () => durumRef.current.karakteriDuzenle();
     motor.onRafDegisti = (acik) => {
       setRafta(acik);
       // Raf ekranın ortasında: oda paneli önünü kapatmasın.
@@ -976,7 +1069,7 @@ export default function OfisOyunu({
           <br />
           <b>Tekerlek</b> yaklaş · <b>Ok tuşları</b> gez · <b>Odaya tıkla</b> içeri gir
           <br />
-          <b>Kişiye, sonra bir yere tıkla</b> oraya yürüsün
+          <b>Kişiye, sonra bir yere ya da koltuğa tıkla</b> oraya yürüsün, otursun
         </div>
       )}
 
@@ -1097,6 +1190,17 @@ export default function OfisOyunu({
           onModulAc={() => onModulAc(duzenlenen, seciliNesne.slice(6))}
           onModulKapat={() => modulKapat(seciliNesne.slice(6))}
           onKapat={() => motorRef.current?.secimiBirak()}
+        />
+      )}
+
+      {karakterTaslagi && (
+        <KarakterDuzenleyici
+          gorunum={karakterTaslagi.g}
+          varsayilanModel={varsayilanModel}
+          kaydediliyor={karakterKaydediliyor}
+          onDegis={(g) => setKarakterTaslagi({ g })}
+          onKaydet={() => void karakteriKaydet()}
+          onVazgec={() => setKarakterTaslagi(null)}
         />
       )}
 

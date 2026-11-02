@@ -34,6 +34,7 @@ export * from "./kartvizitLogo";
 export * from "./projeTakvimi";
 export * from "./anasayfaSirasi";
 export * from "./ofisDuzeni";
+export * from "./karakterGorunumu";
 export * from "./departmanKurali";
 export * from "./modulHakki";
 export * from "./koltukHakki";

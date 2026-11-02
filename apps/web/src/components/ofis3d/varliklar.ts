@@ -9,6 +9,7 @@
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
+import { KARAKTER_MODELLERI, type KarakterGorunumu } from "@projelio/shared";
 
 const KOK = "/ofis/modeller/";
 
@@ -212,12 +213,44 @@ export function varlikVar(ad: string): ad is VarlikAdi {
   return ornekler.has(ad as VarlikAdi);
 }
 
-/** Yüklenmiş modelin bir kopyası (malzemeler paylaşılır). */
+/**
+ * Yüklenmiş modelin bir kopyası (malzemeler paylaşılır). Kökü hangi modelden
+ * geldiğini userData.varlik'te taşır: motor tıklanan şeyin oturulacak bir yer
+ * olup olmadığını buradan anlar (bkz. OTURAKLAR).
+ */
 export function varlik(ad: VarlikAdi): THREE.Group {
   const o = ornekler.get(ad);
   if (!o) throw new Error(`Model yüklenmedi: ${ad}`);
-  return o.clone(true) as THREE.Group;
+  const k = o.clone(true) as THREE.Group;
+  k.userData.varlik = ad;
+  return k;
 }
+
+/**
+ * Üstüne oturulabilen modeller ve oturağın yerden yüksekliği (m). `uzun`:
+ * birden çok kişilik (kanepe, bank) — tıklanan yere en yakın oturağa oturulur.
+ */
+export const OTURAKLAR: Partial<Record<VarlikAdi, { yukseklik: number; uzun?: boolean }>> = {
+  ofisSandalyesi: { yukseklik: 0.46 },
+  toplantiSandalyesi: { yukseklik: 0.46 },
+  sandalyeMinderli: { yukseklik: 0.46 },
+  sandalyeCerceveli: { yukseklik: 0.46 },
+  yuvarlakSandalye: { yukseklik: 0.46 },
+  barTaburesi: { yukseklik: 0.72 },
+  koltuk: { yukseklik: 0.42 },
+  dinlenmeKoltugu: { yukseklik: 0.4 },
+  uzanmaKoltugu: { yukseklik: 0.4 },
+  tasarimBerjer: { yukseklik: 0.42 },
+  minderPuf: { yukseklik: 0.38 },
+  yerMinderi: { yukseklik: 0.22 },
+  kanepe: { yukseklik: 0.42, uzun: true },
+  ikiliKanepe: { yukseklik: 0.4, uzun: true },
+  tasarimKanepe: { yukseklik: 0.4, uzun: true },
+  uzanmaliKanepe: { yukseklik: 0.4, uzun: true },
+  koseKoltuk: { yukseklik: 0.4, uzun: true },
+  buyukKoseKanepe: { yukseklik: 0.4, uzun: true },
+  minderliBank: { yukseklik: 0.44, uzun: true },
+};
 
 /** Bir modelin yerleşik ölçüsü (en, boy, derinlik) — yerleşim hesapları için. */
 export function varlikOlcusu(ad: VarlikAdi): THREE.Vector3 {
@@ -244,16 +277,55 @@ export function hayaletYap(o: THREE.Object3D): void {
 
 // ------------------------------------------------------------------ karakterler
 
-const KARAKTERLER = [
-  "erkek_suit",
-  "kadin_casual",
-  "erkek_casual2",
-  "kadin_formal",
-  "erkek_hoodie",
-  "kadin_suit",
-  "erkek_worker",
-  "kadin_worker",
-] as const;
+const KARAKTERLER = KARAKTER_MODELLERI.map((m) => m.dosya);
+
+/**
+ * Seçilen kıyafet renginin boyadığı ana giysi malzemesi (model başına;
+ * malzeme adları glb dosyalarından). Ten ve saç bütün modellerde aynı adlı.
+ */
+const KIYAFET_MALZEMESI: Record<string, string> = {
+  erkek_suit: "Suit",
+  kadin_casual: "Orange",
+  erkek_casual2: "Red_Dark",
+  kadin_formal: "Red",
+  erkek_hoodie: "Purple",
+  kadin_suit: "Black",
+  erkek_worker: "Worker_Vest",
+  kadin_worker: "Worker_Vest",
+};
+const SAC = /^(Hair|Hair_Brown|Hair_Blond|Eyebrows|Moustache)$/;
+
+/**
+ * Seçilen renkleri karakterin kendi kopyasına boyar. Malzemeler bütün
+ * kopyalarda ortak: önce klonlanır, yoksa aynı modeldeki herkes boyanırdı.
+ */
+function boya(kopya: THREE.Object3D, model: string, g: KarakterGorunumu): void {
+  const klonlar = new Map<THREE.Material, THREE.Material>();
+  const renkFor = (ad: string): { renk: string; kat?: number } | undefined => {
+    if (g.ten && ad === "Skin") return { renk: g.ten };
+    // Elin/yüzün gölgeli yanı: tenin biraz koyusu.
+    if (g.ten && ad === "Skin_Darker") return { renk: g.ten, kat: 0.8 };
+    if (g.sac && SAC.test(ad)) return { renk: g.sac, kat: ad === "Eyebrows" ? 0.7 : 1 };
+    if (g.kiyafet && ad === KIYAFET_MALZEMESI[model]) return { renk: g.kiyafet };
+    return undefined;
+  };
+  kopya.traverse((c) => {
+    const m = c as THREE.Mesh;
+    if (!m.isMesh) return;
+    const degistir = (x: THREE.Material): THREE.Material => {
+      const r = renkFor(x.name);
+      if (!r || !(x as THREE.MeshStandardMaterial).color) return x;
+      let k = klonlar.get(x);
+      if (!k) {
+        k = x.clone();
+        (k as THREE.MeshStandardMaterial).color.set(r.renk).multiplyScalar(r.kat ?? 1);
+        klonlar.set(x, k);
+      }
+      return k;
+    };
+    m.material = Array.isArray(m.material) ? m.material.map(degistir) : degistir(m.material);
+  });
+}
 
 const SILAH = /pistol|gun|rifle|sword|knife|weapon/i;
 
@@ -304,9 +376,12 @@ export interface Karakter3D {
   kadin: boolean;
 }
 
-/** Kişinin adından türetilen sayıyla karakter seçer; aynı kişi hep aynı görünür. */
-export async function karakter(sayi: number): Promise<Karakter3D> {
-  const ad = KARAKTERLER[sayi % KARAKTERLER.length];
+/**
+ * Kişinin seçtiği görünümle (bkz. shared karakterGorunumu.ts) ya da seçmediyse
+ * adından türetilen sayıyla karakter kurar; aynı kişi hep aynı görünür.
+ */
+export async function karakter(sayi: number, gorunum?: KarakterGorunumu | null): Promise<Karakter3D> {
+  const ad = gorunum && KARAKTERLER.includes(gorunum.model) ? gorunum.model : KARAKTERLER[sayi % KARAKTERLER.length];
   let p = karakterOnbellek.get(ad);
   if (!p) {
     p = yukleyici.loadAsync(`${KOK}karakterler/${ad}.glb`);
@@ -324,6 +399,7 @@ export async function karakter(sayi: number): Promise<Karakter3D> {
     // Dosyadan çıkarıldı; yeni eklenen bir karakterde de görünmesin diye burada da gizlenir.
     if (SILAH.test(c.name)) c.visible = false;
   });
+  if (gorunum) boya(kopya, ad, gorunum);
   const nesne = new THREE.Group();
   nesne.add(kopya);
   const karisici = new THREE.AnimationMixer(kopya);

@@ -875,8 +875,12 @@ export const hatalar: TranslationDict = {
   "Ödeme başlatılamadı: {message}": "Couldn't start the payment: {message}",
   "Ek kişili paket bu ödeme yöntemiyle alınamıyor.": "A plan with extra people can't be bought with this payment method.",
   "Kişi sayısı {enAz} ile {enCok} arasında olmalı.": "The number of people must be between {enAz} and {enCok}.",
+  "Bu pakette kişi sayısı değiştirilemez.": "The number of people can't be changed on this plan.",
+  "Kişi sayısı yalnızca yürürlükteki ve yenilenecek bir abonelikte artırılabilir.": "People can only be added to an active subscription that is set to renew.",
+  "Yeni kişi sayısı şu ankinden ({mevcut}) fazla olmalı.": "The new number of people must be more than the current {mevcut}.",
+  "Kişi artırma tutarı şu an hesaplanamıyor. Lütfen bizimle iletişime geç.": "We can't calculate the price for more people right now. Please contact us.",
   "Şirketinde şu an {kisi} kişi var; en az bu kadar kişilik paket seçmelisin.": "Your company has {kisi} people right now; choose a plan for at least that many.",
-  "Şirketin paketindeki {sinir} kişilik yer dolu. Kişi sayısını artırmak için destekten yardım iste.": "Your company's plan is full at {sinir} people. Ask support to add more people.",
+  "Şirketin paketindeki {sinir} kişilik yer dolu. Paketim ekranından kişi sayısını artırabilirsin.": "Your company's plan is full at {sinir} people. You can add more people from the My plan screen.",
   "Bu pakette şirkete en çok {sinir} kişi eklenebilir. Daha kalabalık bir ekip için Business'a geç.": "This plan allows up to {sinir} people in a company. Switch to Business for a larger team.",
 
   // Taşerona kapalı yüzeyler (common/access/subcontractor.ts SURFACE_MESSAGE)

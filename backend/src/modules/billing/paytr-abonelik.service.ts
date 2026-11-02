@@ -7,11 +7,14 @@ import { EmailService } from "../auth/email.service";
 import { abonelikTutari } from "./abonelik-tutari";
 import { BillingService, type Abonelik, type AbonelikKapsami } from "./billing.service";
 import { BillingSettingsService } from "./billing-settings.service";
-import { ayEkle, findPlan, periodMonths, type BillingPeriod, type PlanKey } from "./billing.plans";
+import { abonelikKoltukSiniri } from "@projelio/shared";
+import { hataMetni } from "../../common/i18n/index";
+import { ayEkle, findPlan, koltukCoz, periodMonths, planBirimi, type BillingPeriod, type PlanKey } from "./billing.plans";
+import { kisiArtirmaBirimi, kisiArtirmaTutari } from "./kisi-artirma";
 import { PayTRClient, type DirektFormu } from "./paytr.client";
 import { PayTRKartService } from "./paytr-kart.service";
 import { IndirimService, indirimOzeti } from "./indirim.service";
-import { ilkOdemedenSonraKalan, kalaniAzalt, sonrakiOdemedeIndirim, type Indirim } from "./indirim";
+import { ilkOdemedenSonraKalan, indirimliTutar, kalaniAzalt, sonrakiOdemedeIndirim, type Indirim } from "./indirim";
 import { paytrKullaniciBilgisi } from "./paytr-kullanici";
 import { kurusaCevir, siparisNumarasiCoz, siparisNumarasiUret, telefonAlani } from "./paytr-imza";
 import {
@@ -24,13 +27,14 @@ import {
 import {
   hatirlatmaEpostasi,
   kartDegistiEpostasi,
+  kisiArtirmaEpostasi,
   makbuzEpostasi,
   odemeAlinamadiEpostasi,
   sonaErdiEpostasi,
   type HazirEposta,
 } from "./paytr-abonelik-eposta";
 
-type OdemeTuru = "ilk" | "yenileme" | "elle" | "kart_degisim";
+type OdemeTuru = "ilk" | "yenileme" | "elle" | "kart_degisim" | "kisi_artirma";
 
 interface OdemeSatiri {
   id: string;
@@ -207,6 +211,75 @@ export class PayTRAbonelikService {
     });
   }
 
+  /**
+   * Kişi artırmanın tutarları; ödeme formu açmadan önce ekranda gösterilir.
+   * Form da AYNI hesaptan geçer, istemcinin gösterdiği tutara güvenilmez.
+   */
+  async kisiArtirmaOnizle(userId: string, subscriptionId: string, koltukHam: unknown, simdi = new Date()) {
+    const { tutar, yeniListe, yenilemeTutari, koltuk, birim } = await this.kisiArtirmaHesabi(userId, subscriptionId, koltukHam, simdi);
+    return { koltuk, tutar, yenilemeTutari, yeniListe, birim };
+  }
+
+  /** Kişi artırma: 3D ile dönemin kalanı için fark çekilir, bildirim gelince kişi sayısı artar. */
+  async kisiArtirmaFormu(userId: string, subscriptionId: string, koltukHam: unknown, userIp: string, onay?: boolean): Promise<DirektFormu> {
+    this.yapilandirilmis();
+    const { abonelik, tutar, yeniListe, koltuk } = await this.kisiArtirmaHesabi(userId, subscriptionId, koltukHam, new Date());
+    return this.formHazirla({
+      tur: "kisi_artirma",
+      userId,
+      scope: abonelik.scope,
+      organizationId: abonelik.organizationId ?? null,
+      planKey: abonelik.planKey,
+      period: abonelik.period,
+      koltuk,
+      subscriptionId: abonelik.id,
+      donemBasi: null,
+      // Satırın liste tutarı yeni kişi sayısıyla BİR DÖNEMİN tutarı: bildirim
+      // geldiğinde yenileme tutarı bundan yazılır, o an yeniden hesaplanmaz
+      // (kur değişse bile müşteriye formda gösterilen tutar geçerli).
+      listeTutari: yeniListe,
+      indirimKoduId: null,
+      tutar,
+      userIp,
+      onay,
+    });
+  }
+
+  private async kisiArtirmaHesabi(userId: string, subscriptionId: string, koltukHam: unknown, simdi: Date) {
+    const { abonelik, ham } = await this.kendiPaytrAboneligi(userId, subscriptionId);
+    const plan = findPlan(abonelik.planKey);
+    if (!plan?.ekKoltuk) throw new BadRequestException("Bu pakette kişi sayısı değiştirilemez.");
+    const donemSonu = abonelik.currentPeriodEnd ? new Date(abonelik.currentPeriodEnd) : null;
+    const donemBasi = abonelik.currentPeriodStart ? new Date(abonelik.currentPeriodStart) : null;
+    // Ödemesi düşmüş ya da yenilenmeyi bekleyen dönemde fark hesaplanacak
+    // "kalan gün" yok; önce dönem ödenmeli.
+    if (abonelik.status !== "active" || abonelik.cancelAtPeriodEnd || !donemSonu || !donemBasi || donemSonu <= simdi) {
+      throw new ConflictException("Kişi sayısı yalnızca yürürlükteki ve yenilenecek bir abonelikte artırılabilir.");
+    }
+
+    const cozulen = koltukCoz(plan, koltukHam);
+    if ("hata" in cozulen) throw new BadRequestException(hataMetni(cozulen.hata, cozulen.params));
+    const koltuk = cozulen.koltuk!;
+    const mevcut = abonelikKoltukSiniri(abonelik.planKey, ham.koltuk);
+    if (koltuk <= mevcut) {
+      throw new BadRequestException(hataMetni("Yeni kişi sayısı şu ankinden ({mevcut}) fazla olmalı.", { mevcut }));
+    }
+
+    const [eskiListe, yeniListe] = await Promise.all([this.yenilemeListesi(ham), this.guncelTutar(abonelik.planKey, abonelik.period, koltuk)]);
+    if (eskiListe === null || yeniListe === null) {
+      throw new ServiceUnavailableException("Kişi artırma tutarı şu an hesaplanamıyor. Lütfen bizimle iletişime geç.");
+    }
+    const tutar = kisiArtirmaTutari({ eskiListe, yeniListe, donemBasi, donemSonu, simdi });
+    const yenilemeTutari = indirimliTutar(yeniListe, await this.sonrakiIndirim(ham));
+    const { birim } = kisiArtirmaBirimi({
+      eskiBirim: planBirimi(plan, ham.koltuk),
+      yeniBirim: planBirimi(plan, koltuk),
+      donemBasi,
+      simdi,
+    });
+    return { abonelik, tutar, yeniListe, yenilemeTutari, koltuk, birim };
+  }
+
   private async formHazirla(p: {
     tur: Exclude<OdemeTuru, "yenileme">;
     userId: string;
@@ -214,7 +287,7 @@ export class PayTRAbonelikService {
     organizationId: string | null;
     planKey: PlanKey;
     period: BillingPeriod;
-    /** Yalnızca ilk ödemede: aboneliğin açılacağı kişi sayısı. */
+    /** İlk ödemede aboneliğin açılacağı, kişi artırmada ulaşılacak kişi sayısı. */
     koltuk?: number | null;
     subscriptionId: string | null;
     donemBasi: string | null;
@@ -272,7 +345,9 @@ export class PayTRAbonelikService {
     const sepetAdi =
       p.tur === "kart_degisim"
         ? "Projelio kart doğrulama (iade edilir)"
-        : `Projelio ${plan?.name ?? p.planKey}${kisiEki(p.koltuk)} — ${p.period === "yearly" ? "yıllık" : "aylık"}`;
+        : p.tur === "kisi_artirma"
+          ? `Projelio ${plan?.name ?? p.planKey} kişi artırma${kisiEki(p.koltuk)} — dönemin kalanı`
+          : `Projelio ${plan?.name ?? p.planKey}${kisiEki(p.koltuk)} — ${p.period === "yearly" ? "yıllık" : "aylık"}`;
 
     return this.paytr.direktForm({
       merchantOid,
@@ -360,6 +435,9 @@ export class PayTRAbonelikService {
         return;
       case "kart_degisim":
         await this.kartDegisti(satir);
+        return;
+      case "kisi_artirma":
+        await this.kisiArtirildi(satir);
         return;
     }
   }
@@ -499,6 +577,86 @@ export class PayTRAbonelikService {
       dil: kullanici.dil,
       kartSon4: kart?.son4 ?? null,
       iadeEdildi,
+      paketlerUrl: this.paketlerUrl(),
+    }));
+  }
+
+  /**
+   * Kişi artırmanın parası alındı: koltuk, yenileme tutarı ve bu ayın ek
+   * birimi yazılır. Formda gösterilen yenileme tutarı müşterinin onayıyla
+   * geçerli olduğu için 7 günlük duyuru beklenmez (bkz. kisi-artirma.ts).
+   */
+  private async kisiArtirildi(satir: OdemeSatiri): Promise<void> {
+    if (!satir.subscription_id || !satir.koltuk || satir.liste_tutari === null) {
+      this.logger.error(`Kişi artırma ödemesinde abonelik, kişi sayısı ya da liste tutarı eksik (ödeme ${satir.id}).`);
+      return;
+    }
+    const { data: ham, error: okumaHatasi } = await this.supabase.client
+      .from("subscriptions")
+      .select("*")
+      .eq("id", satir.subscription_id)
+      .maybeSingle();
+    if (okumaHatasi) throw okumaHatasi;
+    const plan = findPlan(satir.plan_key);
+    if (!ham || !plan) {
+      this.logger.error(`Kişi artırmanın aboneliği bulunamadı, İADE GEREKİYOR (ödeme ${satir.id}).`);
+      return;
+    }
+
+    const yeniListe = Number(satir.liste_tutari);
+    const yenilemeTutari = indirimliTutar(yeniListe, await this.sonrakiIndirim(ham));
+    const kart = await this.yeniKart(satir);
+    // Bu vadenin hatırlatması eski tutarla gittiyse yenileme o tutarı çekerdi
+    // (bkz. yenilemeTutari); müşteri yeni tutarı formda onayladı.
+    const hatirlatmaBuVade = ham.hatirlatma_vadesi && ham.current_period_end && new Date(ham.hatirlatma_vadesi).getTime() === new Date(ham.current_period_end).getTime();
+    const { data, error } = await this.supabase.client
+      .from("subscriptions")
+      .update({
+        koltuk: satir.koltuk,
+        liste_tutari: yeniListe,
+        price_amount: yenilemeTutari,
+        ...(hatirlatmaBuVade ? { hatirlatma_tutari: yenilemeTutari, hatirlatma_liste_tutari: yeniListe } : {}),
+        ...(kart ? { paytr_ctoken: kart.ctoken, kart_son4: kart.son4 } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", satir.subscription_id)
+      // Koşullu: iki artırma formu birlikte ödendiyse küçüğü büyüğü ezmesin.
+      .or(`koltuk.is.null,koltuk.lt.${satir.koltuk}`)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      this.logger.error(
+        `Kişi artırma ödendi ama abonelik zaten ${ham.koltuk} kişide, İADE GEREKİYOR (abonelik ${satir.subscription_id}, ${satir.merchant_oid}).`
+      );
+      return;
+    }
+
+    const abonelik = await this.billing.abonelikBul(satir.subscription_id);
+    const { birim, aySonu } = kisiArtirmaBirimi({
+      eskiBirim: planBirimi(plan, ham.koltuk),
+      yeniBirim: planBirimi(plan, satir.koltuk),
+      donemBasi: new Date(ham.current_period_start),
+      simdi: new Date(),
+    });
+    if (aySonu) {
+      try {
+        await this.billing.ekBirimYukle(abonelik, birim, aySonu);
+      } catch (hata) {
+        // Kişi sayısı yazıldı; yalnızca bu ayın ek birimi eksik. Yönetici elle yükler.
+        this.logger.error(`Kişi artırmanın ek birimi yüklenemedi (ödeme ${satir.id}, ${birim} birim): ${describeError(hata)}`);
+      }
+    }
+    this.logger.log(`Kişi sayısı artırıldı: ${abonelik.id}, ${ham.koltuk ?? "eski"} -> ${satir.koltuk}.`);
+    const kullanici = await paytrKullaniciBilgisi(this.supabase, satir.user_id);
+    await this.gonder(kullanici.email, kisiArtirmaEpostasi({
+      dil: kullanici.dil,
+      planAdi: plan.name,
+      koltuk: satir.koltuk,
+      tutar: Number(satir.tutar),
+      kartSon4: abonelik.kartSon4 ?? null,
+      yenilemeTutari,
+      sonrakiVade: new Date(abonelik.currentPeriodEnd ?? Date.now()),
       paketlerUrl: this.paketlerUrl(),
     }));
   }

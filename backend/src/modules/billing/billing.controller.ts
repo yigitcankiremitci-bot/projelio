@@ -76,6 +76,17 @@ export class BillingController {
     return this.paytrAbonelik.kartDegisimFormu(req.user.userId, id, req.ip ?? "", body?.onay);
   }
 
+  /** Business'ta kişi artırmanın tutarları (dönemin kalanı için fark + yeni yenileme tutarı). */
+  @Post("paytr/abonelik/:id/kisi/onizle")
+  paytrKisiOnizle(@Param("id") id: string, @Body() body: { koltuk?: number }, @Req() req: any) {
+    return this.paytrAbonelik.kisiArtirmaOnizle(req.user.userId, id, body?.koltuk);
+  }
+
+  @Post("paytr/abonelik/:id/kisi")
+  paytrKisiArtir(@Param("id") id: string, @Body() body: { koltuk?: number; onay?: boolean }, @Req() req: any) {
+    return this.paytrAbonelik.kisiArtirmaFormu(req.user.userId, id, body?.koltuk, req.ip ?? "", body?.onay);
+  }
+
   /**
    * Lio Bakiyesi siparişi için PayTR ödeme formunu açar.
    *

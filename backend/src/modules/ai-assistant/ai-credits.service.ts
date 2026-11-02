@@ -161,6 +161,24 @@ export class AiCreditsService {
     return typeof data === "string" ? data : null;
   }
 
+  /**
+   * Paket payının ÜSTÜNE ekler (dönem ortasında kişi artırma). grantPlan'dan
+   * farkı: mevcut payı bitirmez, ayın kalanı silinmez. Defter satırının id'sini döner.
+   */
+  async addPlan(userId: string, credits: number, description: string, expiresAt: Date): Promise<string | null> {
+    if (!Number.isFinite(credits) || credits <= 0) {
+      throw new BadRequestException("Birim miktarı pozitif bir sayı olmalı.");
+    }
+    const { data, error } = await this.supabase.client.rpc("ai_add_plan_credits", {
+      p_user_id: userId,
+      p_credits: credits,
+      p_description: description,
+      p_expires_at: expiresAt.toISOString(),
+    });
+    if (error) throw error;
+    return typeof data === "string" ? data : null;
+  }
+
   /** Süresi dolmuş paket paylarını bitirir (gece işi). Sona eren kullanıcı sayısını döner. */
   async expirePlanCredits(): Promise<number> {
     const { data, error } = await this.supabase.client.rpc("ai_expire_plan_credits");

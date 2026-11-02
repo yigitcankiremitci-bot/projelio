@@ -81,6 +81,11 @@ export const billingApi = {
       api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/odeme`, { onay }),
     kartDegisim: (subscriptionId: string, onay: boolean) =>
       api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/kart`, { onay }),
+    /** Business'ta kişi artırmanın tutarları; ödeme formu açmaz. */
+    kisiOnizle: (subscriptionId: string, koltuk: number) =>
+      api.post<KisiArtirmaOnizleme>(`/billing/paytr/abonelik/${subscriptionId}/kisi/onizle`, { koltuk }),
+    kisiArtir: (subscriptionId: string, koltuk: number, onay: boolean) =>
+      api.post<PayTRForm>(`/billing/paytr/abonelik/${subscriptionId}/kisi`, { koltuk, onay }),
     bakiyeOdemesiBaslat: (orderId: string) =>
       api.post<{ token: string; iframeUrl: string; testMode: boolean }>(
         `/billing/paytr/lio-bakiyesi/${orderId}`,
@@ -88,6 +93,16 @@ export const billingApi = {
       ),
   },
 };
+
+/** Kişi artırma: bugün çekilecek fark ve sonraki yenilemeden itibaren çekilecek tutar (TL). */
+export interface KisiArtirmaOnizleme {
+  koltuk: number;
+  tutar: number;
+  yenilemeTutari: number;
+  yeniListe: number;
+  /** Bu ay hemen yüklenecek ek birim. */
+  birim: number;
+}
 
 export type IndirimSuresi = "ilk" | "donem" | "surekli";
 

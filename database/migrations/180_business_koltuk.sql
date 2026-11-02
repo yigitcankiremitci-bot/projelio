@@ -8,7 +8,7 @@
 --   subscriptions.koltuk               Aboneliğin satın aldığı kişi sayısı. BOŞ =
 --                                      bu migration'dan önce alınmış Business ya
 --                                      da koltuksuz paket: eski tutar, eski bakiye,
---                                      sınır yok.
+--                                      Business'ta 10 kişi.
 --   paytr_abonelik_odemeleri.koltuk    Ödeme formu açılırken seçilen sayı; ilk
 --                                      ödeme bildirimi aboneliği bununla açar
 --                                      (tarayıcıdan gelen değere güvenilmez).

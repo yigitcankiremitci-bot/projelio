@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { hatirlatmaEpostasi, makbuzEpostasi, odemeAlinamadiEpostasi } from "./paytr-abonelik-eposta";
+import { hatirlatmaEpostasi, kisiArtirmaEpostasi, makbuzEpostasi, odemeAlinamadiEpostasi } from "./paytr-abonelik-eposta";
 
 const URL = "https://app.projelio.app/settings/billing";
 
@@ -63,4 +63,22 @@ test("ödeme alınamadı e-postası son tarihi söyler ve kullanıcı metnini ka
   });
   assert.match(e.text, /22 Ekim 2026/);
   assert.ok(!e.html.includes("<b>Pro</b>"));
+});
+
+test("kişi artırma makbuzu bugünkü farkı, yeni kişi sayısını ve sonraki yenileme tutarını söyler", () => {
+  const e = kisiArtirmaEpostasi({
+    dil: "tr",
+    planAdi: "Business",
+    koltuk: 5,
+    tutar: 174,
+    kartSon4: "7314",
+    yenilemeTutari: 1390,
+    sonrakiVade: new Date("2026-12-01T12:00:00Z"),
+    paketlerUrl: URL,
+  });
+  assert.match(e.subject, /kişi sayısı artırıldı/);
+  assert.match(e.text, /5 kişilik/);
+  assert.match(e.text, /174,00 ₺/);
+  assert.match(e.text, /1\.390,00 ₺/);
+  assert.match(e.text, /1 Aralık 2026/);
 });

@@ -85,6 +85,39 @@ export function makbuzEpostasi(b: MakbuzBilgisi): HazirEposta {
   );
 }
 
+/** Dönem ortasında kişi artırmanın makbuzu: bugünkü fark ve sonraki yenilemenin yeni tutarı. */
+export function kisiArtirmaEpostasi(b: {
+  dil: Locale;
+  planAdi: string;
+  koltuk: number;
+  tutar: number;
+  kartSon4: string | null;
+  yenilemeTutari: number;
+  sonrakiVade: Date;
+  paketlerUrl: string;
+}): HazirEposta {
+  const t = cevirmen(b.dil);
+  const kart = b.kartSon4 ? t("•••• {son4} ile biten kartından", { son4: b.kartSon4 }) : t("kayıtlı kartından");
+  return kur(
+    b.dil,
+    t("Projelio paketinin kişi sayısı artırıldı"),
+    t("Kişi sayın artırıldı"),
+    [
+      t("{plan} paketin artık {kisi} kişilik. Dönemin kalan günleri için {tutar}, {kart} tahsil edildi.", {
+        plan: b.planAdi,
+        kisi: b.koltuk,
+        tutar: tutarMetni(b.tutar, b.dil),
+        kart,
+      }),
+      t("{tarih} tarihindeki yenilemeden itibaren {tutar} çekilecek. Aboneliğini Paketler ekranından istediğin zaman iptal edebilirsin.", {
+        tarih: tarihMetni(b.sonrakiVade, b.dil),
+        tutar: tutarMetni(b.yenilemeTutari, b.dil),
+      }),
+    ],
+    { etiket: t("Paketlerim"), url: b.paketlerUrl }
+  );
+}
+
 export function kartDegistiEpostasi(b: { dil: Locale; kartSon4: string | null; iadeEdildi: boolean; paketlerUrl: string }): HazirEposta {
   const t = cevirmen(b.dil);
   return kur(

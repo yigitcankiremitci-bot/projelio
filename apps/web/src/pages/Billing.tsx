@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { BillingOverview, BillingPlanView, Subscription } from "@projelio/shared";
-import { billingApi } from "../api/billing";
+import { abonelikKoltukSiniri, type BillingOverview, type BillingPlanView, type Subscription } from "@projelio/shared";
+import { billingApi, type KisiArtirmaOnizleme } from "../api/billing";
 import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
 import { IconSparkle, IconStar } from "../components/icons";
@@ -36,7 +36,8 @@ const ONCEKI_DURUM_ANAHTARI = "projelio.billing.paytrOncesi";
 type KartFormuIstegi =
   | { tur: "ilk"; plan: BillingPlanView; tutar: number; koltuk?: number }
   | { tur: "elle"; abonelik: Subscription }
-  | { tur: "kart"; abonelik: Subscription };
+  | { tur: "kart"; abonelik: Subscription }
+  | { tur: "kisi"; abonelik: Subscription; onizleme: KisiArtirmaOnizleme };
 
 /**
  * Seçilen kişi sayısıyla kartın tutarları. Ek kişiler tabana EKLENİR —
@@ -69,7 +70,7 @@ function kisiliTutarlar(plan: BillingPlanView, donem: "monthly" | "yearly", kisi
 }
 
 function abonelikIzi(a: Subscription | null): string {
-  return a ? [a.id, a.status, a.currentPeriodEnd ?? "", a.kartSon4 ?? ""].join("|") : "-";
+  return a ? [a.id, a.status, a.currentPeriodEnd ?? "", a.kartSon4 ?? "", a.koltuk ?? ""].join("|") : "-";
 }
 
 const DURUM_METINLERI: Record<Subscription["status"], string> = {
@@ -114,6 +115,12 @@ export default function BillingPage() {
   const [kartFormu, setKartFormu] = useState<KartFormuIstegi | null>(null);
   /** Kişi sayısıyla fiyatlanan paketlerde seçilen kişi sayısı (paket anahtarına göre). */
   const [kisiler, setKisiler] = useState<Record<string, number>>({});
+  /** Mevcut abonelikte kişi artırma paneli: seçilen sayı ve sunucunun hesapladığı tutarlar. */
+  const [kisiArtirma, setKisiArtirma] = useState<{
+    koltuk: number;
+    onizleme: KisiArtirmaOnizleme | null;
+    hata: string | null;
+  } | null>(null);
 
   const yenile = useCallback((signal?: AbortSignal) => {
     return billingApi
@@ -208,7 +215,9 @@ export default function BillingPage() {
           metin:
             onceki?.tur === "kart"
               ? t("Kartın güncellendi. Doğrulama için çekilen 1 ₺ iade ediliyor.")
-              : t("Ödemen alındı, paketin etkin. Makbuz e-posta adresine gönderildi."),
+              : onceki?.tur === "kisi"
+                ? t("Kişi sayın artırıldı. Makbuz e-posta adresine gönderildi.")
+                : t("Ödemen alındı, paketin etkin. Makbuz e-posta adresine gönderildi."),
         });
         return;
       }
@@ -291,6 +300,38 @@ export default function BillingPage() {
 
   const abonelik = veri?.subscription ?? null;
   const aktifPlan = veri?.plans.find((p) => p.key === abonelik?.planKey);
+  /** Kişi sayısıyla fiyatlanan pakette aboneliğin bugünkü kişi sayısı (eski Business: söz verilen 10). */
+  const mevcutKisi = abonelik && aktifPlan?.extraSeat ? abonelikKoltukSiniri(abonelik.planKey, abonelik.koltuk) : null;
+  const kisiArtirilabilir =
+    !kabukta &&
+    abonelik?.source === "paytr" &&
+    abonelik.status === "active" &&
+    !abonelik.cancelAtPeriodEnd &&
+    mevcutKisi !== null &&
+    mevcutKisi < (aktifPlan?.extraSeat?.max ?? 0);
+
+  /*
+    Seçilen sayının tutarı SUNUCUDAN: fark dönemin kalan günlerine göre
+    hesaplanıyor (backend billing/kisi-artirma.ts) ve ödemede aynı hesap
+    yeniden yapılıyor. Burada hesaplamak iki yerde ayrışan bir tutar demekti.
+  */
+  const abonelikId = abonelik?.id;
+  const secilenKisi = kisiArtirma?.koltuk;
+  useEffect(() => {
+    if (!abonelikId || secilenKisi === undefined) return;
+    let iptal = false;
+    setKisiArtirma((o) => (o ? { ...o, onizleme: null, hata: null } : o));
+    billingApi.paytr
+      .kisiOnizle(abonelikId, secilenKisi)
+      .then((onizleme) => !iptal && setKisiArtirma((o) => (o && o.koltuk === onizleme.koltuk ? { ...o, onizleme } : o)))
+      .catch((hata) =>
+        !iptal &&
+        setKisiArtirma((o) => (o ? { ...o, hata: hata instanceof ApiError ? hata.message : t("Tutar hesaplanamadı.") } : o))
+      );
+    return () => {
+      iptal = true;
+    };
+  }, [abonelikId, secilenKisi, t]);
   /*
     İptal edilmiş abonelik yeni paket almayı ENGELLEMEZ: dönem sonuna kadar
     kullanmaya devam ederken fikrini değiştirip geri dönebilmeli (sunucu tarafı
@@ -356,6 +397,7 @@ export default function BillingPage() {
           </div>
           <div style={{ fontSize: 13, opacity: 0.8 }}>
             {t(DURUM_METINLERI[abonelik.status])}
+            {mevcutKisi !== null && ` · ${t("{kisi} kişi", { kisi: mevcutKisi })}`}
             {abonelik.kartSon4 && ` · •••• ${abonelik.kartSon4}`}
             {abonelik.currentPeriodEnd &&
               ` · ${new Date(abonelik.currentPeriodEnd).toLocaleDateString(bicimDili())} ${
@@ -402,6 +444,15 @@ export default function BillingPage() {
                     {t("Ödemeyi şimdi yap")}
                   </button>
                 )}
+                {kisiArtirilabilir && !kisiArtirma && (
+                  <button
+                    onClick={() => setKisiArtirma({ koltuk: mevcutKisi! + 1, onizleme: null, hata: null })}
+                    disabled={islemde !== null}
+                    style={koyuDugme(c)}
+                  >
+                    {t("Kişi ekle")}
+                  </button>
+                )}
                 {!kabukta && (
                   <button
                     onClick={() => kartFormunuAc({ tur: "kart", abonelik })}
@@ -416,6 +467,11 @@ export default function BillingPage() {
                 </button>
               </>
             )}
+            {mevcutKisi !== null && !kisiArtirilabilir && abonelik.source !== "paytr" && (
+              <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
+                {t("Kişi sayısını artırmak için destekle iletişime geç.")}
+              </div>
+            )}
             {abonelik.source !== "iyzico" && abonelik.source !== "paytr" && (
               <div style={{ fontSize: 13, opacity: 0.85, lineHeight: 1.5 }}>
                 {abonelik.source === "app_store"
@@ -426,6 +482,51 @@ export default function BillingPage() {
               </div>
             )}
           </div>
+
+          {kisiArtirilabilir && kisiArtirma && aktifPlan?.extraSeat && (
+            <div style={{ marginTop: 16, background: c.surface, color: c.textPrimary, borderRadius: 10, padding: 16 }}>
+              <KisiSecici
+                c={c}
+                deger={kisiArtirma.koltuk}
+                enAz={mevcutKisi! + 1}
+                enCok={aktifPlan.extraSeat.max}
+                kisiBasi={
+                  locale !== "en" && aktifPlan.extraSeat.charge.monthly !== null
+                    ? tlYaz((abonelik.period === "yearly" ? aktifPlan.extraSeat.charge.yearlyMonthly : aktifPlan.extraSeat.charge.monthly) ?? 0)
+                    : `$${(abonelik.period === "yearly" ? aktifPlan.extraSeat.priceUsd.yearlyMonthly : aktifPlan.extraSeat.priceUsd.monthly).toFixed(2)}`
+                }
+                dahil={aktifPlan.seats}
+                onChange={(n) => setKisiArtirma({ koltuk: n, onizleme: null, hata: null })}
+              />
+              <div style={{ fontSize: 13.5, lineHeight: 1.6, marginTop: 12, color: c.textSecondary, minHeight: 44 }}>
+                {kisiArtirma.hata
+                  ? kisiArtirma.hata
+                  : kisiArtirma.onizleme
+                    ? t("Bugün {tutar} çekilir (dönemin kalan günleri için). {tarih} yenilemesinden itibaren {yeni} ödersin. Bu ay {birim} birim hemen eklenir.", {
+                        tutar: tlYaz(kisiArtirma.onizleme.tutar),
+                        tarih: new Date(abonelik.currentPeriodEnd ?? Date.now()).toLocaleDateString(bicimDili()),
+                        yeni: tlYaz(kisiArtirma.onizleme.yenilemeTutari),
+                        birim: kisiArtirma.onizleme.birim.toLocaleString(bicimDili()),
+                      })
+                    : t("Tutar hesaplanıyor…")}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+                <button
+                  onClick={() => kisiArtirma.onizleme && kartFormunuAc({ tur: "kisi", abonelik, onizleme: kisiArtirma.onizleme })}
+                  disabled={!kisiArtirma.onizleme}
+                  style={{ ...koyuDugme(c), background: kisiArtirma.onizleme ? c.primaryDark : c.border }}
+                >
+                  {t("Devam et")}
+                </button>
+                <button
+                  onClick={() => setKisiArtirma(null)}
+                  style={{ border: `1px solid ${c.border}`, borderRadius: 9, padding: "9px 14px", fontSize: 14, cursor: "pointer", background: "transparent", color: c.textPrimary }}
+                >
+                  {t("Vazgeç")}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -627,7 +728,9 @@ export default function BillingPage() {
                 : t("{plan} paketine geç", { plan: t(kartFormu.plan.name) })
               : kartFormu.tur === "elle"
                 ? t("Ödemeyi şimdi yap")
-                : t("Ödeme kartını değiştir")
+                : kartFormu.tur === "kisi"
+                  ? t("Kişi sayısını {kisi} yap", { kisi: kartFormu.onizleme.koltuk })
+                  : t("Ödeme kartını değiştir")
           }
           ozet={
             kartFormu.tur === "ilk"
@@ -639,7 +742,12 @@ export default function BillingPage() {
                 ? t("Bekleyen dönem ödemesi: {tutar}. Bu kart sonraki yenilemelerde de kullanılır.", {
                     tutar: kartFormu.abonelik.priceAmount ? tlYaz(kartFormu.abonelik.priceAmount) : "—",
                   })
-                : t("Kartını doğrulamak için 1 ₺ çekilir ve hemen iade edilir. Sonraki yenilemeler bu karttan yapılır.")
+                : kartFormu.tur === "kisi"
+                  ? t("Bugün {tutar} çekilir (dönemin kalan günleri için). Sonraki yenilemeden itibaren {yeni} bu karttan otomatik çekilir; istediğin zaman iptal edebilirsin.", {
+                      tutar: tlYaz(kartFormu.onizleme.tutar),
+                      yeni: tlYaz(kartFormu.onizleme.yenilemeTutari),
+                    })
+                  : t("Kartını doğrulamak için 1 ₺ çekilir ve hemen iade edilir. Sonraki yenilemeler bu karttan yapılır.")
           }
           dugmeMetni={kartFormu.tur === "kart" ? t("Kartı doğrula") : t("Öde")}
           indirimOnizle={
@@ -653,7 +761,9 @@ export default function BillingPage() {
               ? billingApi.paytr.abonelik({ planKey: kartFormu.plan.key, period: donem, onay, indirimKodu, koltuk: kartFormu.koltuk })
               : kartFormu.tur === "elle"
                 ? billingApi.paytr.gecikmisOdeme(kartFormu.abonelik.id, onay)
-                : billingApi.paytr.kartDegisim(kartFormu.abonelik.id, onay)
+                : kartFormu.tur === "kisi"
+                  ? billingApi.paytr.kisiArtir(kartFormu.abonelik.id, kartFormu.onizleme.koltuk, onay)
+                  : billingApi.paytr.kartDegisim(kartFormu.abonelik.id, onay)
           }
           onKapat={() => setKartFormu(null)}
         />

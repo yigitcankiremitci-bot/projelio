@@ -145,8 +145,19 @@ export const abonelik: TranslationDict = {
   "{plan} paketine geç": "Switch to {plan}",
   "{plan} paketine geç ({kisi} kişi)": "Switch to {plan} ({kisi} people)",
   "Kişi sayısı": "People",
-  "Şirketin paketindeki {sinir} kişilik yer dolu. Kişi sayısını artırmak için destekten yardım iste.":
-    "Your company's plan is full at {sinir} people. Ask support to add more people.",
+  "{kisi} kişi": "{kisi} people",
+  "Kişi ekle": "Add people",
+  "Kişi sayısını artırmak için destekle iletişime geç.": "Contact support to add more people.",
+  "Bugün {tutar} çekilir (dönemin kalan günleri için). {tarih} yenilemesinden itibaren {yeni} ödersin. Bu ay {birim} birim hemen eklenir.":
+    "{tutar} is charged today (for the rest of the current period). From the renewal on {tarih} you pay {yeni}. {birim} units are added right away for this month.",
+  "Tutar hesaplanıyor…": "Calculating the price…",
+  "Tutar hesaplanamadı.": "The price couldn't be calculated.",
+  "Kişi sayısını {kisi} yap": "Increase to {kisi} people",
+  "Bugün {tutar} çekilir (dönemin kalan günleri için). Sonraki yenilemeden itibaren {yeni} bu karttan otomatik çekilir; istediğin zaman iptal edebilirsin.":
+    "{tutar} is charged today (for the rest of the current period). From the next renewal, {yeni} is charged automatically to this card; you can cancel any time.",
+  "Kişi sayın artırıldı. Makbuz e-posta adresine gönderildi.": "People added to your plan. The receipt was sent to your email.",
+  "Şirketin paketindeki {sinir} kişilik yer dolu. Paketim ekranından kişi sayısını artırabilirsin.":
+    "Your company's plan is full at {sinir} people. You can add more people from the My plan screen.",
   "Bu pakette şirkete en çok {sinir} kişi eklenebilir. Daha kalabalık bir ekip için Business'a geç.":
     "This plan allows up to {sinir} people in a company. Switch to Business for a larger team.",
   "Bir kişi azalt": "Remove one person",

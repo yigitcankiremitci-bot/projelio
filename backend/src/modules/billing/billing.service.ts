@@ -656,6 +656,18 @@ export class BillingService {
     return true;
   }
 
+  /**
+   * Dönem ortasında kişi artırmanın ek birimi: paket payına eklenir, ayın
+   * sonunda onunla birlikte biter. Ödeme satırı yalnızca bir kez 'basarili'ya
+   * geçtiği için (bkz. PayTRAbonelikService.sonuclandir) iki kez çağrılmaz.
+   */
+  async ekBirimYukle(abonelik: Abonelik, birim: number, aySonu: Date): Promise<void> {
+    if (birim <= 0) return;
+    const plan = findPlan(abonelik.planKey);
+    await this.credits.addPlan(abonelik.userId, birim, `Paket bakiyesi: ${plan?.name ?? abonelik.planKey} ek kişi`, aySonu);
+    this.logger.log(`Ek kişi birimi yüklendi: ${birim} ->${abonelik.userId} (${abonelik.id}).`);
+  }
+
   // =================================================================== İptal
 
   /**

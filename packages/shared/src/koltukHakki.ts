@@ -66,7 +66,7 @@ export function koltukEklenebilirMi(durum: KoltukDurumu, kisi: { zatenSayiliyor:
     eklenebilir: false,
     metin:
       durum.sinir > KOLTUKSUZ_SIRKET_SINIRI
-        ? "Şirketin paketindeki {sinir} kişilik yer dolu. Kişi sayısını artırmak için destekten yardım iste." // dil:anahtar
+        ? "Şirketin paketindeki {sinir} kişilik yer dolu. Paketim ekranından kişi sayısını artırabilirsin." // dil:anahtar
         : "Bu pakette şirkete en çok {sinir} kişi eklenebilir. Daha kalabalık bir ekip için Business'a geç.", // dil:anahtar
     params: { sinir: durum.sinir },
   };

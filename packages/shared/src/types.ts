@@ -4053,6 +4053,8 @@ export interface Subscription {
   priceUsd?: number;
   /** PayTR aboneliğinde çekimin yapılacağı saklı kartın son 4 hanesi. */
   kartSon4?: string;
+  /** Kişi sayısıyla fiyatlanan pakette satın alınan kişi sayısı; yoksa eski ya da koltuksuz abonelik. */
+  koltuk?: number;
   createdAt: string;
 }
 

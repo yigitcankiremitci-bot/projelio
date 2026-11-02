@@ -42,5 +42,5 @@ test("kural öncesi kalabalık şirket: kalan 0, mesaj Business'ta kişi artırm
   const d = koltukDurumu(5, 8);
   assert.equal(d.kalan, 0);
   const karar = koltukEklenebilirMi(d, { zatenSayiliyor: false, taseron: false });
-  assert.match("metin" in karar ? karar.metin : "", /Kişi sayısını artırmak/);
+  assert.match("metin" in karar ? karar.metin : "", /kişi sayısını artırabilirsin/);
 });

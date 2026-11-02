@@ -68,7 +68,7 @@ export default function AjanPaneli({ onClose, onDurum }: { onClose: () => void; 
 
   const ad = durum?.ad ?? "Ajan";
   return (
-    <Modal title={ad} subtitle={durumMetni(durum)} onClose={onClose} maxWidth={760}>
+    <Modal title={ad} subtitle={durumMetni(durum)} onClose={onClose} maxWidth={1040} mobileFullScreen>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
         {SEKMELER.map((s) => {
           const rozet = s.id === "raporlar" ? durum?.okunmamisRapor : s.id === "sohbet" ? durum?.bekleyenOneri : 0;
@@ -176,7 +176,8 @@ function Sohbet({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | null
           </button>
         </div>
       ))}
-      <div style={{ maxHeight: 380, overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "4px 2px" }}>
+      {/* Pencerenin boyunu kullan: 380px sabitken uzun yanıtlar dar bir kutuda kayıyordu. */}
+      <div style={{ maxHeight: "max(380px, calc(85vh - 260px))", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8, padding: "4px 2px" }}>
         {!mesajlar.length && (
           <p style={{ color: c.textSecondary, margin: "8px 0" }}>
             Merhaba de, bir şey öğret ("raporlarımı madde madde yaz, unutma") ya da bir iş iste. Uzun araştırmalar için Raporlar sekmesindeki "Araştır"ı kullan.

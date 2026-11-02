@@ -146,6 +146,8 @@ export const hatalar: TranslationDict = {
   "Geçersiz birim": "Invalid unit",
   "Geçersiz blok durumu.": "Invalid block status.",
   "Geçersiz blok kaynağı.": "Invalid block source.",
+  "Geçersiz karakter": "Invalid character",
+  "Geçersiz kişi listesi": "Invalid list of people",
   "Geçersiz departman kataloğu anahtarı": "Invalid department catalog key",
   "Geçersiz durum": "Invalid status",
   "Geçersiz dönem durumu.": "Invalid period status.",

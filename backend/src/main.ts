@@ -43,10 +43,10 @@ try {
 
 import { NestFactory } from "@nestjs/core";
 import { NestExpressApplication } from "@nestjs/platform-express";
-import { json } from "express";
 import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { buyukJsonGovde } from "./common/http/buyuk-govde";
 
 // Son savunma hattı: yakalanmamış promise reddi ve istisna süreci ÖLDÜRMESİN.
 //
@@ -108,10 +108,10 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
 
   // Ajana öğretilen metin 100 sayfa olabilir (AJAN_SINIRLARI.ogretilen, 600K
-  // karakter ≈ Türkçede 1+ MB JSON). Express'in varsayılan 100 KB sınırı onu
-  // 413'le düşürüyordu. Sınır YALNIZCA bu uçta büyük: Nest'in kendi
-  // ayrıştırıcısı sonra gelir ve gövde ayrıştırılmış olduğu için ona dokunmaz.
-  app.use("/ajan/bilgiler", json({ limit: "4mb" }));
+  // karakter ≈ Türkçede 1+ MB JSON); Express'in varsayılan 100 KB sınırı onu
+  // 413'le düşürüyordu. Sınır YALNIZCA bu uçta büyük. Neden sarmalayıcı:
+  // buyuk-govde.ts başlığı — doğrudan json() Nest'in ayrıştırıcısını kapatıyor.
+  app.use("/ajan/bilgiler", buyukJsonGovde("4mb"));
 
   // Render (ve benzeri PaaS) uygulamayı bir ters vekil sunucunun arkasında çalıştırır.
   // Bu ayar yapılmazsa Express, req.ip olarak istemcinin değil vekil sunucunun iç

@@ -9,7 +9,7 @@
 import * as THREE from "three";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as SkeletonUtils from "three/examples/jsm/utils/SkeletonUtils.js";
-import { KARAKTER_MODELLERI, type KarakterGorunumu } from "@projelio/shared";
+import { KARAKTER_MODELLERI, KIYAFET_PARCALARI, type KarakterGorunumu, type KiyafetParcasi } from "@projelio/shared";
 
 const KOK = "/ofis/modeller/";
 
@@ -279,52 +279,166 @@ export function hayaletYap(o: THREE.Object3D): void {
 
 const KARAKTERLER = KARAKTER_MODELLERI.map((m) => m.dosya);
 
-/**
- * Seçilen kıyafet renginin boyadığı ana giysi malzemesi (model başına;
- * malzeme adları glb dosyalarından). Ten ve saç bütün modellerde aynı adlı.
- */
-const KIYAFET_MALZEMESI: Record<string, string> = {
-  erkek_suit: "Suit",
-  kadin_casual: "Orange",
-  erkek_casual2: "Red_Dark",
-  kadin_formal: "Red",
-  erkek_hoodie: "Purple",
-  kadin_suit: "Black",
-  erkek_worker: "Worker_Vest",
-  kadin_worker: "Worker_Vest",
-};
 const SAC = /^(Hair|Hair_Brown|Hair_Blond|Eyebrows|Moustache)$/;
+const TEN = /^(Skin|Skin_Darker)$/;
+
+type Parca = KiyafetParcasi | "bas";
+
+/** Parçanın kemik bölgeleri; geri kalan her şey (gövde, kollar) üst. Kalça sayılmaz: hem etekte hem gömlek ucunda. */
+const BOLGELER: [RegExp, Parca][] = [
+  [/^Head/, "bas"],
+  [/^(Foot|PT)/, "ayakkabi"],
+  [/^(UpperLeg|LowerLeg)/, "alt"],
+];
+const parcaOnbellek = new WeakMap<THREE.BufferGeometry, Parca>();
+
+/**
+ * Ağın ait olduğu parça bütünü. Birden çok malzemeli ağ (ör. sandaletin teni
+ * ve kayışı) GLTFLoader'da bir grubun altında malzeme başına ayrı ağ olur;
+ * parça grup olarak sınıflanır ve taşınır, yoksa sandaletin teni pantolonla gidiyordu.
+ */
+const parcaGrubu = (m: THREE.SkinnedMesh): THREE.Object3D => {
+  const e = m.parent;
+  return e && e.children.length > 1 && e.children.every((c) => (c as THREE.SkinnedMesh).isSkinnedMesh) ? e : m;
+};
+const grubunAglari = (g: THREE.Object3D): THREE.SkinnedMesh[] =>
+  (g as THREE.SkinnedMesh).isSkinnedMesh ? [g as THREE.SkinnedMesh] : (g.children as THREE.SkinnedMesh[]);
+
+/**
+ * Ağ hangi parça: parçasının köşeleri en çok hangi bölgenin kemiklerine bağlı.
+ * Modellerde ağ adları (Cube.012…) ve sırası tutarsız, ağırlıklar tutarlı.
+ */
+function parcasi(m: THREE.SkinnedMesh): Parca {
+  const aglar = grubunAglari(parcaGrubu(m));
+  // Kopyalar geometriyi paylaşır: grubun ilk geometrisi anahtar.
+  const onceki = parcaOnbellek.get(aglar[0].geometry);
+  if (onceki) return onceki;
+  const puan: Record<Parca, number> = { bas: 0, ust: 0, alt: 0, ayakkabi: 0 };
+  for (const a of aglar) {
+    const idx = a.geometry.getAttribute("skinIndex");
+    const agirlik = a.geometry.getAttribute("skinWeight");
+    if (!idx || !agirlik) continue;
+    const bolge = a.skeleton.bones.map((b) => (/^Hips/.test(b.name) ? null : (BOLGELER.find(([r]) => r.test(b.name))?.[1] ?? "ust")));
+    for (let i = 0; i < idx.count; i++)
+      for (let c = 0; c < 4; c++) {
+        const b = bolge[idx.getComponent(i, c)];
+        if (b) puan[b] += agirlik.getComponent(i, c);
+      }
+  }
+  // Ayakkabının bilek kısmı baldıra bağlı: ağırlığı ayakla baldır arasında
+  // yarı yarıya. Pantolonda ayağa hiç ağırlık yok; ayağa belirgin bağlı olan ayakkabıdır.
+  const toplam = puan.bas + puan.ust + puan.alt + puan.ayakkabi;
+  const sonuc =
+    puan.ayakkabi > toplam * 0.25 ? "ayakkabi" : (Object.keys(puan) as Parca[]).reduce((a, b) => (puan[b] > puan[a] ? b : a), "ust");
+  parcaOnbellek.set(aglar[0].geometry, sonuc);
+  return sonuc;
+}
+
+const deriliAglar = (o: THREE.Object3D): THREE.SkinnedMesh[] => {
+  const r: THREE.SkinnedMesh[] = [];
+  o.traverse((c) => {
+    if ((c as THREE.SkinnedMesh).isSkinnedMesh) r.push(c as THREE.SkinnedMesh);
+  });
+  return r;
+};
+const tekMalzeme = (m: THREE.Mesh): THREE.Material => (Array.isArray(m.material) ? m.material[0] : m.material);
+
+function karakterYukle(ad: string): Promise<GLTF> {
+  let p = karakterOnbellek.get(ad);
+  if (!p) {
+    p = yukleyici.loadAsync(`${KOK}karakterler/${ad}.glb`);
+    karakterOnbellek.set(ad, p);
+    p.catch(() => karakterOnbellek.delete(ad));
+  }
+  return p;
+}
+
+/**
+ * Seçilen parçaları başka modellerden giydirir. Bütün modeller aynı iskelette
+ * (aynı adlı 62 kemik): kaynak ağın geometrisi karakterin kemiklerine adla
+ * bağlanır, kendi bağlama matrisleriyle. Kadın ve erkek iskeletin oranları
+ * biraz farklı; parça bu sayede giyenin bedenine göre oturur.
+ */
+async function parcalariGiydir(kopya: THREE.Object3D, ad: string, g: KarakterGorunumu): Promise<void> {
+  const kemikler = new Map<string, THREE.Bone>();
+  kopya.traverse((c) => {
+    if ((c as THREE.Bone).isBone) kemikler.set(c.name, c as THREE.Bone);
+  });
+  for (const { alan } of KIYAFET_PARCALARI) {
+    const kaynakAd = g[alan];
+    if (!kaynakAd || kaynakAd === ad || !KARAKTERLER.includes(kaynakAd)) continue;
+    const gruplar = (o: THREE.Object3D) => [...new Set(deriliAglar(o).filter((m) => parcasi(m) === alan).map(parcaGrubu))];
+    const kaynak = gruplar((await karakterYukle(kaynakAd)).scene);
+    const eski = gruplar(kopya);
+    const ebeveyn = eski[0]?.parent;
+    if (!kaynak.length || !ebeveyn) continue;
+    for (const e of eski) e.removeFromParent();
+    for (const kg of kaynak) {
+      // Grup ise grubun kendisi de (yerel konumuyla) kopyalanır, ağlar altına.
+      const hedef: THREE.Object3D = kg === grubunAglari(kg)[0] ? ebeveyn : new THREE.Group();
+      if (hedef !== ebeveyn) {
+        hedef.name = kg.name;
+        hedef.position.copy(kg.position);
+        hedef.quaternion.copy(kg.quaternion);
+        hedef.scale.copy(kg.scale);
+        ebeveyn.add(hedef);
+      }
+      for (const s of grubunAglari(kg)) {
+        const bag = s.skeleton.bones.map((b) => kemikler.get(b.name));
+        if (bag.some((b) => !b)) continue;
+        const yeni = new THREE.SkinnedMesh(s.geometry, s.material);
+        yeni.name = s.name;
+        yeni.position.copy(s.position);
+        yeni.quaternion.copy(s.quaternion);
+        yeni.scale.copy(s.scale);
+        yeni.frustumCulled = false;
+        hedef.add(yeni);
+        yeni.bind(new THREE.Skeleton(bag as THREE.Bone[], s.skeleton.boneInverses.map((x) => x.clone())), s.bindMatrix.clone());
+      }
+    }
+  }
+}
 
 /**
  * Seçilen renkleri karakterin kendi kopyasına boyar. Malzemeler bütün
  * kopyalarda ortak: önce klonlanır, yoksa aynı modeldeki herkes boyanırdı.
+ * Kıyafet rengi parçanın ANA malzemesine gider (ten, saç, göz dışında en
+ * büyük alanı kaplayan): kravat, düğme gibi ayrıntılar kendi renginde kalır.
+ * Aynı malzeme iki parçada olabilir (takım elbisenin ceketi ve pantolonu):
+ * klon parça başına, yoksa üstü boyamak pantolonu da boyardı.
  */
-function boya(kopya: THREE.Object3D, model: string, g: KarakterGorunumu): void {
-  const klonlar = new Map<THREE.Material, THREE.Material>();
-  const renkFor = (ad: string): { renk: string; kat?: number } | undefined => {
-    if (g.ten && ad === "Skin") return { renk: g.ten };
+function boya(kopya: THREE.Object3D, g: KarakterGorunumu): void {
+  const aglar = deriliAglar(kopya);
+  const ana = new Map<Parca, { malzeme: THREE.Material; alan: number }>();
+  for (const m of aglar) {
+    const x = tekMalzeme(m);
+    if (TEN.test(x.name) || SAC.test(x.name) || /^Eye/.test(x.name)) continue;
+    const alan = m.geometry.index?.count ?? m.geometry.getAttribute("position").count;
+    const p = parcasi(m);
+    if ((ana.get(p)?.alan ?? -1) < alan) ana.set(p, { malzeme: x, alan });
+  }
+  const parcaRengi: Partial<Record<Parca, string>> = {};
+  for (const p of KIYAFET_PARCALARI) if (g[p.renk]) parcaRengi[p.alan] = g[p.renk];
+  const klonlar = new Map<string, THREE.Material>();
+  for (const m of aglar) {
+    const x = tekMalzeme(m);
+    const p = parcasi(m);
+    let r: { renk: string; kat?: number } | undefined;
+    if (g.ten && x.name === "Skin") r = { renk: g.ten };
     // Elin/yüzün gölgeli yanı: tenin biraz koyusu.
-    if (g.ten && ad === "Skin_Darker") return { renk: g.ten, kat: 0.8 };
-    if (g.sac && SAC.test(ad)) return { renk: g.sac, kat: ad === "Eyebrows" ? 0.7 : 1 };
-    if (g.kiyafet && ad === KIYAFET_MALZEMESI[model]) return { renk: g.kiyafet };
-    return undefined;
-  };
-  kopya.traverse((c) => {
-    const m = c as THREE.Mesh;
-    if (!m.isMesh) return;
-    const degistir = (x: THREE.Material): THREE.Material => {
-      const r = renkFor(x.name);
-      if (!r || !(x as THREE.MeshStandardMaterial).color) return x;
-      let k = klonlar.get(x);
-      if (!k) {
-        k = x.clone();
-        (k as THREE.MeshStandardMaterial).color.set(r.renk).multiplyScalar(r.kat ?? 1);
-        klonlar.set(x, k);
-      }
-      return k;
-    };
-    m.material = Array.isArray(m.material) ? m.material.map(degistir) : degistir(m.material);
-  });
+    else if (g.ten && x.name === "Skin_Darker") r = { renk: g.ten, kat: 0.8 };
+    else if (g.sac && SAC.test(x.name)) r = { renk: g.sac, kat: x.name === "Eyebrows" ? 0.7 : 1 };
+    else if (parcaRengi[p] && ana.get(p)?.malzeme === x) r = { renk: parcaRengi[p]! };
+    if (!r || !(x as THREE.MeshStandardMaterial).color) continue;
+    const anahtar = `${p}|${x.uuid}`;
+    let k = klonlar.get(anahtar);
+    if (!k) {
+      k = x.clone();
+      (k as THREE.MeshStandardMaterial).color.set(r.renk).multiplyScalar(r.kat ?? 1);
+      klonlar.set(anahtar, k);
+    }
+    m.material = k;
+  }
 }
 
 const SILAH = /pistol|gun|rifle|sword|knife|weapon/i;
@@ -382,13 +496,7 @@ export interface Karakter3D {
  */
 export async function karakter(sayi: number, gorunum?: KarakterGorunumu | null): Promise<Karakter3D> {
   const ad = gorunum && KARAKTERLER.includes(gorunum.model) ? gorunum.model : KARAKTERLER[sayi % KARAKTERLER.length];
-  let p = karakterOnbellek.get(ad);
-  if (!p) {
-    p = yukleyici.loadAsync(`${KOK}karakterler/${ad}.glb`);
-    karakterOnbellek.set(ad, p);
-    p.catch(() => karakterOnbellek.delete(ad));
-  }
-  const g = await p;
+  const g = await karakterYukle(ad);
   const kopya = SkeletonUtils.clone(g.scene) as THREE.Group;
   kopya.scale.setScalar(KARAKTER_OLCEK);
   golgeAc(kopya);
@@ -399,7 +507,11 @@ export async function karakter(sayi: number, gorunum?: KarakterGorunumu | null):
     // Dosyadan çıkarıldı; yeni eklenen bir karakterde de görünmesin diye burada da gizlenir.
     if (SILAH.test(c.name)) c.visible = false;
   });
-  if (gorunum) boya(kopya, ad, gorunum);
+  if (gorunum) {
+    await parcalariGiydir(kopya, ad, gorunum);
+    boya(kopya, gorunum);
+    golgeAc(kopya);
+  }
   const nesne = new THREE.Group();
   nesne.add(kopya);
   const karisici = new THREE.AnimationMixer(kopya);

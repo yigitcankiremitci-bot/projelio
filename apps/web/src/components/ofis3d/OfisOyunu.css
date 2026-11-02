@@ -1474,6 +1474,57 @@
   background: color-mix(in srgb, var(--yn-accent) 14%, transparent);
   font-weight: 700;
 }
+.of-kd-sekmeler {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--yn-ink) 7%, transparent);
+}
+.of-kd-sekme {
+  min-height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--yn-ink-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.of-kd-sekme.secili {
+  background: var(--yn-card);
+  color: var(--yn-ink);
+  font-weight: 700;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--yn-ink) 18%, transparent);
+}
+.of-kd-parca {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--yn-ink) 10%, transparent);
+}
+.of-kd-sekiller {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.of-kd-sekil {
+  padding: 4px 8px;
+  border: 1px solid color-mix(in srgb, var(--yn-ink) 14%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--yn-ink);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.of-kd-sekil.secili {
+  border-color: var(--yn-accent);
+  background: color-mix(in srgb, var(--yn-accent) 14%, transparent);
+  font-weight: 700;
+}
 .of-kd-renkler {
   display: flex;
   flex-wrap: wrap;

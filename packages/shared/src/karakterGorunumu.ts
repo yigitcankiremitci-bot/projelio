@@ -26,12 +26,32 @@ export const TEN_RENKLERI = ["#F3D5BC", "#E3B58F", "#C99068", "#9C6842", "#6E452
 export const SAC_RENKLERI = ["#1F1A17", "#4A2E1E", "#7B4B2A", "#B98B4C", "#DCC38E", "#8E8E8E", "#A8452F"] as const;
 export const KIYAFET_RENKLERI = ["#3E4858", "#1C222C", "#C0813F", "#2F6B5A", "#3C6D88", "#6F5D93", "#B0473A", "#E6E1D8"] as const;
 
+/**
+ * Kıyafet parçaları. Her modelin üstü, altı ve ayakkabısı ayrı parça ve bütün
+ * modeller aynı iskeleti taşıyor: parçanın ŞEKLİ başka bir modelden alınabilir
+ * (ör. takım elbiseli karaktere kapüşonlunun üstü). Boşsa modelin kendi parçası.
+ */
+export const KIYAFET_PARCALARI = [
+  { alan: "ust", renk: "kiyafet", ad: "Üst" },
+  { alan: "alt", renk: "altRenk", ad: "Alt" },
+  { alan: "ayakkabi", renk: "ayakkabiRenk", ad: "Ayakkabı" },
+] as const;
+
+export type KiyafetParcasi = (typeof KIYAFET_PARCALARI)[number]["alan"];
+
 export interface KarakterGorunumu {
   model: KarakterModeli;
   /** Boşsa modelin kendi rengi. */
   ten?: string;
   sac?: string;
+  /** Üstün rengi (ad, parçalar ayrılmadan önceki tek kıyafet renginden kaldı). */
   kiyafet?: string;
+  altRenk?: string;
+  ayakkabiRenk?: string;
+  /** Parçanın şeklinin alındığı model; boşsa karakterin kendi modeli. */
+  ust?: KarakterModeli;
+  alt?: KarakterModeli;
+  ayakkabi?: KarakterModeli;
 }
 
 const renk = (liste: readonly string[], v: unknown): string | undefined =>
@@ -46,10 +66,15 @@ export function karakterGorunumuTemizle(ham: unknown): KarakterGorunumu | null {
   const g: KarakterGorunumu = { model };
   const ten = renk(TEN_RENKLERI, h.ten);
   const sac = renk(SAC_RENKLERI, h.sac);
-  const kiyafet = renk(KIYAFET_RENKLERI, h.kiyafet);
   if (ten) g.ten = ten;
   if (sac) g.sac = sac;
-  if (kiyafet) g.kiyafet = kiyafet;
+  for (const p of KIYAFET_PARCALARI) {
+    const r = renk(KIYAFET_RENKLERI, h[p.renk]);
+    if (r) g[p.renk] = r;
+    // Kendi modelinin parçası seçildiyse yazılmaz: kayıt "boş = kendi parçası" ile tek biçimde kalsın.
+    const sekil = KARAKTER_MODELLERI.find((m) => m.dosya === h[p.alan])?.dosya;
+    if (sekil && sekil !== model) g[p.alan] = sekil;
+  }
   return g;
 }
 

@@ -1,9 +1,11 @@
-// Kişinin kendi 3D ofis karakterini düzenlediği panel: model, ten, saç ve
-// kıyafet rengi. Seçimler anında sahnedeki karaktere uygulanır (önizleme
+// Kişinin kendi 3D ofis karakterini düzenlediği panel: model, ten ve saç;
+// ayrı sekmede kıyafet parçaları (üst, alt, ayakkabı) — şekil ve renk. Seçimler anında sahnedeki karaktere uygulanır (önizleme
 // sahnenin kendisi); "Kaydet" sunucuya yazar, "Vazgeç" eski görünüme döner.
 
+import { useState } from "react";
 import {
   KARAKTER_MODELLERI,
+  KIYAFET_PARCALARI,
   KIYAFET_RENKLERI,
   SAC_RENKLERI,
   TEN_RENKLERI,
@@ -29,7 +31,8 @@ export default function KarakterDuzenleyici({
   onVazgec: () => void;
 }) {
   const g: KarakterGorunumu = gorunum ?? { model: varsayilanModel };
-  const renkler = (baslik: string, liste: readonly string[], alan: "ten" | "sac" | "kiyafet") => (
+  const [sekme, setSekme] = useState<"karakter" | "kiyafet">("karakter");
+  const renkler = (baslik: string, liste: readonly string[], alan: "ten" | "sac" | "kiyafet" | "altRenk" | "ayakkabiRenk") => (
     <div className="of-kd-grup">
       <span className="of-kd-baslik">{baslik}</span>
       <div className="of-kd-renkler">
@@ -61,25 +64,74 @@ export default function KarakterDuzenleyici({
         <b>Karakterini düzenle</b>
         <small>Seçtiğin görünüm ofiste herkese böyle görünür.</small>
       </div>
-      <div className="of-kd-grup">
-        <span className="of-kd-baslik">Karakter</span>
-        <div className="of-kd-modeller">
-          {KARAKTER_MODELLERI.map((m) => (
-            <button
-              key={m.dosya}
-              type="button"
-              className={`of-kd-model${g.model === m.dosya ? " secili" : ""}`}
-              aria-pressed={g.model === m.dosya}
-              onClick={() => onDegis({ ...g, model: m.dosya })}
-            >
-              {m.ad}
-            </button>
-          ))}
-        </div>
+      <div className="of-kd-sekmeler" role="tablist">
+        {(
+          [
+            ["karakter", "Karakter"],
+            ["kiyafet", "Kıyafet"],
+          ] as const
+        ).map(([k, ad]) => (
+          <button key={k} type="button" role="tab" aria-selected={sekme === k} className={`of-kd-sekme${sekme === k ? " secili" : ""}`} onClick={() => setSekme(k)}>
+            {ad}
+          </button>
+        ))}
       </div>
-      {renkler("Ten", TEN_RENKLERI, "ten")}
-      {renkler("Saç", SAC_RENKLERI, "sac")}
-      {renkler("Kıyafet", KIYAFET_RENKLERI, "kiyafet")}
+      {sekme === "karakter" ? (
+        <>
+          <div className="of-kd-grup">
+            <span className="of-kd-baslik">Karakter</span>
+            <div className="of-kd-modeller">
+              {KARAKTER_MODELLERI.map((m) => (
+                <button
+                  key={m.dosya}
+                  type="button"
+                  className={`of-kd-model${g.model === m.dosya ? " secili" : ""}`}
+                  aria-pressed={g.model === m.dosya}
+                  // Parça kendi modelininse kayıtta boş tutulur (bkz. karakterGorunumuTemizle).
+                  onClick={() =>
+                    onDegis({
+                      ...g,
+                      model: m.dosya,
+                      ust: g.ust === m.dosya ? undefined : g.ust,
+                      alt: g.alt === m.dosya ? undefined : g.alt,
+                      ayakkabi: g.ayakkabi === m.dosya ? undefined : g.ayakkabi,
+                    })
+                  }
+                >
+                  {m.ad}
+                </button>
+              ))}
+            </div>
+          </div>
+          {renkler("Ten", TEN_RENKLERI, "ten")}
+          {renkler("Saç", SAC_RENKLERI, "sac")}
+        </>
+      ) : (
+        KIYAFET_PARCALARI.map((p) => {
+          const secili = g[p.alan] ?? g.model;
+          return (
+            <div key={p.alan} className="of-kd-parca">
+              <div className="of-kd-grup">
+                <span className="of-kd-baslik">{p.ad}: şekil</span>
+                <div className="of-kd-sekiller">
+                  {KARAKTER_MODELLERI.map((m) => (
+                    <button
+                      key={m.dosya}
+                      type="button"
+                      className={`of-kd-sekil${secili === m.dosya ? " secili" : ""}`}
+                      aria-pressed={secili === m.dosya}
+                      onClick={() => onDegis({ ...g, [p.alan]: m.dosya === g.model ? undefined : m.dosya })}
+                    >
+                      {m.dosya === g.model ? "Kendi" : m.ad}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {renkler(`${p.ad}: renk`, KIYAFET_RENKLERI, p.renk)}
+            </div>
+          );
+        })
+      )}
       <div className="of-kd-alt">
         <button type="button" className="of-btn" onClick={onVazgec} disabled={kaydediliyor}>
           Vazgeç

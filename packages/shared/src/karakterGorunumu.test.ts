@@ -22,4 +22,18 @@ describe("karakterGorunumuTemizle", () => {
     assert.equal(karakterGorunumuTemizle("erkek_suit"), null);
     assert.equal(karakterGorunumuTemizle(null), null);
   });
+
+  test("kıyafet parçalarının şekli ve rengi; kendi modelinin parçası yazılmaz", () => {
+    assert.deepEqual(
+      karakterGorunumuTemizle({
+        model: "erkek_suit",
+        ust: "erkek_hoodie",
+        alt: "erkek_suit",
+        ayakkabi: "../x",
+        altRenk: KIYAFET_RENKLERI[1],
+        ayakkabiRenk: "#000",
+      }),
+      { model: "erkek_suit", ust: "erkek_hoodie", altRenk: KIYAFET_RENKLERI[1] }
+    );
+  });
 });

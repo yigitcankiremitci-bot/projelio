@@ -2487,14 +2487,42 @@ export class OfisMotoru {
     const orta = kutuL.getCenter(new THREE.Vector3());
     // Kişi başına ~0,7 m: kenarlardan yarım oturak içeride kalır.
     const pay = 0.35 / olcek.x;
-    const x = tanim.uzun ? THREE.MathUtils.clamp(yerel.x, kutuL.min.x + pay, Math.max(kutuL.min.x + pay, kutuL.max.x - pay)) : orta.x;
+    const enAz = kutuL.min.x + pay;
+    const enCok = Math.max(enAz, kutuL.max.x - pay);
+    const istenen = tanim.uzun ? THREE.MathUtils.clamp(yerel.x, enAz, enCok) : orta.x;
     // Kalça ön kenarın ~30 cm gerisinde: dizler kenarı aşar, baldırlar oturağın
     // önünden iner. Ortaya göre konunca derin kanepede ayaklar minderin içine gömülüyordu.
-    const yer = obj.localToWorld(new THREE.Vector3(x, 0, Math.max(orta.z, kutuL.max.z - 0.3 / olcek.z)));
-    yer.y = ZEMIN_Y;
-    // Oturmadan önce durulan yer: ön kenarın biraz önü.
-    const ayakta = obj.localToWorld(new THREE.Vector3(x, 0, kutuL.max.z + 0.3 / olcek.z));
-    ayakta.y = ZEMIN_Y;
+    const yerZ = Math.max(orta.z, kutuL.max.z - 0.3 / olcek.z);
+    const onZ = kutuL.max.z + 0.3 / olcek.z;
+    const noktada = (x: number, z: number) => {
+      const p = obj.localToWorld(new THREE.Vector3(x, 0, z));
+      p.y = ZEMIN_Y;
+      return p;
+    };
+    // Oturmadan önce durulan yer (ön kenarın biraz önü) boş olmalı: kanepenin
+    // önündeki sehpa 20 cm yakındaydı, kişi sehpanın içinde durup oradan
+    // oturuyordu. Önü doluysa ön çizgide en yakın boş yerde durulur — gerekirse
+    // oturağın ucunun da ötesinde, sehpanın yanında — ve oradan en yakın
+    // oturağa yandan geçilir. Hiç boş yer yoksa istenen yerde kalınır.
+    const engeller = this.engelKutulari().filter((b) => !b.isEmpty() && !b.containsPoint(noktada(istenen, yerZ).setY(b.min.y)));
+    const r = 0.16;
+    const bos = (p: THREE.Vector3) => !engeller.some((b) => p.x > b.min.x - r && p.x < b.max.x + r && p.z > b.min.z - r && p.z < b.max.z + r);
+    let durX = istenen;
+    if (!bos(noktada(istenen, onZ))) {
+      const adim = 0.05 / olcek.x;
+      const sinirA = kutuL.min.x - 0.4 / olcek.x;
+      const sinirB = kutuL.max.x + 0.4 / olcek.x;
+      for (let d = adim; istenen - d >= sinirA || istenen + d <= sinirB; d += adim) {
+        const aday = [istenen - d, istenen + d].find((c) => c >= sinirA && c <= sinirB && bos(noktada(c, onZ)));
+        if (aday !== undefined) {
+          durX = aday;
+          break;
+        }
+      }
+    }
+    const x = tanim.uzun ? THREE.MathUtils.clamp(durX, enAz, enCok) : orta.x;
+    const yer = noktada(x, yerZ);
+    const ayakta = noktada(durX, onZ);
     // Minderin üstü yukarıdan ölçülür (tablodaki yükseklik yalnızca ölçülemezse): kalça
     // tahmini yükseklikte kalınca mindere gömülüyor ya da havada duruyordu.
     const asagi = new THREE.Raycaster(new THREE.Vector3(yer.x, 2, yer.z), ASAGI, 0, 2);

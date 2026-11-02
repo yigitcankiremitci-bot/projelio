@@ -8,7 +8,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import type { EsyaTuru } from "../../lib/ofisOyunu";
-import { hayaletYap, varlik } from "./varliklar";
+import { hayaletYap, varlik, type VarlikAdi } from "./varliklar";
 
 export type Malzeme = (renk: string, o?: { parlak?: number; isik?: string; opak?: number; metal?: number }) => THREE.Material;
 
@@ -604,7 +604,73 @@ export function esyaModeli(tur: EsyaTuru, hayalet = false): THREE.Group {
     case "modernLamba":
     case "haliYuvarlak":
     case "haliCizgili":
+    case "uzanmaKoltugu":
+    case "tasarimBerjer":
+    case "buyukKoseKanepe":
+    case "uzanmaliKanepe":
+    case "minderPuf":
+    case "minderliBank":
+    case "yerMinderi":
+    case "barTaburesi":
+    case "yuvarlakSandalye":
+    case "genisKitaplik":
+    case "kapakliKitaplik":
+    case "alcakKitaplik":
+    case "tvDolabi":
+    case "koseMasa":
+    case "yuvarlakMasa":
+    case "camSehpa":
+    case "kareSehpa":
+    case "ahsapMasa":
+    case "komodin":
+    case "oyuncakAyi":
+    case "kareLambader":
+    case "haliDikdortgen":
+    case "haliKoseli":
+    case "haliKare":
+    case "haliPaspas":
+    case "eskiTelevizyon":
+    case "buzdolabiBuyuk":
+    case "buzdolabiDik":
+    case "ocak":
       g = varlik(tur);
+      break;
+    case "koliYigini":
+      g = dizi([["koliKapali", -0.3, 0], ["koliKapali", -0.3, 0, 0.3, 0.51], ["koliAcik", 0.2, 0.03]]);
+      break;
+    case "okumaKosesi":
+      g = dizi([["uzanmaKoltugu", -0.2, 0], ["kareLambader", 0.45, -0.4]]);
+      break;
+    case "yemekMasasi":
+      g = dizi([
+        ["ortuluMasa", 0, 0],
+        ["sandalyeMinderli", -0.4, 0.6, Math.PI],
+        ["sandalyeMinderli", 0.4, 0.6, Math.PI],
+        ["sandalyeMinderli", -0.4, -0.6],
+        ["sandalyeMinderli", 0.4, -0.6],
+      ]);
+      break;
+    case "camToplantiMasasi":
+      g = dizi([
+        ["camMasa", 0, 0],
+        ...([-0.5, 0, 0.5].flatMap((x) => [
+          ["sandalyeCerceveli", x, 0.6, Math.PI],
+          ["sandalyeCerceveli", x, -0.6],
+        ]) as [VarlikAdi, number, number, number?][]),
+      ]);
+      break;
+    case "barKosesi":
+      g = dizi([["bar", -0.49, -0.23], ["bar", 0.31, -0.23], ["barUcu", 0.8, -0.23], ["barTaburesi", -0.49, 0.22], ["barTaburesi", 0.31, 0.22]]);
+      break;
+    case "mutfakTezgahi":
+      g = dizi([
+        ["cekmeceliDolap", -0.77, 0],
+        ["evye", 0, 0],
+        ["mutfakDolabi", 0.77, 0],
+        ["mikrodalga", 0.77, -0.1, 0, 0.81],
+        ["tostMakinesi", -0.9, -0.1, 0, 0.81],
+        ["blender", -0.6, -0.15, 0, 0.81],
+      ]);
       break;
     case "yanSehpa":
       g = varlik("yanMasa");

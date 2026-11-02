@@ -15,3 +15,9 @@ Idle_Neutral, Interact, Walk, Wave tutuldu, kullanılmayan veri atılıp GLB'ye
 çevrildi (dosya başına ~3,3 MB → ~0,9 MB). `erkek_suit.glb`'nin elindeki
 tabanca ("Pistol") modeli dosyadan çıkarıldı. Paketlerin kendisi yeniden
 satılmamalı (üreticilerin ricası), yalnızca uygulamanın içinde kullanılıyor.
+
+`kenney/` klasörüne 2026-11-02'de paketin geri kalanından 41 model daha
+eklendi (mağazanın üçüncü dalgası: kanepeler, kitaplıklar, masalar, halılar,
+mutfak). Duvar, kapı, merdiven, banyo ve yatak modelleri ofise uymadığı için
+alınmadı. Paketten seçerken dosyaya dokunulmadı; renkler yüklerken
+`varliklar.ts`'teki palete boyanıyor.

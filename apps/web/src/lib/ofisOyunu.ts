@@ -967,6 +967,16 @@ export type EsyaTuru =
   | "ikiliKanepe"
   | "tasarimKanepe"
   | "koseKoltuk"
+  | "minderPuf"
+  | "yerMinderi"
+  | "barTaburesi"
+  | "yuvarlakSandalye"
+  | "minderliBank"
+  | "uzanmaKoltugu"
+  | "tasarimBerjer"
+  | "okumaKosesi"
+  | "uzanmaliKanepe"
+  | "buyukKoseKanepe"
   // mobilya
   | "kitaplik"
   | "dolap"
@@ -978,6 +988,19 @@ export type EsyaTuru =
   | "copKovasi"
   | "calismaKosesi"
   | "masaTakimi"
+  | "koliYigini"
+  | "komodin"
+  | "kareSehpa"
+  | "alcakKitaplik"
+  | "camSehpa"
+  | "tvDolabi"
+  | "kapakliKitaplik"
+  | "ahsapMasa"
+  | "yuvarlakMasa"
+  | "genisKitaplik"
+  | "koseMasa"
+  | "yemekMasasi"
+  | "camToplantiMasasi"
   // dekor
   | "lamba"
   | "modernLamba"
@@ -991,6 +1014,12 @@ export type EsyaTuru =
   | "akvaryum"
   | "roket"
   | "heykel"
+  | "haliPaspas"
+  | "oyuncakAyi"
+  | "kareLambader"
+  | "haliKare"
+  | "haliDikdortgen"
+  | "haliKoseli"
   // eğlence
   | "radyoSehpasi"
   | "hoparlorler"
@@ -1003,12 +1032,18 @@ export type EsyaTuru =
   | "oyun"
   | "piyano"
   | "bilardo"
+  | "eskiTelevizyon"
   // mutfak
   | "suSebili"
   | "buzdolabi"
   | "kahve"
   | "barTezgahi"
-  | "otomat";
+  | "otomat"
+  | "ocak"
+  | "buzdolabiDik"
+  | "barKosesi"
+  | "buzdolabiBuyuk"
+  | "mutfakTezgahi";
 
 export type EsyaKategorisi = "bitki" | "oturma" | "mobilya" | "dekor" | "eglence" | "mutfak";
 
@@ -1049,30 +1084,59 @@ export const KATALOG: KatalogEsyasi[] = [
   { tur: "agacBuyuk", ad: "Saksı ağacı", fiyat: 120, w: 0.7, d: 0.75, seviye: 3, kategori: "bitki" },
   { tur: "monstera", ad: "Gür monstera", fiyat: 130, w: 0.9, d: 0.9, seviye: 3, kategori: "bitki" },
 
+  { tur: "barTaburesi", ad: "Bar taburesi", fiyat: 20, w: 0.5, d: 0.45, seviye: 1, kategori: "oturma" },
+  { tur: "yuvarlakSandalye", ad: "Yuvarlak sandalye", fiyat: 20, w: 0.4, d: 0.4, seviye: 1, kategori: "oturma" },
+  { tur: "minderPuf", ad: "Minder puf", fiyat: 25, w: 0.8, d: 0.85, seviye: 1, kategori: "oturma" },
+  { tur: "yerMinderi", ad: "Yer minderi", fiyat: 25, w: 0.8, d: 0.45, seviye: 1, kategori: "oturma" },
+  { tur: "minderliBank", ad: "Minderli bank", fiyat: 35, w: 0.75, d: 0.4, seviye: 1, kategori: "oturma" },
   { tur: "armut", ad: "Armut koltuk", fiyat: 40, w: 0.9, d: 0.9, seviye: 1, kategori: "oturma" },
   { tur: "puf", ad: "Koltuk", fiyat: 45, w: 1.3, d: 1.15, seviye: 1, kategori: "oturma" },
   { tur: "dinlenmeKoltugu", ad: "Dinlenme koltuğu", fiyat: 55, w: 0.9, d: 0.8, seviye: 1, kategori: "oturma" },
+  { tur: "uzanmaKoltugu", ad: "Uzanma koltuğu", fiyat: 70, w: 0.9, d: 1.25, seviye: 2, kategori: "oturma" },
+  { tur: "tasarimBerjer", ad: "Tasarım berjer", fiyat: 75, w: 1.35, d: 0.8, seviye: 2, kategori: "oturma" },
+  { tur: "okumaKosesi", ad: "Okuma köşesi", fiyat: 95, w: 1.25, d: 1.25, seviye: 2, kategori: "oturma" },
   { tur: "ikiliKanepe", ad: "İkili kanepe", fiyat: 120, w: 1.8, d: 0.8, seviye: 2, kategori: "oturma" },
   { tur: "kanepe", ad: "Kanepe", fiyat: 140, w: 2.1, d: 1.15, seviye: 3, kategori: "oturma" },
   { tur: "tasarimKanepe", ad: "Tasarım kanepe", fiyat: 160, w: 2.05, d: 0.8, seviye: 3, kategori: "oturma" },
+  { tur: "uzanmaliKanepe", ad: "Uzanmalı kanepe", fiyat: 180, w: 1.8, d: 1.5, seviye: 4, kategori: "oturma" },
   { tur: "koseKoltuk", ad: "Köşe koltuk", fiyat: 210, w: 1.8, d: 1.8, seviye: 4, kategori: "oturma" },
+  { tur: "buyukKoseKanepe", ad: "Büyük köşe kanepe", fiyat: 260, w: 2.45, d: 2.45, seviye: 5, kategori: "oturma" },
 
   { tur: "copKovasi", ad: "Çöp kovası", fiyat: 10, w: 0.4, d: 0.45, seviye: 1, kategori: "mobilya" },
+  { tur: "koliYigini", ad: "Koli yığını", fiyat: 15, w: 1.1, d: 0.5, seviye: 1, kategori: "mobilya" },
+  { tur: "komodin", ad: "Komodin", fiyat: 30, w: 0.5, d: 0.4, seviye: 1, kategori: "mobilya" },
   { tur: "askilik", ad: "Askılık", fiyat: 35, w: 0.6, d: 0.6, seviye: 1, kategori: "mobilya" },
   { tur: "yanSehpa", ad: "Yan sehpa", fiyat: 40, w: 0.95, d: 0.4, seviye: 1, kategori: "mobilya" },
+  { tur: "kareSehpa", ad: "Kare sehpa", fiyat: 45, w: 0.75, d: 0.75, seviye: 1, kategori: "mobilya" },
+  { tur: "alcakKitaplik", ad: "Alçak kitaplık", fiyat: 50, w: 0.75, d: 0.5, seviye: 1, kategori: "mobilya" },
   { tur: "ortaSehpa", ad: "Orta sehpa", fiyat: 65, w: 1.2, d: 0.75, seviye: 1, kategori: "mobilya" },
   { tur: "alcakSehpa", ad: "Alçak sehpa", fiyat: 70, w: 1.5, d: 0.95, seviye: 2, kategori: "mobilya" },
+  { tur: "camSehpa", ad: "Cam sehpa", fiyat: 70, w: 1.2, d: 0.75, seviye: 2, kategori: "mobilya" },
   { tur: "alcakRaf", ad: "Alçak raf", fiyat: 75, w: 1.45, d: 0.4, seviye: 2, kategori: "mobilya" },
+  { tur: "tvDolabi", ad: "TV dolabı", fiyat: 80, w: 1.45, d: 0.5, seviye: 2, kategori: "mobilya" },
+  { tur: "kapakliKitaplik", ad: "Kapaklı kitaplık", fiyat: 85, w: 0.75, d: 0.5, seviye: 2, kategori: "mobilya" },
+  { tur: "ahsapMasa", ad: "Ahşap masa", fiyat: 85, w: 1.55, d: 0.85, seviye: 2, kategori: "mobilya" },
   { tur: "kitaplik", ad: "Kitaplık", fiyat: 90, w: 0.75, d: 0.5, seviye: 2, kategori: "mobilya" },
+  { tur: "yuvarlakMasa", ad: "Yuvarlak masa", fiyat: 90, w: 1.3, d: 1.45, seviye: 2, kategori: "mobilya" },
   { tur: "dolap", ad: "Dekor dolabı", fiyat: 100, w: 1.45, d: 0.75, seviye: 2, kategori: "mobilya" },
+  { tur: "genisKitaplik", ad: "Geniş kitaplık", fiyat: 110, w: 1.45, d: 0.5, seviye: 3, kategori: "mobilya" },
+  { tur: "koseMasa", ad: "Köşe masa", fiyat: 120, w: 1.8, d: 1.8, seviye: 3, kategori: "mobilya" },
   { tur: "calismaKosesi", ad: "Çalışma köşesi", fiyat: 150, w: 1.3, d: 1.2, seviye: 3, kategori: "mobilya" },
+  { tur: "yemekMasasi", ad: "Yemek masası", fiyat: 160, w: 1.55, d: 1.6, seviye: 3, kategori: "mobilya" },
   { tur: "masaTakimi", ad: "Masa takımı", fiyat: 180, w: 1.75, d: 1.8, seviye: 3, kategori: "mobilya" },
+  { tur: "camToplantiMasasi", ad: "Cam toplantı masası", fiyat: 230, w: 1.55, d: 1.6, seviye: 4, kategori: "mobilya" },
 
+  { tur: "haliPaspas", ad: "Paspas", fiyat: 10, w: 0.8, d: 0.45, seviye: 1, kategori: "dekor" },
+  { tur: "oyuncakAyi", ad: "Oyuncak ayı", fiyat: 30, w: 0.7, d: 0.5, seviye: 1, kategori: "dekor" },
   { tur: "modernLamba", ad: "Modern lambader", fiyat: 40, w: 0.35, d: 0.35, seviye: 1, kategori: "dekor" },
+  { tur: "kareLambader", ad: "Kare lambader", fiyat: 40, w: 0.25, d: 0.25, seviye: 1, kategori: "dekor" },
   { tur: "lamba", ad: "Ayaklı lamba", fiyat: 50, w: 0.65, d: 0.65, seviye: 1, kategori: "dekor" },
   { tur: "haliYuvarlak", ad: "Yuvarlak halı", fiyat: 55, w: 1.7, d: 1.7, seviye: 1, kategori: "dekor" },
+  { tur: "haliKare", ad: "Kare halı", fiyat: 55, w: 1.65, d: 1.7, seviye: 1, kategori: "dekor" },
   { tur: "hali", ad: "Oval halı", fiyat: 60, w: 2.1, d: 1.4, seviye: 1, kategori: "dekor" },
+  { tur: "haliDikdortgen", ad: "Büyük halı", fiyat: 70, w: 2.85, d: 1.7, seviye: 2, kategori: "dekor" },
   { tur: "haliCizgili", ad: "Çizgili halı", fiyat: 75, w: 2.6, d: 1.75, seviye: 2, kategori: "dekor" },
+  { tur: "haliKoseli", ad: "Yumuşak köşeli halı", fiyat: 75, w: 2.85, d: 1.7, seviye: 2, kategori: "dekor" },
   { tur: "kure", ad: "Yer küresi", fiyat: 85, w: 0.8, d: 0.7, seviye: 2, kategori: "dekor" },
   { tur: "saat", ad: "Ayaklı saat", fiyat: 150, w: 0.6, d: 0.4, seviye: 3, kategori: "dekor" },
   { tur: "akvaryum", ad: "Akvaryum", fiyat: 220, w: 1.4, d: 0.6, seviye: 4, kategori: "dekor" },
@@ -1083,6 +1147,7 @@ export const KATALOG: KatalogEsyasi[] = [
 
   { tur: "radyoSehpasi", ad: "Radyo sehpası", fiyat: 50, w: 0.95, d: 0.4, seviye: 1, kategori: "eglence" },
   { tur: "hoparlorler", ad: "Hoparlör çifti", fiyat: 60, w: 0.95, d: 0.3, seviye: 2, kategori: "eglence" },
+  { tur: "eskiTelevizyon", ad: "Eski televizyon", fiyat: 60, w: 0.75, d: 0.5, seviye: 2, kategori: "eglence" },
   { tur: "satranc", ad: "Satranç masası", fiyat: 120, w: 1.3, d: 0.7, seviye: 2, kategori: "eglence" },
   { tur: "boksTorbasi", ad: "Boks torbası", fiyat: 130, w: 0.8, d: 0.8, seviye: 3, kategori: "eglence" },
   { tur: "medya", ad: "Medya ünitesi", fiyat: 170, w: 1.85, d: 0.4, seviye: 3, kategori: "eglence" },
@@ -1095,9 +1160,14 @@ export const KATALOG: KatalogEsyasi[] = [
 
   { tur: "suSebili", ad: "Su sebili", fiyat: 45, w: 0.45, d: 0.45, seviye: 1, kategori: "mutfak" },
   { tur: "buzdolabi", ad: "Mini buzdolabı", fiyat: 90, w: 0.6, d: 0.6, seviye: 2, kategori: "mutfak" },
+  { tur: "ocak", ad: "Elektrikli ocak", fiyat: 90, w: 0.8, d: 0.85, seviye: 3, kategori: "mutfak" },
   { tur: "kahve", ad: "Kahve köşesi", fiyat: 110, w: 1.45, d: 0.45, seviye: 2, kategori: "mutfak" },
+  { tur: "buzdolabiDik", ad: "Buzdolabı", fiyat: 120, w: 0.8, d: 0.55, seviye: 3, kategori: "mutfak" },
   { tur: "barTezgahi", ad: "Bar tezgâhı", fiyat: 130, w: 2.45, d: 0.45, seviye: 3, kategori: "mutfak" },
+  { tur: "barKosesi", ad: "Bar köşesi", fiyat: 140, w: 1.8, d: 0.85, seviye: 3, kategori: "mutfak" },
+  { tur: "buzdolabiBuyuk", ad: "Büyük buzdolabı", fiyat: 150, w: 0.95, d: 0.75, seviye: 3, kategori: "mutfak" },
   { tur: "otomat", ad: "İçecek otomatı", fiyat: 190, w: 0.95, d: 0.8, seviye: 4, kategori: "mutfak" },
+  { tur: "mutfakTezgahi", ad: "Mutfak tezgâhı", fiyat: 200, w: 2.35, d: 0.85, seviye: 4, kategori: "mutfak" },
 ];
 
 /**

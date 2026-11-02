@@ -65,6 +65,50 @@ const TANIMLAR = {
   modernLamba: ["kenney/lampRoundFloor.glb", 1.8],
   ortaSehpa: ["kenney/tableCoffee.glb", 1.8],
   copKovasi: ["kenney/trashcan.glb", 1.2],
+  // Kenney Furniture Kit'in geri kalanından (2026-11-02): mağazanın üçüncü dalgası.
+  uzanmaKoltugu: ["kenney/loungeChairRelax.glb", 1.8],
+  tasarimBerjer: ["kenney/loungeDesignChair.glb", 1.8],
+  buyukKoseKanepe: ["kenney/loungeDesignSofaCorner.glb", 1.8],
+  uzanmaliKanepe: ["kenney/loungeSofaLong.glb", 1.8],
+  minderPuf: ["kenney/loungeSofaOttoman.glb", 1.8],
+  minderliBank: ["kenney/benchCushion.glb", 1.8],
+  yerMinderi: ["kenney/benchCushionLow.glb", 1.8],
+  barTaburesi: ["kenney/stoolBar.glb", 1.8],
+  yuvarlakSandalye: ["kenney/chairRounded.glb", 1.8],
+  genisKitaplik: ["kenney/bookcaseClosedWide.glb", 1.8],
+  kapakliKitaplik: ["kenney/bookcaseClosedDoors.glb", 1.8],
+  alcakKitaplik: ["kenney/bookcaseOpenLow.glb", 1.8],
+  tvDolabi: ["kenney/cabinetTelevisionDoors.glb", 1.8],
+  koseMasa: ["kenney/deskCorner.glb", 1.8],
+  yuvarlakMasa: ["kenney/tableRound.glb", 1.8],
+  camSehpa: ["kenney/tableCoffeeGlass.glb", 1.8],
+  kareSehpa: ["kenney/tableCoffeeSquare.glb", 1.8],
+  ahsapMasa: ["kenney/tableCross.glb", 1.8],
+  komodin: ["kenney/cabinetBedDrawerTable.glb", 1.8],
+  oyuncakAyi: ["kenney/bear.glb", 1.8],
+  kareLambader: ["kenney/lampSquareFloor.glb", 1.8],
+  haliDikdortgen: ["kenney/rugRectangle.glb", 1.8],
+  haliKoseli: ["kenney/rugRounded.glb", 1.8],
+  haliKare: ["kenney/rugSquare.glb", 1.8],
+  haliPaspas: ["kenney/rugDoormat.glb", 1.8],
+  eskiTelevizyon: ["kenney/televisionVintage.glb", 1.8],
+  buzdolabiBuyuk: ["kenney/kitchenFridgeLarge.glb", 1.8],
+  buzdolabiDik: ["kenney/kitchenFridge.glb", 1.8],
+  ocak: ["kenney/kitchenStoveElectric.glb", 1.8],
+  // Yalnızca takımların parçası olarak kullanılanlar.
+  sandalyeMinderli: ["kenney/chairCushion.glb", 1.8],
+  sandalyeCerceveli: ["kenney/chairModernFrameCushion.glb", 1.8],
+  camMasa: ["kenney/tableGlass.glb", 1.8],
+  ortuluMasa: ["kenney/tableCloth.glb", 1.8],
+  koliKapali: ["kenney/cardboardBoxClosed.glb", 1.8],
+  koliAcik: ["kenney/cardboardBoxOpen.glb", 1.8],
+  mutfakDolabi: ["kenney/kitchenCabinet.glb", 1.8],
+  cekmeceliDolap: ["kenney/kitchenCabinetDrawer.glb", 1.8],
+  evye: ["kenney/kitchenSink.glb", 1.8],
+  mikrodalga: ["kenney/kitchenMicrowave.glb", 1.8],
+  blender: ["kenney/kitchenBlender.glb", 1.8],
+  tostMakinesi: ["kenney/toaster.glb", 1.8],
+  barUcu: ["kenney/kitchenBarEnd.glb", 1.8],
 } as const satisfies Record<string, readonly [string, number | { boy: number }]>;
 
 export type VarlikAdi = keyof typeof TANIMLAR;
@@ -87,16 +131,28 @@ const KENNEY_PALET: Record<string, string> = {
   wood: "#C99A6B",
   woodDark: "#8A6446",
   lamp: "#FFE7A8",
+  metalLight: "#C9CDD6",
+  glass: "#CFE3EC",
+  fur: "#B07A4E",
 };
 
 function kenneyBoya(o: THREE.Object3D): void {
   o.traverse((c) => {
     const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
     if (!m || Array.isArray(m) || !m.isMeshStandardMaterial) return;
-    const renk = KENNEY_PALET[m.name];
+    // Paketin bazı dosyalarında ad sonda boşlukla geliyor ("wood ").
+    const ad = m.name.trim();
+    const renk = KENNEY_PALET[ad];
     if (renk) m.color.set(renk);
     m.metalness = 0;
-    m.roughness = m.name.startsWith("metal") ? 0.45 : 0.75;
+    m.roughness = ad.startsWith("metal") ? 0.45 : 0.75;
+    // Cam sehpa/masa: opak açık mavi bir levha gibi duruyordu.
+    if (ad === "glass") {
+      m.transparent = true;
+      m.opacity = 0.45;
+      m.roughness = 0.1;
+      m.depthWrite = false;
+    }
   });
 }
 

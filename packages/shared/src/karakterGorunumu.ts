@@ -8,14 +8,14 @@
 
 /** Karakter modelleri: `dosya` public/ofis/modeller/karakterler/<dosya>.glb. Sıra adın türetilmesinde kullanılır, DEĞİŞTİRME. */
 export const KARAKTER_MODELLERI = [
-  { dosya: "erkek_suit", ad: "Takım elbise" },
-  { dosya: "kadin_casual", ad: "Gündelik" },
-  { dosya: "erkek_casual2", ad: "Gömlekli" },
-  { dosya: "kadin_formal", ad: "Şık" },
-  { dosya: "erkek_hoodie", ad: "Kapüşonlu" },
-  { dosya: "kadin_suit", ad: "Ceketli" },
-  { dosya: "erkek_worker", ad: "Saha (bıyıklı)" },
-  { dosya: "kadin_worker", ad: "Saha" },
+  { dosya: "erkek_suit", ad: "Erkek · takım elbise" },
+  { dosya: "kadin_casual", ad: "Kadın · gündelik" },
+  { dosya: "erkek_casual2", ad: "Erkek · tişört" },
+  { dosya: "kadin_formal", ad: "Kadın · elbise" },
+  { dosya: "erkek_hoodie", ad: "Erkek · kapüşonlu" },
+  { dosya: "kadin_suit", ad: "Kadın · blazer" },
+  { dosya: "erkek_worker", ad: "Erkek · baretli" },
+  { dosya: "kadin_worker", ad: "Kadın · baretli" },
 ] as const;
 
 export type KarakterModeli = (typeof KARAKTER_MODELLERI)[number]["dosya"];
@@ -39,6 +39,43 @@ export const KIYAFET_PARCALARI = [
 
 export type KiyafetParcasi = (typeof KIYAFET_PARCALARI)[number]["alan"];
 
+/**
+ * Parçaların kendi adları (panelde şekil seçenekleri): modelin adı parçayı
+ * anlatmıyordu ("Saha" ayakkabısı). Renk söylemez, renk ayrıca seçiliyor.
+ */
+export const KIYAFET_ADLARI: Record<KiyafetParcasi, Record<KarakterModeli, string>> = {
+  ust: {
+    erkek_suit: "Kravatlı ceket",
+    kadin_casual: "Dar tişört",
+    erkek_casual2: "Tişört",
+    kadin_formal: "Kolsuz elbise üstü",
+    erkek_hoodie: "Kapüşonlu",
+    kadin_suit: "Blazer ve gömlek",
+    erkek_worker: "Yelek ve gömlek",
+    kadin_worker: "Yelek ve tişört",
+  },
+  alt: {
+    erkek_suit: "Kumaş pantolon",
+    kadin_casual: "Bol pantolon",
+    erkek_casual2: "Kot pantolon",
+    kadin_formal: "Etek",
+    erkek_hoodie: "Dar kot",
+    kadin_suit: "Dar pantolon",
+    erkek_worker: "İş pantolonu",
+    kadin_worker: "Dar iş pantolonu",
+  },
+  ayakkabi: {
+    erkek_suit: "Klasik ayakkabı",
+    kadin_casual: "Babet",
+    erkek_casual2: "Spor ayakkabı",
+    kadin_formal: "Topuklu ayakkabı",
+    erkek_hoodie: "Kanvas ayakkabı",
+    kadin_suit: "Kısa topuklu",
+    erkek_worker: "İş botu",
+    kadin_worker: "Kısa bot",
+  },
+};
+
 export interface KarakterGorunumu {
   model: KarakterModeli;
   /** Boşsa modelin kendi rengi. */
@@ -52,7 +89,17 @@ export interface KarakterGorunumu {
   ust?: KarakterModeli;
   alt?: KarakterModeli;
   ayakkabi?: KarakterModeli;
+  /**
+   * Kişinin seçtiği çalışma masası, oda başına: oda kimliği → odadaki masa
+   * sırası. Görünüm değil ama kişiye ait ve aynı kayıtta tutuluyor (ayrı tablo
+   * açmaya değmez); seçilmemiş odada kişi sıradaki boş masaya oturur.
+   */
+  masalar?: Record<string, number>;
 }
+
+/** Kayıtta tutulabilecek en çok oda masası (kişinin girebildiği oda sayısından fazlası anlamsız). */
+export const EN_COK_MASA_SECIMI = 50;
+const ODA_KIMLIGI = /^[\w:-]{1,80}$/;
 
 const renk = (liste: readonly string[], v: unknown): string | undefined =>
   typeof v === "string" ? liste.find((r) => r.toLowerCase() === v.toLowerCase()) : undefined;
@@ -74,6 +121,13 @@ export function karakterGorunumuTemizle(ham: unknown): KarakterGorunumu | null {
     // Kendi modelinin parçası seçildiyse yazılmaz: kayıt "boş = kendi parçası" ile tek biçimde kalsın.
     const sekil = KARAKTER_MODELLERI.find((m) => m.dosya === h[p.alan])?.dosya;
     if (sekil && sekil !== model) g[p.alan] = sekil;
+  }
+  if (h.masalar && typeof h.masalar === "object" && !Array.isArray(h.masalar)) {
+    const masalar: Record<string, number> = {};
+    for (const [oda, no] of Object.entries(h.masalar as Record<string, unknown>).slice(0, EN_COK_MASA_SECIMI)) {
+      if (ODA_KIMLIGI.test(oda) && Number.isInteger(no) && (no as number) >= 0 && (no as number) < 200) masalar[oda] = no as number;
+    }
+    if (Object.keys(masalar).length) g.masalar = masalar;
   }
   return g;
 }

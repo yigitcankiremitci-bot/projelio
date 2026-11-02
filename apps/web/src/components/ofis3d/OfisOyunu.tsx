@@ -319,6 +319,9 @@ export default function OfisOyunu({
   const [karakterKaydediliyor, setKarakterKaydediliyor] = useState(false);
   /** Sahnede seçili kişi: kendisiyse sol üstte "Karakterini düzenle" çıkar. */
   const [seciliKisi, setSeciliKisi] = useState<string | null>(null);
+  /** Kendi karakteri seçiliyken tıklanan masa: orada "Çalışma masası yap" düğmesi çıkar. */
+  const [masaTeklifi, setMasaTeklifi] = useState<{ odaId: string; masaNo: number; x: number; y: number } | null>(null);
+  const [masaKaydediliyor, setMasaKaydediliyor] = useState(false);
   const benIdRef = useRef(benId);
   benIdRef.current = benId;
   /** Oda paneli kapatılabilir; kapatmak kamerayı odadan çıkarmaz (yalnızca "Ofise dön" ve Esc çıkarır). */
@@ -549,10 +552,11 @@ export default function OfisOyunu({
           emek: k.emek ?? 0,
           yonetici: !!k.yonetici,
           istasyon: k.istasyon,
+          masa: gorunumler[k.id]?.masalar?.[d.id],
         }))
       )
     );
-  }, [departmanlar, cevrimici, benId]);
+  }, [departmanlar, cevrimici, benId, gorunumler]);
 
   // Ajanın hâli dakikada bir yoklanır (panel açıkken panel 5 sn'de bir yoklar).
   // Uç yoksa ya da hesap izinli değilse robot hiç çıkmaz.
@@ -637,28 +641,62 @@ export default function OfisOyunu({
     motorRef.current?.kisiyeOdaklan(benId);
   }
 
-  async function karakteriKaydet() {
-    if (!benId || !karakterTaslagi) return;
-    const g = karakterTaslagi.g ?? { model: varsayilanModel };
-    setKarakterKaydediliyor(true);
+  /**
+   * Kendi karakter kaydını yazar ve sahneye uygular; uç henüz yayında değilse
+   * (404) tarayıcıda tutar. Sunucunun kaydettiği hâl dönülür: sunucu bir
+   * seçimi tanımayıp atarsa (ör. eski sürüm) "kaydedildi" denip seçim
+   * sessizce kayboluyordu — artık söylenir.
+   */
+  async function karakterKaydiYaz(g: KarakterGorunumu): Promise<"sunucu" | "tarayici" | "eksik"> {
+    if (!benId) throw new Error("Oturum yok");
     try {
       const kayitli = karakterGorunumuTemizle(await api.post<unknown>("/ofis-duzeni/karakter", g)) ?? g;
       setGorunumler((o) => ({ ...o, [benId]: kayitli }));
-      setKarakterTaslagi(null);
-      bildir("Karakterin kaydedildi");
+      return JSON.stringify(kayitli) === JSON.stringify(karakterGorunumuTemizle(g)) ? "sunucu" : "eksik";
     } catch (e) {
-      if (e instanceof ApiError && e.status === 404) {
-        try {
-          localStorage.setItem(yerelKarakterAnahtari(benId), JSON.stringify(g));
-        } catch {
-          // Tarayıcı depolaması kapalı: bu oturumluk kalır.
-        }
-        setGorunumler((o) => ({ ...o, [benId]: g }));
-        setKarakterTaslagi(null);
-        bildir("Karakterin bu tarayıcıda kaydedildi");
-      } else bildir(e instanceof ApiError ? e.message : "Karakter kaydedilemedi");
+      if (!(e instanceof ApiError && e.status === 404)) throw e;
+      try {
+        localStorage.setItem(yerelKarakterAnahtari(benId), JSON.stringify(g));
+      } catch {
+        // Tarayıcı depolaması kapalı: bu oturumluk kalır.
+      }
+      setGorunumler((o) => ({ ...o, [benId]: g }));
+      return "tarayici";
+    }
+  }
+
+  async function karakteriKaydet() {
+    if (!benId || !karakterTaslagi) return;
+    setKarakterKaydediliyor(true);
+    try {
+      const sonuc = await karakterKaydiYaz(karakterTaslagi.g ?? { model: varsayilanModel });
+      setKarakterTaslagi(null);
+      bildir(
+        sonuc === "sunucu"
+          ? "Karakterin kaydedildi"
+          : sonuc === "tarayici"
+            ? "Karakterin bu tarayıcıda kaydedildi"
+            : "Karakterin kaydedildi ama bazı seçimler sunucuda henüz desteklenmiyor; sayfa yenilenince kaybolabilir"
+      );
+    } catch (e) {
+      bildir(e instanceof ApiError ? e.message : "Karakter kaydedilemedi");
     } finally {
       setKarakterKaydediliyor(false);
+    }
+  }
+
+  async function calismaMasasiYap() {
+    if (!benId || !masaTeklifi) return;
+    const g = gorunumler[benId] ?? { model: varsayilanModel };
+    setMasaKaydediliyor(true);
+    try {
+      const sonuc = await karakterKaydiYaz({ ...g, masalar: { ...g.masalar, [masaTeklifi.odaId]: masaTeklifi.masaNo } });
+      setMasaTeklifi(null);
+      bildir(sonuc === "eksik" ? "Masa seçimi sunucuda henüz desteklenmiyor" : "Çalışma masan değişti");
+    } catch (e) {
+      bildir(e instanceof ApiError ? e.message : "Masa kaydedilemedi");
+    } finally {
+      setMasaKaydediliyor(false);
     }
   }
 
@@ -703,6 +741,7 @@ export default function OfisOyunu({
       setMagaza(false);
     };
     motor.onOdadanCikildi = () => setIcerdekiOda(null);
+    motor.onMasaTeklifi = setMasaTeklifi;
     motor.onKisiSecildi = (id) => {
       setSeciliKisi(id);
       // Oda paneli de sol üstte: kendi karakterini seçince düzenleme düğmesine yer açılır.
@@ -1231,6 +1270,17 @@ export default function OfisOyunu({
       )}
 
       {!(icerdekiOda && !panelAcik) && karakterDugmesi && <div className="of-hud of-oda-mini">{karakterDugmesi}</div>}
+      {masaTeklifi && seciliKisi === benId && (
+        <button
+          type="button"
+          className="of-btn birincil of-masa-teklifi"
+          style={{ left: masaTeklifi.x, top: masaTeklifi.y }}
+          onClick={() => void calismaMasasiYap()}
+          disabled={masaKaydediliyor}
+        >
+          {masaKaydediliyor ? "Kaydediliyor…" : "Çalışma masası yap"}
+        </button>
+      )}
 
       {icerdekiOda && !panelAcik && !duzenlenen && !rafta && (
         <div className="of-hud of-oda-mini">

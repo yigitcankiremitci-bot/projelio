@@ -67,6 +67,8 @@ export interface SahneKisisi {
   yonetici?: boolean;
   /** Stüdyo: üzerinde çalıştığı projenin istasyonu (modül anahtarı); masası yerine onun önünde ayakta durur. */
   istasyon?: string;
+  /** Kişinin bu odada seçtiği çalışma masası (odadaki sırası); boşsa sıradaki boş masa. */
+  masa?: number;
 }
 
 interface Yerlestirme {
@@ -231,6 +233,9 @@ function patronMasasi(): THREE.Group {
   g.add(koltuk);
   return g;
 }
+
+/** Karakteri yeniden kurmayı gerektiren görünüm: masa seçimi modele dokunmaz, sayılmaz. */
+const gorunumImzasi = (g: KarakterGorunumu | undefined): string => JSON.stringify(g ? { ...g, masalar: undefined } : null);
 
 /** Kemiğin uzunluk ekseni (yerel +Y; çocuk kemik o yönde) dünyada `yon`e baksın. */
 function kemigiYonelt(kemik: THREE.Object3D, yon: THREE.Vector3): void {
@@ -414,6 +419,11 @@ export class OfisMotoru {
   onAjanTikla?: () => void;
   /** Kişi seçilince ya da seçim bırakılınca (arayüz kendi karakterindeyse "düzenle" düğmesini gösterir). */
   onKisiSecildi?: (id: string | null) => void;
+  /**
+   * Kendi karakteri seçiliyken odasındaki başka bir ekip masasına tıklandı:
+   * arayüz tıklanan yerde "Çalışma masası yap" düğmesi gösterir (null: düğme kalksın).
+   */
+  onMasaTeklifi?: (t: { odaId: string; masaNo: number; x: number; y: number } | null) => void;
   /**
    * Stüdyoda proje istasyonlarının ve kupa rafının bilgisi. Anahtar "oda|modül":
    * kupa rafının anahtarı her işte aynı, yalnızca modül anahtarıyla tutulunca
@@ -1753,6 +1763,19 @@ export class OfisMotoru {
     const patronDolu = new Set<string>();
     const yerler: { v: SahneKisisi; oda: OfisOdasi; koltuk: THREE.Vector3; koltukYonu: number; masaNo: number; ayakta?: boolean }[] = [];
     const istasyonda = new Map<string, number>();
+    // Masasını seçmiş olanlar önce yerleşir; geri kalanlar sırayla boş kalanlara.
+    // Aynı masayı iki kişi seçtiyse listede önce gelen alır, öteki sıradaki boşa düşer.
+    const secilen = new Map<SahneKisisi, number>();
+    const tutulan = new Map<string, Set<number>>();
+    for (const v of kisiler) {
+      const oda = plan.odalar.find((o) => o.id === v.odaId);
+      if (!oda || v.masa === undefined || (v.istasyon && this.modulNesneleri.has(`${oda.id}|${v.istasyon}`))) continue;
+      const t = tutulan.get(oda.id) ?? new Set<number>();
+      if (!oda.masalar[v.masa] || oda.masalar[v.masa].patron || t.has(v.masa)) continue;
+      t.add(v.masa);
+      tutulan.set(oda.id, t);
+      secilen.set(v, v.masa);
+    }
     for (const v of kisiler) {
       const oda = plan.odalar.find((o) => o.id === v.odaId);
       if (!oda) continue;
@@ -1781,11 +1804,14 @@ export class OfisMotoru {
       // Yönetici (ilki) yönetici masasına; diğerleri sırayla ekip masalarına.
       const patronNo = oda.masalar.findIndex((m) => m.patron);
       let s: number;
-      if (v.yonetici && patronNo >= 0 && !patronDolu.has(oda.id)) {
+      const t = tutulan.get(oda.id);
+      if (secilen.has(v)) s = secilen.get(v)!;
+      else if (v.yonetici && patronNo >= 0 && !patronDolu.has(oda.id)) {
         s = patronNo;
         patronDolu.add(oda.id);
       } else {
         s = doluluk.get(oda.id) ?? 0;
+        while (t?.has(s)) s++;
         if (oda.masalar[s]?.patron) continue; // ekip masaları doldu
         doluluk.set(oda.id, s + 1);
       }
@@ -1801,6 +1827,7 @@ export class OfisMotoru {
         masaNo: s,
       });
     }
+    const masasiDegisen: Karakter[] = [];
     const yeni = await Promise.all(
       yerler.map(async ({ v, oda, koltuk, koltukYonu, masaNo, ayakta }): Promise<Karakter | null> => {
         const anahtar = v.id + "|" + v.odaId;
@@ -1808,7 +1835,10 @@ export class OfisMotoru {
         if (onceki) {
           eski.delete(anahtar);
           this.halkaRengi(onceki.halka, v);
-          return { ...onceki, veri: v, koltuk, koltukYonu, masaNo, oda, ayakta };
+          const k = { ...onceki, veri: v, koltuk, koltukYonu, masaNo, oda, ayakta };
+          // Masası değişen (yeni masasını seçen) kişi yerinde ışınlanmaz, yeni masasına yürür.
+          if (onceki.masaNo !== masaNo && onceki.durum === "oturuyor") masasiDegisen.push(k);
+          return k;
         }
         let k3: Karakter3D;
         const gorunum = this.gorunumler.get(v.id);
@@ -1849,7 +1879,7 @@ export class OfisMotoru {
           yolVer: 0,
           kacis: new THREE.Vector3(),
           yazma: Math.random() * 20,
-          gorunumImza: JSON.stringify(gorunum ?? null),
+          gorunumImza: gorunumImzasi(gorunum),
         };
         this.eylemeGec(k, "Idle_Neutral", 0);
         // Herkes aynı anda nefes almasın.
@@ -1868,8 +1898,14 @@ export class OfisMotoru {
     for (const k of this.karakterler) if (k.k3.nesne.parent !== this.kisiGrubu) this.kisiGrubu.add(k.k3.nesne);
     if (this.seciliKisiId && !this.karakterler.some((k) => k.veri.id === this.seciliKisiId)) this.kisiSec(null);
     else if (this.seciliKisiId) this.kisiSec(this.seciliKisiId, false);
+    for (const k of masasiDegisen) {
+      // Eski masasının sandalyesinden kalkıp yürür (oturma pozundan çıkar).
+      k.k3.nesne.position.y = ZEMIN_Y;
+      k.oturak = undefined;
+      this.yuru(k, k.koltuk, true);
+    }
     // Kurulum sürerken görünümler gelmiş olabilir: eski görünümle kurulanlar yenilenir.
-    for (const k of this.karakterler) if (k.gorunumImza !== JSON.stringify(this.gorunumler.get(k.veri.id) ?? null)) void this.karakteriYenile(k);
+    for (const k of this.karakterler) if (k.gorunumImza !== gorunumImzasi(this.gorunumler.get(k.veri.id))) void this.karakteriYenile(k);
   }
 
   /**
@@ -1879,13 +1915,13 @@ export class OfisMotoru {
    */
   gorunumleriAyarla(gorunumler: Map<string, KarakterGorunumu>): void {
     this.gorunumler = new Map(gorunumler);
-    for (const k of this.karakterler) if (k.gorunumImza !== JSON.stringify(this.gorunumler.get(k.veri.id) ?? null)) void this.karakteriYenile(k);
+    for (const k of this.karakterler) if (k.gorunumImza !== gorunumImzasi(this.gorunumler.get(k.veri.id))) void this.karakteriYenile(k);
   }
 
   /** Karakterin modelini yeni görünümle değiştirir: yeri, duruşu, halkası ve işaretleri korunur. */
   private async karakteriYenile(k: Karakter): Promise<void> {
     const gorunum = this.gorunumler.get(k.veri.id);
-    const imza = JSON.stringify(gorunum ?? null);
+    const imza = gorunumImzasi(gorunum);
     k.gorunumImza = imza;
     let yeni: Karakter3D;
     try {
@@ -2463,6 +2499,15 @@ export class OfisMotoru {
     return null;
   }
 
+  /** İmlecin altındaki çalışma masası (sandalyesiyle birlikte): odası ve sırası. */
+  private masaBul(): { oda: OfisOdasi; no: number } | null {
+    this.isin.setFromCamera(this.fare, this.kamera);
+    const v = this.isin.intersectObjects([...this.nesneler.values()].map((n) => n.obj), true)[0];
+    const n = v ? this.nesneler.get(v.object.userData.nesne as string) : undefined;
+    const no = n && /^masa-(\d+)$/.exec(n.nesneId);
+    return n && no ? { oda: n.oda, no: Number(no[1]) } : null;
+  }
+
   /**
    * Kişiyi oturağın önüne yürütüp oturtur. Kanepede tıklanan yere en yakın
    * oturağa oturulur. Başkasının oturduğu yere ya da birinin masasına oturulmaz;
@@ -2569,6 +2614,7 @@ export class OfisMotoru {
       this.halkaRengi(eski.halka, eski.veri);
     }
     this.seciliKisiId = id;
+    this.onMasaTeklifi?.(null);
     // Üstündeki kişinin etiketi ("götür" / "vazgeç") yenilensin.
     const u = this.ustteki;
     if (u?.tur === "kisi") {
@@ -3205,7 +3251,11 @@ export class OfisMotoru {
     if (!this.basilan) return;
     const surukleme = Math.hypot(e.clientX - this.basilan.x, e.clientY - this.basilan.y) > 6;
     this.basilan = null;
-    if (surukleme) return;
+    // Sahne kaydırılınca masa düğmesi masanın üstünden kayar; kaldırılır.
+    if (surukleme) {
+      this.onMasaTeklifi?.(null);
+      return;
+    }
     this.fareKonumu(e);
     // Düzenleyicide boş yere tıklamak seçimi bırakır; oda/modül tıklaması çalışmaz.
     if (this.duzenlenenOda && !this.yerlestirme) {
@@ -3231,6 +3281,17 @@ export class OfisMotoru {
     }
     if (this.seciliKisiId) {
       const k = this.karakterler.find((c) => c.veri.id === this.seciliKisiId);
+      this.onMasaTeklifi?.(null);
+      // Kendi karakteriyle başka bir masaya tıklanınca o masa çalışma masası yapılabilir
+      // (yürümez; düğmeye basılınca yeni masasına kendisi yürür).
+      const masa = k?.veri.ben ? this.masaBul() : null;
+      if (k && masa) {
+        if (masa.oda.id !== k.oda.id) this.onUyari?.("Yalnızca kendi odandaki bir masayı çalışma masası yapabilirsin");
+        else if (masa.oda.masalar[masa.no]?.patron) this.onUyari?.("Bu, odanın yönetici masası");
+        else if (masa.no !== k.masaNo) this.onMasaTeklifi?.({ odaId: masa.oda.id, masaNo: masa.no, x: e.clientX, y: e.clientY });
+        else this.onUyari?.("Zaten çalışma masan");
+        return;
+      }
       // Sandalyeye, koltuğa, kanepeye tıklandıysa oraya oturur; değilse zemindeki noktaya yürür.
       const oturak = this.oturakBul();
       const p = oturak ? null : this.zemineDegen();

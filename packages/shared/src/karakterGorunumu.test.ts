@@ -36,4 +36,15 @@ describe("karakterGorunumuTemizle", () => {
       { model: "erkek_suit", ust: "erkek_hoodie", altRenk: KIYAFET_RENKLERI[1] }
     );
   });
+
+  test("masa seçimi: geçerli oda kimliği ve tam sayı sıra kalır", () => {
+    assert.deepEqual(
+      karakterGorunumuTemizle({
+        model: "kadin_suit",
+        masalar: { "a1b2-c3": 2, "../x": 1, "oda-2": -1, "oda-3": 1.5, "oda-4": "3" },
+      }),
+      { model: "kadin_suit", masalar: { "a1b2-c3": 2 } }
+    );
+    assert.deepEqual(karakterGorunumuTemizle({ model: "kadin_suit", masalar: [1, 2] }), { model: "kadin_suit" });
+  });
 });

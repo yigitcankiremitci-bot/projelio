@@ -5,6 +5,7 @@
 import { useState } from "react";
 import {
   KARAKTER_MODELLERI,
+  KIYAFET_ADLARI,
   KIYAFET_PARCALARI,
   KIYAFET_RENKLERI,
   SAC_RENKLERI,
@@ -122,7 +123,7 @@ export default function KarakterDuzenleyici({
                       aria-pressed={secili === m.dosya}
                       onClick={() => onDegis({ ...g, [p.alan]: m.dosya === g.model ? undefined : m.dosya })}
                     >
-                      {m.dosya === g.model ? "Kendi" : m.ad}
+                      {KIYAFET_ADLARI[p.alan][m.dosya]}
                     </button>
                   ))}
                 </div>

@@ -1395,6 +1395,24 @@ export default function CustomersPanel({
               {t("Vazgeç")}
             </button>
           </div>
+          {/* Silme yalnızca kartın en altında: eskiden her satırda Düzenle'nin
+              hemen yanında bir çöp kutusu vardı, yanlış tıklamayla müşteri
+              silindi (kullanıcı şikâyeti, 2026-11-03). */}
+          {formMode.kind === "edit" && canWrite && (
+            <div style={{ borderTop: `1px solid ${c.border}`, paddingTop: 12, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={async () => {
+                  const p = formMode.party;
+                  closeForm();
+                  await handleArchive(p);
+                }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${c.danger}60`, background: "transparent", color: c.danger, fontSize: 13, cursor: "pointer" }}
+              >
+                <IconTrash size={14} color={c.danger} />
+                {baglantiModu ? t("Bağlantıyı sil") : t("Müşteriyi sil")}
+              </button>
+            </div>
+          )}
         </div>
   ) : null;
 
@@ -1942,14 +1960,7 @@ export default function CustomersPanel({
                         <IconEdit size={15} color={c.textSecondary} />
                       )}
                     </button>
-                    <button
-                      onClick={() => handleArchive(p)}
-                      aria-label={t("Sil")}
-                      title={t("Sil")}
-                      style={{ background: "transparent", border: "none", cursor: "pointer" }}
-                    >
-                      <IconTrash size={14} color={c.textSecondary} />
-                    </button>
+                    {/* Silme düğmesi satırda yok: düzenleme kartının en altında (bkz. formAlani). */}
                   </>
                 )}
               </div>

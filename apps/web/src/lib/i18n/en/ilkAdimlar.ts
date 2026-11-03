@@ -236,6 +236,8 @@ export const ilkAdimlar: TranslationDict = {
   // ─────────────────────────────────────────────── Müşteriler, destek, e-posta modülü
   "Müşteri ekle": "Add customer",
   "Müşteri arşivleme": "Archiving customer",
+  "Müşteriyi sil": "Delete customer",
+  "Bağlantıyı sil": "Delete connection",
   "Ad / Unvan *": "Name / Company name *",
   "Vergi / TC No": "Tax / ID No",
   "Fatura kesilecekse gerekli": "Required if you'll invoice them",

@@ -23,6 +23,7 @@ import { useModuleTabs } from "../lib/useModuleTabs";
 import { tourAnchor } from "../lib/tour/types";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
+import OfisDavetKarti from "../components/OfisDavetKarti";
 
 // Sabit sekmeler + (varsa) terfi etmiş modül sekmeleri. Modül sekmeleri
 // "Modüller"in soluna girer: kullanıcı en sık kullandığı modülü çekirdek
@@ -471,6 +472,11 @@ export default function Dashboard() {
                   <JobCard job={j} projectCount={j.projectCount ?? projectCountByJob[j.id] ?? 0} />
                 </div>
               ))}
+            </div>
+
+            {/* 3D stüdyo daveti: iş ızgaralarının arasında, sayfanın ortasında. */}
+            <div style={{ margin: "28px 0" }}>
+              <OfisDavetKarti tur="studyo" />
             </div>
 
             {splitView && (

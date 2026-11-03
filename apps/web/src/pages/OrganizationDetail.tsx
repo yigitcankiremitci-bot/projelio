@@ -32,6 +32,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
 import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "../components/icons";
+import OfisDavetKarti from "../components/OfisDavetKarti";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import { bicimDili } from "../lib/i18n/depo";
@@ -351,8 +352,13 @@ export default function OrganizationDetail() {
                 oklar bölümü bir yukarı/aşağı taşır. Paneller her sırada kurulu
                 kalır — "+" menüsü ref'lerle onlara ulaşıyor. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-              {bolumSirasi.map((bolum) => {
+              {bolumSirasi.map((bolum, i) => {
                 const oklar = siralamaOklari(bolum);
+                // 3D ofis daveti bölümlerin ortasında durur; sıralama
+                // oklarına katılmaz, kullanıcı bölümleri dizince yerinde kalır.
+                const davet =
+                  id && i === Math.ceil(bolumSirasi.length / 2) ? <OfisDavetKarti key="ofis-davet" tur="sirket" organizationId={id} /> : null;
+                const panel = (() => {
                 switch (bolum) {
                   case "products":
                     return (
@@ -374,6 +380,8 @@ export default function OrganizationDetail() {
                   case "modules":
                     return <ModulesPanel key={bolum} ref={modulesRef} organizationId={id} basliktaSag={oklar} />;
                 }
+                })();
+                return davet ? [davet, panel] : panel;
               })}
             </div>
           </>

@@ -166,7 +166,15 @@ export default function Yeni() {
       .then((d) => {
         const liste = (d ?? []).filter((o) => !o.archivedAt);
         setOrgs(liste);
-        if (liste[0]) setOrgId(liste[0].id);
+        // Ana sayfalardaki davet kartı (components/OfisDavetKarti.tsx) hangi
+        // ofisin açılacağını ?ofis= ile söyler: şirket kimliği ya da "studyo".
+        const istenen = new URLSearchParams(location.search).get("ofis");
+        const istenenSirket = liste.find((o) => o.id === istenen);
+        if (istenen === "studyo" && liste[0]) {
+          setOrgId(liste[0].id);
+          setStudyo(true);
+        } else if (istenenSirket) setOrgId(istenenSirket.id);
+        else if (liste[0]) setOrgId(liste[0].id);
         else {
           setStudyo(true);
           setDepartmanlar([]);

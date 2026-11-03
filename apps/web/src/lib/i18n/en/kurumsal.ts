@@ -657,4 +657,20 @@ export const kurumsal: TranslationDict = {
   "{eposta} bülten listesinden çıkarılsın mı?": "Remove {eposta} from the newsletter list?",
   "{eposta} kalıcı olarak silinsin mi? Rıza kaydı da gider.": "Permanently delete {eposta}? The consent record goes too.",
   "İşlem yapılamadı.": "The action couldn't be completed.",
+  // ─────────────────────────────────────────────── 3D ofis davet kartı (ana sayfalar)
+  "Yeni · 3D ofis": "New · 3D office",
+  "Şirketin 3D ofisi seni bekliyor": "Your company's 3D office is waiting",
+  "Stüdyon seni bekliyor": "Your studio is waiting",
+  "Her departman bir oda, ekibin masasında. Kimin ne üzerinde çalıştığını canlı gör, panolardan projelere geç, ofisi birlikte döşe.":
+    "Every department is a room, your team at their desks. See live who's working on what, jump into projects from the boards and furnish the office together.",
+  "Her işin bir oda, projelerin birer çalışma istasyonu. Karakterini seç, görev bitirdikçe puan topla, stüdyonu dilediğin gibi döşe.":
+    "Every job is a room, every project a workstation. Pick your character, earn points as you finish tasks and furnish your studio your way.",
+  "Canlı ekip": "Live team",
+  "Panodan projeye": "From board to project",
+  "Ortak oda düzeni": "Shared room layout",
+  "İş başına oda": "A room per job",
+  "Puanla eşya": "Furniture for points",
+  "Kendi karakterin": "Your own character",
+  "Ofise gir": "Enter the office",
+  "Stüdyoya gir": "Enter the studio",
 };

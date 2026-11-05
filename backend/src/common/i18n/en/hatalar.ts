@@ -173,6 +173,7 @@ export const hatalar: TranslationDict = {
   "Hesap adı gerekli": "Account name is required",
   "Hisse yüzdesi 0-100 arasında olmalı": "The share percentage must be between 0 and 100",
   "Kadroya bir kullanıcı ya da davet e-postası gerekli": "A user or an invite email is required for the staff record",
+  "Bu davet artık geçerli değil": "This invitation is no longer valid",
   "Kayıt kendisiyle birleştirilemez": "A record can't be merged with itself",
   "Kişi adı gerekli": "The contact name is required",
   "Kişi seçin": "Select a person",

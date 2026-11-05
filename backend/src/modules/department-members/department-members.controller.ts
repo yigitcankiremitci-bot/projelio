@@ -15,6 +15,13 @@ export class DepartmentMembersController {
     return this.departmentMembersService.findByDepartment(departmentId, req.user.userId);
   }
 
+  // Davetlinin kendi bekleyen daveti — departman sayfası ona henüz kapalıyken
+  // Onayla/Reddet gösterebilmek için (bkz. DepartmentMembersService.myInvite).
+  @Get("departments/:departmentId/members/me/invite")
+  myInvite(@Param("departmentId") departmentId: string, @Req() req: any) {
+    return this.departmentMembersService.myInvite(departmentId, req.user.userId);
+  }
+
   @Post("departments/:departmentId/members")
   invite(
     @Param("departmentId") departmentId: string,

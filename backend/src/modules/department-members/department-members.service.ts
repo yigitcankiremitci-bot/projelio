@@ -229,10 +229,66 @@ export class DepartmentMembersService {
 
   // Davet edilen kişi kendisi onaylar/reddeder. E-posta ile davet edilmiş ama
   // henüz user_id bağlanmamışsa, onaylayan kişinin hesabıyla ilk burada eşleşir.
+  /**
+   * Davet edilen kişinin bu departmandaki bekleyen daveti + davetin neye
+   * olduğunu anlatacak kadar ad.
+   *
+   * Neden ayrı bir uç: "Kadro Daveti" bildirimi /departments/:id'ye gidiyor,
+   * ama davetli henüz kadroda olmadığı için GET /departments/:id 403 dönüyor ve
+   * sayfa bomboş açılıyordu — Onayla/Reddet düğmeleri o boş sayfanın içinde
+   * kaldığından davet hiç kabul edilemiyordu (2026-11-04, müşteri önünde).
+   * Departmanın kendisini davetliye açmak yerine yalnızca davetin kendisi ve
+   * departman/şirket ADI veriliyor: kabul edilene kadar başka hiçbir şey görünmez.
+   */
+  async myInvite(
+    departmentId: string,
+    userId: string
+  ): Promise<{ invite: DepartmentMember | null; departmentName?: string; organizationName?: string }> {
+    const { data: row, error } = await this.supabase.client
+      .from("department_members")
+      .select("*, users!department_members_user_id_fkey(full_name, email, username)")
+      .eq("department_id", departmentId)
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (error) throw error;
+    if (!row) return { invite: null };
+
+    const { data: dept } = await this.supabase.client
+      .from("departments")
+      .select("name, organizations(name)")
+      .eq("id", departmentId)
+      .maybeSingle();
+    return {
+      invite: mapDepartmentMember(row),
+      departmentName: (dept as any)?.name ?? undefined,
+      organizationName: (dept as any)?.organizations?.name ?? undefined,
+    };
+  }
+
   async respond(id: string, approve: boolean, requestingUserId: string): Promise<DepartmentMember> {
     const existing = await this.findById(id);
     if (existing.userId && existing.userId !== requestingUserId) {
       throw new ForbiddenException("Bu daveti yalnızca davet edilen kişi yanıtlayabilir");
+    }
+    // Yalnızca bekleyen davet yanıtlanır. Kontrol yokken kadrodan çıkarılmış
+    // (removed) ya da daveti reddetmiş biri aynı kaydı "approve" ile kendi
+    // kendine yeniden onaylayıp departmana geri girebiliyordu.
+    if (existing.status !== "pending" && existing.status !== "invited") {
+      throw new BadRequestException("Bu davet artık geçerli değil");
+    }
+    // E-postayla açılmış davet (user_id boş) yalnızca o e-postanın sahibine
+    // bağlanabilir; yoksa kaydın kimliğini bilen herkes onu üstlenebilirdi.
+    if (!existing.userId) {
+      const { data: user } = await this.supabase.client
+        .from("users")
+        .select("email")
+        .eq("id", requestingUserId)
+        .maybeSingle();
+      const eposta = (user as any)?.email?.trim().toLowerCase();
+      if (!eposta || eposta !== existing.inviteEmail?.trim().toLowerCase()) {
+        throw new ForbiddenException("Bu daveti yalnızca davet edilen kişi yanıtlayabilir");
+      }
     }
 
     // Davet atıldığında yer vardı ama kabule kadar dolmuş olabilir.

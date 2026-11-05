@@ -25,6 +25,17 @@ export const kurumsal: TranslationDict = {
   "Ayrılma talebin şirket kurucusunun onayını bekliyor.":
     "Your request to leave is awaiting the founder's approval.",
   "Ayrılmasını onayla": "Approve their departure",
+  // Departman sayfası davetliye henüz kapalıyken gösterilen kart (DepartmentDetail > DavetKarti)
+  "Kadro daveti": "Staff invitation",
+  "{sirket} şirketinin {departman} departmanına davet edildin.":
+    "You've been invited to the {departman} department at {sirket}.",
+  "{departman} departmanına davet edildin.": "You've been invited to the {departman} department.",
+  "Kabul edince departmanın görevlerini ve modüllerini görürsün.":
+    "Once you accept, you'll see the department's tasks and modules.",
+  "Davet yanıtlanamadı, tekrar dene.": "Couldn't respond to the invitation, please try again.",
+  "Bu departmanı görüntüleme yetkin yok ya da departman artık yok.":
+    "You don't have access to this department, or it no longer exists.",
+  "Ana sayfaya dön": "Back to home",
   "Onayla": "Approve",
   "Onaylamak için": "To approve",
   "Ata": "Assign",

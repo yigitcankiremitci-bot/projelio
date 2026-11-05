@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { Department, Task } from "@projelio/shared";
-import { api } from "../api/client";
+import type { Department, DepartmentMember, Task } from "@projelio/shared";
+import { api, ApiError } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
 import DepartmentMembersList, { DepartmentMembersListHandle } from "../components/DepartmentMembersList";
 import DepartmentModulesPanel from "../components/DepartmentModulesPanel";
@@ -85,9 +85,33 @@ export default function DepartmentDetail() {
   const tasksRef = useRef<DepartmentTasksPanelHandle>(null);
   const budgetRef = useRef<ScopeBudgetPanelHandle>(null);
 
+  // Departman açılamadıysa (403/404) sayfa boş kalmasın: davetli kendi
+  // bekleyen davetini burada görüp yanıtlar (bkz. DavetKarti). Eskiden
+  // department null kalınca hiçbir şey çizilmiyor, "Kadro Daveti"
+  // bildirimine tıklayan kişi bomboş bir ekrana düşüyordu.
+  const [erisimYok, setErisimYok] = useState(false);
+  const [davet, setDavet] = useState<BekleyenDavet | null | undefined>(undefined);
+
   const reload = () => {
     if (!id) return;
-    api.get<Department>(`/departments/${id}`).then(setDepartment).catch(() => setDepartment(null));
+    api
+      .get<Department>(`/departments/${id}`)
+      .then((d) => {
+        setDepartment(d);
+        setErisimYok(false);
+        setDavet(null);
+      })
+      .catch((e) => {
+        setDepartment(null);
+        if (e instanceof ApiError && (e.status === 403 || e.status === 404)) {
+          setErisimYok(true);
+          setDavet(undefined);
+          api
+            .get<BekleyenDavet>(`/departments/${id}/members/me/invite`)
+            .then((r) => setDavet(r.invite ? r : null))
+            .catch(() => setDavet(null));
+        }
+      });
     api
       .get<Task[]>(`/departments/${id}/tasks`)
       .then(setTasks)
@@ -359,6 +383,9 @@ export default function DepartmentDetail() {
       )}
 
       <div style={{ padding: `12px ${gutter}px 28px` }}>
+        {!department && erisimYok && davet !== undefined && (
+          <DavetKarti davet={davet} onYanitlandi={(kabul) => (kabul ? reload() : navigate("/"))} onAnaSayfa={() => navigate("/")} />
+        )}
         {department && (
           <>
             <div ref={tabsRef}>
@@ -434,6 +461,118 @@ export default function DepartmentDetail() {
           onArchived={() => navigate(`/organizations/${department.organizationId}`)}
         />
       )}
+    </div>
+  );
+}
+
+interface BekleyenDavet {
+  invite: DepartmentMember | null;
+  departmentName?: string;
+  organizationName?: string;
+}
+
+const ROL_ADI: Record<DepartmentMember["role"], string> = {
+  manager: "Departman Yöneticisi", // dil:anahtar
+  employee: "Üretici Çalışan", // dil:anahtar
+  subcontractor: "Taşeron", // dil:anahtar
+};
+
+/**
+ * Departmanı henüz göremeyen kişiye gösterilen kart: bekleyen daveti varsa
+ * Kabul et / Reddet, yoksa neden açılmadığını söyleyen kısa bir not. Kabulden
+ * sonra sayfa yeniden yüklenir ve departman artık açılır.
+ */
+function DavetKarti({
+  davet,
+  onYanitlandi,
+  onAnaSayfa,
+}: {
+  davet: BekleyenDavet | null;
+  onYanitlandi: (kabul: boolean) => void;
+  onAnaSayfa: () => void;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  const [yanitlaniyor, setYanitlaniyor] = useState(false);
+  const [hata, setHata] = useState<string | null>(null);
+
+  const kart = {
+    maxWidth: 520,
+    margin: "40px auto",
+    border: `1px solid ${c.border}`,
+    borderRadius: 12,
+    background: c.surface,
+    padding: 20,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 12,
+  };
+
+  if (!davet?.invite) {
+    return (
+      <div style={kart}>
+        <div style={{ fontSize: 15, color: c.textPrimary }}>
+          {t("Bu departmanı görüntüleme yetkin yok ya da departman artık yok.")}
+        </div>
+        <button
+          onClick={onAnaSayfa}
+          style={{ padding: "10px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
+        >
+          {t("Ana sayfaya dön")}
+        </button>
+      </div>
+    );
+  }
+
+  const invite = davet.invite;
+  const yanitla = async (kabul: boolean) => {
+    setYanitlaniyor(true);
+    setHata(null);
+    try {
+      await api.patch(`/department-members/${invite.id}/respond`, { approve: kabul });
+      onYanitlandi(kabul);
+    } catch (e) {
+      // Sunucunun metni gösterilir: kabulde en sık sebep şirketin kişi
+      // hakkının dolmuş olması ve kişi ne yapacağını oradan öğreniyor.
+      setHata(e instanceof Error && e.message ? e.message : t("Davet yanıtlanamadı, tekrar dene."));
+    } finally {
+      setYanitlaniyor(false);
+    }
+  };
+
+  const rol = t(ROL_ADI[invite.role]);
+  const departman = davet.departmentName;
+  return (
+    <div style={{ ...kart, border: `1px solid ${c.primary}` }}>
+      <div style={{ fontSize: 17, fontWeight: 600, color: c.textPrimary }}>{t("Kadro daveti")}</div>
+      <div style={{ fontSize: 15, color: c.textPrimary }}>
+        {departman && davet.organizationName
+          ? t("{sirket} şirketinin {departman} departmanına davet edildin.", { sirket: davet.organizationName, departman })
+          : departman
+          ? t("{departman} departmanına davet edildin.", { departman })
+          : t("Bu departmana davet edildin ({rol}).", { rol })}
+      </div>
+      <div style={{ fontSize: 14, color: c.textSecondary }}>{invite.title ? `${invite.title} · ${rol}` : rol}</div>
+      <div style={{ fontSize: 13, color: c.textSecondary }}>
+        {t("Kabul edince departmanın görevlerini ve modüllerini görürsün.")}
+      </div>
+      {hata && <div style={{ fontSize: 13, color: c.danger }}>{hata}</div>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => yanitla(true)}
+          disabled={yanitlaniyor}
+          style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
+        >
+          {t("Kabul et")}
+        </button>
+        <button
+          onClick={() => yanitla(false)}
+          disabled={yanitlaniyor}
+          style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textPrimary, fontSize: 14 }}
+        >
+          {t("Reddet")}
+        </button>
+      </div>
     </div>
   );
 }

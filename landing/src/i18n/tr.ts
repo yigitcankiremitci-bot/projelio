@@ -67,6 +67,8 @@ export const tr = {
   },
 
   misafir: {
+    // Görünen yalnızca adim.*.yer ve donus'un düğmeleri; gerisi ekran okuyucu ve
+    // fareyle üzerine gelme metni. Sayfada yazı bilerek yok.
     baslik: "Vaktiniz kıymetli, sizi oyalamıyoruz.",
     altBaslik: "Doğrudan işlerinizi yönetmeye başlayın.",
     giris: "Giriş yap",
@@ -80,44 +82,22 @@ export const tr = {
     bolumKilidi: "{bolum} üyelikle açılır",
     isKilidi: "Birden çok iş üyelikle açılır",
     projeKilidi: "Birden çok proje üyelikle açılır",
-    kilitMetni: "Üye olun, buraya kadar yaptıklarınız hesabınıza geçsin.",
-    yeniIs: "İş",
-    yeniProje: "Proje",
     isAdi: "İşin adı",
     projeAdi: "Projenin adı",
     adim: {
-      is: {
-        soru: "Üzerinde çalıştığınız işin adı ne?",
-        ornek: "Örn. Kafe açılışı",
-        dugme: "Başla",
-        ipucu: "İş, en büyük başlığınız: bir müşteri, bir girişim, bir dönem.",
-      },
-      proje: {
-        soru: "Bu işin içindeki ilk proje ne?",
-        ornek: "Örn. Web sitesi",
-        dugme: "Ekle",
-        ipucu: "Proje, işin içindeki somut bir teslimat.",
-      },
-      gorev: {
-        soru: "Şimdi ne yapılacak?",
-        ornek: "Örn. Menü fotoğraflarını çek",
-        dugme: "Ekle",
-        ipucu: "Görev, tek seferde bitirebileceğiniz bir adım.",
-      },
+      is: { yer: "İş", soru: "Üzerinde çalıştığınız işin adı", dugme: "Başla" },
+      proje: { yer: "Proje", soru: "Bu işin içindeki ilk proje", dugme: "Ekle" },
+      gorev: { yer: "Görev", soru: "Yapılacak görev", dugme: "Ekle" },
     },
-    gorevIpucu: "Bittiğinde işaretleyin.",
     sayac: "{n} / {sinir} görev",
     gorevSil: "{gorev} görevini sil",
-    sinir: "Üyeliksiz 10 göreve kadar. Üye olun, sınır kalksın, işiniz de yanınızda gelsin.",
-    yerelNot: "Bu çalışma yalnızca bu tarayıcıda duruyor.",
+    sinir: "Üyeliksiz görev sınırı doldu",
     kaydetmekIcin: "Kaydetmek için üye olun",
-    ozet: "{proje} proje, {gorev} görev",
     donus: {
       baslik: "Çalışmanız henüz kaydedilmedi",
-      metin: "Kaybetmemek için üye olun, hesabınıza geçsin.",
-      uyeOl: "Üye ol ve kaydet",
+      uyeOl: "Üye ol",
       sil: "Sil",
-      eminSil: "Evet, hepsini sil",
+      eminSil: "Evet, sil",
     },
   },
   hero: {

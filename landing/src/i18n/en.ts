@@ -68,6 +68,8 @@ export const en: Dict = {
   },
 
   misafir: {
+    // Only adim.*.yer and the donus buttons are visible; the rest is for screen
+    // readers and hover. The page has no copy on purpose.
     baslik: "Your time matters. We won't waste it.",
     altBaslik: "Start managing your work right now.",
     giris: "Log in",
@@ -81,44 +83,22 @@ export const en: Dict = {
     bolumKilidi: "{bolum} comes with an account",
     isKilidi: "More jobs come with an account",
     projeKilidi: "More projects come with an account",
-    kilitMetni: "Sign up and everything you've done so far moves to your account.",
-    yeniIs: "Job",
-    yeniProje: "Project",
     isAdi: "Job name",
     projeAdi: "Project name",
     adim: {
-      is: {
-        soru: "What job are you working on?",
-        ornek: "e.g. Café opening",
-        dugme: "Start",
-        ipucu: "A job is your biggest heading: a client, a venture, a season.",
-      },
-      proje: {
-        soru: "What's the first project in it?",
-        ornek: "e.g. Website",
-        dugme: "Add",
-        ipucu: "A project is one concrete deliverable inside the job.",
-      },
-      gorev: {
-        soru: "What needs doing?",
-        ornek: "e.g. Shoot the menu photos",
-        dugme: "Add",
-        ipucu: "A task is one step you can finish in one go.",
-      },
+      is: { yer: "Job", soru: "Name of the job you're working on", dugme: "Start" },
+      proje: { yer: "Project", soru: "First project in this job", dugme: "Add" },
+      gorev: { yer: "Task", soru: "Task to do", dugme: "Add" },
     },
-    gorevIpucu: "Tick it off when it's done.",
     sayac: "{n} / {sinir} tasks",
     gorevSil: "Delete task {gorev}",
-    sinir: "Up to 10 tasks without an account. Sign up to lift the limit and keep your work.",
-    yerelNot: "This work only exists in this browser.",
+    sinir: "Task limit without an account reached",
     kaydetmekIcin: "Sign up to save it",
-    ozet: "{proje} project, {gorev} tasks",
     donus: {
       baslik: "Your work isn't saved yet",
-      metin: "Sign up to keep it. It moves straight to your account.",
-      uyeOl: "Sign up and save",
+      uyeOl: "Sign up",
       sil: "Delete",
-      eminSil: "Yes, delete everything",
+      eminSil: "Yes, delete",
     },
   },
   hero: {

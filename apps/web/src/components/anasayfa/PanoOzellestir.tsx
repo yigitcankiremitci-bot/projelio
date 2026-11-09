@@ -121,6 +121,8 @@ export default function PanoOzellestir({
         );
       });
   const moduller = kartDugmeleri("modul");
+  const isKartlari = kartDugmeleri("is");
+  const projeKartlari = kartDugmeleri("proje");
 
   return (
     <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 14, padding: 14, marginBottom: 14 }}>
@@ -153,6 +155,20 @@ export default function PanoOzellestir({
         <>
           <Baslik>{t("Kartları sürükleyerek taşı; boyutu kartın altından seç.")}</Baslik>
           <Satirlar>{kartDugmeleri("temel")}</Satirlar>
+          <Baslik>{t("Küçük araçlar")}</Baslik>
+          <Satirlar>{kartDugmeleri("arac")}</Satirlar>
+          {isKartlari.length > 0 && (
+            <>
+              <Baslik>{t("İş kartları")}</Baslik>
+              <Satirlar>{isKartlari}</Satirlar>
+            </>
+          )}
+          {projeKartlari.length > 0 && (
+            <>
+              <Baslik>{t("Proje kartları")}</Baslik>
+              <Satirlar>{projeKartlari}</Satirlar>
+            </>
+          )}
           {moduller.length > 0 && (
             <>
               <Baslik>{t("Modül özetleri")}</Baslik>

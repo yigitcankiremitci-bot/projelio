@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useIsDesktop } from "../../lib/useIsDesktop";
@@ -59,15 +59,21 @@ export default function AnasayfaBaslik({
   baslikRef,
   geri,
   araclar,
+  secici,
 }: {
   baslik: string;
   baslikRef?: Ref<HTMLDivElement>;
   geri?: ReactNode;
   araclar?: ReactNode;
+  /** Anasayfada başlığın yerine geçen Ben / Şirket geçişi. */
+  secici?: ReactNode;
 }) {
   const c = useThemeColors();
   const isDesktop = useIsDesktop();
   const gutter = pageGutter(isDesktop);
+  // Masaüstünde seçici başlığın yerinde durur; h1 ekran okuyucular için kalır.
+  const seciciBantta = Boolean(secici) && isDesktop;
+  const aracStili = { display: "flex", alignItems: "center", gap: 8, flexShrink: 0, "--cover-action-size": "36px" } as CSSProperties;
   return (
     <div ref={baslikRef} style={{ marginBottom: isDesktop ? 18 : 12 }}>
       <div
@@ -84,25 +90,33 @@ export default function AnasayfaBaslik({
       >
         {geri}
         <h1
-          style={{
-            flex: 1,
-            minWidth: 0,
-            margin: 0,
-            fontSize: isDesktop ? 22 : 19,
-            fontWeight: 500,
-            color: c.textPrimary,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
+          style={
+            seciciBantta
+              ? { position: "absolute", width: 1, height: 1, margin: -1, overflow: "hidden", clip: "rect(0 0 0 0)" }
+              : {
+                  flex: 1,
+                  minWidth: 0,
+                  margin: 0,
+                  fontSize: isDesktop ? 22 : 19,
+                  fontWeight: 500,
+                  color: c.textPrimary,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }
+          }
         >
           {baslik}
         </h1>
-        {isDesktop && araclar && <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>{araclar}</div>}
+        {seciciBantta && <div style={{ flex: 1, minWidth: 0 }}>{secici}</div>}
+        {isDesktop && araclar && <div style={aracStili}>{araclar}</div>}
       </div>
       {/* Telefonda bantta yer yok: başlık ile iki yandaki düğmeler onu dolduruyor. */}
-      {!isDesktop && araclar && (
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, padding: `8px ${gutter}px 0` }}>{araclar}</div>
+      {!isDesktop && (araclar || secici) && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: `8px ${gutter}px 0` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>{secici}</div>
+          {araclar && <div style={aracStili}>{araclar}</div>}
+        </div>
       )}
     </div>
   );

@@ -2,15 +2,10 @@ import type { TranslationDict } from "@projelio/shared";
 
 /**
  * Anasayfa panosu: özet kartları ve Özelleştir paneli.
- *
- * Kartlar dar olduğu için etiketler bilerek kısa ve küçük harfle başlıyor:
- * büyük sayının hemen altında birim gibi okunuyorlar.
  */
 export const anasayfaPano: TranslationDict = {
   "3D ofis": "3D office",
   "3D stüdyo": "3D studio",
-  "Ekibinle 3D ofiste buluş": "Meet your team in the 3D office",
-  "Stüdyona gir, işlerini gez": "Step into your studio",
   "Arkaya al": "Move back",
   "Öne al": "Move forward",
   "Davranış": "Behaviour",
@@ -23,20 +18,27 @@ export const anasayfaPano: TranslationDict = {
   "Panodan kaldır": "Remove from board",
   "Panon boş. Özelleştir'den istediğin kartları ekleyebilirsin.": "Your board is empty. Add cards from Customize.",
   "Eski görünümü aç": "Open old interface",
-  "Son hareket": "Last activity",
   "Tüm ayarlar": "All settings",
   "Özelleştir": "Customize",
   "Özet yüklenemedi": "Couldn't load summary",
-  "açık görev": "open tasks",
-  "açık modül": "active modules",
-  "bakiye": "balance",
-  "birim kaldı": "units left",
-  "eldeki net": "net in hand",
-  "kişi": "people",
-  "kişi · {adet} davet bekliyor": "people · {adet} invited",
-  "iş · {adet} katıldığın": "jobs · {adet} joined",
-  "paylaşım": "posts",
-  "ürün/hizmet": "products/services",
   "{adet} görev gecikti": { one: "{adet} task overdue", other: "{adet} tasks overdue" },
   "{adet} proje": { one: "{adet} project", other: "{adet} projects" },
+  "{adet} davet bekliyor": { one: "{adet} invitation pending", other: "{adet} invitations pending" },
+  "{modul} modülüne yeni kayıt eklemek istiyorum: ": "I want to add a new record to the {modul} module: ",
+  "Ben": "Me",
+  "Büyüt": "Expand",
+  "Duraklat": "Pause",
+  "Görünüm": "View",
+  "Hızlı not": "Quick note",
+  "İş kartları": "Job cards",
+  "Kronometre": "Stopwatch",
+  "Küçük araçlar": "Small tools",
+  "Lio'ya yaz": "Message Lio",
+  "Not yaz": "Write a note",
+  "Pomodoro": "Pomodoro",
+  "Proje kartları": "Project cards",
+  "Sanal ofis": "Virtual office",
+  "Sıfırla": "Reset",
+  "Şirket kur": "Create a company",
+  "Yeni kayıt": "New record",
 };

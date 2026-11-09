@@ -17,7 +17,6 @@ import { CORE_ORG_TABS, ORG_TABS, OrgTab, visibleOrgTabs } from "../components/O
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { modulDepartmani } from "../lib/modulYeri";
-import AskLioButton from "../components/AskLioButton";
 import { coverActionButton } from "../components/EntityCover";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
@@ -30,7 +29,8 @@ import { IconSettings, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
-import AnasayfaPanosu, { OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import AnasayfaPanosu, { OfisKapisi, OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import GorunumSecici from "../components/anasayfa/GorunumSecici";
 import { SIRKET_VARSAYILAN_PANO, useSirketKatalogu } from "../components/anasayfa/ozetKartlari";
 import { useAnasayfaPano } from "../lib/useAnasayfaPano";
 
@@ -208,28 +208,29 @@ export default function OrganizationDetail() {
         baslik={baslik}
         baslikRef={headerRef}
         geri={
-          <GeriDugmesi
-            to={geriHedefi.to}
-            etiket={geriHedefi.label}
-            geriGit={anasayfada ? back.geriGit : undefined}
-          />
+          anasayfada ? undefined : (
+            <GeriDugmesi to={geriHedefi.to} etiket={geriHedefi.label} />
+          )
         }
+        secici={anasayfada && id ? <GorunumSecici aktif={id} /> : undefined}
         araclar={
           anasayfada ? (
             <>
-              {organization && <AskLioButton subject={{ kind: "organizasyon", title: organization.name, id: organization.id }} size={28} withBackground />}
-              {/* Taşerona gösterilmiyor: sunucu kartı zaten reddediyor
-                  (bkz. bilgiKartiYetkisiKarari) ve açılmayan bir düğme, yetki
-                  sorununu hata gibi gösteriyordu. canViewCommercial tam olarak
-                  bu ayrımı taşıyor. */}
-              {access?.canViewCommercial !== false && (
+              {/* Şirket ayarları günlük iş değil: sade üst şerit için yalnızca
+                  Özelleştir açıkken görünür. */}
+              {duzenleme && access?.canViewCommercial !== false && (
+                // Taşerona gösterilmiyor: sunucu kartı zaten reddediyor (bkz.
+                // bilgiKartiYetkisiKarari); canViewCommercial bu ayrımı taşıyor.
                 <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} title={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
-                  <IconIdCard size={20} color={c.textSecondary} />
+                  <IconIdCard size={18} color={c.textSecondary} />
                 </button>
               )}
-              <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} title={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
-                <IconSettings size={20} color={c.textSecondary} />
-              </button>
+              {duzenleme && (
+                <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} title={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
+                  <IconSettings size={18} color={c.textSecondary} />
+                </button>
+              )}
+              {id && <OfisKapisi hedef={`/yeni?ofis=${encodeURIComponent(id)}`} />}
               <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} />
             </>
           ) : undefined

@@ -636,3 +636,50 @@ export function IconMap({ size = 18, color = "currentColor" }: IconProps) {
     </svg>
   );
 }
+
+export function IconWallet({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M19 7V5a1 1 0 0 0-1-1H6a2 2 0 0 0 0 4h13a1 1 0 0 1 1 1v3" />
+      <path d="M20 16v3a1 1 0 0 1-1 1H6a2 2 0 0 1-2-2V6" />
+      <path d="M21 12v4h-4a2 2 0 0 1 0-4z" />
+    </svg>
+  );
+}
+
+export function IconTimer({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 3h10M7 21h10" />
+      <path d="M8 3v3a4 4 0 0 0 1.2 2.8L12 12l2.8-3.2A4 4 0 0 0 16 6V3" />
+      <path d="M8 21v-3a4 4 0 0 1 1.2-2.8L12 12l2.8 3.2A4 4 0 0 1 16 18v3" />
+    </svg>
+  );
+}
+
+export function IconStopwatch({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="14" r="7" />
+      <path d="M12 14V10M10 3h4M12 3v4" />
+    </svg>
+  );
+}
+
+export function IconNote({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 3h14a1 1 0 0 1 1 1v11l-5 6H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M15 21v-6h5M8 8h8M8 12h5" />
+    </svg>
+  );
+}
+
+export function IconDoor({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 21h16M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17" />
+      <path d="M14 12v.01" />
+    </svg>
+  );
+}

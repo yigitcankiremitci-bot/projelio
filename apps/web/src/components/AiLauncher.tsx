@@ -10,6 +10,7 @@ import type { AskLioRequest } from "../lib/askLio";
 import { tourAnchor } from "../lib/tour/types";
 import { useT } from "../lib/i18n";
 import AiAssistantPanel from "./AiAssistantPanel";
+import LioSohbetCubugu from "./anasayfa/LioSohbetCubugu";
 
 // Lio'nun düğme boyutu ve ekrandaki yeri artık layout.ts'te (bkz. LIO_LAUNCHER):
 // bildirim şeridi balonun ÜSTÜNE konumlanmak için aynı ölçüleri okuyor.
@@ -35,6 +36,16 @@ const TOP_CLEARANCE = 96;
  *
  * Klavye kısayolu: Cmd/Ctrl + K
  */
+const CUBUK_ANAHTARI = "projelio_lio_cubugu";
+
+function cubukAcikMi(): boolean {
+  try {
+    return localStorage.getItem(CUBUK_ANAHTARI) !== "0";
+  } catch {
+    return true;
+  }
+}
+
 export default function AiLauncher() {
   const t = useT();
   const isDesktop = useIsDesktop();
@@ -45,12 +56,28 @@ export default function AiLauncher() {
   // simgesi) gelen açılış isteği. Panel bunu işledikten sonra sıfırlar, aksi
   // halde panel her açıldığında aynı mesaj tekrar gelirdi.
   const [pendingRequest, setPendingRequest] = useState<AskLioRequest | null>(null);
+  // Panel anasayfadaki kutunun yerinde mi açık, yoksa sağdaki tam hâlinde mi.
+  const [balonda, setBalonda] = useState(false);
+  const [cubukAcik, setCubukAcikHam] = useState(cubukAcikMi);
+  const setCubukAcik = (acik: boolean) => {
+    setCubukAcikHam(acik);
+    try {
+      localStorage.setItem(CUBUK_ANAHTARI, acik ? "1" : "0");
+    } catch {
+      // Depolama kapalıysa tercih yalnızca bu oturumda geçerli.
+    }
+  };
   const hoveredRef = useRef(hovered);
   const location = useLocation();
   const modalAcik = useLioModalAcik();
   // Çalışma alanlarında ve bir pencere açıkken küçük (bkz. lioKucukMu, lib/lioBalon).
   const compact = modalAcik || lioKucukMu(location.pathname);
   const lift = useLioLift();
+  // Yalnızca panonun kendisinde: ?tab= ile açılan tam görünümlerin altında kutu
+  // listenin üstüne binerdi. Pencere açıkken de çekilir, Kaydet'i örtmesin.
+  const anasayfada =
+    (location.pathname === "/" || /^\/organizations\/[^/]+$/.test(location.pathname)) && !new URLSearchParams(location.search).has("tab");
+  const cubukGorunur = anasayfada && cubukAcik && !open && !modalAcik;
   /**
    * Sürükleme durumu. Ref'te: her pointermove'da render tetiklemesin, yalnızca
    * yükseklik (depo) değişsin. `moved` bırakıştan sonraki click'i yutmak için —
@@ -80,6 +107,7 @@ export default function AiLauncher() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        setBalonda(false);
         setOpen((v) => !v);
       }
     };
@@ -97,12 +125,20 @@ export default function AiLauncher() {
   useEffect(
     () =>
       onAskLio((request) => {
+        setBalonda(false);
         setPendingRequest(request);
         setOpen(true);
       }),
     []
   );
-  useEffect(() => onOpenLio(() => setOpen(true)), []);
+  useEffect(
+    () =>
+      onOpenLio(() => {
+        setBalonda(false);
+        setOpen(true);
+      }),
+    []
+  );
 
   // Lio arada bir göz kırpar: normalde 10-12sn'de bir, üzerine gelinince
   // ilgisi artmış gibi 4-6sn'de bir — her seferinde 0.3sn'liğine gözler kapanır.
@@ -184,7 +220,20 @@ export default function AiLauncher() {
 
   return (
     <>
-      {!open && (
+      {cubukGorunur && (
+        <LioSohbetCubugu
+          isDesktop={isDesktop}
+          onGonder={(message) => {
+            setBalonda(true);
+            setPendingRequest({ message, autoSend: true });
+            setOpen(true);
+          }}
+          onAc={() => setOpen(true)}
+          onKapat={() => setCubukAcik(false)}
+        />
+      )}
+
+      {!open && !cubukGorunur && (
         <button
           {...tourAnchor("lio-launcher")}
           // Klavye açıkken gizlenir (bkz. lib/klavye.ts).
@@ -194,7 +243,9 @@ export default function AiLauncher() {
               suppressClick.current = false;
               return;
             }
-            setOpen(true);
+            // Anasayfada simge, kapatılmış kutunun geri dönüş yolu.
+            if (anasayfada) setCubukAcik(true);
+            else setOpen(true);
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -281,7 +332,12 @@ export default function AiLauncher() {
 
       <AiAssistantPanel
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          setBalonda(false);
+        }}
+        balon={balonda && isDesktop}
+        onBuyut={() => setBalonda(false)}
         initialMessage={pendingRequest?.message ?? null}
         initialAutoSend={pendingRequest?.autoSend ?? true}
         onInitialMessageSent={() => setPendingRequest(null)}

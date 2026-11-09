@@ -9,7 +9,7 @@ import { LONG_PRESS_DELAY, useSortableList } from "../../lib/useSortableList";
 import type { AnasayfaPano } from "../../lib/useAnasayfaPano";
 import { tourAnchor } from "../../lib/tour/types";
 import { useT } from "../../lib/i18n";
-import { IconChevronLeft, IconChevronRight, IconEdit, IconX } from "../icons";
+import { IconCheck, IconChevronLeft, IconChevronRight, IconDoor, IconEdit, IconPlus, IconX } from "../icons";
 import PanoOzellestir from "./PanoOzellestir";
 import type { PanoKartTanimi } from "./ozetKartlari";
 
@@ -20,29 +20,38 @@ const BOYUT_ADI: Record<PanoBoyut, string> = { kucuk: "Küçük", orta: "Orta", 
 export function OzellestirDugmesi({ acik, onClick }: { acik: boolean; onClick: () => void }) {
   const c = useThemeColors();
   const t = useT();
+  const ad = acik ? t("Bitti") : t("Özelleştir");
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={acik}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        height: 36,
-        padding: "0 12px",
-        borderRadius: 10,
-        border: `1px solid ${acik ? c.accent : c.border}`,
-        background: c.surface,
-        color: c.textPrimary,
-        fontSize: 14,
-        whiteSpace: "nowrap",
-      }}
-    >
-      <IconEdit size={14} color={c.textSecondary} />
-      {acik ? t("Bitti") : t("Özelleştir")}
+    <button type="button" onClick={onClick} aria-pressed={acik} aria-label={ad} title={ad} style={ustDugmeStili(c, acik)}>
+      {acik ? <IconCheck size={16} color={c.accentDark} /> : <IconEdit size={16} color={c.textSecondary} />}
     </button>
   );
+}
+
+/** Sanal ofise tek dokunuşla geçiş. */
+export function OfisKapisi({ hedef }: { hedef: string }) {
+  const c = useThemeColors();
+  const t = useT();
+  return (
+    <Link to={hedef} aria-label={t("Sanal ofis")} title={t("Sanal ofis")} style={ustDugmeStili(c, false)}>
+      <IconDoor size={17} color={c.textSecondary} />
+    </Link>
+  );
+}
+
+function ustDugmeStili(c: ReturnType<typeof useThemeColors>, acik: boolean): CSSProperties {
+  return {
+    width: 36,
+    height: 36,
+    padding: 0,
+    borderRadius: "50%",
+    border: `1px solid ${acik ? c.accent : c.border}`,
+    background: c.surface,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
 }
 
 /** Karttaki küçük denetim düğmeleri için ortak görünüm. */
@@ -123,7 +132,7 @@ export default function AnasayfaPanosu({
   };
 
   return (
-    <div className="pano" style={{ padding: `0 ${gutter}px 110px` }}>
+    <div className="pano" style={{ padding: `0 ${gutter}px 170px` }}>
       {duzenleme && <PanoOzellestir pano={pano} katalog={katalog} onKapat={onDuzenlemeBitti} />}
 
       {gorunen.length === 0 ? (
@@ -134,25 +143,52 @@ export default function AnasayfaPanosu({
         <div ref={izgaraRef} className={`pano-izgara${duzenleme ? " pano-izgara--duzenleme" : ""}`} {...tourAnchor("dashboard-tabs")}>
           {gorunen.map((kart, sira) => {
             const tanim = tanimlar.get(kart.id)!;
+            const icerik = tanim.tamKaplama ? (
+              tanim.ciz(kart.boyut)
+            ) : (
+              <>
+                <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, marginBottom: "auto", paddingBottom: 10 }}>
+                  <tanim.Icon size={19} color={c.accentDark} />
+                  {tanim.adGoster && (
+                    <span style={{ fontSize: 14, color: c.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tanim.ad}</span>
+                  )}
+                </span>
+                {tanim.ciz(kart.boyut)}
+              </>
+            );
+            const kartStili: CSSProperties = {
+              background: c.surface,
+              border: `1px solid ${c.border}`,
+              ...(tanim.tamKaplama ? { padding: 0, overflow: "hidden" } : {}),
+              paddingBottom: duzenleme ? 44 : tanim.tamKaplama ? 0 : 14,
+            };
             return (
               <div key={kart.id} data-id={kart.id} data-boyut={kart.boyut} className="pano-hucre" {...(tanim.turCapasi ? tourAnchor(tanim.turCapasi) : {})}>
-                <Link
-                  to={tanim.hedef}
-                  draggable={false}
-                  className="entity-card pano-kart"
-                  onClick={(e) => {
-                    if (duzenleme) e.preventDefault();
-                  }}
-                  style={{ background: c.surface, border: `1px solid ${c.border}`, paddingBottom: duzenleme ? 44 : 14 }}
-                >
-                  <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, marginBottom: "auto", paddingBottom: 10 }}>
-                    <tanim.Icon size={15} color={c.accentDark} />
-                    <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {tanim.ad}
-                    </span>
-                  </span>
-                  {tanim.ciz(kart.boyut)}
-                </Link>
+                {tanim.etkilesimli ? (
+                  <div className="pano-kart" role="group" aria-label={tanim.ad} title={tanim.ad} style={kartStili}>
+                    {icerik}
+                  </div>
+                ) : (
+                  <Link
+                    to={tanim.hedef}
+                    draggable={false}
+                    className="entity-card pano-kart"
+                    aria-label={tanim.ad}
+                    title={tanim.ad}
+                    onClick={(e) => {
+                      if (duzenleme) e.preventDefault();
+                    }}
+                    style={kartStili}
+                  >
+                    {icerik}
+                  </Link>
+                )}
+
+                {tanim.hizliEylem && !duzenleme && (
+                  <button type="button" className="no-drag pano-hizli" onClick={tanim.hizliEylem.calistir} aria-label={tanim.hizliEylem.ad} title={tanim.hizliEylem.ad} style={{ border: `1px solid ${c.border}`, background: c.surface }}>
+                    <IconPlus size={14} color={c.textSecondary} />
+                  </button>
+                )}
 
                 {duzenleme && (
                   <div className="no-drag pano-denetim" style={{ background: c.background }}>

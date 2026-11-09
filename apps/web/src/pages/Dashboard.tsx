@@ -20,7 +20,8 @@ import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { useT } from "../lib/i18n";
 import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
-import AnasayfaPanosu, { OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import AnasayfaPanosu, { OfisKapisi, OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import GorunumSecici from "../components/anasayfa/GorunumSecici";
 import { SERBEST_VARSAYILAN_PANO, useSerbestKatalogu } from "../components/anasayfa/ozetKartlari";
 import { useAnasayfaPano } from "../lib/useAnasayfaPano";
 
@@ -81,13 +82,18 @@ export default function Dashboard() {
   // İşleri "kendi kurduğum" ve "ekibine dahil olduğum" diye ayırabilmek için
   // gereken tek bilgi: giriş yapan kullanıcının id'si (bkz. Job.ownerId).
   const [myUserId, setMyUserId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  // Üstteki "Ben" geçişi: şirket sahibi de kişisel panosunu açabilsin.
+  const benGorunumu = searchParams.get("gorunum") === "ben";
 
   useEffect(() => {
     api
       .get<User>("/auth/me")
       .then(async (me) => {
         setMyUserId(me.id);
-        if (me.accountType === "organization_owner") {
+        if (benGorunumu) {
+          setRedirectTo(null);
+        } else if (me.accountType === "organization_owner") {
           const orgs = await api.get<Organization[]>("/organizations").catch(() => []);
           setRedirectTo(orgs[0] ? `/organizations/${orgs[0].id}` : null);
         } else if (me.accountType === "group_owner") {
@@ -98,11 +104,10 @@ export default function Dashboard() {
         }
       })
       .catch(() => setRedirectTo(null));
-  }, []);
+  }, [benGorunumu]);
 
   // Görünüm, URL'deki ?tab= ile eşleşir: kenar çubuğundan "/?tab=budget" gibi
   // bir bağlantıyla gelindiğinde ilgili tam görünüm açık başlasın diye.
-  const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   // Terfi etmiş modüller: puanlama ve slot sayısı useModuleTabs içinde
   // (bkz. lib/moduleLayout.ts). Serbest çalışan bağlamı — organizasyon yok.
@@ -199,7 +204,7 @@ export default function Dashboard() {
             ? t("Modüller")
             : t("Ana Sayfa");
 
-  const katalog = useSerbestKatalogu({ isler: visibleJobs, kullaniciId: myUserId });
+  const katalog = useSerbestKatalogu({ isler: visibleJobs, projeler: projects });
   const pano = useAnasayfaPano("me", SERBEST_VARSAYILAN_PANO);
   const [duzenleme, setDuzenleme] = useDuzenlemeModu(tab);
 
@@ -221,7 +226,15 @@ export default function Dashboard() {
         baslik={pageTitle}
         baslikRef={headerRef}
         geri={tab === "home" ? undefined : <GeriDugmesi to="/" etiket={anasayfaEtiketi} />}
-        araclar={tab === "home" ? <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} /> : undefined}
+        secici={tab === "home" ? <GorunumSecici aktif="ben" isSayisi={visibleJobs.length} /> : undefined}
+        araclar={
+          tab === "home" ? (
+            <>
+              <OfisKapisi hedef="/yeni?ofis=studyo" />
+              <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} />
+            </>
+          ) : undefined
+        }
       />
 
       {tab === "home" && (

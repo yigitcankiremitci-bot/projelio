@@ -6,7 +6,7 @@ import { parseMessageLinks } from "../lib/messageLinks";
 import { useT } from "../lib/i18n";
 import { COARSE_POINTER } from "./AutoGrowTextarea";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
-import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile } from "./icons";
+import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile, IconExternalLink } from "./icons";
 import { aiChat } from "../api/aiChat";
 import { filesApi } from "../api/files";
 import type { ProjectFile } from "@projelio/shared";
@@ -65,6 +65,10 @@ interface Props {
   initialAutoSend?: boolean;
   /** Mesaj işlendikten sonra çağrılır; aksi halde her açılışta tekrar gelirdi. */
   onInitialMessageSent?: () => void;
+  /** Anasayfadaki kutunun yerinde, sayfayı örtmeden küçük açılır. */
+  balon?: boolean;
+  /** Küçük hâlden sağdaki tam panele geçer. */
+  onBuyut?: () => void;
 }
 
 interface PendingConfirmation {
@@ -162,6 +166,8 @@ export default function AiAssistantPanel({
   initialMessage,
   initialAutoSend = true,
   onInitialMessageSent,
+  balon = false,
+  onBuyut,
 }: Props) {
   const c = useThemeColors();
   const t = useT();
@@ -1041,7 +1047,7 @@ export default function AiAssistantPanel({
   return (
     <>
       {/* Arka plan karartması */}
-      {open && (
+      {open && !balon && (
         <div
           onClick={onClose}
           style={{
@@ -1064,17 +1070,31 @@ export default function AiAssistantPanel({
         aria-hidden={!open}
         style={{
           position: "fixed",
-          right: 0,
-          ...(gorunurAlan ? { top: gorunurAlan.top, height: gorunurAlan.height } : { top: 0, bottom: 0 }),
-          width: panelWidth ?? "100%",
-          maxWidth: "100vw",
+          ...(balon
+            ? {
+                // Kutuyla aynı yerde büyür: transform yerine left, çünkü açılış
+                // animasyonu transform'u kullanıyor.
+                left: "calc(50vw - min(300px, 50vw - 16px))",
+                bottom: 92,
+                width: "min(600px, calc(100vw - 32px))",
+                height: "min(520px, calc(100vh - 150px))",
+                borderRadius: 18,
+                overflow: "hidden",
+                border: `1px solid ${c.border}`,
+              }
+            : {
+                right: 0,
+                ...(gorunurAlan ? { top: gorunurAlan.top, height: gorunurAlan.height } : { top: 0, bottom: 0 }),
+                width: panelWidth ?? "100%",
+                maxWidth: "100vw",
+                borderLeft: `1px solid ${c.border}`,
+              }),
           background: c.surface,
-          borderLeft: `1px solid ${c.border}`,
           boxShadow: "-8px 0 32px rgba(26,31,41,0.16)",
           zIndex: Z.aiPanel,
           display: open ? "flex" : "none",
           flexDirection: "column",
-          animation: "projelioAiSlide .22s ease",
+          animation: balon ? "projelioAiFade .18s ease" : "projelioAiSlide .22s ease",
         }}
       >
         {/* Başlık */}
@@ -1121,6 +1141,11 @@ export default function AiAssistantPanel({
           <HeaderButton title={t("Yeni sohbet")} onClick={startNewConversation}>
             <IconPlus size={17} color="#fff" />
           </HeaderButton>
+          {balon && (
+            <HeaderButton title={t("Büyüt")} onClick={() => onBuyut?.()}>
+              <IconExternalLink size={16} color="#fff" />
+            </HeaderButton>
+          )}
           <HeaderButton title={t("Kapat")} onClick={onClose}>
             <IconX size={17} color="#fff" />
           </HeaderButton>

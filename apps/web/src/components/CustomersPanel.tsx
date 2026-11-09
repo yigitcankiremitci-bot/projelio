@@ -19,6 +19,7 @@ import {
   ozelSiraAnahtari,
   safeExternalUrl,
   type BaglantiListeKaydi,
+  type MusteriPortalOzeti,
   type KartvizitSosyal,
   type KartvizitSosyalAnahtar,
   type BaglantiOnem,
@@ -59,10 +60,11 @@ import { timeAgo } from "../lib/dates";
 import { useIsWide } from "../lib/useIsDesktop";
 import { listeCercevesi, listeSatiri, ozetKutusu, sekmeStili } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
-import { acilisApi, partyApi } from "../api/party";
+import { acilisApi, partyApi, portalApi } from "../api/party";
 import { filesApi } from "../api/files";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
+import MusteriPortali from "./musteri/MusteriPortali";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
 import MusteriKunyesi from "./musteri/MusteriKunyesi";
 // Harita ancak "Haritada göster"e basılınca yüklenir: il sınırlarının verisi
@@ -2211,7 +2213,7 @@ function PartyDetail({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "iliski" | "gorevler" | "dosyalar">(
+  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "portal" | "iliski" | "gorevler" | "dosyalar">(
     ilkSekme ?? (baglantiModu ? "iliski" : "siparisler")
   );
   const [gorevler, setGorevler] = useState<PartyGorevi[]>([]);
@@ -2243,6 +2245,25 @@ function PartyDetail({
     }
   };
   const [siparisSayisi, setSiparisSayisi] = useState(0);
+  // Web portalı (B2B, migration 188): yalnızca şirkette etkin web sitesi
+  // bağlantısı varsa. Önceden Siparişler sekmesinin içinde duruyordu ve
+  // yönetici "portal hesabı aç"ı bulamadı (kullanıcı şikâyeti, 2026-11-09) —
+  // artık kendi sekmesi ve kartın tepesinde belirgin bir düğmesi var.
+  const [portal, setPortal] = useState<MusteriPortalOzeti | null>(null);
+  const [portalYeni, setPortalYeni] = useState(false);
+  useEffect(() => {
+    if (baglantiModu) return;
+    let iptal = false;
+    portalApi
+      .ozet(party.id)
+      .then((o) => !iptal && setPortal(o))
+      .catch(() => !iptal && setPortal(null));
+    return () => {
+      iptal = true;
+    };
+  }, [party.id, baglantiModu]);
+  const portalVar = !!portal && portal.baglantilar.length > 0;
+  const portalHesabi = portal?.kullanicilar.filter((k) => k.durum === "aktif").length ?? 0;
   // null = şirket kartı değil ya da kullanıcının alacak/borç defterini görme
   // yetkisi yok; sekme o zaman hiç çıkmaz (bkz. useMusteriAlacakBorcu).
   const alacakBorc = useMusteriAlacakBorcu(party, organizationId);
@@ -2321,6 +2342,31 @@ function PartyDetail({
       {/* Künye: iletişim, adres, vergi ve sipariş özeti — önceden yalnızca
           düzenleme formunda görünüyordu (bkz. MusteriKunyesi). */}
       <MusteriKunyesi party={party} siparisOzetiGoster={!baglantiModu} />
+      {portalVar && (portalHesabi > 0 || portal!.yazabilir) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          {portalHesabi === 0 ? (
+            <button
+              onClick={() => {
+                setTab("portal");
+                setPortalYeni(true);
+              }}
+              style={{ fontSize: 13, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+            >
+              {t("Portal hesabı aç")}
+            </button>
+          ) : (
+            <button
+              onClick={() => setTab("portal")}
+              style={{ fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
+            >
+              {t("Web portalı · {n} hesap", { n: portalHesabi })}
+            </button>
+          )}
+          {portalHesabi === 0 && (
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Bu müşteri portalda görünmüyor; hesap açılınca görünür.")}</span>
+          )}
+        </div>
+      )}
       {/* Dosyalar özette küçük resimleriyle; tıklayınca önizleme. */}
       <KartDosyaOnizleme party={party} onTumu={() => setTab(baglantiModu ? "iliski" : "dosyalar")} />
       {/* Liste kartın tepesinde: hangi gruptaysa görünsün, buradan taşınsın. */}
@@ -2365,6 +2411,11 @@ function PartyDetail({
             <button onClick={() => setTab("siparisler")} style={tabStyle(tab === "siparisler")}>
               {t("Siparişler")} {siparisSayisi > 0 && `(${siparisSayisi})`}
             </button>
+            {portalVar && (
+              <button onClick={() => setTab("portal")} style={tabStyle(tab === "portal")}>
+                {t("Web portalı")} {portalHesabi > 0 && `(${portalHesabi})`}
+              </button>
+            )}
             {/* Bağlantılar'da dosyalar İlişki sekmesinde; müşteride kendi sekmesi
                 (kullanıcı isteği, 2026-10-26 — müşteriye dosya eklenemiyordu). */}
             <button onClick={() => setTab("dosyalar")} style={tabStyle(tab === "dosyalar")}>
@@ -2532,6 +2583,14 @@ function PartyDetail({
         </div>
       ) : tab === "siparisler" ? (
         <MusteriSiparisleri party={party} yazabilir={siparisYazar} onSayi={setSiparisSayisi} />
+      ) : tab === "portal" && portal && portalVar ? (
+        <MusteriPortali
+          party={party}
+          ozet={portal}
+          onOzet={setPortal}
+          yeniAcik={portalYeni}
+          onYeniKapandi={() => setPortalYeni(false)}
+        />
       ) : tab === "alacakBorc" && alacakBorc.kayitlar && organizationId ? (
         <MusteriAlacakBorcu
           party={party}

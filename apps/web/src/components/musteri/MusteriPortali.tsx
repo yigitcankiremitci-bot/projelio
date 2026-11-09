@@ -19,29 +19,35 @@ const YETKILER: PortalYetkisi[] = ["siparis_ver", "fiyat_gor", "siparis_gecmisi"
  * İskonto müşteriye ait (party.iskonto_orani): liste fiyatı herkese aynı,
  * portal bu müşterinin fiyatını sunucudan hesaplanmış alır.
  */
-export default function MusteriPortali({ party }: { party: Party }) {
+export default function MusteriPortali({
+  party,
+  ozet,
+  onOzet,
+  yeniAcik = false,
+  onYeniKapandi,
+}: {
+  party: Party;
+  /** Kart okur (sekmeyi ve üstteki düğmeyi göstermek için); burada değişir. */
+  ozet: MusteriPortalOzeti;
+  onOzet: (o: MusteriPortalOzeti) => void;
+  /** Kartın üstündeki "Portal hesabı aç" düğmesi formu doğrudan açar. */
+  yeniAcik?: boolean;
+  onYeniKapandi?: () => void;
+}) {
   const c = useThemeColors();
   const t = useT();
-  const [ozet, setOzet] = useState<MusteriPortalOzeti | null>(null);
   const [hata, setHata] = useState("");
   const [iskonto, setIskonto] = useState(party.iskontoOrani === undefined ? "" : String(party.iskontoOrani));
   const [iskontoKayitli, setIskontoKayitli] = useState(iskonto);
-  const [yeni, setYeni] = useState(false);
+  const [yeni, setYeniYerel] = useState(yeniAcik);
   const [calisiyor, setCalisiyor] = useState(false);
-
+  const setYeni = (v: boolean) => {
+    setYeniYerel(v);
+    if (!v) onYeniKapandi?.();
+  };
   useEffect(() => {
-    let iptal = false;
-    portalApi
-      .ozet(party.id)
-      .then((o) => !iptal && setOzet(o))
-      .catch(() => !iptal && setOzet(null));
-    return () => {
-      iptal = true;
-    };
-  }, [party.id]);
-
-  // Bağlantı yoksa bölüm yok — portalı olmayan şirkete gürültü olmasın.
-  if (!ozet || ozet.baglantilar.length === 0) return null;
+    if (yeniAcik) setYeniYerel(true);
+  }, [yeniAcik]);
 
   const etiket: Record<PortalYetkisi, string> = {
     siparis_ver: t("Sipariş verebilir"),
@@ -68,7 +74,7 @@ export default function MusteriPortali({ party }: { party: Party }) {
   };
 
   const degisti = (k: PortalKullanicisi) =>
-    setOzet((o) => o && { ...o, kullanicilar: o.kullanicilar.some((x) => x.id === k.id) ? o.kullanicilar.map((x) => (x.id === k.id ? k : x)) : [...o.kullanicilar, k] });
+    onOzet({ ...ozet, kullanicilar: ozet.kullanicilar.some((x) => x.id === k.id) ? ozet.kullanicilar.map((x) => (x.id === k.id ? k : x)) : [...ozet.kullanicilar, k] });
 
   const guncelle = async (k: PortalKullanicisi, govde: Parameters<typeof portalApi.guncelle>[1]) => {
     setHata("");
@@ -175,9 +181,9 @@ export default function MusteriPortali({ party }: { party: Party }) {
         ozet.yazabilir && (
           <button
             onClick={() => setYeni(true)}
-            style={{ alignSelf: "flex-start", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
           >
-            {t("+ Portal kullanıcısı oluştur")}
+            {ozet.kullanicilar.length === 0 ? t("Portal hesabı aç") : t("+ Portal kullanıcısı oluştur")}
           </button>
         )
       )}

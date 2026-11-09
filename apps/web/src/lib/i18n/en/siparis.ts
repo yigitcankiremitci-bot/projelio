@@ -32,6 +32,9 @@ export const siparis: TranslationDict = {
   "Yeniden aç": "Reopen",
   "Portal hesabı kapatılsın mı? Kişi portala giremez.": "Close this portal account? The person won't be able to sign in to the portal.",
   "+ Portal kullanıcısı oluştur": "+ Create portal user",
+  "Portal hesabı aç": "Open portal account",
+  "Web portalı · {n} hesap": "Web portal · {n} accounts",
+  "Bu müşteri portalda görünmüyor; hesap açılınca görünür.": "This customer isn't on the portal yet; it appears once an account is opened.",
   "Ad (isteğe bağlı)": "Name (optional)",
   "Şifre Projelio'da tutulmaz: portal bu adrese şifre belirleme e-postası gönderir.":
     "Passwords aren't stored in Projelio: the portal sends a set-password email to this address.",

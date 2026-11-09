@@ -97,6 +97,12 @@ interface Props {
    * Kayıtlar silinmez, geri alınabilir. Verilmezse menüde görünmez.
    */
   onModulKapat?: (modulKey: string) => Promise<void>;
+  /**
+   * Üye olmayan ziyaretçinin stüdyosu (pages/MisafirStudyo.tsx): sunucuya hiç
+   * istek atılmaz (oturum yok, her istek 401 olup girişe atardı), düzenleme,
+   * mağaza ve karakter düzenleme görünmez. Gezmek, odaya girmek serbest.
+   */
+  misafir?: boolean;
 }
 
 /** Odadan ortak alana devredilen dekorun (türü hazır model adı) okunur adı. */
@@ -290,6 +296,7 @@ export default function OfisOyunu({
   onOdaSayfasi,
   onModulAc,
   onModulKapat,
+  misafir = false,
 }: Props) {
   const kapRef = useRef<HTMLDivElement>(null);
   const kokRef = useRef<HTMLDivElement>(null);
@@ -348,7 +355,7 @@ export default function OfisOyunu({
 
   // Oda düzenlerinin ucu: şirketin (migration 171) ya da stüdyonun (175).
   // Şirketsiz kişisel ofiste (stüdyo değilse) düzen yok.
-  const duzenUcu = studyo ? "/ofis-duzeni/studyo" : kapsam !== "kisisel" ? `/organizations/${kapsam}/ofis-duzeni` : null;
+  const duzenUcu = misafir ? null : studyo ? "/ofis-duzeni/studyo" : kapsam !== "kisisel" ? `/organizations/${kapsam}/ofis-duzeni` : null;
   /** Uç henüz yayında değilken (404) düzenin tarayıcıda tutulduğu anahtar. */
   const yerelKapsam = studyo ? "studyo" : kapsam;
 
@@ -561,6 +568,7 @@ export default function OfisOyunu({
   // Ajanın hâli dakikada bir yoklanır (panel açıkken panel 5 sn'de bir yoklar).
   // Uç yoksa ya da hesap izinli değilse robot hiç çıkmaz.
   useEffect(() => {
+    if (misafir) return;
     const ac = new AbortController();
     const yokla = () => {
       if (document.hidden) return;
@@ -573,7 +581,7 @@ export default function OfisOyunu({
       clearInterval(z);
       ac.abort();
     };
-  }, []);
+  }, [misafir]);
 
   useEffect(() => {
     const d = ajanDurumu;
@@ -593,7 +601,7 @@ export default function OfisOyunu({
   // Ofisteki kişilerin karakter görünümleri: kişi listesi değişince yeniden sorulur.
   const kisiKimlikleri = useMemo(() => [...new Set(sahneKisileri.map((k) => k.id))].sort().join(","), [sahneKisileri]);
   useEffect(() => {
-    if (!kisiKimlikleri) return;
+    if (!kisiKimlikleri || misafir) return;
     const ac = new AbortController();
     api
       .get<Record<string, unknown>>(`/ofis-duzeni/karakterler?kisiler=${encodeURIComponent(kisiKimlikleri)}`, ac.signal)
@@ -618,7 +626,7 @@ export default function OfisOyunu({
         }
       });
     return () => ac.abort();
-  }, [kisiKimlikleri, benId]);
+  }, [kisiKimlikleri, benId, misafir]);
 
   // Düzenlerken taslak sahnedeki kendi karakterine uygulanır (önizleme); vazgeçince kayıtlıya döner.
   useEffect(() => {
@@ -703,7 +711,7 @@ export default function OfisOyunu({
   // Kendi karakteri seçiliyken sol üstte (oda düğmelerinin yanında). Kişinin başının
   // üstünde dururken karakterle birlikte kayıyor, tıklaması zorlaşıyordu.
   const karakterDugmesi =
-    seciliKisi && seciliKisi === benId && !karakterTaslagi && !duzenlenen && !rafta ? (
+    !misafir && seciliKisi && seciliKisi === benId && !karakterTaslagi && !duzenlenen && !rafta ? (
       <button type="button" className="of-btn birincil" onClick={karakteriDuzenle}>
         Karakterini düzenle
       </button>
@@ -1059,12 +1067,16 @@ export default function OfisOyunu({
       </div>
 
       <div className="of-hud of-sag-ust">
-        <button type="button" className={`of-btn${duzenle ? " on" : ""}`} onClick={() => setDuzenle((d) => !d)} aria-pressed={duzenle}>
-          {duzenle ? "Bitti" : "Düzenle"}
-        </button>
-        <button type="button" className="of-btn birincil" onClick={() => setMagaza((m) => !m)}>
-          Mağaza
-        </button>
+        {!misafir && (
+          <>
+            <button type="button" className={`of-btn${duzenle ? " on" : ""}`} onClick={() => setDuzenle((d) => !d)} aria-pressed={duzenle}>
+              {duzenle ? "Bitti" : "Düzenle"}
+            </button>
+            <button type="button" className="of-btn birincil" onClick={() => setMagaza((m) => !m)}>
+              Mağaza
+            </button>
+          </>
+        )}
         <button type="button" className="of-btn ikon" onClick={() => motorRef.current?.kamerayiSifirla()} aria-label="Görünümü sıfırla" title="Görünümü sıfırla">
           ⟲
         </button>

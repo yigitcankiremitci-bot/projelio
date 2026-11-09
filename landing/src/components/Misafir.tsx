@@ -56,6 +56,7 @@ export default function Misafir({
   locale,
   girisHref,
   kayitHref,
+  studyoHref,
   altBaglantilar,
   digerDil,
 }: {
@@ -63,6 +64,8 @@ export default function Misafir({
   locale: Locale;
   girisHref: string;
   kayitHref: string;
+  /** Panelin girişsiz misafir stüdyosu (apps/web/src/pages/MisafirStudyo.tsx). */
+  studyoHref: string;
   altBaglantilar: AltBaglanti[];
   digerDil: AltBaglanti;
 }) {
@@ -195,35 +198,42 @@ export default function Misafir({
       <main id="main" className="mf-pano">
         {/*
           Sıra dört sütunda boşluk bırakmayacak biçimde dizildi:
-          1: Kasa · Yapılacaklar · Takvim · Pomodoro
-          2: İşler · Yapılacaklar · Takvim · Müşteriler
-          3: İşler · Projeler (2) · Müşteriler
-          4: 3D stüdyo (2) · Modüller · Dosyalar
-          5: 3D stüdyo (2) · Notlar (2)
+          1: Projelio nedir (2) · Yapılacaklar · Takvim
+          2: Projelio nedir (2) · Yapılacaklar · Takvim
+          3: İşler · Projeler (2) · Pomodoro
+          4: İşler · Kasa · Müşteriler · Modüller
+          5: 3D stüdyo (2) · Müşteriler · Dosyalar
+          6: 3D stüdyo (2) · Notlar (2)
           Bir kartın boyunu ya da yerini değiştirirsen bu tabloyu da güncelle.
         */}
         <div className="mf-izgara">
-          <KasaKarti dict={dict} kilitli={kilitli} />
+          <NedirKarti dict={dict} dene={eksigeGit} uyeOl={uyeOl} />
           <Yapilacaklar dict={dict} taslak={taslak} uygula={uygula} eksigeGit={eksigeGit} uyeOl={uyeOl} kilitli={kilitli} />
           <Takvim dict={dict} locale={locale} />
-          <Pomodoro dict={dict} />
           <IslerKarti dict={dict} locale={locale} taslak={taslak} uygula={uygula} isRef={isRef} kilitli={kilitli} />
-          <MusterilerKarti dict={dict} kilitli={kilitli} />
           <ProjelerKarti dict={dict} taslak={taslak} uygula={uygula} projeRef={projeRef} eksigeGit={eksigeGit} kilitli={kilitli} />
+          <Pomodoro dict={dict} />
+          <KasaKarti dict={dict} kilitli={kilitli} />
+          <MusterilerKarti dict={dict} kilitli={kilitli} />
+          <KilitliOzet ad={dict.kart.moduller} ikon="isilti" onClick={() => kilitli("moduller")} cipler={[dict.sonKullanilan, dict.enCokKayit]} />
 
           <div className="mf-hucre orta" style={{ gridRow: "span 2" }}>
-            <button type="button" className="mf-kart mf-tam" onClick={() => kilitli("studyo")} aria-label={dict.kilit.studyo}>
+            {/* Yeni sekmede: buradaki taslak (ve "ayrılıyorsun" uyarısı) bu sekmede kalsın. */}
+            <a className="mf-kart mf-tam" href={studyoHref} target="_blank" rel="noopener" aria-label={dict.studyoGir}>
               <span className="mf-ofis">
                 <span className="mf-ofis-ad">
                   <Ikon ad="katman" boyut={17} renk="var(--mf-accent-dark)" />
                   {dict.kart.studyo}
                 </span>
                 <img src="/brand/ofis-onizleme.webp" alt="" draggable={false} />
+                <span className="mf-ofis-gir">
+                  {dict.studyoGir}
+                  <Ikon ad="sag" boyut={15} />
+                </span>
               </span>
-            </button>
+            </a>
           </div>
 
-          <KilitliOzet ad={dict.kart.moduller} ikon="isilti" onClick={() => kilitli("moduller")} cipler={[dict.sonKullanilan, dict.enCokKayit]} />
           <KilitliOzet ad={dict.kart.dosyalar} ikon="dosya" onClick={() => kilitli("dosyalar")} cipler={[dict.tumu, `${dict.projeDosyalari} 0`, `${dict.isDosyalari} 0`]} />
 
           <div className="mf-hucre orta">
@@ -789,6 +799,52 @@ function KilitliOzet({ ad, ikon, cipler, onClick }: { ad: string; ikon: IkonAdi;
         </span>
         <span className="mf-buyuk-sayi">0</span>
       </button>
+    </div>
+  );
+}
+
+/**
+ * Panelde olmayan tek kart: ziyaretçi neye baktığını ve Projelio'nun neden
+ * var olduğunu burada okur. Tanıtım sayfası yerine panonun içinde, çünkü
+ * anlatılan şey zaten etrafındaki kartlar.
+ */
+function NedirKarti({ dict, dene, uyeOl }: { dict: MisafirDict; dene: () => void; uyeOl: () => void }) {
+  const n = dict.nedir;
+  return (
+    <div className="mf-hucre orta" style={{ gridRow: "span 2" }}>
+      <section className="mf-kart mf-nedir" aria-labelledby="mf-nedir-baslik">
+        <span className="mf-nedir-soru">
+          <img src="/brand/logo.png" alt="" width={18} height={18} />
+          {n.soru}
+        </span>
+        <h2 id="mf-nedir-baslik">{n.baslik}</h2>
+        <p>{n.metin}</p>
+        <ul>
+          {n.nedenler.map((x) => (
+            <li key={x}>
+              <span className="mf-nedir-tik">
+                <Ikon ad="onay" boyut={12} kalinlik={2.6} />
+              </span>
+              {x}
+            </li>
+          ))}
+        </ul>
+        <div className="mf-nedir-dugmeler">
+          <button type="button" className="mf-birincil" onClick={uyeOl}>
+            <Ikon ad="uyeOl" boyut={16} />
+            {n.basla}
+          </button>
+          <button type="button" className="mf-ikincil" onClick={dene}>
+            {n.dene}
+            <Ikon ad="sag" boyut={15} />
+          </button>
+        </div>
+        {/* Lio iki katman: gövde ve gözler (paneldeki AiLauncher gibi). */}
+        <span className="mf-nedir-lio" aria-hidden="true">
+          <img src="/brand/lio-base.png" alt="" draggable={false} />
+          <img src="/brand/lio-eyes.png" alt="" draggable={false} />
+        </span>
+      </section>
     </div>
   );
 }

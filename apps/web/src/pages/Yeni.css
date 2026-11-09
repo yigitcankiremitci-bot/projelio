@@ -901,3 +901,14 @@
     display: none;
   }
 }
+
+/* Üye olmadan gezilen stüdyo (pages/MisafirStudyo.tsx): sahne tüm ekranı kaplar. */
+.misafir-studyo {
+  position: fixed;
+  inset: 0;
+}
+.misafir-studyo .of {
+  flex: 1;
+  height: 100dvh;
+  border-radius: 0;
+}

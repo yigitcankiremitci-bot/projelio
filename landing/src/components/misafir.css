@@ -1207,3 +1207,134 @@ button.mf-proje-kutu.kesik:hover {
     min-height: 200px;
   }
 }
+
+/* "Projelio nedir?" — panelde olmayan tek kart; panonun diliyle ama öne çıkar. */
+.mf-nedir {
+  position: relative;
+  overflow: hidden;
+  gap: 10px;
+  padding: 22px 24px;
+  border-color: rgba(217, 168, 104, 0.45);
+  background:
+    radial-gradient(120% 90% at 100% 100%, rgba(217, 168, 104, 0.16), transparent 60%),
+    var(--mf-yuzey);
+}
+.mf-nedir-soru {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mf-accent);
+}
+.mf-nedir h2 {
+  margin: 0;
+  max-width: 30ch;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+.mf-nedir p {
+  margin: 0;
+  max-width: 52ch;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--mf-soluk);
+}
+.mf-nedir ul {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-width: calc(100% - 120px);
+}
+.mf-nedir li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.mf-nedir-tik {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(63, 190, 115, 0.16);
+  color: var(--mf-basari);
+}
+.mf-nedir-dugmeler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  position: relative;
+  z-index: 1;
+}
+.mf-nedir-lio {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  width: 112px;
+  height: 112px;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(26, 31, 41, 0.28));
+}
+.mf-nedir-lio img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+@container (max-width: 560px) {
+  .mf-nedir ul {
+    max-width: none;
+  }
+  .mf-nedir-lio {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .mf-nedir {
+    padding: 18px;
+  }
+  .mf-nedir h2 {
+    font-size: 21px;
+  }
+}
+
+/* 3D stüdyo kartı misafir stüdyosuna götürür (yeni sekmede). */
+a.mf-kart {
+  color: inherit;
+  text-decoration: none;
+}
+.mf-ofis-gir {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: var(--mf-accent);
+  color: var(--mf-yuzey);
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: 0 4px 14px rgba(26, 31, 41, 0.22);
+  transition: transform 150ms ease;
+}
+a.mf-kart:hover .mf-ofis-gir {
+  transform: translateX(2px);
+}

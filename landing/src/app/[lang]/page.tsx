@@ -20,6 +20,7 @@ export default async function HomePage({ params }: { params: Promise<{ lang: str
       locale={locale}
       girisHref={dilliAdres(`${site.appUrl}/login`, locale)}
       kayitHref={dilliAdres(`${site.appUrl}/register`, locale)}
+      studyoHref={dilliAdres(`${site.appUrl}/misafir/studyo`, locale)}
       altBaglantilar={[
         { href: path(locale, "pricing"), label: dict.nav.pricing, ikon: "fiyat" },
         { href: path(locale, "faq"), label: dict.nav.faq, ikon: "sss" },

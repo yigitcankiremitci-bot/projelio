@@ -152,6 +152,16 @@ case "$komut" in
     # API'de görünmez (bkz. CLAUDE.md).
     echo "PostgREST şema önbelleği tazeleniyor..."
     echo "notify pgrst, 'reload schema';" | psql_calistir >/dev/null
+
+    # Her uygulamadan sonra izinler ölçülür. 062'nin düzeni aylarca kimse fark
+    # etmeden delinmişti (bkz. migration 184); uyarı artık burada görünür.
+    denetim="$(psql_calistir < "$(cd "$(dirname "$0")/.." && pwd)/scripts/db-izin-denetimi.sql" || true)"
+    if [ "${denetim%%|*}" = "GECTI" ]; then
+      echo "İzin denetimi: GECTI"
+    else
+      echo "UYARI: izin denetimi GEÇMEDİ. scripts/db-izin-denetimi.sql çıktısına bak:" >&2
+      printf '%s\n' "$denetim" | tr '|' '\n' | cut -c1-400 >&2
+    fi
     echo "Bitti."
     ;;
 

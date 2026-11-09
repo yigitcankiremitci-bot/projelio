@@ -71,6 +71,7 @@ import { KartvizitModule } from "./modules/kartvizit/kartvizit.module";
 import { MailboxModule } from "./modules/mailbox/mailbox.module";
 import { WhatsappModule } from "./modules/whatsapp/whatsapp.module";
 import { ShopifyModule } from "./modules/shopify/shopify.module";
+import { WebSitesiModule } from "./modules/web-sitesi/web-sitesi.module";
 import { DataRetentionModule } from "./modules/data-retention/data-retention.module";
 import { RealtimeModule } from "./modules/realtime/realtime.module";
 import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.interceptor";
@@ -167,6 +168,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Shopify mağazası: siparişler Müşteriler > Tahsilat'a, ödemeler kasaya
     // düşer (bkz. 129_shopify.sql). Anahtarlar tanımlanana kadar kapalı.
     ShopifyModule,
+    WebSitesiModule,
     // Taşeronun iş/proje açma talepleri (onay akışı).
     CreationRequestsModule,
     // Aynı sayfadaki kullanıcıların birbirini görmesi ve değişikliklerin anında

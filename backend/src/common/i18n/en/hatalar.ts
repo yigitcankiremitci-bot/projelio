@@ -928,6 +928,15 @@ export const hatalar: TranslationDict = {
   "Shopify bağlantı isteği geçersiz veya süresi dolmuş": "The Shopify connection request is invalid or has expired",
   "Shopify erişimi sona erdi; mağazayı yeniden bağlayın": "Shopify access has expired; reconnect the store",
   "Mağaza bulunamadı": "Store not found",
+  // Web sitesi eklentisi
+  "Web sitesi eklentisi şimdilik yalnızca izinli hesaplara açık": "The website plugin is currently available to approved accounts only",
+  "Web sitesi bağlantısını yalnızca şirketin kurucusu yönetebilir": "Only the company's founder can manage the website connection",
+  "Web sitesi eklentisi bu sunucuda henüz açılmadı": "The website plugin isn't enabled on this server yet",
+  "Bağlantı adı 1-80 karakter olmalı": "The connection name must be 1-80 characters",
+  "Bildirim adresi https:// ile başlayan, herkese açık bir adres olmalı": "The webhook URL must be a public address starting with https://",
+  "Site adresi geçerli bir web adresi değil": "The site address isn't a valid web address",
+  "Web sitesi bağlantısı bulunamadı": "Website connection not found",
+  "Önce bir bildirim adresi girin": "Enter a webhook URL first",
   // Arkadaşlık ve duvar
   "Bu duvarı yalnızca arkadaşları görebilir": "Only friends can see this wall",
   "Kendine arkadaşlık isteği gönderemezsin": "You can't send a friend request to yourself",

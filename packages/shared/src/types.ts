@@ -4882,6 +4882,54 @@ export interface ShopifyOzeti {
   magazalar: ShopifyMagazaOzeti[];
 }
 
+// ============================================================ Web sitesi eklentisi (bkz. 186_web_sitesi_eklentisi.sql)
+
+/** Şirket ayarlarındaki "Web sitesi" kartının bir satırı. Anahtar ve imza sırrı burada YOK. */
+export interface WebSitesiBaglantisi {
+  id: string;
+  ad: string;
+  siteAdresi: string | null;
+  /** Boşsa bildirim gönderilmez; site yalnızca okuyarak eşitler. */
+  webhookAdresi: string | null;
+  /** "psite_Ab12…" — anahtarın tanınması için; anahtarın kendisi değil. */
+  anahtarOnEki: string;
+  createdAt: string;
+  sonIstekAt: string | null;
+  sonBildirimAt: string | null;
+  sonHata: string | null;
+  sonHataAt: string | null;
+  /** Gönderilmeyi bekleyen ürün bildirimi sayısı. */
+  bekleyenBildirim: number;
+  /** Siteden gelen son stok hareketleri (en yeni önce, en çok 10). */
+  sonHareketler: WebSitesiStokHareketi[];
+}
+
+export interface WebSitesiStokHareketi {
+  referans: string;
+  tur: "satis" | "iade";
+  urunAdi: string;
+  miktar: number;
+  sonrakiStok: number | null;
+  createdAt: string;
+}
+
+export interface WebSitesiOzeti {
+  /** Kullanıcı eklentiye erişebilir mi (şimdilik WEB_SITESI_EPOSTALARI listesi). */
+  izinli: boolean;
+  /** Sunucuda şifreleme anahtarı tanımlı mı; değilse bağlantı açılamaz. */
+  yapilandirildi: boolean;
+  /** Sitenin çağıracağı API'nin kökü, ör. "https://api.projelio.app/v1/site". */
+  apiKoku: string;
+  baglantilar: WebSitesiBaglantisi[];
+}
+
+/** Bağlantı açılınca ya da anahtar yenilenince YALNIZCA bir kez dönen sırlar. */
+export interface WebSitesiSirlari {
+  baglanti: WebSitesiBaglantisi;
+  anahtar?: string;
+  webhookSiri?: string;
+}
+
 /** Tanıtım sitesinin bülten abonesi (Admin > Bülten, migration 149). */
 export interface BultenAbonesi {
   id: string;

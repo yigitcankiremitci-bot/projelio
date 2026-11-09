@@ -110,6 +110,7 @@ export const hatalar: TranslationDict = {
   // Doğrulama ve zorunlu alanlar
   "Ad gerekli": "Name is required",
   "Ad soyad boş olamaz": "Your name can't be empty",
+  "İş başlığı boş olamaz": "The job title can't be empty",
   "Alan adı boş olamaz.": "The area name can't be empty.",
   "Alt görevleri olan bir görev alt göreve dönüştürülemez; önce alt görevlerini başka bir göreve taşı": "A task with subtasks can't be turned into a subtask; move its subtasks to another task first",
   "Aynı odak alanı için iki hedef girilemez.": "You can't set two goals for the same focus area.",

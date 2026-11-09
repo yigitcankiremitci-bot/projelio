@@ -3,6 +3,8 @@ import { JwtService } from "@nestjs/jwt";
 import { hashPassword, needsRehash, verifyPassword, wasteVerifyTime } from "../../common/password.util";
 import { UsersService } from "../users/users.service";
 import { EmailVerificationService } from "./email-verification.service";
+import { epostadanAd, rastgeleKullaniciAdi } from "./kayit-kimligi";
+import { consumeRateLimit } from "../../common/guards/rate-limit.store";
 import { LoginAttemptService } from "./login-attempt.service";
 import { nowInSeconds } from "./session-payload";
 import { EmailService } from "./email.service";
@@ -33,11 +35,20 @@ export class AuthService {
    * döner. Kullanıcı e-postasındaki bağlantıya tıklayana kadar giriş yapamaz
    * (bkz. login içindeki emailVerifiedAt kontrolü).
    */
-  async register(fullName: string, email: string, password: string, username: string, locale?: Locale) {
+  async register(
+    verilenAd: string | undefined,
+    email: string,
+    password: string,
+    verilenKullaniciAdi: string | undefined,
+    locale?: Locale
+  ) {
+    const fullName = verilenAd?.trim() || epostadanAd(email);
+    const username = verilenKullaniciAdi ?? (await this.bosKullaniciAdiBul());
+
     // Kullanıcı adı çakışması AÇIKÇA söylenir: kullanıcı adı uygulamada zaten
     // herkese görünen bir tanımlayıcı, "alınmış" demek bir bilgi sızdırmaz — üstelik
     // söylemezsek kullanıcı neden kayıt olamadığını anlayamaz.
-    if (await this.usersService.isUsernameTaken(username)) {
+    if (verilenKullaniciAdi && (await this.usersService.isUsernameTaken(username))) {
       throw new ConflictException("Bu kullanıcı adı zaten alınmış, başka bir tane dene.");
     }
 
@@ -45,6 +56,12 @@ export class AuthService {
     // yanıtı ~300 ms hızlandırır ve "bu adres kayıtlı" bilgisini zamanlamadan
     // sızdırırdı (aynı gerekçe: password.util.ts wasteVerifyTime).
     const passwordHash = await hashPassword(password);
+
+    // Aynı adrese saatte en çok 3 posta. Yoksa başkasının adresini yazıp durmak o
+    // kişinin gelen kutusunu doldurmanın bedava yolu olurdu. Yanıt bilerek aynı.
+    if (!consumeRateLimit(`kayit-eposta:${email.trim().toLowerCase()}`, 3, 60 * 60 * 1000)) {
+      return this.registrationPendingResponse(email);
+    }
 
     const existing = await this.usersService.findByEmail(email);
     if (existing) {
@@ -84,6 +101,15 @@ export class AuthService {
     }
 
     return this.registrationPendingResponse(user.email);
+  }
+
+  /** Çakışma 40 bitte pratikte yok; yine de körlemesine yazıp 500 almaktansa bakılır. */
+  private async bosKullaniciAdiBul(): Promise<string> {
+    let aday = rastgeleKullaniciAdi();
+    for (let i = 0; i < 4 && (await this.usersService.isUsernameTaken(aday)); i++) {
+      aday = rastgeleKullaniciAdi();
+    }
+    return aday;
   }
 
   async login(email: string, password: string) {

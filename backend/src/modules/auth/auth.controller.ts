@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
+import { consumeRateLimit } from "../../common/guards/rate-limit.store";
+import { Body, Controller, Get, Post, Req, UnauthorizedException, UseGuards, HttpException } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { AuthRateLimitGuard } from "../../common/guards/auth-rate-limit.guard";
 import { AuthService } from "./auth.service";
@@ -50,6 +51,15 @@ export class AuthController {
     // başlığı tek ipucu. Hesabın dili boş kalırsa sonradan üretilen her şey
     // (doğrulama e-postası, örnek iş, ipuçları) Türkçeye düşüyor.
     const locale = dto.locale ?? tarayiciDili(req);
+    // Dakikalık sınır (AuthRateLimitGuard) kaba denemeyi keser ama gün boyu günde
+    // 14.400 sahte kayda izin verirdi. Kayıt kısaldıkça saatlik tavan şart; ofis
+    // gibi tek IP'yi paylaşanlar takılmasın diye 20.
+    if (!consumeRateLimit(`kayit-saat:${(req as { ip?: string }).ip ?? "unknown"}`, 20, 60 * 60 * 1000)) {
+      throw new HttpException(
+        { statusCode: 429, error: "Too Many Requests", message: "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar deneyin." }, // dil:anahtar
+        429
+      );
+    }
     return this.authService.register(dto.fullName, dto.email, dto.password, dto.username, locale);
   }
 

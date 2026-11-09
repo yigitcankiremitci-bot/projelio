@@ -2,8 +2,12 @@ import { IsEmail, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } fr
 import { locales, type Locale } from "@projelio/shared";
 
 export class RegisterDto {
+  // Ad ve kullanıcı adı artık istenmiyor: gelmezse sunucu üretir (kayit-kimligi.ts).
+  // Alanlar duruyor, çünkü eski mobil kabuk ve sürümler hâlâ gönderiyor.
+  @IsOptional()
   @IsString()
-  fullName!: string;
+  @MaxLength(120)
+  fullName?: string;
 
   @IsEmail()
   email!: string;
@@ -16,11 +20,12 @@ export class RegisterDto {
   password!: string;
 
   // Başında "@" olsun ya da olmasın kabul edilir, servis katmanında normalize edilir.
+  @IsOptional()
   @IsString()
   @Matches(/^@?[a-zA-Z0-9_.]{3,30}$/, {
     message: "Kullanıcı adı 3-30 karakter olmalı; sadece harf, rakam, nokta ve alt çizgi içerebilir.",
   })
-  username!: string;
+  username?: string;
 
   /**
    * Kayıt ekranında kullanılan arayüz dili.

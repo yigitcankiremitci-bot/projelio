@@ -61,10 +61,6 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
       id: "product",
       label: dict.nav.groups.product,
       links: [
-        { href: path(locale, "#lio"), label: dict.nav.lio, desc: d.lio },
-        { href: path(locale, "#journey"), label: dict.nav.journey, desc: d.journey },
-        { href: path(locale, "#features"), label: dict.nav.features, desc: d.features },
-        { href: path(locale, "#modules"), label: dict.nav.modules, desc: d.modules },
         { href: path(locale, "screenshots"), label: dict.nav.screenshots, desc: d.screenshots },
       ],
     },
@@ -86,10 +82,10 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
       ],
     },
   ];
-  // Demo hesabı yalnızca anasayfada bir bölüm; iç sayfalardan da tıklanabilsin
-  // diye bağlantı ana sayfanın çapasına gidiyor. Dönüşümün en kısa yolu olduğu
-  // için gruba gömülmedi, tek başına duruyor.
-  const demo: NavLink = { href: path(locale, "#demo-account"), label: dict.nav.demoAccount };
+  // Ana sayfa artık uygulamanın kendisi: demo hesabına panelin giriş ekranından
+  // geçiliyor (alanlar hazır dolu gelir). Dönüşümün kısa yolu olduğu için gruba
+  // gömülmedi, tek başına duruyor.
+  const demo: NavLink = { href: dilliAdres(appLinks.demo, locale), label: dict.nav.demoAccount };
 
   /** Aktif dil dışındaki dile aynı sayfada geçiş yapan yol. */
   const swap = (target: Locale) => {

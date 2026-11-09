@@ -15,8 +15,6 @@ export default function Footer({ dict, locale }: { dict: Dict; locale: Locale })
     .join(" / ");
 
   const product = [
-    { href: path(locale, "#lio"), label: dict.nav.lio },
-    { href: path(locale, "#modules"), label: dict.nav.modules },
     { href: path(locale, "screenshots"), label: dict.nav.screenshots },
     { href: path(locale, "pricing"), label: dict.nav.pricing },
     { href: path(locale, "lio-units"), label: dict.nav.credits },

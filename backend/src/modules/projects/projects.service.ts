@@ -174,6 +174,10 @@ export class ProjectsService {
     await this.access.assertCanViewProject(projectId, userId);
   }
 
+  async assertCanUseJob(jobId: string, userId: string): Promise<void> {
+    await this.access.assertCanViewJob(jobId, userId);
+  }
+
   async create(ownerId: string, data: Partial<Project>): Promise<Project> {
     const { data: row, error } = await this.supabase.client
       .from("projects")

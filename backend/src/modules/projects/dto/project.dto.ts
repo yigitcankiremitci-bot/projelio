@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from "class-validator";
 
 // @projelio/shared'daki ProjectStatus ile aynı küme (bkz. migration 063).
 // class-validator'ın çalışma zamanında bir diziye ihtiyacı olduğu için burada
@@ -13,10 +13,12 @@ const PROJECT_STATUSES = ["active", "on_hold", "passive", "completed", "archived
 export class CreateProjectDto {
   @IsString()
   @IsNotEmpty({ message: "Proje başlığı boş olamaz" })
+  @MaxLength(200)
   title!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(20000)
   description?: string;
 
   @IsOptional()

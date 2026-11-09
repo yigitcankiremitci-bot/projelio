@@ -7,13 +7,14 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useLocale, useT } from "../lib/i18n";
 import GirisDilSecici from "../components/GirisDilSecici";
 import SifreGirdisi from "../components/SifreGirdisi";
+import { misafirAktarimindanVazgec, misafirParcasiniYakala } from "../lib/misafirAktarim";
 
 export default function Register() {
-  const [fullName, setFullName] = useState("");
   // Demo randevusu e-postasındaki "Hesabımı oluştur" adresi hazır getiriyor
   // (/register?email=…): randevu bu adrese bağlı, farklı yazılırsa eşleşmez.
   const [email, setEmail] = useState(() => new URLSearchParams(window.location.search).get("email") ?? "");
-  const [username, setUsername] = useState("");
+  // Ana sayfada üyeliksiz yapılan çalışma; üye olunca hesaba geçer.
+  const [misafirTaslak, setMisafirTaslak] = useState(() => misafirParcasiniYakala());
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,13 +37,14 @@ export default function Register() {
       // boş kalıyordu ve arayüzü İngilizce gören kullanıcıya doğrulama
       // e-postası, örnek iş ve ipucu e-postaları Türkçe gidiyordu — sunucu
       // tarayıcı kapalıyken üretilen içerikte dili yalnızca hesaptan bilir.
-      await api.post("/auth/register", { fullName, email, password, username, locale });
+      // Ad ve kullanıcı adı sunucuda üretilir; ikisi de Ayarlar'dan değişir.
+      await api.post("/auth/register", { email, password, locale });
       setRegistered(true);
     } catch (err) {
       // "E-posta zaten kullanılıyor" ARTIK BİR HATA DEĞİL: adres kayıtlıysa sunucu
       // yeni kayıtla aynı yanıtı döndürüp gerçek sahibine bildirim e-postası atıyor
       // (hesap varlığını sızdırmamak için, bkz. backend AuthService.register).
-      // Buraya düşen tek beklenen durum kullanıcı adı çakışması.
+      // Buraya düşen tek beklenen durum doğrulama hatası (ör. geçersiz adres).
       setError(err instanceof Error ? err.message : t("Kayıt oluşturulamadı, tekrar dener misin?"));
     } finally {
       setLoading(false);
@@ -169,22 +171,41 @@ export default function Register() {
           <img src="/logo.png" alt="Projelio" style={{ width: 48, height: 48, marginBottom: 14 }} />
           <h1 style={{ color: c.textPrimary, fontSize: 25, fontWeight: 600, margin: 0 }}>{t("Kayıt ol")}</h1>
           <p style={{ color: c.textSecondary, fontSize: 16, margin: "6px 0 0" }}>
-            {t("Freelance proje & görev yönetimi")}
+            {t("E-posta ve şifre yeterli.")}
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Ad Soyad")}</label>
-            <input
-              type="text"
-              placeholder={t("Ad Soyad")}
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              style={{ width: "100%" }}
-            />
+        {misafirTaslak && (
+          <div
+            style={{
+              border: `1px solid ${c.border}`,
+              borderRadius: 8,
+              padding: "10px 12px",
+              marginBottom: 16,
+              fontSize: 14,
+              lineHeight: 1.5,
+              color: c.textSecondary,
+              overflowWrap: "anywhere",
+            }}
+          >
+            {t("“{is}” ve {gorev} görev üye olunca hesabına geçecek.", {
+              is: misafirTaslak.is,
+              gorev: misafirTaslak.gorevler.length,
+            })}{" "}
+            <button
+              type="button"
+              onClick={() => {
+                misafirAktarimindanVazgec();
+                setMisafirTaslak(null);
+              }}
+              style={{ background: "none", border: "none", padding: 0, color: c.primary, fontSize: 14 }}
+            >
+              {t("Aktarma")}
+            </button>
           </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("E-posta")}</label>
             <input
@@ -195,38 +216,6 @@ export default function Register() {
               required
               style={{ width: "100%" }}
             />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kullanıcı adı")}</label>
-            <div style={{ position: "relative" }}>
-              <span
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  color: c.textSecondary,
-                  fontSize: 16,
-                  pointerEvents: "none",
-                }}
-              >
-                @
-              </span>
-              <input
-                type="text"
-                placeholder={t("kullaniciadi")}
-                value={username}
-                onChange={(e) => setUsername(e.target.value.replace(/^@/, ""))}
-                required
-                minLength={3}
-                maxLength={30}
-                pattern="[a-zA-Z0-9_.]{3,30}"
-                style={{ width: "100%", paddingLeft: 26 }}
-              />
-            </div>
-            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
-              {t("Ekip üyesi eklerken seni bu kullanıcı adıyla arayabilirler.")}
-            </p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Şifre")}</label>

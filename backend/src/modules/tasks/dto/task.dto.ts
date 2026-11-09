@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { MaxLength, IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from "class-validator";
 import type { TaskPriority } from "@projelio/shared";
 
 const TASK_STATUSES = ["todo", "in_progress", "completed"] as const;
@@ -10,10 +10,12 @@ const DURATION_UNITS = ["minutes", "hours", "days"] as const;
 export class CreateTaskDto {
   @IsString()
   @IsNotEmpty({ message: "Görev başlığı boş olamaz" })
+  @MaxLength(500)
   title!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(50000)
   description?: string;
 
   @IsOptional()

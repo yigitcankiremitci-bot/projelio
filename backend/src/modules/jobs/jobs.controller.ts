@@ -22,6 +22,7 @@ import { JobsService } from "./jobs.service";
 import { ProjectsService } from "../projects/projects.service";
 import { OperationsService } from "../operations/operations.service";
 import { AccessService } from "../../common/access/access.service";
+import { CreateJobDto } from "./dto/job.dto";
 import { CreationRequestsService } from "../creation-requests/creation-requests.service";
 
 @Controller("jobs")
@@ -70,7 +71,7 @@ export class JobsController {
    * ayrı bir uç çağırmak zorunda kalmaz (bkz. shared CreateOrRequestResult).
    */
   @Post()
-  async create(@Req() req: any, @Body() body: any) {
+  async create(@Req() req: any, @Body() body: CreateJobDto) {
     const userId = req.user.userId;
     const needsApproval = await this.creationRequests.requiresApproval("job", userId, {
       organizationId: body?.organizationId,
@@ -83,6 +84,10 @@ export class JobsController {
       });
       return { outcome: "pending", request };
     }
+    // Gövdedeki kimliğe güvenilmez: bu kontrol yokken üye olan herkes başka bir
+    // şirketin ya da holdingin iş listesine kayıt ekleyebiliyordu.
+    if (body.organizationId) await this.access.assertCanViewOrganization(body.organizationId, userId);
+    if (body.groupId) await this.access.assertCanViewGroup(body.groupId, userId);
     return { outcome: "created", entity: await this.jobsService.create(userId, body) };
   }
 

@@ -189,6 +189,8 @@ export class UsersController {
       useCases?: UseCase[];
       // Sihirbazda işaretlenen modül anahtarları (tercih kaydı, yetki değil).
       onboardingModules?: string[];
+      // Üye olmadan başlayıp çalışmasını getiren kişinin zaten kendi işi var.
+      ornekIsAtla?: boolean;
     }
   ) {
     const userId = req.user.userId;
@@ -219,7 +221,7 @@ export class UsersController {
     // Eğitici örnek iş (bkz. migration 118). İçerik hesap tipine göre
     // (bireysel / şirket / taşeron); şirket örneği az önce kurulan şirkete
     // bağlanıyor. Sessiz: açılamazsa sihirbaz yine tamamlanır.
-    await this.ornekIs.olusturSessiz(userId, { organizationId, groupId });
+    if (!body.ornekIsAtla) await this.ornekIs.olusturSessiz(userId, { organizationId, groupId });
 
     // Frontend, sihirbaz kapanınca kullanıcıyı doğrudan oluşturulan organizasyona/gruba
     // yönlendirebilsin diye kimlikleri de döneriz (departman seçimine hemen başlasın diye).

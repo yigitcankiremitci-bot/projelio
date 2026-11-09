@@ -32,6 +32,7 @@ import { useUploads } from "./lib/uploadQueue";
 import { CoverBackLink } from "./components/EntityCover";
 import { IconChevronRight, IconUser } from "./components/icons";
 import { useT } from "./lib/i18n";
+import { misafirAktarimBekliyorMu, misafirTaslaginiAktar } from "./lib/misafirAktarim";
 
 // SAYFALAR AYRI PAKETLERE BÖLÜNÜYOR. Hepsi doğrudan import edilirken Vite
 // 27 sayfayı tek dosyada topluyordu (1,29 MB): giriş ekranını görmek için bile
@@ -657,6 +658,29 @@ export default function App() {
 
   useEffect(reloadMe, [hasToken, isAuthScreen]);
 
+  // Üye olmadan başlayan kişi çalışmasını hesabına taşır (bkz. lib/misafirAktarim.ts).
+  // Sihirbaz atlanıyor: "sizi oyalamıyoruz" diyip üyelikten sonra altı adım
+  // sormak sözü bozardı. Hesap tipi bireysel başlar, şirket sonradan kurulabilir.
+  // Herkese açık demo hesabına yazılmaz; o hesabı herkes görüyor.
+  const misafirBasladi = useRef(false);
+  useEffect(() => {
+    if (!me || misafirBasladi.current || demoEpostasiMi(me.email) || !misafirAktarimBekliyorMu()) return;
+    misafirBasladi.current = true;
+    (async () => {
+      try {
+        if (!me.onboardingCompletedAt) {
+          await api.patch("/users/me/onboarding", { accountType: "freelancer", ornekIsAtla: true });
+        }
+        const sonuc = await misafirTaslaginiAktar(api.post);
+        if (sonuc) navigate(sonuc.projeId ? `/projects/${sonuc.projeId}` : `/jobs/${sonuc.isId}`, { replace: true });
+      } catch {
+        // Taslak duruyor; sonraki açılışta kaldığı yerden sürer.
+      } finally {
+        reloadMe();
+      }
+    })();
+  }, [me]);
+
   // Uygulamada geçirilen süre (Admin > Kullanıcılar). Yalnızca oturum doğrulanmışken:
   // giriş ekranında ya da /auth/me yanıt vermeden sinyal atmak 401 zinciri başlatırdı.
   useEtkinlikSayaci(Boolean(me) && !isAuthScreen);
@@ -751,7 +775,7 @@ export default function App() {
         başlamaz (autoStartEnabled); kullanıcı isterse sağ üstteki "?" düğmesinden
         her an başlatabilir. */}
     <TourProvider
-      autoStartEnabled={Boolean(me?.onboardingCompletedAt)}
+      autoStartEnabled={Boolean(me?.onboardingCompletedAt) && !misafirBasladi.current}
       serverSeen={me?.toursSeen}
       paylasilanHesap={demoEpostasiMi(me?.email)}
     >
@@ -761,7 +785,7 @@ export default function App() {
       {/* Şifre ekranı açıkken sihirbaz beklemede: admin panelinden açılan
           hesaplar sihirbazı ATLAMIYOR (hesap tipini kişi seçer), ikisi üst
           üste binmesin — önce şifre, sonra kurulum. */}
-      {me && !me.onboardingCompletedAt && !me.mustChangePassword && (
+      {me && !me.onboardingCompletedAt && !me.mustChangePassword && !misafirAktarimBekliyorMu() && (
         <Suspense fallback={null}>
           <OnboardingWizard onCompleted={reloadMe} />
         </Suspense>

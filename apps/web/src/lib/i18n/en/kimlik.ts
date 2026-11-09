@@ -52,6 +52,9 @@ export const kimlik: TranslationDict = {
     "The link is valid for 24 hours. If nothing arrives within a few minutes, check your spam folder.",
   "Bu adresle zaten bir hesabın varsa yeni hesap açılmadı; onun yerine giriş yapmanı hatırlatan bir e-posta gönderdik.":
     "If you already have an account with this address, no new account was created; we sent you an email reminding you to sign in instead.",
+  "E-posta ve şifre yeterli.": "Just an email and a password.",
+  "“{is}” ve {gorev} görev üye olunca hesabına geçecek.": "“{is}” and {gorev} tasks will move to your account when you sign up.",
+  "Aktarma": "Don't move it",
   "Bağlantıyı tekrar gönder": "Resend the link",
   "Yeni bağlantı gönderildi.": "New link sent.",
 

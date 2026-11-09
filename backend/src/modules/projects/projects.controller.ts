@@ -67,6 +67,9 @@ export class ProjectsController {
       });
       return { outcome: "pending", request };
     }
+    // Gövdedeki jobId'ye güvenilmez: kontrol yokken üye olan herkes, kimliğini
+    // bildiği başkasının işinin altına proje açabiliyordu.
+    if (body.jobId) await this.projectsService.assertCanUseJob(body.jobId, userId);
     return { outcome: "created", entity: await this.projectsService.create(userId, body) };
   }
 

@@ -1,0 +1,394 @@
+/* Ana sayfa bir tanıtım değil, çalışan bir araç: düz yüzey, gradyan yok, animasyon yok. */
+.mf {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--text);
+}
+
+.mf-ust {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 60px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+}
+.mf-marka {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 600;
+  font-size: 16px;
+}
+.mf-hesap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+}
+.mf-hesap a {
+  color: var(--text-soft);
+}
+.mf-hesap a:hover {
+  color: var(--text);
+}
+
+.mf button {
+  font: inherit;
+  cursor: pointer;
+}
+.mf-birincil {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: #c0813f;
+  color: #14171d;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mf-birincil:hover:not(:disabled) {
+  background: #cf9150;
+}
+.mf-birincil:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.mf-ikincil,
+.mf-tehlike {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  white-space: nowrap;
+}
+.mf-ikincil {
+  border: 1px solid var(--line-strong);
+  color: var(--text-soft);
+}
+.mf-tehlike {
+  border: 1px solid #d0604f;
+  color: #ec8a7b;
+}
+
+.mf-govde {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 196px minmax(0, 1fr);
+}
+
+.mf-yan {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--line);
+}
+.mf-bolum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+button.mf-bolum:hover {
+  background: var(--tint);
+  color: var(--text-soft);
+}
+.mf-bolum.etkin {
+  background: var(--tint);
+  color: var(--text);
+  font-weight: 500;
+}
+.mf-kilit {
+  flex: none;
+  opacity: 0.7;
+}
+
+.mf-alan {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: clamp(28px, 7vh, 72px) 20px 40px;
+}
+
+.mf-giris h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+.mf-giris p {
+  margin: 8px 0 32px;
+  color: var(--text-soft);
+  font-size: 17px;
+}
+
+.mf-yol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 26px;
+}
+.mf-ad {
+  field-sizing: content;
+  min-width: 3ch;
+  max-width: 100%;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  font: inherit;
+  font-size: 16px;
+}
+.mf-ad-is {
+  color: var(--text);
+  font-weight: 600;
+}
+.mf-ad:hover {
+  border-color: var(--line);
+}
+.mf-ad:focus {
+  outline: none;
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+.mf-ayrac {
+  color: var(--text-faint);
+}
+.mf .mf-arti {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.mf .mf-arti:hover {
+  color: var(--text-soft);
+}
+
+.mf-form label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.mf-satir {
+  display: flex;
+  gap: 8px;
+}
+.mf-satir input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  /* 16 px'in altında iOS odaklanınca sayfayı yakınlaştırıyor. */
+  font: inherit;
+  font-size: 16px;
+}
+.mf-satir input:focus {
+  outline: none;
+  border-color: #c0813f;
+}
+.mf-satir input::placeholder {
+  color: var(--text-faint);
+}
+.mf-satir .mf-birincil {
+  height: 46px;
+}
+.mf-ipucu {
+  margin: 10px 0 0;
+  color: var(--text-faint);
+  font-size: 13.5px;
+}
+
+.mf-liste {
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.mf-liste li {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+}
+.mf-liste label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+.mf-liste label span {
+  overflow-wrap: anywhere;
+}
+.mf-liste input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: #c0813f;
+}
+.mf-liste li.bitti span {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.mf-liste li button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 19px;
+}
+.mf-liste li button:hover {
+  color: var(--text);
+}
+.mf-sayac {
+  margin: 10px 0 0;
+  color: var(--text-faint);
+  font-size: 13px;
+  text-align: right;
+}
+
+.mf-sinir {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.mf-sinir p {
+  margin: 0;
+  font-size: 14.5px;
+}
+
+.mf-kayit {
+  margin: 28px 0 0;
+  color: var(--text-faint);
+  font-size: 13.5px;
+}
+.mf-kayit button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d9a868;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mf-alt {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 18px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.mf-alt a {
+  color: var(--text-faint);
+}
+.mf-alt a:hover {
+  color: var(--text-soft);
+}
+
+.mf-pencere {
+  /* Sitenin sıfırlaması margin'i siliyor; dialog ortalanması buna bağlı. */
+  margin: auto;
+  width: calc(100% - 32px);
+  max-width: 400px;
+  padding: 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.mf-pencere::backdrop {
+  background: rgba(8, 10, 14, 0.7);
+}
+.mf-pencere h2 {
+  margin: 0 0 10px;
+  font-size: 19px;
+  font-weight: 600;
+}
+.mf-pencere p {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 14.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.mf-pencere strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.mf-pencere-dugmeler {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.mf-pencere-dugmeler button {
+  flex: 1 1 auto;
+}
+
+@media (max-width: 720px) {
+  .mf-ust {
+    padding: 0 16px;
+  }
+  .mf-govde {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .mf-yan {
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 12px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    scrollbar-width: none;
+  }
+  .mf-bolum {
+    flex: none;
+    gap: 6px;
+    min-height: 36px;
+  }
+  .mf-alan {
+    padding: 28px 16px 32px;
+  }
+  .mf-sinir {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

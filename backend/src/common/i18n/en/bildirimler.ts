@@ -428,5 +428,8 @@ export const bildirimler: TranslationDict = {
   "Bu haftanın işleri": "This week's tasks",
   "{adres} kutusuna yeni e-posta": "New email in {adres}",
   "{gonderen}: {konu}": "{gonderen}: {konu}",
+  "{musteri} portaldan sipariş verdi": "{musteri} placed an order on the portal",
+  "{no} · {tutar} — onay bekliyor": "{no} · {tutar} — awaiting approval",
+  "{tutar} — onay bekliyor": "{tutar} — awaiting approval",
   "{gonderen} (konusuz)": "{gonderen} (no subject)",
 };

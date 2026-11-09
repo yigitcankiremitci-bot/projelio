@@ -84,6 +84,10 @@ export const bildirimTercihleri: TranslationDict = {
   "Müşteriden WhatsApp mesajı geldiğinde": "When a customer sends a WhatsApp message",
   "@projelio.app kutusuna e-posta geldiğinde": "When an email arrives at a @projelio.app mailbox",
 
+  "Müşteriler ve siparişler": "Customers and orders",
+  "Müşterilerin web portalından verdiği siparişler.": "Orders customers place through the web portal.",
+  "Web portalından sipariş geldiğinde": "When an order arrives from the web portal",
+
   "Destek ve duyurular": "Support and announcements",
   "Destek yanıtları ve Projelio ekibinden gelen mesajlar. Uygulamada her zaman görünür.":
     "Support replies and messages from the Projelio team. Always shown in the app.",

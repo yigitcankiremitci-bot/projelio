@@ -2364,6 +2364,9 @@ export interface NotificationPayload {
     // @projelio.app kutusuna posta geldi (bkz. migration 162). Modüle atanmış
     // herkese gider; kutu ortak olduğu için "kime geldi" yok, "kutuya geldi" var.
     | "mail_received"
+    // B2B portalından sipariş geldi (bkz. web-sitesi-b2b.service.ts). Müşterinin
+    // sorumlusuna ve müşteri defterini yönetenlere; sipariş onay bekliyor.
+    | "web_order_received"
     // Admin panelinden yöneticinin yazdığı mesaj (bkz. modules/admin/admin-mesaj.service.ts).
     // Bildirim çanı bu tipi görünce mesajın tamamını bir pencerede açar: gövde
     // listede tek satıra sığmayacak kadar uzun olabilir.

@@ -298,6 +298,17 @@ export default function SiparisKarti({
           ) : (
             yazabilir && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {/* Tek tık onay: portaldan gelen sipariş "alındı"da bekler; aşama
+                    seçicisini aramadan onaylansın. Web sitesi siparişinde portala
+                    order.updated (approved) tetikleyiciyle gider (migration 188). */}
+                {siparis.asama === "alindi" && asamaSecenekleri.includes("onaylandi") && (
+                  <button
+                    onClick={() => asamaDegistir("onaylandi")}
+                    style={{ ...kucukDugme, border: "none", background: c.primary, color: c.onPrimary }}
+                  >
+                    {t("Onayla")}
+                  </button>
+                )}
                 {kalan > 0 && (
                   <button
                     onClick={() => setMod("tahsil")}

@@ -183,6 +183,12 @@ export const BILDIRIM_KATEGORILERI: BildirimKategorisi[] = [
     ],
   },
   {
+    kimlik: "siparisler",
+    baslik: "Müşteriler ve siparişler", // dil:anahtar
+    aciklama: "Müşterilerin web portalından verdiği siparişler.", // dil:anahtar
+    tipler: [{ tip: "web_order_received", etiket: "Web portalından sipariş geldiğinde" }], // dil:anahtar
+  },
+  {
     kimlik: "destek",
     baslik: "Destek ve duyurular", // dil:anahtar
     aciklama: "Destek yanıtları ve Projelio ekibinden gelen mesajlar. Uygulamada her zaman görünür.", // dil:anahtar

@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from "@nestjs/common";
-import { iskontoluFiyat, kalemTutariKurus } from "@projelio/shared";
+import { iskontoluFiyat, kalemTutariKurus, MUSTERI_MODUL_KEY } from "@projelio/shared";
 import type { MusteriPortalOzeti, Party, PortalKullanicisi } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { ModuleMembersService } from "../module-members/module-members.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PartyService } from "../party/party.service";
 import { SiparisService, type KalemSatiri } from "../party/siparis.service";
 import {
@@ -65,7 +67,9 @@ export class WebSitesiB2bService {
     private site: WebSitesiService,
     private partyService: PartyService,
     private siparisler: SiparisService,
-    private processor: WebSitesiProcessor
+    private processor: WebSitesiProcessor,
+    private moduleMembers: ModuleMembersService,
+    private notifications: NotificationsService
   ) {}
 
   private get db() {
@@ -156,7 +160,35 @@ export class WebSitesiB2bService {
       kalemler,
       aktorId: null,
     });
+    if (yeni) void this.siparisiHaberVer(party, siparis).catch(() => undefined);
     return { created: yeni, order: siteSiparisi(siparis, await this.site.skulariOku(siparis)) };
+  }
+
+  /**
+   * Portaldan gelen siparişi şirkette haber ver: müşterinin sorumlusu + müşteri
+   * defterini yönetebilenler (sahip, departman/modül yöneticileri). Sipariş
+   * "alındı" aşamasında bekliyor ve stok ancak onayda düşüyor — kimse fark
+   * etmezse sipariş orada unutulur. Bildirim siparişi BEKLETMEZ: portal
+   * yanıtını almadan önce bir bildirim hatası siparişi düşürmemeli.
+   */
+  private async siparisiHaberVer(party: Party, siparis: { siparisNo?: string; tutar: number; paraBirimi: string }): Promise<void> {
+    if (!party.organizationId) return;
+    const { kisiler, departmentId } = await this.moduleMembers.organizasyonYoneticileri(party.organizationId, MUSTERI_MODUL_KEY);
+    const alicilar = new Set(kisiler);
+    if (party.ownerUserId) alicilar.add(party.ownerUserId);
+    const link = departmentId ? `/departments/${departmentId}/modules/${MUSTERI_MODUL_KEY}` : undefined;
+    const tutar = `${siparis.tutar.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siparis.paraBirimi}`;
+    for (const userId of alicilar) {
+      this.notifications.notifyUserSafe(
+        userId,
+        "web_order_received",
+        { metin: "{musteri} portaldan sipariş verdi", params: { musteri: party.displayName } },
+        siparis.siparisNo
+          ? { metin: "{no} · {tutar} — onay bekliyor", params: { no: siparis.siparisNo, tutar } }
+          : { metin: "{tutar} — onay bekliyor", params: { tutar } },
+        link
+      );
+    }
   }
 
   private async mevcutSiparis(s: SiteKimligi, disKimlik: string) {

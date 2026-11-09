@@ -222,6 +222,44 @@ export class ModuleMembersService {
     return ev ? [ev] : [];
   }
 
+  /**
+   * Modülde ekibi yönetebilenler (canManageTeam): organizasyon sahibi, modülün
+   * evindeki departman yöneticileri ve modül yöneticileri. Kural
+   * resolveOrganizationAccess ile AYNI kaynaktan (departmentsWithModule) —
+   * "kime haber verilir" ile "kim hepsini görür" ayrışmasın.
+   * `departmentId` modülün ilk evi: bildirim bağlantısı oraya gider.
+   */
+  async organizasyonYoneticileri(
+    organizationId: string,
+    moduleKey: string
+  ): Promise<{ kisiler: string[]; departmentId: string | null }> {
+    const kisiler = new Set<string>();
+    const [{ data: org }, departmanlar, { data: modulYoneticileri }] = await Promise.all([
+      this.supabase.client.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle(),
+      this.departmentsWithModule(organizationId, moduleKey),
+      this.supabase.client
+        .from("module_members")
+        .select("user_id")
+        .eq("organization_id", organizationId)
+        .eq("module_key", moduleKey)
+        .eq("role", "manager")
+        .eq("status", "approved")
+        .is("removed_at", null),
+    ]);
+    if (org?.owner_id) kisiler.add(org.owner_id);
+    for (const r of (modulYoneticileri ?? []) as any[]) if (r.user_id) kisiler.add(r.user_id);
+    if (departmanlar.length) {
+      const { data: yoneticiler } = await this.supabase.client
+        .from("department_members")
+        .select("user_id")
+        .in("department_id", departmanlar)
+        .eq("role", "manager")
+        .eq("status", "approved");
+      for (const r of (yoneticiler ?? []) as any[]) if (r.user_id) kisiler.add(r.user_id);
+    }
+    return { kisiler: [...kisiler], departmentId: departmanlar[0] ?? null };
+  }
+
   private async assertCanManageTeam(
     scope: { organizationId?: string; jobId?: string; departmentId?: string },
     moduleKey: string,

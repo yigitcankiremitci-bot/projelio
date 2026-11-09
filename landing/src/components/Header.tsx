@@ -12,8 +12,8 @@ type NavLink = { href: string; label: string; desc?: string };
 type NavGroup = { id: string; label: string; links: NavLink[] };
 
 /**
- * Üst menü dört ana ögeye indirildi (Ürün, Fiyatlandırma, Demo Hesabı,
- * Destek); diğer sayfalar açılır menülerde gruplu. Eskiden sekiz bağlantı yan
+ * Üst menü üç ana ögeye indirildi (Ürün, Fiyatlandırma, Destek; Demo Hesabı
+ * 2026-11-09'da kalktı); diğer sayfalar açılır menülerde gruplu. Eskiden sekiz bağlantı yan
  * yana diziliyordu ve dar masaüstünde iki satıra kırılıyordu.
  *
  * Açılır menü masaüstünde üzerine gelince (CSS :hover) ve tıklayınca açılır —
@@ -82,10 +82,8 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
       ],
     },
   ];
-  // Ana sayfa artık uygulamanın kendisi: demo hesabına panelin giriş ekranından
-  // geçiliyor (alanlar hazır dolu gelir). Dönüşümün kısa yolu olduğu için gruba
-  // gömülmedi, tek başına duruyor.
-  const demo: NavLink = { href: dilliAdres(appLinks.demo, locale), label: dict.nav.demoAccount };
+  // "Demo Hesabı" bağlantısı kaldırıldı (kullanıcı kararı, 2026-11-09): panele
+  // yalnızca üye olarak girilir.
 
   /** Aktif dil dışındaki dile aynı sayfada geçiş yapan yol. */
   const swap = (target: Locale) => {
@@ -138,9 +136,6 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
         <nav className="nav-links" aria-label={dict.nav.menu} ref={navRef}>
           {renderGroup(groups[0])}
           {renderGroup(groups[1])}
-          <Link className="nav-plain" href={demo.href}>
-            {demo.label}
-          </Link>
           {renderGroup(groups[2])}
         </nav>
 
@@ -183,11 +178,6 @@ export default function Header({ dict, locale }: { dict: Dict; locale: Locale })
               ))}
             </div>
           ))}
-          <div className="mobile-group">
-            <Link href={demo.href} onClick={() => setOpen(false)}>
-              {demo.label}
-            </Link>
-          </div>
           <div className="btn-row">
             <a className="btn btn-ghost btn-sm" href={dilliAdres(appLinks.login, locale)}>
               {dict.nav.login}

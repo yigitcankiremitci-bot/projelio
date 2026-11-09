@@ -414,6 +414,7 @@ export const kurumsal: TranslationDict = {
 
   // Admin
   "Admin paneli": "Admin panel",
+  "Eski tanıtım sayfasını aç": "Open old landing page",
   "Demo ziyaretleri": "Demo visits",
   "Admin paneli yalnızca yönetici hesapları içindir.": "The admin panel is for administrator accounts only.",
   "Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.":

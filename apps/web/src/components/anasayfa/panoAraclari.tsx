@@ -8,7 +8,7 @@ import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import { IconCalendar, IconChevronLeft, IconChevronRight, IconNote, IconPause, IconPlay, IconRestore, IconStopwatch, IconTimer } from "../icons";
 import { POMODORO_BASI, POMODORO_SURESI, pomodoroAyarla, usePomodoro } from "../../lib/pomodoro";
-import { Halka, Sayi, SonListe } from "./gorselOzet";
+import { Sayi, SonListe } from "./gorselOzet";
 import type { PanoKartTanimi } from "./ozetKartlari";
 import NotDefteri from "./NotDefteri";
 import { askLioDraft } from "../../lib/askLio";
@@ -84,13 +84,17 @@ function Pomodoro() {
   const kalan = durum.bitis !== null ? Math.max(0, durum.bitis - simdi) : durum.kalan;
   const calisiyor = durum.bitis !== null;
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-      <Halka oran={1 - kalan / POMODORO_SURESI[durum.evre]} renk={durum.evre === "mola" ? c.success : c.accent} boyut={76}>
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.15 }}>
-          {sure(kalan)}
-          <span style={{ fontSize: 11, fontWeight: 400, color: c.textSecondary }}>{durum.evre === "mola" ? t("Mola") : t("Çalışma")}</span>
+    // Süre büyük rakamla, ilerleme altta ince çubukla: halkanın içindeki 15px
+    // sayaç küçük kalıyordu ve kart yüksekliği halkayı büyütmeye yetmiyor
+    // (kullanıcı isteği, 2026-11-09).
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+        <span style={{ fontSize: 38, fontWeight: 600, lineHeight: 1, letterSpacing: "-0.02em", color: c.textPrimary, fontVariantNumeric: "tabular-nums" }}>{sure(kalan)}</span>
+        <span style={{ fontSize: 12, color: c.textSecondary }}>{durum.evre === "mola" ? t("Mola") : t("Çalışma")}</span>
+        <span aria-hidden style={{ height: 5, borderRadius: 3, background: c.border, overflow: "hidden" }}>
+          <span style={{ display: "block", height: "100%", width: `${Math.min(100, Math.max(0, (1 - kalan / POMODORO_SURESI[durum.evre]) * 100))}%`, background: durum.evre === "mola" ? c.success : c.accent, transition: "width 1s linear" }} />
         </span>
-      </Halka>
+      </div>
       <div className="no-drag" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <AracDugmesi
           ad={calisiyor ? t("Duraklat") : t("Başlat")}

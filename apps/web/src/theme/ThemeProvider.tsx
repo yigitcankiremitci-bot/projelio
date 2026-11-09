@@ -106,6 +106,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     sistemCubuklariniTemayaUydur(mode);
   }, [mode]);
 
+  // Tarayıcının kendi parçaları (kaydırma çubukları, tarih seçici, kutucuklar)
+  // da temaya uysun: yoksa koyu modda açık renk kaydırma çubukları sırıtıyordu
+  // (kullanıcı isteği, 2026-11-09).
+  useEffect(() => {
+    document.documentElement.style.colorScheme = mode;
+  }, [mode]);
+
   const setPreference = (next: ThemePreference) => {
     setPreferenceState(next);
     persistThemePreference(next);

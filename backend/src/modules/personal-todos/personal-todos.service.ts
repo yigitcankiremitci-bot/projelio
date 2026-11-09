@@ -10,6 +10,7 @@ import type {
 import { SupabaseService } from "../../database/supabase.service";
 import { TasksService } from "../tasks/tasks.service";
 import { yerelBugun } from "../notifications/hatirlatma-ani";
+import { YapilacakListeleriService } from "./yapilacak-listeleri.service";
 
 const STATUSES: TaskStatus[] = ["todo", "in_progress", "completed"];
 
@@ -33,7 +34,8 @@ const STATUSES: TaskStatus[] = ["todo", "in_progress", "completed"];
 export class PersonalTodosService {
   constructor(
     private supabase: SupabaseService,
-    private tasksService: TasksService
+    private tasksService: TasksService,
+    private listeler: YapilacakListeleriService
   ) {}
 
   // ------------------------------------------------------------------ Pano
@@ -73,13 +75,19 @@ export class PersonalTodosService {
     // completed_at null ve PostgREST'te "null VEYA tarihten yeni" ifadesi
     // okunaksız kalıyor.
     const cutoff = Date.now() - completedWithinDays * 24 * 60 * 60 * 1000;
+    // Liste üyelikleri kartın üstüne yazılır: kanban ve anasayfa sekmeleri ayrı istek atmasın.
+    const uyelikler = await this.listeler.uyelikler(userId);
     return (data ?? [])
       .filter((row: any) => {
         if (row.status !== "completed") return true;
         if (!row.completed_at) return true;
         return new Date(row.completed_at).getTime() >= cutoff;
       })
-      .map(mapBoardItem);
+      .map((row: any) => {
+        const oge = mapBoardItem(row);
+        const listeIdleri = uyelikler.get(`${oge.source}:${oge.itemId}`);
+        return listeIdleri ? { ...oge, listeIdleri } : oge;
+      });
   }
 
 

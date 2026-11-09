@@ -683,3 +683,35 @@ export function IconDoor({ size = 18, color = "currentColor" }: IconProps) {
     </svg>
   );
 }
+
+/** Gazete: anasayfanın Haber kartı. */
+export function IconNews({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 5h13v13a2 2 0 0 0 2 2H6a2 2 0 0 1-2-2z" />
+      <path d="M17 9h3v9a2 2 0 0 1-2 2" />
+      <path d="M8 9h5M8 13h5M8 17h3" />
+    </svg>
+  );
+}
+
+/** Üst üste iki para: Döviz kartı. */
+export function IconCoins({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="9" cy="9" r="6" />
+      <path d="M15.5 9.3A6 6 0 1 1 9.3 15.5" />
+      <path d="M9 6.5v5M7.5 8h3" />
+    </svg>
+  );
+}
+
+/** Yükselen çizgi: Borsa kartı. */
+export function IconTrend({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 17l6-6 4 4 8-8" />
+      <path d="M15 7h6v6" />
+    </svg>
+  );
+}

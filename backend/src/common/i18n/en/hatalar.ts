@@ -1075,6 +1075,11 @@ export const hatalar: TranslationDict = {
   "Abone silinemedi.": "Couldn't delete the subscriber.",
   "Abonelik iptal edilemedi.": "Couldn't cancel the subscription.",
   "Bülten listesi okunamadı.": "Couldn't read the newsletter list.",
+  "Geçersiz haber türü": "Invalid news type",
+  "Liste adı boş olamaz": "List name can't be empty",
+  "Liste adı en fazla 60 karakter olabilir": "List name can be at most 60 characters",
+  "Liste bulunamadı": "List not found",
+  "En fazla 30 liste açılabilir": "You can create at most 30 lists",
   "Kayıt şu an alınamadı, biraz sonra tekrar deneyin.": "We couldn't save that right now; please try again shortly.",
   "Facebook hiçbir Sayfaya erişim vermedi. Tekrar bağlan ve izin ekranında Instagram'a bağlı Sayfanı seç (\"Tüm Sayfalar\" ya da Sayfanın kutusu).":
     "Facebook didn't grant access to any Page. Reconnect and select the Page linked to your Instagram on the permission screen (\"All Pages\" or the Page's checkbox).",

@@ -2760,6 +2760,16 @@ export interface PersonalBoardItem {
   parentTaskId?: string;
   completedAt?: string;
   createdAt: string;
+  /** Kartın bulunduğu yapılacaklar listeleri (migration 185); kişiye özel. */
+  listeIdleri?: string[];
+}
+
+/** Kişinin yapılacaklar listesi (migration 185): kanbanın ve anasayfa kartının sekmeleri. */
+export interface YapilacakListesi {
+  id: string;
+  ad: string;
+  sira: number;
+  createdAt: string;
 }
 
 // --- Takvim: kişisel planlama katmanı ----------------------------------------

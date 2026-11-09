@@ -9,6 +9,7 @@ import { yaziyiGorunurTut } from "./lib/yaziGorunur";
 import Sidebar from "./components/Sidebar";
 import BottomNav from "./components/BottomNav";
 import NotificationBell from "./components/NotificationBell";
+import { usePomodoroIzleyici } from "./lib/pomodoro";
 import PresenceStrip from "./components/PresenceStrip";
 import AiLiveActivity from "./components/AiLiveActivity";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
@@ -690,6 +691,7 @@ export default function App() {
   // Uygulamada geçirilen süre (Admin > Kullanıcılar). Yalnızca oturum doğrulanmışken:
   // giriş ekranında ya da /auth/me yanıt vermeden sinyal atmak 401 zinciri başlatırdı.
   useEtkinlikSayaci(Boolean(me) && !isAuthScreen);
+  usePomodoroIzleyici(Boolean(me) && !isAuthScreen);
   // Demo ziyaretçisi neye bakıyor (Admin > Demo ziyaretleri). Yalnızca herkese
   // açık demo hesabında; gerçek kullanıcıların gezinmesi ölçülmüyor.
   useDemoZiyaret(

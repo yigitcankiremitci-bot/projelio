@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import type { PersonalBoardSource } from "@projelio/shared";
 import { PersonalTodosService } from "./personal-todos.service";
+import { YapilacakListeleriService } from "./yapilacak-listeleri.service";
 
 /**
  * Yapılacaklar sayfası: kullanıcının kişisel kanban panosu.
@@ -13,7 +14,42 @@ import { PersonalTodosService } from "./personal-todos.service";
 @Controller("todos")
 @UseGuards(AuthGuard("jwt"))
 export class PersonalTodosController {
-  constructor(private personalTodosService: PersonalTodosService) {}
+  constructor(
+    private personalTodosService: PersonalTodosService,
+    private listeler: YapilacakListeleriService
+  ) {}
+
+  // ── Listeler (migration 185). "todos/:id" ile çakışmasın diye ondan önce. ──
+
+  @Get("listeler")
+  listeleriGetir(@Req() req: any) {
+    return this.listeler.listele(req.user.userId);
+  }
+
+  @Post("listeler")
+  listeOlustur(@Req() req: any, @Body("ad") ad: unknown) {
+    return this.listeler.olustur(req.user.userId, ad);
+  }
+
+  @Patch("listeler/:listeId")
+  listeAdlandir(@Req() req: any, @Param("listeId", ParseUUIDPipe) listeId: string, @Body("ad") ad: unknown) {
+    return this.listeler.adlandir(req.user.userId, listeId, ad);
+  }
+
+  @Delete("listeler/:listeId")
+  listeSil(@Req() req: any, @Param("listeId", ParseUUIDPipe) listeId: string) {
+    return this.listeler.sil(req.user.userId, listeId);
+  }
+
+  @Post("listeler/:listeId/ekle")
+  listeyeEkle(@Req() req: any, @Param("listeId", ParseUUIDPipe) listeId: string, @Body("ogeler") ogeler: { source?: string; itemId?: string }[]) {
+    return this.listeler.ekle(req.user.userId, listeId, Array.isArray(ogeler) ? ogeler : []);
+  }
+
+  @Post("listeler/:listeId/cikar")
+  listedenCikar(@Req() req: any, @Param("listeId", ParseUUIDPipe) listeId: string, @Body("ogeler") ogeler: { source?: string; itemId?: string }[]) {
+    return this.listeler.cikar(req.user.userId, listeId, Array.isArray(ogeler) ? ogeler : []);
+  }
 
   @Get("board")
   getBoard(
@@ -65,9 +101,13 @@ export class PersonalTodosController {
   @Post()
   create(
     @Req() req: any,
-    @Body() body: { title?: string; description?: string; status?: any; priority?: number; color?: string; dueDate?: string }
+    @Body() body: { title?: string; description?: string; status?: any; priority?: number; color?: string; dueDate?: string; listeId?: string }
   ) {
-    return this.personalTodosService.create(req.user.userId, body);
+    return this.personalTodosService.create(req.user.userId, body).then(async (todo) => {
+      // Açık listeden eklenen kart o listeye girsin; liste yoksa ya da başkasınınsa kart yine açılır.
+      if (body.listeId) await this.listeler.ekle(req.user.userId, body.listeId, [{ source: "personal", itemId: todo.id }]).catch(() => undefined);
+      return todo;
+    });
   }
 
   /**

@@ -99,17 +99,23 @@ export default function MusteriHaritasi({
   musteriler,
   onKapat,
   onMusteriAc,
+  baglanti = false,
+  acilisIli,
 }: {
   musteriler: Party[];
+  /** Bağlantılar modülünden açıldıysa metinler "bağlantı" der. */
+  baglanti?: boolean;
+  /** Anasayfa kartında bir ile tıklanınca pencere doğrudan o ilin ilçe görünümünde açılır. */
+  acilisIli?: number;
   onKapat: () => void;
   /** Listedeki müşteriye tıklanınca kartı açar (pencere CustomersPanel'de). */
   onMusteriAc: (p: Party) => void;
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [gorunum, setGorunum] = useState<Gorunum>({ tur: "turkiye" });
+  const [gorunum, setGorunum] = useState<Gorunum>(acilisIli ? { tur: "il", plaka: acilisIli } : { tur: "turkiye" });
   /** Türkiye görünümünde seçili il; il görünümünde seçili ilçe (adı). */
-  const [seciliIl, setSeciliIl] = useState<number | null>(null);
+  const [seciliIl, setSeciliIl] = useState<number | null>(acilisIli ?? null);
   const [seciliIlce, setSeciliIlce] = useState<string | null>(null);
   const [uzerinde, setUzerinde] = useState<{ ad: string; n: number; x: number; y: number } | null>(null);
   const [ilceler, setIlceler] = useState<Ilce[] | null>(null);
@@ -237,16 +243,19 @@ export default function MusteriHaritasi({
   const birim = turkiyeMi ? 1 : ilceBirim;
   const baslikIl = acikIl !== null ? TURKIYE_ILLERI[acikIl - 1].ad : undefined;
 
+  const bolgeBasligi = (il: string | undefined, n: number) =>
+    baglanti ? t("{il}: {n} bağlantı", { il, n }) : t("{il}: {n} müşteri", { il, n });
   const listeBasligi = turkiyeMi
     ? seciliIl === null
-      ? t("İl il müşteri")
-      : t("{il}: {n} müşteri", { il: TURKIYE_ILLERI[seciliIl - 1].ad, n: listedekiler.length })
+      ? baglanti ? t("İl il bağlantı") : t("İl il müşteri")
+      : bolgeBasligi(TURKIYE_ILLERI[seciliIl - 1].ad, listedekiler.length)
     : seciliIlce
-      ? t("{il}: {n} müşteri", { il: `${seciliIlce} / ${baslikIl}`, n: listedekiler.length })
-      : t("{il}: {n} müşteri", { il: baslikIl, n: listedekiler.length });
+      ? bolgeBasligi(`${seciliIlce} / ${baslikIl}`, listedekiler.length)
+      : bolgeBasligi(baslikIl, listedekiler.length);
+  const birimAdi = baglanti ? t("bağlantı") : t("müşteri");
 
   return (
-    <Modal title={t("Müşteriler haritada")} onClose={onKapat} maxWidth={1180} mobileFullScreen>
+    <Modal title={baglanti ? t("Bağlantılar haritada") : t("Müşteriler haritada")} onClose={onKapat} maxWidth={1180} mobileFullScreen>
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 16px", fontSize: 13, color: c.textSecondary }}>
           {!turkiyeMi && (
@@ -257,7 +266,7 @@ export default function MusteriHaritasi({
           {turkiyeMi ? (
             <>
               <span>
-                <strong style={{ color: c.textPrimary }}>{musteriler.length - tanimsiz}</strong> {t("müşteri")} ·{" "}
+                <strong style={{ color: c.textPrimary }}>{musteriler.length - tanimsiz}</strong> {birimAdi} ·{" "}
                 <strong style={{ color: c.textPrimary }}>{iller.length}</strong> {t("il")}
               </span>
               {tanimsiz > 0 && <span>{t("{n} kartta il belirtilmemiş ya da tanınmadı", { n: tanimsiz })}</span>}
@@ -267,7 +276,7 @@ export default function MusteriHaritasi({
             <>
               <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{baslikIl}</span>
               <span>
-                <strong style={{ color: c.textPrimary }}>{ildeki.length}</strong> {t("müşteri")}
+                <strong style={{ color: c.textPrimary }}>{ildeki.length}</strong> {birimAdi}
               </span>
               {ilceler && ilceSayim.bos > 0 && <span>{t("{n} kartta ilçe belirtilmemiş ya da tanınmadı", { n: ilceSayim.bos })}</span>}
             </>
@@ -288,8 +297,10 @@ export default function MusteriHaritasi({
               role="img"
               aria-label={
                 turkiyeMi
-                  ? t("İl il müşteri sayısını gösteren Türkiye haritası")
-                  : t("{il} ilinin ilçe ilçe müşteri sayısını gösteren harita", { il: baslikIl })
+                  ? baglanti ? t("İl il bağlantı sayısını gösteren Türkiye haritası") : t("İl il müşteri sayısını gösteren Türkiye haritası")
+                  : baglanti
+                    ? t("{il} ilinin ilçe ilçe bağlantı sayısını gösteren harita", { il: baslikIl })
+                    : t("{il} ilinin ilçe ilçe müşteri sayısını gösteren harita", { il: baslikIl })
               }
               style={{
                 width: "100%",
@@ -386,7 +397,7 @@ export default function MusteriHaritasi({
                 }}
               >
                 <div style={{ fontWeight: 600 }}>{uzerinde.ad}</div>
-                <div style={{ color: c.textSecondary }}>{t("{n} müşteri", { n: uzerinde.n })}</div>
+                <div style={{ color: c.textSecondary }}>{baglanti ? t("{n} bağlantı", { n: uzerinde.n }) : t("{n} müşteri", { n: uzerinde.n })}</div>
                 {turkiyeMi && <div style={{ color: c.textSecondary, fontSize: 11 }}>{t("Çift tıkla: ilçeler")}</div>}
               </div>
             )}
@@ -395,7 +406,7 @@ export default function MusteriHaritasi({
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 12px", marginTop: 8, fontSize: 12, color: c.textSecondary }}>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                 <span style={{ width: 14, height: 10, borderRadius: 2, background: c.background, border: `1px solid ${c.border}` }} />
-                {t("Müşteri yok")}
+                {baglanti ? t("Bağlantı yok") : t("Müşteri yok")}
               </span>
               {ESIKLER.map((_, i) => (
                 <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -428,7 +439,9 @@ export default function MusteriHaritasi({
             {turkiyeMi && seciliIl === null ? (
               iller.length === 0 ? (
                 <span style={{ fontSize: 12, color: c.textSecondary }}>
-                  {t("Kartlarda il bilgisi yok. Müşteri kartının adresine şehir yazıldığında burada görünür.")}
+                  {baglanti
+                    ? t("Kartlarda il bilgisi yok. Bağlantı kartının adresine şehir yazıldığında burada görünür.")
+                    : t("Kartlarda il bilgisi yok. Müşteri kartının adresine şehir yazıldığında burada görünür.")}
                 </span>
               ) : (
                 <div style={{ ...listeCercevesi(c), maxHeight: "58vh", overflowY: "auto" }}>
@@ -442,7 +455,7 @@ export default function MusteriHaritasi({
                 </div>
               )
             ) : listedekiler.length === 0 ? (
-              <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Bu bölgede müşteri yok.")}</span>
+              <span style={{ fontSize: 12, color: c.textSecondary }}>{baglanti ? t("Bu bölgede bağlantı yok.") : t("Bu bölgede müşteri yok.")}</span>
             ) : (
               <div style={{ ...listeCercevesi(c), maxHeight: "58vh", overflowY: "auto" }}>
                 {listedekiler.map((p, i) => {

@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { api } from "../../api/client";
+import { googleTakvimApi } from "../../api/googleTakvim";
+import type { GoogleTakvimEtkinligi, PersonalBoardItem, ProjeEtkinligi } from "@projelio/shared";
+import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
-import { IconCalendar, IconNote, IconPause, IconPlay, IconRestore, IconStopwatch, IconTimer } from "../icons";
-import { Halka, Sayi } from "./gorselOzet";
+import { IconCalendar, IconChevronLeft, IconChevronRight, IconNote, IconPause, IconPlay, IconRestore, IconStopwatch, IconTimer } from "../icons";
+import { POMODORO_BASI, POMODORO_SURESI, pomodoroAyarla, usePomodoro } from "../../lib/pomodoro";
+import { Halka, Sayi, SonListe } from "./gorselOzet";
 import type { PanoKartTanimi } from "./ozetKartlari";
+import NotDefteri from "./NotDefteri";
+import { askLioDraft } from "../../lib/askLio";
 
 /**
  * Panonun küçük araçları. Durum saat gibi "bitiş anı" olarak saklanır, kalan
@@ -69,60 +75,34 @@ function AracDugmesi({ ad, onClick, vurgulu, children }: { ad: string; onClick: 
   );
 }
 
-const POMODORO_MS = 25 * 60 * 1000;
-const POMODORO_ANAHTARI = "projelio_pano_pomodoro";
-
-/** Bitişi duyurur; kısa bir bip, ses dosyası taşımaya değmez. */
-function bip() {
-  try {
-    const ses = new AudioContext();
-    const osilator = ses.createOscillator();
-    osilator.connect(ses.destination);
-    osilator.frequency.value = 660;
-    osilator.start();
-    osilator.stop(ses.currentTime + 0.25);
-  } catch {
-    // Tarayıcı izin vermediyse halka yine dolu görünür.
-  }
-}
-
 function Pomodoro() {
   const c = useThemeColors();
   const t = useT();
-  const [durum, setDurumHam] = useState(() => okuJson<{ bitis: number | null; kalan: number }>(POMODORO_ANAHTARI, { bitis: null, kalan: POMODORO_MS }));
-  const setDurum = (d: typeof durum) => {
-    setDurumHam(d);
-    yazJson(POMODORO_ANAHTARI, d);
-  };
+  const durum = usePomodoro();
+  const setDurum = pomodoroAyarla;
   const simdi = useSaniyelik(durum.bitis !== null);
   const kalan = durum.bitis !== null ? Math.max(0, durum.bitis - simdi) : durum.kalan;
-  const bitti = kalan === 0;
-  const durumRef = useRef(durum);
-  durumRef.current = durum;
-  useEffect(() => {
-    if (durumRef.current.bitis === null || !bitti) return;
-    bip();
-    setDurum({ bitis: null, kalan: 0 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bitti]);
   const calisiyor = durum.bitis !== null;
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-      <Halka oran={1 - kalan / POMODORO_MS} renk={bitti ? c.success : c.accent} boyut={76}>
-        {sure(kalan)}
+      <Halka oran={1 - kalan / POMODORO_SURESI[durum.evre]} renk={durum.evre === "mola" ? c.success : c.accent} boyut={76}>
+        <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.15 }}>
+          {sure(kalan)}
+          <span style={{ fontSize: 11, fontWeight: 400, color: c.textSecondary }}>{durum.evre === "mola" ? t("Mola") : t("Çalışma")}</span>
+        </span>
       </Halka>
       <div className="no-drag" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <AracDugmesi
           ad={calisiyor ? t("Duraklat") : t("Başlat")}
           vurgulu
           onClick={() => {
-            if (calisiyor) setDurum({ bitis: null, kalan });
-            else setDurum({ bitis: Date.now() + (bitti ? POMODORO_MS : kalan), kalan: bitti ? POMODORO_MS : kalan });
+            if (calisiyor) setDurum({ evre: durum.evre, bitis: null, kalan });
+            else setDurum({ evre: durum.evre, bitis: Date.now() + kalan, kalan });
           }}
         >
           {calisiyor ? <IconPause size={15} color={c.surface} /> : <IconPlay size={15} color={c.surface} />}
         </AracDugmesi>
-        <AracDugmesi ad={t("Sıfırla")} onClick={() => setDurum({ bitis: null, kalan: POMODORO_MS })}>
+        <AracDugmesi ad={t("Sıfırla")} onClick={() => setDurum(POMODORO_BASI)}>
           <IconRestore size={15} color={c.textSecondary} />
         </AracDugmesi>
       </div>
@@ -162,43 +142,104 @@ function Kronometre() {
   );
 }
 
-function HizliNot({ kapsam }: { kapsam: string }) {
-  const c = useThemeColors();
-  const t = useT();
-  const anahtar = `projelio_pano_not_${kapsam}`;
-  const [metin, setMetin] = useState(() => {
-    try {
-      return localStorage.getItem(anahtar) ?? "";
-    } catch {
-      return "";
-    }
-  });
-  return (
-    <textarea
-      className="no-drag"
-      value={metin}
-      onChange={(e) => {
-        setMetin(e.target.value);
-        try {
-          localStorage.setItem(anahtar, e.target.value);
-        } catch {
-          // Depolama kapalıysa not yalnızca bu oturumda durur.
-        }
-      }}
-      placeholder={t("Not yaz")}
-      aria-label={t("Hızlı not")}
-      style={{ flex: 1, width: "100%", minHeight: 62, boxSizing: "border-box", padding: 0, border: "none", outline: "none", resize: "none", background: "transparent", color: c.textPrimary, fontSize: 14, fontFamily: "inherit" }}
-    />
-  );
+interface TakvimOlayi {
+  id: string;
+  ad: string;
+  gun: string;
+  renk?: string;
+  hedef?: string;
+  disAdres?: string;
 }
 
-function TakvimOzeti() {
+function gunAnahtari(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Ay görünümlü gerçek takvim: proje etkinlikleri, yapılacak tarihleri, bağlıysa Google. */
+function TakvimKarti() {
   const c = useThemeColors();
-  const bugun = new Date();
+  const t = useT();
+  const bugun = gunAnahtari(new Date());
+  const [ay, setAy] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [secili, setSecili] = useState(bugun);
+  const [olaylar, setOlaylar] = useState<TakvimOlayi[]>([]);
+  const ayAnahtari = gunAnahtari(ay);
+
+  useEffect(() => {
+    let iptal = false;
+    const ilk = new Date(ay.getFullYear(), ay.getMonth(), 1);
+    const son = new Date(ay.getFullYear(), ay.getMonth() + 1, 0);
+    const from = gunAnahtari(ilk);
+    const to = gunAnahtari(son);
+    // Kaynaklar bağımsız: Google bağlı değilse ya da biri düşerse diğerleri yine görünsün.
+    Promise.all([
+      api.get<ProjeEtkinligi[]>(`/calendar/mine?from=${from}&to=${to}`).catch(() => [] as ProjeEtkinligi[]),
+      api.get<PersonalBoardItem[]>("/todos/board?source=all").catch(() => [] as PersonalBoardItem[]),
+      googleTakvimApi.etkinlikler(from, to).catch(() => [] as GoogleTakvimEtkinligi[]),
+    ]).then(([etkinlikler, gorevler, google]) => {
+      if (iptal) return;
+      const liste: TakvimOlayi[] = [];
+      for (const e of etkinlikler) {
+        const bitis = e.endDate ?? e.eventDate;
+        for (const g = new Date(`${e.eventDate}T12:00:00`); gunAnahtari(g) <= bitis; g.setDate(g.getDate() + 1)) {
+          liste.push({ id: `${e.id}:${gunAnahtari(g)}`, ad: e.title, gun: gunAnahtari(g), renk: c.accent, hedef: e.projectId ? `/projects/${e.projectId}` : "/calendar" });
+        }
+      }
+      for (const g of gorevler) {
+        if (!g.effectiveDueDate || g.status === "completed") continue;
+        liste.push({ id: g.itemId, ad: g.title, gun: g.effectiveDueDate.slice(0, 10), renk: c.success, hedef: g.projectId ? `/projects/${g.projectId}` : "/tasks" });
+      }
+      for (const e of google) {
+        liste.push({ id: e.id, ad: e.baslik, gun: e.tumGun ? e.baslangic.slice(0, 10) : gunAnahtari(new Date(e.baslangic)), renk: e.takvimRengi, disAdres: e.htmlLink, hedef: "/calendar" });
+      }
+      setOlaylar(liste);
+    });
+    return () => {
+      iptal = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ayAnahtari]);
+
+  const kaydir = (yon: number) => setAy(new Date(ay.getFullYear(), ay.getMonth() + yon, 1));
+  const bosluk = (ay.getDay() + 6) % 7; // Hafta pazartesi başlar.
+  const gunSayisi = new Date(ay.getFullYear(), ay.getMonth() + 1, 0).getDate();
+  const haftaGunleri = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(bicimDili(), { weekday: "narrow" }));
+  const okStili: CSSProperties = { width: 24, height: 24, padding: 0, border: "none", background: "transparent", color: c.textSecondary, display: "flex", alignItems: "center", justifyContent: "center" };
+
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
-      <Sayi boyut={38}>{bugun.getDate()}</Sayi>
-      <span style={{ fontSize: 13, color: c.textSecondary, whiteSpace: "nowrap" }}>{bugun.toLocaleDateString(bicimDili(), { month: "short", weekday: "short" })}</span>
+    <div className="no-drag" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+        <span style={{ fontSize: 13, color: c.textPrimary, fontWeight: 500 }}>{ay.toLocaleDateString(bicimDili(), { month: "long", year: "numeric" })}</span>
+        <span style={{ display: "flex" }}>
+          <button type="button" onClick={() => kaydir(-1)} aria-label={t("Önceki")} title={t("Önceki")} style={okStili}>
+            <IconChevronLeft size={14} color="currentColor" />
+          </button>
+          <button type="button" onClick={() => kaydir(1)} aria-label={t("Sonraki")} title={t("Sonraki")} style={okStili}>
+            <IconChevronRight size={14} color="currentColor" />
+          </button>
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", rowGap: 1, textAlign: "center" }}>
+        {haftaGunleri.map((g, i) => (
+          <span key={i} style={{ fontSize: 11, color: c.textSecondary, paddingBottom: 2 }}>{g}</span>
+        ))}
+        {Array.from({ length: bosluk }, (_, i) => (
+          <span key={`b${i}`} />
+        ))}
+        {Array.from({ length: gunSayisi }, (_, i) => {
+          const anahtar = gunAnahtari(new Date(ay.getFullYear(), ay.getMonth(), i + 1));
+          const buGun = anahtar === bugun;
+          const secilen = anahtar === secili;
+          const dolu = olaylar.some((o) => o.gun === anahtar);
+          return (
+            <button key={anahtar} type="button" onClick={() => setSecili(anahtar)} aria-pressed={secilen} style={{ position: "relative", height: 24, padding: 0, border: "none", background: "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, background: buGun ? c.accent : "transparent", color: buGun ? c.surface : c.textPrimary, boxShadow: secilen && !buGun ? `inset 0 0 0 1px ${c.accent}` : undefined }}>{i + 1}</span>
+              {dolu && <span style={{ position: "absolute", bottom: 0, width: 4, height: 4, borderRadius: "50%", background: buGun ? c.surface : c.accent }} />}
+            </button>
+          );
+        })}
+      </div>
+      <SonListe ogeler={olaylar.filter((o) => o.gun === secili)} adet={2} />
     </div>
   );
 }
@@ -208,7 +249,20 @@ export function aracTanimlari(t: ReturnType<typeof useT>, kapsam: string): PanoK
   return [
     { id: "pomodoro", ad: t("Pomodoro"), grup: "arac", Icon: IconTimer, boyut: "kucuk", etkilesimli: true, hedef: "", ciz: () => <Pomodoro /> },
     { id: "kronometre", ad: t("Kronometre"), grup: "arac", Icon: IconStopwatch, boyut: "kucuk", etkilesimli: true, hedef: "", ciz: () => <Kronometre /> },
-    { id: "not", ad: t("Hızlı not"), grup: "arac", Icon: IconNote, boyut: "kucuk", etkilesimli: true, hedef: "", ciz: () => <HizliNot kapsam={kapsam} /> },
-    { id: "takvim", ad: t("Takvim"), grup: "arac", Icon: IconCalendar, boyut: "kucuk", hedef: "/calendar", ciz: () => <TakvimOzeti /> },
+    // Geniş ve iki satır: yazmak için yer olsun; araç çubuğu dar kartta yana kayar.
+    { id: "not", ad: t("Notlar"), grup: "arac", Icon: IconNote, boyut: "genis", satir: 2, etkilesimli: true, hedef: "", ciz: () => <NotDefteri kapsam={kapsam} /> },
+    {
+      id: "takvim",
+      ad: t("Takvim"),
+      grup: "arac",
+      Icon: IconCalendar,
+      boyut: "kucuk",
+      satir: 2,
+      etkilesimli: true,
+      hedef: "/calendar",
+      // Lio takvime etkinlik/plan yazabiliyor; taslak yazılır, göndermek kişide.
+      hizliEylem: { ad: t("Lio'ya takvim için yaz"), ikon: "lio", calistir: () => askLioDraft(t("Takvimime eklemek istiyorum: ")) },
+      ciz: () => <TakvimKarti />,
+    },
   ];
 }

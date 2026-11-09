@@ -6,6 +6,7 @@ import JobCard from "../components/JobCard";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useSortableList } from "../lib/useSortableList";
 import { useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../lib/undo";
+import { onSidebarChanged } from "../lib/sidebarEvents";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
@@ -20,7 +21,7 @@ import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { useT } from "../lib/i18n";
 import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
-import AnasayfaPanosu, { OfisKapisi, OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import AnasayfaPanosu, { OfisKapisi } from "../components/anasayfa/AnasayfaPanosu";
 import GorunumSecici from "../components/anasayfa/GorunumSecici";
 import { SERBEST_VARSAYILAN_PANO, useSerbestKatalogu } from "../components/anasayfa/ozetKartlari";
 import { useAnasayfaPano } from "../lib/useAnasayfaPano";
@@ -147,6 +148,8 @@ export default function Dashboard() {
   // Geri/ileri alma sunucu durumunu değiştirir (ör. silinen iş geri gelir);
   // liste kendini tazelemeli, yoksa ancak sayfa yenilenince görünür.
   useRefreshOnUndo(reloadAll);
+  // Panodaki Projeler kartından proje açılınca (CreateProjectModal bunu yayar) kart tazelensin.
+  useEffect(() => onSidebarChanged(reloadAll), []);
   // Bir iş daveti kabul edilince (bildirim çanından ya da iş sayfasından) o iş
   // "Katıldıklarım" ızgarasına anında düşsün — kullanıcı sayfayı yenilemek
   // zorunda kalmasın.
@@ -204,9 +207,8 @@ export default function Dashboard() {
             ? t("Modüller")
             : t("Ana Sayfa");
 
-  const katalog = useSerbestKatalogu({ isler: visibleJobs, projeler: projects });
   const pano = useAnasayfaPano("me", SERBEST_VARSAYILAN_PANO);
-  const [duzenleme, setDuzenleme] = useDuzenlemeModu(tab);
+  const katalog = useSerbestKatalogu({ isler: visibleJobs, projeler: projects, pano });
 
   // Kaydırınca tepede beliren sabit şerit (bkz. App.tsx CoverStickyHeader).
   const anasayfaEtiketi = t("Ana Sayfa");
@@ -228,17 +230,12 @@ export default function Dashboard() {
         geri={tab === "home" ? undefined : <GeriDugmesi to="/" etiket={anasayfaEtiketi} />}
         secici={tab === "home" ? <GorunumSecici aktif="ben" isSayisi={visibleJobs.length} /> : undefined}
         araclar={
-          tab === "home" ? (
-            <>
-              <OfisKapisi hedef="/yeni?ofis=studyo" />
-              <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} />
-            </>
-          ) : undefined
+          tab === "home" ? <OfisKapisi hedef="/yeni?ofis=studyo" /> : undefined
         }
       />
 
       {tab === "home" && (
-        <AnasayfaPanosu pano={pano} katalog={katalog} duzenleme={duzenleme} onDuzenlemeBitti={() => setDuzenleme(false)} />
+        <AnasayfaPanosu pano={pano} katalog={katalog} />
       )}
 
       {tab !== "home" && (

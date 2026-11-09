@@ -29,7 +29,7 @@ import { IconSettings, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
 import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
-import AnasayfaPanosu, { OfisKapisi, OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import AnasayfaPanosu, { OfisKapisi } from "../components/anasayfa/AnasayfaPanosu";
 import GorunumSecici from "../components/anasayfa/GorunumSecici";
 import { SIRKET_VARSAYILAN_PANO, useSirketKatalogu } from "../components/anasayfa/ozetKartlari";
 import { useAnasayfaPano } from "../lib/useAnasayfaPano";
@@ -153,7 +153,6 @@ export default function OrganizationDetail() {
     modulKatalogu: moduleCatalog,
   });
   const pano = useAnasayfaPano(id ?? "me", SIRKET_VARSAYILAN_PANO);
-  const [duzenleme, setDuzenleme] = useDuzenlemeModu(`${id}:${activeTab}`);
 
   const reload = () => {
     if (!id) return;
@@ -216,22 +215,17 @@ export default function OrganizationDetail() {
         araclar={
           anasayfada ? (
             <>
-              {/* Şirket ayarları günlük iş değil: sade üst şerit için yalnızca
-                  Özelleştir açıkken görünür. */}
-              {duzenleme && access?.canViewCommercial !== false && (
+              {access?.canViewCommercial !== false && (
                 // Taşerona gösterilmiyor: sunucu kartı zaten reddediyor (bkz.
                 // bilgiKartiYetkisiKarari); canViewCommercial bu ayrımı taşıyor.
                 <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} title={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
                   <IconIdCard size={18} color={c.textSecondary} />
                 </button>
               )}
-              {duzenleme && (
-                <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} title={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
-                  <IconSettings size={18} color={c.textSecondary} />
-                </button>
-              )}
+              <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} title={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
+                <IconSettings size={18} color={c.textSecondary} />
+              </button>
               {id && <OfisKapisi hedef={`/yeni?ofis=${encodeURIComponent(id)}`} />}
-              <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} />
             </>
           ) : undefined
         }
@@ -245,7 +239,7 @@ export default function OrganizationDetail() {
             setAddingFile={setAddingFile}
             onGelirGider={() => setActiveTab("budget")}
           />
-          <AnasayfaPanosu pano={pano} katalog={katalog} duzenleme={duzenleme} onDuzenlemeBitti={() => setDuzenleme(false)} />
+          <AnasayfaPanosu pano={pano} katalog={katalog} />
         </>
       )}
 

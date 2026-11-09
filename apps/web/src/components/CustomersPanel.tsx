@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   BAGLANTI_MODUL_KEY,
   BAGLANTI_ONEMLERI,
@@ -438,6 +439,51 @@ export default function CustomersPanel({
   // Şablon indirme ve doldurulmuş dosyayı yükleme aynı pencerede (bkz. MusteriExcelModal).
   const [excelAcik, setExcelAcik] = useState(false);
   const [haritaAcik, setHaritaAcik] = useState(false);
+  // Anasayfadaki harita kartı buraya ?harita=1 ile gelir. Liste yüklenmeden açılırsa
+  // harita boş görünürdü; parametre de silinir ki yenileyince kapatılan harita geri gelmesin.
+  const [aramaParametreleri, setAramaParametreleri] = useSearchParams();
+  const haritaIstendi = aramaParametreleri.get("harita") === "1";
+  // Anasayfa kartının sekmesinden gelindiyse: ?sekme= (Müşteriler) ya da ?liste= (Bağlantılar).
+  // Bir kez okunur ve adresten silinir; yenileyince kişinin kendi tercihi geçerli olsun.
+  const istenenSekme = useRef<string | null>(
+    (() => {
+      const s = aramaParametreleri.get("sekme");
+      return s === "musteriler" || s === "potansiyel" || s === "tahsilat" ? s : null;
+    })()
+  );
+  useEffect(() => {
+    const liste = aramaParametreleri.get("liste");
+    if (!aramaParametreleri.has("sekme") && !liste) return;
+    if (liste) setSeciliListe(liste);
+    setAramaParametreleri(
+      (once) => {
+        const yeni = new URLSearchParams(once);
+        yeni.delete("sekme");
+        yeni.delete("liste");
+        return yeni;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // ?il=<plaka>: karttaki bir ile tıklanınca pencere o ilin ilçeleriyle açılır.
+  const [haritaAcilisIli, setHaritaAcilisIli] = useState<number | undefined>();
+  useEffect(() => {
+    if (loading || !haritaIstendi) return;
+    const plaka = Number(aramaParametreleri.get("il"));
+    setHaritaAcilisIli(plaka >= 1 && plaka <= 81 ? plaka : undefined);
+    setHaritaAcik(true);
+    setAramaParametreleri(
+      (once) => {
+        const yeni = new URLSearchParams(once);
+        yeni.delete("harita");
+        yeni.delete("il");
+        return yeni;
+      },
+      { replace: true }
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, haritaIstendi]);
   // Haritanın yan listesinden açılan kart (harita penceresinin üstünde).
   const [haritaKartiId, setHaritaKartiId] = useState<string | null>(null);
 
@@ -454,7 +500,10 @@ export default function CustomersPanel({
       .oku(kapsamYolu, MUSTERI_MODUL_KEY)
       .then((r) => {
         if (iptal) return;
-        setGorunum((r.sekme ?? ilkGorunum) as typeof gorunum);
+        // Anasayfa kartındaki sekmeden gelindiyse (?sekme=) o sekme, kayıtlı tercihin önünde.
+        const istenen = istenenSekme.current;
+        istenenSekme.current = null;
+        setGorunum((istenen ?? r.sekme ?? ilkGorunum) as typeof gorunum);
         setKayitliAcilis(r.kayitli ? r.sekme ?? null : null);
       })
       .catch(() => !iptal && setGorunum(ilkGorunum))
@@ -1602,7 +1651,10 @@ export default function CustomersPanel({
 
       {haritaAcik && (
         <Suspense fallback={null}>
-          <MusteriHaritasi musteriler={haritaKartlari} onKapat={() => setHaritaAcik(false)} onMusteriAc={(p) => setHaritaKartiId(p.id)} />
+          <MusteriHaritasi musteriler={haritaKartlari} baglanti={baglantiModu} acilisIli={haritaAcilisIli} onKapat={() => {
+            setHaritaAcik(false);
+            setHaritaAcilisIli(undefined);
+          }} onMusteriAc={(p) => setHaritaKartiId(p.id)} />
         </Suspense>
       )}
       {(() => {

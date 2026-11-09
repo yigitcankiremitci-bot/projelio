@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import TaskColumn, { TaskColumnHandle } from "../components/TaskColumn";
+import { YapilacakListeSekmeleri, listedekiler, useYapilacakListeleri, yapilacakListeApi } from "../components/YapilacakListeleri";
 import TaskEditModal from "../components/TaskEditModal";
 import PersonalTodoModal from "../components/PersonalTodoModal";
 import TaskSelectionBar from "../components/TaskSelectionBar";
@@ -100,6 +101,24 @@ export default function TasksOverview() {
     [setSearchParams]
   );
 
+  // Açık yapılacak listesi (migration 185) — filtre gibi adreste; "" = Tümü.
+  const seciliListe = searchParams.get("liste") ?? "";
+  const setSeciliListe = useCallback(
+    (id: string) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (id) params.set("liste", id);
+          else params.delete("liste");
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+  const yapilacakListeleri = useYapilacakListeleri();
+
   // Geri dönüşte çıkılan kartı bul, ona kaydır ve parlat (bkz. TaskColumn).
   const [highlightTaskId, setHighlightTaskId] = useState<string | undefined>(undefined);
   const [sort, setSort] = useState<TaskSortMode>("manual");
@@ -174,10 +193,10 @@ export default function TasksOverview() {
   const sortedItems = useMemo(
     () =>
       sortTasks(
-        items.map((i) => ({ ...i, deadline: i.effectiveDueDate, createdAt: i.createdAt, title: i.title })),
+        listedekiler(items, seciliListe).map((i) => ({ ...i, deadline: i.effectiveDueDate, createdAt: i.createdAt, title: i.title })),
         sort
       ),
-    [items, sort]
+    [items, sort, seciliListe]
   );
 
   const tasks: Task[] = useMemo(
@@ -292,7 +311,8 @@ export default function TasksOverview() {
 
   const handleCreate = async (status: TaskStatus, title: string) => {
     try {
-      const created = await api.post<PersonalTodo>("/todos", { title, status });
+      // Liste açıkken eklenen kart o listeye girer, yoksa eklendiği an gözden kaybolurdu.
+      const created = await api.post<PersonalTodo>("/todos", { title, status, listeId: seciliListe || undefined });
       load();
       registerTodoCreateUndo(created.id, { title, status });
     } catch {
@@ -695,6 +715,63 @@ export default function TasksOverview() {
             ? t("Sana atanmış görevler. Buradaki sıralama yalnızca sana görünür.")
             : t("Kişisel görevlerini senden başkası görmez.")}
         </p>
+      )}
+
+      <YapilacakListeSekmeleri
+        listeler={yapilacakListeleri.listeler}
+        secili={seciliListe}
+        onSec={(id) => {
+          selection.clear();
+          setSeciliListe(id);
+        }}
+        sayilar={Object.fromEntries([["", items.length], ...yapilacakListeleri.listeler.map((l) => [l.id, listedekiler(items, l.id).length])])}
+        onOlustur={yapilacakListeleri.olustur}
+        onAdlandir={yapilacakListeleri.adlandir}
+        onSil={(id) => void yapilacakListeleri.sil(id).then(load)}
+      />
+
+      {/* Seçim modunda: seçilen kartları bir listeye koy ya da açık listeden çıkar. */}
+      {selection.selectionMode && selection.selectedIds.size > 0 && (yapilacakListeleri.listeler.length > 0 || seciliListe) && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", margin: "-6px 0 14px", fontSize: 13, color: c.textSecondary }}>
+          <span>{t("Seçilenleri listeye ekle:")}</span>
+          {yapilacakListeleri.listeler
+            .filter((l) => l.id !== seciliListe)
+            .map((l) => (
+              <button
+                key={l.id}
+                type="button"
+                onClick={async () => {
+                  const ogeler = Array.from(selection.selectedIds).flatMap((id) => {
+                    const source = sourceById.get(id);
+                    return source ? [{ source, itemId: id }] : [];
+                  });
+                  await yapilacakListeApi.ekle(l.id, ogeler).catch(() => undefined);
+                  selection.clear();
+                  load();
+                }}
+                style={{ padding: "4px 11px", borderRadius: 999, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary, fontSize: 13 }}
+              >
+                {l.ad}
+              </button>
+            ))}
+          {seciliListe && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ogeler = Array.from(selection.selectedIds).flatMap((id) => {
+                  const source = sourceById.get(id);
+                  return source ? [{ source, itemId: id }] : [];
+                });
+                await yapilacakListeApi.cikar(seciliListe, ogeler).catch(() => undefined);
+                selection.clear();
+                load();
+              }}
+              style={{ padding: "4px 11px", borderRadius: 999, border: `1px solid ${c.border}`, background: "transparent", color: c.danger, fontSize: 13 }}
+            >
+              {t("Bu listeden çıkar")}
+            </button>
+          )}
+        </div>
       )}
 
       {loading ? (

@@ -1089,3 +1089,121 @@ button.mf-proje-kutu.kesik:hover {
     bottom: calc(96px + env(safe-area-inset-bottom));
   }
 }
+
+/* ---------- Eklemeler: harita, iş kapağı, Lio simgesi ---------- */
+.mf-cip-sayi {
+  opacity: 0.7;
+}
+
+/* Müşteriler kartındaki harita (paneldeki MusteriHaritaOzeti ölçüleri). */
+.mf-harita {
+  position: relative;
+  flex: 1;
+  min-height: 120px;
+  max-height: 190px;
+  margin: 8px 0 2px;
+  cursor: pointer;
+  outline: none;
+}
+.mf-harita svg {
+  display: block;
+}
+.mf-harita-ipucu {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--mf-yuzey);
+  border: 1px solid var(--mf-cizgi);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.mf-harita-ipucu b {
+  font-weight: 600;
+}
+.mf-harita-ipucu span {
+  color: var(--mf-soluk);
+}
+
+/* İşler kartının kapak fotoğrafı. */
+.mf-kapak {
+  position: relative;
+  overflow: hidden;
+}
+.mf-kapak img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mf-is-satir + .mf-is-satir {
+  margin-top: 4px;
+}
+.mf-is-ipucu {
+  margin: 0 0 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--mf-soluk);
+}
+
+/* 3D stüdyo iki satır boyunca: görsel büyük ve Lio kutusunun arkasında kalmasın. */
+.mf-hucre > .mf-kart.mf-tam {
+  display: flex;
+}
+.mf-hucre .mf-ofis {
+  min-height: 276px;
+}
+.mf-hucre .mf-ofis img {
+  inset: 44px 12px 12px;
+  width: calc(100% - 24px);
+  height: calc(100% - 56px);
+}
+
+/* Kutu kapatılınca sağ altta duran Lio (paneldeki AiLauncher ölçüleri). */
+.mf-lio-simge {
+  position: fixed;
+  right: 18px;
+  bottom: 22px;
+  z-index: 30;
+  width: 132px;
+  height: 132px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.mf-lio-simge > span {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: bottom right;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 4px 10px rgba(26, 31, 41, 0.28));
+}
+.mf-lio-simge:hover > span {
+  transform: scale(1.28);
+}
+.mf-lio-simge img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  transition: opacity 0.15s ease-in-out;
+}
+@media (max-width: 767px) {
+  .mf-lio-simge {
+    width: 88px;
+    height: 88px;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .mf-hucre .mf-ofis {
+    min-height: 200px;
+  }
+}

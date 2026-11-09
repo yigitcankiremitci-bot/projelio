@@ -29,6 +29,7 @@ const CIZIM = {
   sifirla: '<path d="M3 11a9 9 0 1 1 2.6 6.3"/><path d="M3 4v6h6"/>',
   klasor: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
   onay: '<path d="M5 12l5 5 9-10"/>',
+  musteri: '<path d="M9 4 3 6.5v13.5l6-2.5 6 2.5 6-2.5V4l-6 2.5L9 4z"/><path d="M9 4v13.5M15 6.5V20"/>',
   // Misafire özgü
   kilit: '<path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',
   giris: '<path d="M13 4h6v16h-6M4 12h10M11 8.5 14.5 12 11 15.5"/>',

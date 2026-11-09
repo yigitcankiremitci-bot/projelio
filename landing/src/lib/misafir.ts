@@ -22,6 +22,8 @@ export type Taslak = {
   gorevler: MisafirGorev[];
   /** Panele devredildiği an. Kişi üye olduysa buradaki kopyayı silebilecek kimse yok. */
   devredildi?: number;
+  /** İşin yazıldığı an; yalnızca İşler kartındaki "kuruldu" satırı için, panele gitmez. */
+  isTarihi?: number;
 };
 
 export const BOS_TASLAK: Taslak = { is: null, proje: null, gorevler: [] };

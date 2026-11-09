@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Bricolage_Grotesque } from "next/font/google";
 import type { Dict, Locale } from "@/i18n";
 import {
@@ -19,6 +20,11 @@ import "./misafir.css";
 
 // Panelin yazı tipi (apps/web/index.html). Sayfa panelin aynısı görünsün diye.
 const yaziTipi = Bricolage_Grotesque({ subsets: ["latin", "latin-ext"], weight: ["400", "500", "600"], display: "swap" });
+
+// 81 ilin yolları ~110 KB: sayfanın ilk paketine binmesin, kart çizilince gelsin.
+const MisafirHarita = dynamic(() => import("./MisafirHarita"), { ssr: false, loading: () => <div className="mf-harita" /> });
+
+const LIO_CUBUK_ANAHTARI = "projelio_misafir_lio_cubuk";
 
 type MisafirDict = Dict["misafir"];
 type KilitAdi = keyof MisafirDict["kilit"];
@@ -187,28 +193,40 @@ export default function Misafir({
       </header>
 
       <main id="main" className="mf-pano">
+        {/*
+          Sıra dört sütunda boşluk bırakmayacak biçimde dizildi:
+          1: Kasa · Yapılacaklar · Takvim · Pomodoro
+          2: İşler · Yapılacaklar · Takvim · Müşteriler
+          3: İşler · Projeler (2) · Müşteriler
+          4: 3D stüdyo (2) · Modüller · Dosyalar
+          5: 3D stüdyo (2) · Notlar (2)
+          Bir kartın boyunu ya da yerini değiştirirsen bu tabloyu da güncelle.
+        */}
         <div className="mf-izgara">
           <KasaKarti dict={dict} kilitli={kilitli} />
           <Yapilacaklar dict={dict} taslak={taslak} uygula={uygula} eksigeGit={eksigeGit} uyeOl={uyeOl} kilitli={kilitli} />
           <Takvim dict={dict} locale={locale} />
-          <IslerKarti dict={dict} taslak={taslak} uygula={uygula} isRef={isRef} kilitli={kilitli} />
-          <ProjelerKarti dict={dict} taslak={taslak} uygula={uygula} projeRef={projeRef} eksigeGit={eksigeGit} kilitli={kilitli} />
           <Pomodoro dict={dict} />
+          <IslerKarti dict={dict} locale={locale} taslak={taslak} uygula={uygula} isRef={isRef} kilitli={kilitli} />
+          <MusterilerKarti dict={dict} kilitli={kilitli} />
+          <ProjelerKarti dict={dict} taslak={taslak} uygula={uygula} projeRef={projeRef} eksigeGit={eksigeGit} kilitli={kilitli} />
 
-          <button type="button" className="mf-kart mf-tam" onClick={() => kilitli("studyo")} aria-label={dict.kilit.studyo}>
-            <span className="mf-ofis">
-              <span className="mf-ofis-ad">
-                <Ikon ad="katman" boyut={17} renk="var(--mf-accent-dark)" />
-                {dict.kart.studyo}
+          <div className="mf-hucre orta" style={{ gridRow: "span 2" }}>
+            <button type="button" className="mf-kart mf-tam" onClick={() => kilitli("studyo")} aria-label={dict.kilit.studyo}>
+              <span className="mf-ofis">
+                <span className="mf-ofis-ad">
+                  <Ikon ad="katman" boyut={17} renk="var(--mf-accent-dark)" />
+                  {dict.kart.studyo}
+                </span>
+                <img src="/brand/ofis-onizleme.webp" alt="" draggable={false} />
               </span>
-              <img src="/brand/ofis-onizleme.webp" alt="" draggable={false} />
-            </span>
-          </button>
+            </button>
+          </div>
 
           <KilitliOzet ad={dict.kart.moduller} ikon="isilti" onClick={() => kilitli("moduller")} cipler={[dict.sonKullanilan, dict.enCokKayit]} />
           <KilitliOzet ad={dict.kart.dosyalar} ikon="dosya" onClick={() => kilitli("dosyalar")} cipler={[dict.tumu, `${dict.projeDosyalari} 0`, `${dict.isDosyalari} 0`]} />
 
-          <div className="mf-hucre genis" style={{ gridRow: "span 2" }}>
+          <div className="mf-hucre orta">
             <div className="mf-kart" role="group" aria-label={dict.kart.notlar}>
               <KartBasligi ad={dict.kart.notlar} ikon="not" />
               <div className="mf-cipler">
@@ -252,7 +270,7 @@ export default function Misafir({
         </footer>
       </main>
 
-      <LioCubugu dict={dict} onGonder={() => kilitli("lio")} />
+      <Lio dict={dict} onGonder={() => kilitli("lio")} />
 
       <div className="mf-fab-kutu">
         <button type="button" className="mf-fab" onClick={fab} aria-label={dict.fab} title={dict.fab}>
@@ -377,7 +395,7 @@ function AdAlani({ deger, etiket, sinif, degistir }: { deger: string; etiket: st
 function KasaKarti({ dict, kilitli }: KartOrtak) {
   const [sekme, setSekme] = useState(0);
   return (
-    <div className="mf-hucre orta">
+    <div className="mf-hucre">
       <div className="mf-kart" role="group" aria-label={dict.kart.kasa}>
         <KartBasligi ad={dict.kart.kasa} ikon="kasa" />
         <div className="mf-cipler" role="tablist">
@@ -572,20 +590,24 @@ function Takvim({ dict, locale }: { dict: MisafirDict; locale: Locale }) {
   );
 }
 
-function IslerKarti({ dict, taslak, uygula, isRef, kilitli }: KartOrtak & TaslakOrtak & { isRef: React.RefObject<HTMLInputElement | null> }) {
+function IslerKarti({ dict, locale, taslak, uygula, isRef, kilitli }: KartOrtak & TaslakOrtak & { locale: Locale; isRef: React.RefObject<HTMLInputElement | null> }) {
   const [girdi, setGirdi] = useState("");
   const ekle = (e: React.FormEvent) => {
     e.preventDefault();
     const metin = girdi.trim();
     if (!metin) return;
-    uygula({ ...taslak, is: metin });
+    uygula({ ...taslak, is: metin, isTarihi: Date.now() });
     setGirdi("");
   };
+  const tarih = taslak.isTarihi ? new Date(taslak.isTarihi).toLocaleDateString(locale === "tr" ? "tr-TR" : "en-US") : null;
   return (
     <div className="mf-hucre" style={{ gridRow: "span 2" }}>
       <div className="mf-kart mf-tam" role="group" aria-label={dict.kart.isler}>
         <div className="mf-isler">
-          <div className="mf-kapak" />
+          {/* Paneldeki iş kartı gibi kapak fotoğraflı: boş degrade kart yarım kalmış görünüyordu. */}
+          <div className="mf-kapak">
+            <img src="/brand/is-kapak.jpg" alt="" draggable={false} />
+          </div>
           <span className="mf-isler-hap">
             <Ikon ad="is" boyut={14} renk="var(--mf-accent-dark)" />
             {dict.kart.isler} <span>{taslak.is ? 1 : 0}</span>
@@ -603,9 +625,16 @@ function IslerKarti({ dict, taslak, uygula, isRef, kilitli }: KartOrtak & Taslak
                   <Ikon ad="kisi" boyut={15} />
                   <span>{dict.ben}</span>
                 </div>
+                {tarih && (
+                  <div className="mf-is-satir">
+                    <Ikon ad="takvim" boyut={15} />
+                    <span>{dict.kuruldu.replace("{tarih}", tarih)}</span>
+                  </div>
+                )}
               </>
             ) : (
               <form className="mf-ilk" onSubmit={ekle}>
+                <p className="mf-is-ipucu">{dict.isIpucu}</p>
                 <input
                   ref={isRef}
                   aria-label={dict.isYer}
@@ -764,10 +793,82 @@ function KilitliOzet({ ad, ikon, cipler, onClick }: { ad: string; ikon: IkonAdi;
   );
 }
 
-function LioCubugu({ dict, onGonder }: { dict: MisafirDict; onGonder: () => void }) {
+function MusterilerKarti({ dict, kilitli }: KartOrtak) {
+  return (
+    <div className="mf-hucre" style={{ gridRow: "span 2" }}>
+      <div className="mf-kart" role="group" aria-label={dict.kart.musteriler}>
+        <KartBasligi ad={dict.kart.musteriler} ikon="musteri" />
+        <div className="mf-cipler" role="tablist">
+          <span className="mf-cip secili" role="tab" aria-selected="true">
+            {dict.harita}
+          </span>
+          {[dict.musteriSekme, dict.potansiyel].map((s) => (
+            <button key={s} type="button" role="tab" aria-selected="false" className="mf-cip" onClick={() => kilitli("musteriler")}>
+              {s} <span className="mf-cip-sayi">0</span>
+            </button>
+          ))}
+        </div>
+        <div className="mf-buyuk-sayi">0</div>
+        <MisafirHarita etiket={dict.kilit.musteriler} sayiMetni={dict.ilSayisi} onAc={() => kilitli("musteriler")} />
+      </div>
+    </div>
+  );
+}
+
+/** Kutunun açık/kapalı tercihi panelde de kalıcı; yalnızca bu tarayıcıda tutulur. */
+function lioCubukAcikMi(): boolean {
+  try {
+    return window.localStorage.getItem(LIO_CUBUK_ANAHTARI) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Paneldeki gibi (apps/web/src/components/AiLauncher.tsx): anasayfada Lio
+ * altta yazmaya hazır bir kutu; çarpıyla kapatılınca sağ altta Lio'nun kendisi
+ * belirir, ona basınca kutu geri gelir.
+ */
+function Lio({ dict, onGonder }: { dict: MisafirDict; onGonder: () => void }) {
+  const [cubukAcik, setCubukAcikHam] = useState(true);
   const [metin, setMetin] = useState("");
-  const [kapali, setKapali] = useState(false);
-  if (kapali) return null;
+  const [gozKapali, setGozKapali] = useState(false);
+  useEffect(() => setCubukAcikHam(lioCubukAcikMi()), []);
+  const setCubukAcik = (acik: boolean) => {
+    setCubukAcikHam(acik);
+    try {
+      window.localStorage.setItem(LIO_CUBUK_ANAHTARI, acik ? "1" : "0");
+    } catch {
+      // Depolama kapalıysa tercih yalnızca bu sayfa açıkken geçerli.
+    }
+  };
+
+  // Ara sıra göz kırpar; panelde de Lio böyle canlı duruyor.
+  useEffect(() => {
+    if (cubukAcik) return;
+    let zamanlayici = 0;
+    const kirp = () => {
+      setGozKapali(true);
+      zamanlayici = window.setTimeout(() => {
+        setGozKapali(false);
+        zamanlayici = window.setTimeout(kirp, 2500 + Math.random() * 3500);
+      }, 160);
+    };
+    zamanlayici = window.setTimeout(kirp, 2000);
+    return () => window.clearTimeout(zamanlayici);
+  }, [cubukAcik]);
+
+  if (!cubukAcik) {
+    return (
+      <button type="button" className="mf-lio-simge" onClick={() => setCubukAcik(true)} aria-label={dict.lioAc} title={dict.lioAc}>
+        <span>
+          <img src="/brand/lio-base.png" alt="" draggable={false} />
+          <img src="/brand/lio-eyes.png" alt="" draggable={false} style={{ opacity: gozKapali ? 0 : 1 }} />
+        </span>
+      </button>
+    );
+  }
+
   const gonder = () => {
     if (!metin.trim()) return;
     onGonder();
@@ -787,7 +888,7 @@ function LioCubugu({ dict, onGonder }: { dict: MisafirDict; onGonder: () => void
       <button type="button" className={metin.trim() ? "dolu" : undefined} onClick={gonder} aria-label={dict.gonder} title={dict.gonder}>
         <Ikon ad="gonder" boyut={16} />
       </button>
-      <button type="button" onClick={() => setKapali(true)} aria-label={dict.kapat} title={dict.kapat}>
+      <button type="button" onClick={() => setCubukAcik(false)} aria-label={dict.kapat} title={dict.kapat}>
         <Ikon ad="kapat" boyut={16} />
       </button>
     </div>

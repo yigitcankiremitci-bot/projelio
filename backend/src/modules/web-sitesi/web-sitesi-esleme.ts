@@ -1,5 +1,11 @@
 import { createHash, createHmac } from "node:crypto";
 import { isIP } from "node:net";
+import {
+  SIPARIS_ASAMASI_API,
+  iskontoluFiyat,
+  type MusteriSiparisi,
+  type PortalYetkisi,
+} from "@projelio/shared";
 
 /**
  * Web sitesi eklentisinin SAF kuralları (bkz. 186_web_sitesi_eklentisi.sql).
@@ -18,6 +24,19 @@ export const AZAMI_DENEME = 10;
 
 /** Bir stok isteğindeki en çok kalem — sipariş sepeti için bol, kötüye kullanım için dar. */
 export const AZAMI_KALEM = 100;
+
+/**
+ * Bağlantıyı kim yönetir (kart, anahtar, webhook). İzin listesi
+ * (`WEB_SITESI_EPOSTALARI`) admin'in verdiği yetkidir: listedeki kişi şirketin
+ * sahibi OLMASA da şirkette çalışıyorsa (üye, departman çalışanı ya da
+ * yöneticisi) bağlantıyı yönetir — siteyi kodlayan geliştirici kurucunun
+ * hesabına girmek zorunda kalmasın (2026-11-09). Taşeron ve şirketi göremeyen
+ * hiçbir zaman. Listede olmayan sahip de yönetemez (eklenti hâlâ izinlilere açık).
+ */
+export function baglantiYonetebilir(rol: string, izinli: boolean): boolean {
+  if (!izinli) return false;
+  return rol === "owner" || rol === "department_manager" || rol === "member" || rol === "staff";
+}
 
 export function anahtarOzeti(anahtar: string): string {
   return createHash("sha256").update(anahtar).digest("hex");
@@ -53,6 +72,13 @@ export interface SiteUrunu {
   specs: { label: string; value: string }[];
   warranty: string | null;
   lead_time: string | null;
+  /** Kritik stok seviyesi (188). */
+  min_stock: number | null;
+  /** `?customer_id=` verildiyse o müşterinin fiyatları (188). */
+  customer_price?: number | null;
+  customer_price_with_tax?: number | null;
+  list_price_with_tax?: number | null;
+  discount_rate?: number;
 }
 
 const sayi = (v: unknown): number | null => (v === null || v === undefined || v === "" ? null : Number.isFinite(Number(v)) ? Number(v) : null);
@@ -102,6 +128,111 @@ export function siteUrunu(row: any, gorseller: { url: string; sort_order?: numbe
       : [],
     warranty: metin(row.warranty),
     lead_time: metin(row.lead_time),
+    min_stock: sayi(row.min_stock),
+  };
+}
+
+/**
+ * Ürüne müşterinin fiyatlarını ekler. Portal fiyatı KENDİSİ hesaplamasın:
+ * yuvarlama farkıyla ekrandaki toplam siparişin tutarından kuruş kuruş
+ * ayrışırdı. Siparişte de AYNI fonksiyon kullanılıyor (iskontoluFiyat).
+ */
+export function musteriFiyatiEkle(u: SiteUrunu, row: any, iskonto: number | null): SiteUrunu {
+  const f = iskontoluFiyat(sayi(row.price), iskonto, sayi(row.tax_rate));
+  return {
+    ...u,
+    discount_rate: iskonto ?? 0,
+    list_price_with_tax: f?.listeKdvDahil ?? null,
+    customer_price: f?.net ?? null,
+    customer_price_with_tax: f?.kdvDahil ?? null,
+  };
+}
+
+// ─────────────────────────────────────────────── Müşteri ve sipariş yükü
+
+export interface SiteMusterisi {
+  id: string;
+  display_name: string;
+  legal_name: string | null;
+  city: string | null;
+  district: string | null;
+  status: "active" | "passive" | "blocked";
+  discount_rate: number;
+}
+
+/**
+ * Müşterinin portala giden hâli. BEYAZ LİSTE: vergi no, telefon, e-posta,
+ * adres ayrıntısı ve tahsilat ASLA çıkmaz (karar, 2026-11-09).
+ */
+export function siteMusterisi(row: any): SiteMusterisi {
+  const adres = row.address && typeof row.address === "object" ? row.address : {};
+  return {
+    id: row.id,
+    display_name: String(row.display_name ?? ""),
+    legal_name: metin(row.legal_name),
+    city: metin(adres.city),
+    district: metin(adres.district),
+    status: row.status === "passive" || row.status === "blocked" ? row.status : "active",
+    discount_rate: sayi(row.iskonto_orani) ?? 0,
+  };
+}
+
+/** Siparişin portala giden hâli — tahsilat ve kasa bilgisi YOK. Fiyatlar KDV dahil. */
+export function siteSiparisi(s: MusteriSiparisi, skular: Map<string, string | null> = new Map()) {
+  return {
+    id: s.id,
+    reference: s.siparisNo ?? null,
+    customer_id: s.partyId ?? null,
+    status: SIPARIS_ASAMASI_API[s.asama],
+    status_changed_at: s.asamaDegistiAt ?? null,
+    source: s.kaynak === "web_sitesi" ? "website" : "other",
+    portal_user_id: s.portalKullaniciId ?? null,
+    order_date: s.siparisTarihi,
+    currency: s.paraBirimi,
+    total: Number(s.tutar),
+    note: s.notlar ?? null,
+    items: s.kalemler.map((k) => ({
+      product_id: k.productId ?? null,
+      sku: k.productId ? (skular.get(k.productId) ?? null) : null,
+      name: k.productName ?? k.aciklama ?? null,
+      quantity: Number(k.miktar),
+      unit: k.birim ?? null,
+      list_unit_price: k.listeBirimFiyat ?? null,
+      unit_price: Number(k.birimFiyat),
+      total: Number(k.tutar),
+    })),
+    created_at: s.createdAt,
+  };
+}
+
+// ─────────────────────────────────────────────── Portal kullanıcısı
+
+export const PORTAL_YETKILERI: PortalYetkisi[] = ["siparis_ver", "fiyat_gor", "siparis_gecmisi"];
+
+/** Bilinmeyeni atar, tekrarı ayıklar, sırayı sabitler. Dizi değilse null. */
+export function portalYetkileriCoz(x: unknown): PortalYetkisi[] | null {
+  if (!Array.isArray(x)) return null;
+  const set = new Set(x.filter((y): y is PortalYetkisi => (PORTAL_YETKILERI as string[]).includes(y)));
+  return PORTAL_YETKILERI.filter((y) => set.has(y));
+}
+
+/** Basit e-posta doğrulaması; küçük harfe çevrilir. */
+export function epostaCoz(x: unknown): string | null {
+  if (typeof x !== "string") return null;
+  const e = x.trim().toLowerCase();
+  if (e.length < 3 || e.length > 254) return null;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : null;
+}
+
+/** Webhook'ta portal kullanıcısının hâli. */
+export function sitePortalKullanicisi(row: any) {
+  return {
+    id: row.id,
+    customer_id: row.party_id,
+    email: row.eposta,
+    name: row.ad ?? null,
+    permissions: Array.isArray(row.yetkiler) ? row.yetkiler : [],
+    active: row.durum === "aktif",
   };
 }
 
@@ -258,4 +389,53 @@ export function stokIstegiCoz(govde: any): { istek: StokIstegi } | { hata: strin
     else birlesik.set(anahtar, kalem);
   }
   return { istek: { referans, tur: turHam === "return" ? "iade" : "satis", kalemler: [...birlesik.values()] } };
+}
+
+// ─────────────────────────────────────────────── Sipariş isteği
+
+export interface SiparisIstegi {
+  musteriId: string;
+  referans: string;
+  not: string | null;
+  portalKullaniciId: string | null;
+  kalemler: StokKalemi[];
+}
+
+/**
+ * `POST /v1/site/orders` gövdesi:
+ *   { "customer_id", "reference", "items": [{ "sku" | "product_id", "quantity" }],
+ *     "note"?, "portal_user_id"? }
+ * İstekteki fiyat (varsa) YOK SAYILIR: fiyat sunucuda üründen ve müşteriden.
+ * Kalem kuralları stok bildirimiyle aynı (aynı ürün iki satırda gelirse toplanır).
+ */
+export function siparisIstegiCoz(govde: any): { istek: SiparisIstegi } | { hata: string } {
+  if (!govde || typeof govde !== "object") return { hata: "Body must be a JSON object." };
+  if (!uuidMi(govde.customer_id)) return { hata: "`customer_id` must be a valid customer id." };
+  if (govde.portal_user_id !== undefined && govde.portal_user_id !== null && !uuidMi(govde.portal_user_id)) {
+    return { hata: "`portal_user_id` is not a valid id." };
+  }
+  if (govde.note !== undefined && govde.note !== null && (typeof govde.note !== "string" || govde.note.length > 2000)) {
+    return { hata: "`note` must be a string of at most 2000 characters." };
+  }
+  // Kalem ve referans doğrulaması stok bildirimiyle ORTAK; tür burada yok.
+  const k = stokIstegiCoz({ reference: govde.reference, type: "sale", items: govde.items });
+  if ("hata" in k) return k;
+  return {
+    istek: {
+      musteriId: govde.customer_id.toLowerCase(),
+      referans: k.istek.referans,
+      not: typeof govde.note === "string" && govde.note.trim() ? govde.note.trim() : null,
+      portalKullaniciId: govde.portal_user_id ? String(govde.portal_user_id).toLowerCase() : null,
+      kalemler: k.istek.kalemler,
+    },
+  };
+}
+
+/**
+ * Siparişin dış kimliği. Bağlantı öneki ŞART: tekil indeks (kaynak,
+ * dis_kimlik) şirketten bağımsız; iki şirketin portalı aynı "SIP-1"i
+ * gönderebilir (bkz. 188).
+ */
+export function siparisDisKimligi(baglantiId: string, referans: string): string {
+  return `${baglantiId}:${referans}`;
 }

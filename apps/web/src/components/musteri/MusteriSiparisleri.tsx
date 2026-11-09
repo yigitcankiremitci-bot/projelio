@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n";
 import { fmtPara } from "../butce/butceBicim";
 import SiparisFormu from "./SiparisFormu";
 import SiparisKarti from "./SiparisKarti";
+import MusteriPortali from "./MusteriPortali";
 import { bugunYerel } from "./siparisOrtak";
 
 /**
@@ -68,6 +69,8 @@ export default function MusteriSiparisleri({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {/* Şirkette web sitesi bağlantısı yoksa kendini göstermez. */}
+      <MusteriPortali party={party} />
       {acikAlacak.length > 0 && (
         <div style={{ fontSize: 12, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
           {acikAlacak.map(([para, v]) => (

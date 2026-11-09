@@ -33,12 +33,15 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
   const [hata, setHata] = useState("");
   const [surukleniyor, setSurukleniyor] = useState(false);
   const [zatenAcik, setZatenAcik] = useState(false);
+  // Stok koduyla eşleşen ürünleri güncelle; stok ayrıca işaretlenmedikçe yazılmaz.
+  const [guncelle, setGuncelle] = useState(false);
+  const [stokGuncelle, setStokGuncelle] = useState(false);
 
-  const gonder = async (f: File, onizleme: boolean) => {
+  const gonder = async (f: File, onizleme: boolean, secenek = { guncelle, stokGuncelle }) => {
     setCalisiyor(true);
     setHata("");
     try {
-      const r = await urunlerApi.iceAktar(organizationId, f, onizleme, departmentId);
+      const r = await urunlerApi.iceAktar(organizationId, f, onizleme, departmentId, secenek);
       setSonuc(r);
       if (!onizleme) onDone();
     } catch (err) {
@@ -66,6 +69,15 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
   const neden = (n: string) =>
     n === "aynı stok kodu" ? t("aynı stok kodu") : n === "aynı barkod" ? t("aynı barkod") : n === "aynı ad" ? t("aynı ad") : n;
 
+  // Seçenek değişince önizleme yeniden alınır: sayılar seçeneğe bağlı.
+  const secenekDegisti = (g: boolean, st: boolean) => {
+    setGuncelle(g);
+    setStokGuncelle(st);
+    if (dosya && !(sonuc && !sonuc.onizleme)) void gonder(dosya, true, { guncelle: g, stokGuncelle: st });
+  };
+
+  const guncellenecek = sonuc?.guncellenecek ?? 0;
+  const yazilacak = (sonuc?.acilacak ?? 0) + guncellenecek;
   const bitti = sonuc && !sonuc.onizleme;
   const adim = (n: number, baslik: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
@@ -198,12 +210,39 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
             {bitti ? (
               <div style={{ fontSize: 15, fontWeight: 500, color: c.success }}>
                 {t("{n} ürün/hizmet eklendi.", { n: sonuc.acilan ?? 0 })}
+                {(sonuc.guncellenen ?? 0) > 0 && ` ${t("{n} ürün güncellendi.", { n: sonuc.guncellenen ?? 0 })}`}
               </div>
             ) : (
               <div style={{ fontSize: 15, fontWeight: 500 }}>
                 {sonuc.acilacak > 0
                   ? t("{n} satır okundu, {m} ürün/hizmet eklenecek.", { n: sonuc.okunanSatir, m: sonuc.acilacak })
                   : t("{n} satır okundu, eklenecek yeni ürün/hizmet yok.", { n: sonuc.okunanSatir })}
+                {guncellenecek > 0 &&
+                  ` ${
+                    sonuc.stokGuncellenir
+                      ? t("{n} ürün stok koduyla eşleşti, stok dahil güncellenecek.", { n: guncellenecek })
+                      : t("{n} ürün stok koduyla eşleşti, stok hariç güncellenecek.", { n: guncellenecek })
+                  }`}
+              </div>
+            )}
+
+            {!bitti && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, color: c.textSecondary }}>
+                <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer" }}>
+                  <input type="checkbox" checked={guncelle} disabled={calisiyor} onChange={(e) => secenekDegisti(e.target.checked, false)} />
+                  {t("Stok kodu aynı olan mevcut ürünleri güncelle")}
+                </label>
+                {guncelle && (
+                  <label style={{ display: "flex", gap: 6, alignItems: "center", cursor: "pointer", marginLeft: 22 }}>
+                    <input
+                      type="checkbox"
+                      checked={stokGuncelle}
+                      disabled={calisiyor}
+                      onChange={(e) => secenekDegisti(true, e.target.checked)}
+                    />
+                    {t("Stok adedini de dosyadakiyle değiştir")}
+                  </label>
+                )}
               </div>
             )}
 
@@ -279,7 +318,7 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
         ) : (
           <button
             data-primary
-            disabled={!dosya || !sonuc || sonuc.acilacak === 0 || calisiyor}
+            disabled={!dosya || !sonuc || yazilacak === 0 || calisiyor}
             onClick={() => dosya && gonder(dosya, false)}
             style={{
               background: c.primary,
@@ -289,10 +328,16 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
               border: "none",
               fontSize: 16,
               fontWeight: 500,
-              opacity: !dosya || !sonuc || sonuc.acilacak === 0 ? 0.5 : 1,
+              opacity: !dosya || !sonuc || yazilacak === 0 ? 0.5 : 1,
             }}
           >
-            {sonuc && sonuc.acilacak > 0 ? t("{n} ürün/hizmeti ekle", { n: sonuc.acilacak }) : t("Ürünleri ekle")}
+            {sonuc && sonuc.acilacak > 0 && guncellenecek > 0
+              ? t("{n} ekle, {m} güncelle", { n: sonuc.acilacak, m: guncellenecek })
+              : sonuc && guncellenecek > 0
+                ? t("{n} ürünü güncelle", { n: guncellenecek })
+                : sonuc && sonuc.acilacak > 0
+                  ? t("{n} ürün/hizmeti ekle", { n: sonuc.acilacak })
+                  : t("Ürünleri ekle")}
           </button>
         )}
       </div>

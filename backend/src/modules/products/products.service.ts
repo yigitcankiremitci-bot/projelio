@@ -436,7 +436,7 @@ export class ProductsService {
     organizationId: string,
     sheet: SheetData | undefined,
     userId: string,
-    opts: { onizleme?: boolean; departmentId?: string } = {}
+    opts: { onizleme?: boolean; departmentId?: string; guncelle?: boolean; stokGuncelle?: boolean } = {}
   ): Promise<UrunIceAktarmaSonucu> {
     const departmentId = opts.departmentId || undefined;
     await this.assertCanManage(organizationId, departmentId, userId);
@@ -457,7 +457,7 @@ export class ProductsService {
     const plan = planUrunImport(sheet);
     const { data: mevcutSatirlar, error: mevcutHata } = await this.supabase.client
       .from("products")
-      .select("name, sku, barcode, archived_at")
+      .select("id, name, sku, barcode, archived_at, department_id")
       .eq("organization_id", organizationId);
     if (mevcutHata) throw mevcutHata;
     const mevcut = (mevcutSatirlar ?? []).map((r: any) => ({
@@ -466,9 +466,44 @@ export class ProductsService {
       barcode: r.barcode ?? undefined,
       archivedAt: r.archived_at ?? undefined,
     }));
-    const { yeni, zatenVar } = mevcutUrunleriAyikla(plan.planlanan, mevcut);
+    const { yeni, zatenVar: eslesenler } = mevcutUrunleriAyikla(plan.planlanan, mevcut);
 
+    // "Mevcut ürünleri güncelle" (2026-11-09): yalnızca STOK KODUYLA eşleşen,
+    // arşivde olmayan ürün güncellenir — ad ya da barkod eşleşmesi kimlik
+    // sayılmaz (yanlış ürünün fiyatı ezilirdi). Departman yöneticisi yalnızca
+    // kendi departmanının ürününü günceller. Stok ancak ayrıca istenirse
+    // yazılır: Excel bir an önceki sayımdır, o arada satılan ürün geri gelirdi.
     const atlanan = [...plan.atlanan];
+    const zatenVar: typeof eslesenler = [];
+    const guncellenecek: { satir: number; ad: string; id: string; patch: Record<string, unknown> }[] = [];
+    if (opts.guncelle) {
+      const skuIle = new Map<string, any>();
+      for (const r of mevcutSatirlar ?? []) {
+        if ((r as any).sku && !(r as any).archived_at) skuIle.set(String((r as any).sku).trim().toLocaleLowerCase("tr"), r);
+      }
+      const planIle = new Map(plan.planlanan.map((p) => [p.satir, p]));
+      const dokunulan = new Set<string>();
+      for (const z of eslesenler) {
+        const p = planIle.get(z.satir);
+        const hedef = z.neden === "aynı stok kodu" && p?.urun.sku ? skuIle.get(p.urun.sku.trim().toLocaleLowerCase("tr")) : undefined;
+        const yetkili = hedef && (!departmentId || hedef.department_id === departmentId);
+        if (!p || !hedef || !yetkili || dokunulan.has(hedef.id)) {
+          zatenVar.push(z);
+          continue;
+        }
+        try {
+          // undefined = "dokunma" (buildPatch); stok istenmediyse hiç yazılmaz.
+          const patch = this.buildPatch(opts.stokGuncelle ? p.urun : { ...p.urun, stockQuantity: undefined });
+          dokunulan.add(hedef.id);
+          guncellenecek.push({ satir: p.satir, ad: p.urun.name, id: hedef.id, patch });
+        } catch (e: any) {
+          atlanan.push({ satir: p.satir, sebep: e?.message ?? "geçersiz satır" });
+        }
+      }
+    } else {
+      zatenVar.push(...eslesenler);
+    }
+
     const gecerli: { satir: number; ad: string; kayit: Record<string, unknown> }[] = [];
     for (const p of yeni) {
       try {
@@ -509,11 +544,30 @@ export class ProductsService {
         stokKodu: typeof g.kayit.sku === "string" ? g.kayit.sku : undefined,
       })),
       kalanIlkSatir: gecerli[MAX_IMPORT_ROWS]?.satir,
+      guncellenecek: guncellenecek.length,
+      stokGuncellenir: !!opts.guncelle && !!opts.stokGuncelle,
     };
-    if (sonuc.onizleme || !islenecek.length) return sonuc;
+    if (sonuc.onizleme || (!islenecek.length && !guncellenecek.length)) return sonuc;
+
+    let guncellenen = 0;
+    const hatalar: { satir: number; sebep: string }[] = [];
+    // Tek tek: her ürünün ayrı yaması var; satır tavanı yeni ürünlerle ortak.
+    for (const g of guncellenecek.slice(0, MAX_IMPORT_ROWS)) {
+      if (!Object.keys(g.patch).length) {
+        guncellenen++;
+        continue;
+      }
+      const { error } = await this.supabase.client.from("products").update(g.patch).eq("id", g.id);
+      if (!error) {
+        guncellenen++;
+        continue;
+      }
+      const cevrilen = this.translateWriteError(error);
+      if (cevrilen instanceof ServiceUnavailableException) throw cevrilen;
+      hatalar.push({ satir: g.satir, sebep: cevrilen.message || "kaydedilemedi" });
+    }
 
     let acilan = 0;
-    const hatalar: { satir: number; sebep: string }[] = [];
     for (let i = 0; i < islenecek.length; i += IMPORT_CHUNK) {
       const parca = islenecek.slice(i, i + IMPORT_CHUNK);
       const { error } = await this.supabase.client.from("products").insert(parca.map((g) => g.kayit));
@@ -534,7 +588,8 @@ export class ProductsService {
         hatalar.push({ satir: g.satir, sebep: cevrilen.message || "kaydedilemedi" });
       }
     }
-    return { ...sonuc, acilan, hatalar };
+    hatalar.sort((a, b) => a.satir - b.satir);
+    return { ...sonuc, acilan, guncellenen, hatalar };
   }
 
   async update(id: string, data: ProductWriteInput, requestingUserId?: string): Promise<Product> {

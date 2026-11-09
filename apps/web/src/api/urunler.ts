@@ -28,11 +28,19 @@ export const urunlerApi = {
   },
 
   /** onizleme=true iken sunucu hiçbir şey yazmaz. */
-  iceAktar: (organizationId: string, dosya: File, onizleme: boolean, departmentId?: string) => {
+  iceAktar: (
+    organizationId: string,
+    dosya: File,
+    onizleme: boolean,
+    departmentId?: string,
+    secenek: { guncelle?: boolean; stokGuncelle?: boolean } = {}
+  ) => {
     const fd = new FormData();
     fd.append("file", dosya);
     const q = new URLSearchParams({ onizleme: onizleme ? "1" : "0" });
     if (departmentId) q.set("departmentId", departmentId);
+    if (secenek.guncelle) q.set("guncelle", "1");
+    if (secenek.guncelle && secenek.stokGuncelle) q.set("stokGuncelle", "1");
     return api.uploadFile<UrunIceAktarmaSonucu>(`/organizations/${organizationId}/products/import?${q}`, fd);
   },
 };

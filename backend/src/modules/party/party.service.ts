@@ -76,6 +76,18 @@ function mapBaglanti(embed: any): PartyBaglanti | undefined {
   };
 }
 
+/**
+ * Müşteri iskontosu (%): boş/null kaldırır, 0-100 arası en çok 2 ondalık.
+ * undefined = alan gönderilmedi (dokunma).
+ */
+function iskontoDogrula(x: unknown): number | null | undefined {
+  if (x === undefined) return undefined;
+  if (x === null || x === "") return null;
+  const n = Number(x);
+  if (!Number.isFinite(n) || n < 0 || n > 100) throw new BadRequestException("İskonto oranı 0 ile 100 arasında olmalı");
+  return Math.round(n * 100) / 100;
+}
+
 function mapParty(row: any): Party {
   return {
     id: row.id,
@@ -105,6 +117,7 @@ function mapParty(row: any): Party {
     data: row.data ?? {},
     notes: row.notes ?? undefined,
     sonrakiArama: row.sonraki_arama ?? undefined,
+    iskontoOrani: row.iskonto_orani === null || row.iskonto_orani === undefined ? undefined : Number(row.iskonto_orani),
     createdBy: row.created_by ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -221,6 +234,20 @@ export class PartyService {
     const e = await this.erisimler(party, userId);
     if (!kayitOkunur(party.modules, e)) throw new ForbiddenException("Bu kaydı görme yetkin yok");
     return e;
+  }
+
+  /**
+   * Başka bir modülün (web sitesi portalı) kayda bağlı yetki kontrolü:
+   * okuma ya da kart düzenleme — Müşteriler'deki kartla AYNI kural.
+   */
+  async kayitYetkisi(id: string, userId: string, yaz: boolean): Promise<Party> {
+    const p = await this.findOne(id);
+    const e = await this.assertKayitOkunur(p, userId);
+    if (yaz) {
+      const hata = kartDuzenlemeKarari(p.modules, e, p.ownerUserId, undefined, userId);
+      if (hata) throw new ForbiddenException(hata);
+    }
+    return p;
   }
 
   /** Kayda bağlı yazma. assertCanWrite gibi userId yoksa (sistem çağrısı) geçer. */
@@ -913,6 +940,7 @@ export class PartyService {
     assign("data", payload.data);
     assign("notes", payload.notes);
     assign("sonraki_arama", payload.sonrakiArama === undefined ? undefined : gunDogrula(payload.sonrakiArama));
+    assign("iskonto_orani", iskontoDogrula(payload.iskontoOrani));
 
     const { error } = await this.supabase.client.from("party").update(patch).eq("id", id);
     if (error) {

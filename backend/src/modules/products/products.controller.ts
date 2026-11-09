@@ -77,6 +77,8 @@ export class ProductsController {
     @Param("organizationId") organizationId: string,
     @Query("onizleme") onizleme: string | undefined,
     @Query("departmentId") departmentId: string | undefined,
+    @Query("guncelle") guncelle: string | undefined,
+    @Query("stokGuncelle") stokGuncelle: string | undefined,
     @Req() req: any,
     @UploadedFile() file?: Express.Multer.File
   ) {
@@ -88,6 +90,8 @@ export class ProductsController {
     return this.productsService.sablondanIceAktar(organizationId, sayfa, req.user.userId, {
       onizleme: onizleme !== "0",
       departmentId,
+      guncelle: guncelle === "1",
+      stokGuncelle: stokGuncelle === "1",
     });
   }
 

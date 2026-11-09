@@ -31,6 +31,7 @@ import { kartvizit } from "./kartvizit";
 import { projeTakvimi } from "./projeTakvimi";
 import { baglantilar } from "./baglantilar";
 import { projelioPosta } from "./projelioPosta";
+import { siparis } from "./siparis";
 
 /**
  * Türkçe → İngilizce sözlük.
@@ -94,4 +95,5 @@ export const en: TranslationDict = {
   ...projeTakvimi,
   ...baglantilar,
   ...projelioPosta,
+  ...siparis,
 };

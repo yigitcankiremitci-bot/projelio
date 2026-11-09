@@ -1,4 +1,4 @@
-import { SIPARIS_DURUMU_ETIKET, type SiparisDurumu } from "@projelio/shared";
+import { SIPARIS_ASAMASI_ETIKET, SIPARIS_DURUMU_ETIKET, type SiparisAsamasi, type SiparisDurumu } from "@projelio/shared";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
@@ -40,6 +40,19 @@ export function DurumRozeti({ durum }: { durum: SiparisDurumu }) {
       }}
     >
       {t(SIPARIS_DURUMU_ETIKET[durum])}
+    </span>
+  );
+}
+
+/** Siparişin aşaması (alındı → teslim). İptal, tahsilat rozetinde zaten yazıyor. */
+export function AsamaRozeti({ asama }: { asama: SiparisAsamasi }) {
+  const c = useThemeColors();
+  const t = useT();
+  if (asama === "iptal") return null;
+  const renk = asama === "alindi" ? c.warning : asama === "teslim_edildi" ? c.textSecondary : c.primary;
+  return (
+    <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 6, color: renk, background: `${renk}14`, whiteSpace: "nowrap" }}>
+      {t(SIPARIS_ASAMASI_ETIKET[asama])}
     </span>
   );
 }

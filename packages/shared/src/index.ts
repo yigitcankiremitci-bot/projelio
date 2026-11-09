@@ -9,6 +9,8 @@ export * from "./taskSearch";
 export * from "./butceToplama";
 export * from "./tahsilat";
 export * from "./siparisKalemleri";
+export * from "./siparisAsamasi";
+export * from "./iskontoluFiyat";
 export * from "./modulSekmeleri";
 export * from "./turkiyeIlleri";
 export * from "./gorusmeNotlari";

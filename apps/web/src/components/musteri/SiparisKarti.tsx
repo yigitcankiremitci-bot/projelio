@@ -2,7 +2,12 @@ import { useState } from "react";
 import {
   ODEME_YONTEMI_ETIKET,
   ODEME_YONTEMLERI,
+  SIPARIS_ASAMALARI,
+  SIPARIS_ASAMASI_ETIKET,
+  asamaGecisi,
   evrakliMi,
+  onayliMi,
+  stokTakipli,
   kalanTutar,
   katalogSapmasi,
   siparisDurumu,
@@ -10,6 +15,7 @@ import {
   tahsilEdilen,
   type MusteriSiparisi,
   type OdemeYontemi,
+  type SiparisAsamasi,
 } from "@projelio/shared";
 import { siparisApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
@@ -18,7 +24,7 @@ import { fmtPara, fmtTarih } from "../butce/butceBicim";
 import { IconTrash } from "../icons";
 import SiparisFormu from "./SiparisFormu";
 import SiparisFaturasi from "./SiparisFaturasi";
-import { Alan, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
+import { Alan, AsamaRozeti, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
 
 /**
  * Tek sipariş: özet satırı + açılınca tahsilatlar, "tahsil et", düzenle, sil.
@@ -86,6 +92,31 @@ export default function SiparisKarti({
     }
   };
 
+  // Aşama: yalnızca geçerli geçişler listelenir (kural ortak: asamaGecisi).
+  const asamaSecenekleri = SIPARIS_ASAMALARI.filter((a) => a === siparis.asama || !("hata" in asamaGecisi(siparis.kaynak, siparis.asama, a)));
+  const asamaDegistir = async (yeni: SiparisAsamasi) => {
+    if (yeni === siparis.asama) return;
+    const g = asamaGecisi(siparis.kaynak, siparis.asama, yeni);
+    if ("hata" in g) return setHata(t(g.hata));
+    const soru =
+      g.stok === "satis"
+        ? t("Sipariş onaylanınca ürünlerin stoğu düşer. Devam edilsin mi?")
+        : g.stok === "iade"
+          ? t("Sipariş iptal edilince düşen stok geri eklenir. İptal geri alınamaz. Devam edilsin mi?")
+          : yeni === "iptal"
+            ? t("Sipariş iptal edilsin mi? İptal geri alınamaz.")
+            : null;
+    if (soru && !window.confirm(soru)) return;
+    setHata("");
+    try {
+      onDegisti(await siparisApi.asama(siparis.id, yeni));
+    } catch (err) {
+      setHata(err instanceof Error ? err.message : t("İşlem başarısız"));
+    }
+  };
+  // Onaylı (stoğu düşmüş) sipariş silinmez; önce iptal edilir (sunucu da reddeder).
+  const silinebilir = siparis.tahsilatlar.length === 0 && !(stokTakipli(siparis.kaynak) && onayliMi(siparis.asama));
+
   const sil = async () => {
     if (!window.confirm(t("Sipariş silinsin mi?"))) return;
     setHata("");
@@ -140,7 +171,13 @@ export default function SiparisKarti({
             <span style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>
               {baslik || t("Sipariş")}
             </span>
+            <AsamaRozeti asama={siparis.asama} />
             <DurumRozeti durum={durum} />
+            {siparis.kaynak === "web_sitesi" && (
+              <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 6, color: c.textSecondary, border: `1px solid ${c.border}` }}>
+                {t("Web sitesi")}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
             {[
@@ -269,10 +306,26 @@ export default function SiparisKarti({
                     {t("Tahsil et")}
                   </button>
                 )}
-                <button onClick={() => setMod("duzenle")} style={kucukDugme}>
-                  {t("Düzenle")}
-                </button>
-                {siparis.tahsilatlar.length === 0 && (
+                {siparis.asama !== "iptal" && (
+                  <button onClick={() => setMod("duzenle")} style={kucukDugme}>
+                    {t("Düzenle")}
+                  </button>
+                )}
+                {siparis.asama !== "iptal" && (
+                  <select
+                    aria-label={t("Sipariş aşaması")}
+                    value={siparis.asama}
+                    onChange={(e) => asamaDegistir(e.target.value as SiparisAsamasi)}
+                    style={{ ...kucukDugme, cursor: "pointer" }}
+                  >
+                    {asamaSecenekleri.map((a) => (
+                      <option key={a} value={a}>
+                        {t(SIPARIS_ASAMASI_ETIKET[a])}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {silinebilir && (
                   <button
                     onClick={sil}
                     aria-label={t("Siparişi sil")}

@@ -7,6 +7,13 @@ import {
   kalemToplami,
   kalemTutari,
   kdvDahilFiyat,
+  SIPARIS_ASAMASI_ETIKET,
+  asamaGecisi,
+  asamaMi,
+  kalemlerKilitli,
+  onayliMi,
+  stokImzasi,
+  stokTakipli,
   tahsilatTutariHatasi,
   tahsilEdilen,
   type MusteriSiparisi,
@@ -15,6 +22,7 @@ import {
   type OdemeYontemi,
   type Party,
   type SatisKanali,
+  type SiparisAsamasi,
   type SiparisKalemi,
   MUSTERI_MODUL_KEY,
 } from "@projelio/shared";
@@ -129,6 +137,10 @@ function mapSiparis(row: any, adlar: Map<string, string>): MusteriSiparisi {
       .sort((a, b) => (a.sira ?? 0) - (b.sira ?? 0))
       .map(mapKalem),
     kaynak: row.kaynak ?? undefined,
+    asama: (row.asama ?? "teslim_edildi") as SiparisAsamasi,
+    asamaDegistiAt: row.asama_degisti_at ?? undefined,
+    webSitesiBaglantiId: row.web_sitesi_baglanti_id ?? undefined,
+    portalKullaniciId: row.portal_kullanici_id ?? undefined,
     fatura: row.fatura
       ? {
           id: row.fatura.id,
@@ -201,6 +213,12 @@ export interface SiparisGirdisi {
   evrakNo?: string;
   evrakVadesi?: string;
   notlar?: string;
+  /**
+   * Yalnızca oluşturmada: siparişin açılacağı aşama. Verilmezse "onaylandı" —
+   * şirketin kendisi girdiği sipariş onaylıdır ve stok hemen düşer (187).
+   * Aşama sonradan `asamaDegistir` ile değişir.
+   */
+  asama?: SiparisAsamasi;
 }
 
 export interface TahsilatGirdisi {
@@ -381,6 +399,7 @@ export class SiparisService {
       .insert({
         ...alanlar,
         ...this.aliciAlanlari(g.alici),
+        asama: "alindi",
         party_id: sahip.tur === "musteri" ? sahip.party.id : null,
         kanal_id: kanal?.id ?? null,
         organization_id: scope.jobId ? null : scope.organizationId ?? null,
@@ -398,6 +417,13 @@ export class SiparisService {
       await this.supabase.client.from("musteri_siparisleri").delete().eq("id", row.id);
       throw err;
     }
+
+    // Sipariş "alındı" yazıldı; istenen aşamaya stok kuralıyla birlikte
+    // geçirilir (onaylıysa stok tek işlemde düşer). Geçiş düşerse sipariş
+    // "alındı" olarak kalır ve hata yüzeye çıkar — stok sessizce eksik kalmaz.
+    const hedef = girdi.asama === undefined ? "onaylandi" : girdi.asama;
+    if (!asamaMi(hedef)) throw new BadRequestException("Geçersiz sipariş aşaması");
+    if (hedef !== "alindi") await this.asamaUygula(row.id, "elle", "alindi", hedef);
 
     if (sahip.tur === "musteri") {
       // Sipariş veren aday artık müşteridir. Rol eklenir, silinmez (bkz. PartyRole).
@@ -426,6 +452,18 @@ export class SiparisService {
     if (girdi.kanalId !== undefined) {
       if (!girdi.kanalId && !mevcut.partyId) throw new BadRequestException("Müşterisiz siparişin kanalı kaldırılamaz");
       alanlar.kanal_id = girdi.kanalId ? (await this.kanalCoz(scope, girdi.kanalId)).id : null;
+    }
+
+    // Stok düştükten sonra ürün/adet değişirse düşen miktarla sipariş ayrışırdı.
+    if (kalemler && kalemlerKilitli(mevcut)) {
+      const yeni = stokImzasi(kalemler.map((k) => ({ productId: k.product_id ?? undefined, miktar: k.miktar })));
+      if (yeni !== stokImzasi(mevcut.kalemler)) {
+        throw new BadRequestException(
+          mevcut.asama === "iptal"
+            ? "İptal edilen siparişin ürünleri değiştirilemez"
+            : "Onaylanan siparişin ürünleri ve adetleri değiştirilemez; gerekiyorsa iptal edip yenisini açın"
+        );
+      }
     }
 
     const odenen = tahsilEdilen(mevcut);
@@ -463,9 +501,62 @@ export class SiparisService {
     if (mevcut.tahsilatlar.length > 0) {
       throw new BadRequestException("Tahsilatı olan sipariş silinemez; önce tahsilatları geri al");
     }
+    // Stoğu düşmüş sipariş silinirse stok geri gelmezdi; iptal stoğu geri ekler.
+    if (stokTakipli(mevcut.kaynak) && onayliMi(mevcut.asama)) {
+      throw new BadRequestException("Onaylanan sipariş silinemez; önce iptal edin (stok geri eklenir)");
+    }
     const { error } = await this.supabase.client.from("musteri_siparisleri").delete().eq("id", id);
     if (error) throw error;
     return { success: true };
+  }
+
+  // ============================================================ Aşama (migration 187)
+
+  /**
+   * Siparişin aşamasını değiştirir. Onaya ilk geçişte stok düşer, onaydan
+   * sonra iptalde geri eklenir (kural: packages/shared/src/siparisAsamasi.ts);
+   * aşama ve stok veritabanında TEK işlemde yazılır.
+   */
+  async asamaDegistir(id: string, yeniHam: unknown, userId: string): Promise<MusteriSiparisi> {
+    if (!asamaMi(yeniHam)) throw new BadRequestException("Geçersiz sipariş aşaması");
+    const mevcut = await this.tekil(id);
+    const sahip = await this.sahibi(mevcut);
+    await this.yetkiIste(sahip, userId, "yazar");
+    if (yeniHam === "iptal" && mevcut.tahsilatlar.length > 0) {
+      throw new BadRequestException("Tahsilatı olan sipariş iptal edilemez; önce tahsilatları geri al");
+    }
+    await this.asamaUygula(id, mevcut.kaynak, mevcut.asama, yeniHam);
+    if (sahip.tur === "musteri") {
+      const ad = SIPARIS_ASAMASI_ETIKET[yeniHam];
+      await this.partyService
+        .logActivity(sahip.party.id, "sistem", `Sipariş ${mevcut.siparisNo ? `#${mevcut.siparisNo} ` : ""}aşaması: ${ad}`, userId)
+        .catch(() => undefined);
+    }
+    return this.tekil(id);
+  }
+
+  /** Yetkisiz iç yol: geçişi doğrular, aşamayı ve stoğu tek işlemde yazar. */
+  private async asamaUygula(
+    id: string,
+    kaynak: MusteriSiparisi["kaynak"],
+    eski: SiparisAsamasi,
+    yeni: SiparisAsamasi
+  ): Promise<void> {
+    const gecis = asamaGecisi(kaynak, eski, yeni);
+    if ("hata" in gecis) throw new BadRequestException(gecis.hata);
+    const { error } = await this.supabase.client.rpc("siparis_asama_uygula", {
+      p_siparis: id,
+      p_eski: eski,
+      p_yeni: yeni,
+      p_stok: gecis.stok,
+    });
+    if (error) {
+      // Fonksiyonun kendi mesajları (eşzamanlı değişiklik) kullanıcıya gider.
+      if (String(error.message ?? "").includes("aşaması bu arada değişti")) {
+        throw new BadRequestException("Siparişin aşaması bu arada değişti; sayfayı yenileyin");
+      }
+      throw error;
+    }
   }
 
   // ============================================================ Tahsilat
@@ -661,6 +752,8 @@ export class SiparisService {
         kaynak: p.kaynak,
         dis_kimlik: p.disKimlik,
         shopify_magaza_id: p.shopifyMagazaId,
+        // Shopify siparişi ödenmiş gelir; stoğunu Shopify yönetiyor (187).
+        asama: "onaylandi",
         created_by: p.aktorId,
       })
       .select("id")
@@ -688,6 +781,90 @@ export class SiparisService {
       .logActivity(p.party.id, "sistem", `Shopify siparişi: ${p.alanlar.siparis_no ?? p.disKimlik}`, p.aktorId ?? undefined)
       .catch(() => undefined);
     return { siparis: await this.tekil(row.id), yeni: true };
+  }
+
+  /**
+   * Web sitesinden (B2B portal) gelen siparişi YALNIZCA açar (migration 188).
+   * Aynı dış kimlik zaten varsa mevcut sipariş döner, hiçbir şey yazılmaz —
+   * portal ağ hatasında aynı isteği güvenle tekrarlayabilsin. Fiyatlar ve
+   * kalemler çağıranda (WebSitesiService) sunucuda hesaplandı; yetki
+   * sorulmaz: çağıran bir kullanıcı değil, şirketin anahtarıyla gelen site.
+   * Aşama "alındı": stok ancak şirket Projelio'da onaylayınca düşer.
+   */
+  async webSiparisiYaz(p: {
+    party: Party;
+    disKimlik: string;
+    baglantiId: string;
+    kanalId: string | null;
+    portalKullaniciId: string | null;
+    alanlar: Record<string, unknown>;
+    kalemler: KalemSatiri[];
+    aktorId: string | null;
+  }): Promise<{ siparis: MusteriSiparisi; yeni: boolean }> {
+    const mevcutId = await this.disKimliktenBul("web_sitesi", p.disKimlik);
+    if (mevcutId) return { siparis: await this.tekil(mevcutId), yeni: false };
+
+    const { data: row, error } = await this.supabase.client
+      .from("musteri_siparisleri")
+      .insert({
+        ...p.alanlar,
+        tutar: kalemToplamiSatir(p.kalemler),
+        party_id: p.party.id,
+        organization_id: p.party.organizationId ?? null,
+        job_id: null,
+        kanal_id: p.kanalId,
+        kaynak: "web_sitesi",
+        dis_kimlik: p.disKimlik,
+        web_sitesi_baglanti_id: p.baglantiId,
+        portal_kullanici_id: p.portalKullaniciId,
+        asama: "alindi",
+        created_by: p.aktorId,
+      })
+      .select("id")
+      .single();
+    if (error) {
+      if ((error as any).code === "23505") {
+        const id = await this.disKimliktenBul("web_sitesi", p.disKimlik);
+        if (id) return { siparis: await this.tekil(id), yeni: false };
+      }
+      throw error;
+    }
+    try {
+      await this.kalemleriYaz(row.id, p.kalemler);
+    } catch (err) {
+      await this.supabase.client.from("musteri_siparisleri").delete().eq("id", row.id);
+      throw err;
+    }
+    if (!p.party.roles.includes("customer")) {
+      await this.partyService.addRoleTo(p.party.id, "customer").catch(() => undefined);
+    }
+    await this.partyService
+      .logActivity(p.party.id, "sistem", `Web sitesi siparişi: ${p.alanlar.siparis_no ?? p.disKimlik}`, p.aktorId ?? undefined)
+      .catch(() => undefined);
+    return { siparis: await this.tekil(row.id), yeni: true };
+  }
+
+  /** Bir müşterinin siparişleri — yetkisiz iç okuma (web sitesi API'si). */
+  async musterininSiparisleriIc(partyId: string, limit = 100): Promise<MusteriSiparisi[]> {
+    const { data, error } = await this.supabase.client
+      .from("musteri_siparisleri")
+      .select(SIPARIS_SECIM)
+      .eq("party_id", partyId)
+      .order("siparis_tarihi", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return this.eslestir(data ?? []);
+  }
+
+  /** Tek sipariş — yetkisiz iç okuma (web sitesi bildirimi). */
+  async tekilIc(id: string): Promise<MusteriSiparisi | null> {
+    try {
+      return await this.tekil(id);
+    } catch (err) {
+      if (err instanceof NotFoundException) return null;
+      throw err;
+    }
   }
 
   /**
@@ -744,7 +921,7 @@ export class SiparisService {
 
       const { data: rows, error } = await this.supabase.client
         .from("musteri_siparisleri")
-        .insert(yeniler.map((s) => ({ ...s.siparis, kaynak: "excel", created_by: aktorId })))
+        .insert(yeniler.map((s) => ({ asama: "teslim_edildi", ...s.siparis, kaynak: "excel", created_by: aktorId })))
         .select("id, dis_kimlik");
       if (error) throw error;
       const idOf = new Map((rows ?? []).map((r: any) => [r.dis_kimlik, r.id]));

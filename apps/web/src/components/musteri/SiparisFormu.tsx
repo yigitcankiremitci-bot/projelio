@@ -3,7 +3,10 @@ import {
   ODEME_YONTEMI_ETIKET,
   ODEME_YONTEMLERI,
   PRODUCT_UNIT_LABEL,
+  SIPARIS_ASAMALARI,
+  SIPARIS_ASAMASI_ETIKET,
   evrakliMi,
+  kalemlerKilitli,
   kalemTutari,
   kdvDahilFiyat,
   tahsilEdilen,
@@ -12,6 +15,7 @@ import {
   type OdemeYontemi,
   type Product,
   type SatisKanali,
+  type SiparisAsamasi,
 } from "@projelio/shared";
 import { api } from "../../api/client";
 import { kanalApi, siparisApi, type KalemGovdesi, type SiparisGovdesi } from "../../api/party";
@@ -96,6 +100,8 @@ export default function SiparisFormu({
     aliciAdi: mevcut?.alici?.ad ?? "",
     aliciIl: mevcut?.alici?.il ?? "",
     aliciIlce: mevcut?.alici?.ilce ?? "",
+    // Elle açılan sipariş çoğunlukla zaten kesinleşmiş: varsayılan Onaylandı (stok düşer).
+    asama: "onaylandi" as SiparisAsamasi,
   }));
   const [kalemler, setKalemler] = useState<KalemSatiri[]>(() =>
     mevcut?.kalemler.length
@@ -236,6 +242,7 @@ export default function SiparisFormu({
       notlar: f.notlar,
       kanalId: f.kanalId || null,
       alici: { ad: f.aliciAdi, il: f.aliciIl, ilce: f.aliciIlce },
+      ...(mevcut ? {} : { asama: f.asama }),
     };
     setHata("");
     setKaydediliyor(true);
@@ -410,7 +417,24 @@ export default function SiparisFormu({
           : t("Boş bırakılırsa kalem toplamı: {tutar}", { tutar: fmtPara(kalemToplam, f.paraBirimi) })}
       </span>
 
+      {mevcut && kalemlerKilitli(mevcut) && (
+        <span style={{ fontSize: 12, color: c.textSecondary }}>
+          {t("Onaylanan siparişin ürünleri ve adetleri kilitli; fiyat ve diğer bilgiler değiştirilebilir.")}
+        </span>
+      )}
+
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!mevcut && (
+          <Alan label={t("Aşama")} style={{ flex: "1 1 130px" }}>
+            <select value={f.asama} onChange={(e) => set("asama", e.target.value as SiparisAsamasi)} style={TAM_GENISLIK}>
+              {SIPARIS_ASAMALARI.filter((a) => a !== "iptal").map((a) => (
+                <option key={a} value={a}>
+                  {t(SIPARIS_ASAMASI_ETIKET[a])}
+                </option>
+              ))}
+            </select>
+          </Alan>
+        )}
         <Alan label={t("Sipariş no")} style={{ flex: "1 1 120px" }}>
           <input value={f.siparisNo} onChange={(e) => set("siparisNo", e.target.value)} style={TAM_GENISLIK} />
         </Alan>

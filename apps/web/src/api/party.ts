@@ -16,6 +16,10 @@ import type {
   SatisKanaliTuru,
   SiparisAktarimDuzeltmeleri,
   SiparisAktarimSonucu,
+  SiparisAsamasi,
+  MusteriPortalOzeti,
+  PortalKullanicisi,
+  PortalYetkisi,
 } from "@projelio/shared";
 import { api, API_URL } from "./client";
 import { TOKEN_KEY } from "../lib/session";
@@ -144,6 +148,8 @@ export interface SiparisGovdesi {
   notlar?: string;
   kanalId?: string | null;
   alici?: { ad?: string; il?: string; ilce?: string };
+  /** Yalnızca yeni siparişte; boşsa "Onaylandı" (stok düşer). */
+  asama?: SiparisAsamasi;
 }
 
 export interface TahsilatGovdesi {
@@ -167,6 +173,8 @@ export const siparisApi = {
   ekle: (partyId: string, govde: SiparisGovdesi) => api.post<MusteriSiparisi>(`/party/${partyId}/siparisler`, govde),
   guncelle: (id: string, govde: Partial<SiparisGovdesi>) => api.patch<MusteriSiparisi>(`/siparisler/${id}`, govde),
   sil: (id: string) => api.delete(`/siparisler/${id}`),
+  /** Onaya ilk geçişte stok düşer, onaydan sonra iptalde geri eklenir (sunucuda). */
+  asama: (id: string, asama: SiparisAsamasi) => api.patch<MusteriSiparisi>(`/siparisler/${id}/asama`, { asama }),
   tahsilEt: (siparisId: string, govde: TahsilatGovdesi) =>
     api.post<MusteriSiparisi>(`/siparisler/${siparisId}/tahsilatlar`, govde),
   tahsilatiGeriAl: (tahsilatId: string) => api.delete<MusteriSiparisi>(`/tahsilatlar/${tahsilatId}`),
@@ -210,4 +218,13 @@ export const kanalApi = {
   liste: (kapsamYolu: string) => api.get<SatisKanali[]>(`${kapsamYolu}/satis-kanallari`),
   ekle: (kapsamYolu: string, govde: SatisKanaliGovdesi) => api.post<SatisKanali>(`${kapsamYolu}/satis-kanallari`, govde),
   guncelle: (id: string, govde: SatisKanaliGovdesi) => api.patch<SatisKanali>(`/satis-kanallari/${id}`, govde),
+};
+
+/** Müşteri kartının "Web portalı" bölümü (web sitesi eklentisi, migration 188). */
+export const portalApi = {
+  ozet: (partyId: string) => api.get<MusteriPortalOzeti>(`/party/${partyId}/web-portal`),
+  ac: (partyId: string, govde: { baglantiId?: string; eposta: string; ad?: string; yetkiler: PortalYetkisi[] }) =>
+    api.post<PortalKullanicisi>(`/party/${partyId}/web-portal/kullanicilar`, govde),
+  guncelle: (id: string, govde: { ad?: string | null; yetkiler?: PortalYetkisi[]; durum?: "aktif" | "kapali" }) =>
+    api.patch<PortalKullanicisi>(`/web-portal/kullanicilar/${id}`, govde),
 };

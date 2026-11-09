@@ -34,6 +34,7 @@ export const SIPARIS_DURUMU_ETIKET: Record<SiparisDurumu, string> = {
   kismi: "Kısmi tahsil",
   tahsil_edildi: "Tahsil edildi",
   gecikti: "Gecikti",
+  iptal: "İptal",
 };
 // dil:anahtar-bitis
 
@@ -59,7 +60,12 @@ export function tahsilEdilen(s: Pick<MusteriSiparisi, "tahsilatlar">): number {
   return kurus(s.tahsilatlar.reduce((t, x) => t + Number(x.tutar || 0), 0));
 }
 
-export function kalanTutar(s: Pick<MusteriSiparisi, "tutar" | "tahsilatlar">): number {
+/**
+ * İptal edilen siparişin alacağı yoktur (migration 187): kalan 0, raporlarda
+ * beklenen tutara girmez. Tahsilatı olan sipariş zaten iptal edilemiyor.
+ */
+export function kalanTutar(s: Pick<MusteriSiparisi, "tutar" | "tahsilatlar"> & { asama?: MusteriSiparisi["asama"] }): number {
+  if (s.asama === "iptal") return 0;
   return Math.max(0, kurus(Number(s.tutar) - tahsilEdilen(s)));
 }
 
@@ -73,9 +79,10 @@ export function kalanTutar(s: Pick<MusteriSiparisi, "tutar" | "tahsilatlar">): n
  * `bugun` YYYY-MM-DD; vade günü henüz gecikmiş sayılmaz.
  */
 export function siparisDurumu(
-  s: Pick<MusteriSiparisi, "tutar" | "tahsilatlar" | "vadeTarihi">,
+  s: Pick<MusteriSiparisi, "tutar" | "tahsilatlar" | "vadeTarihi"> & { asama?: MusteriSiparisi["asama"] },
   bugun: string
 ): SiparisDurumu {
+  if (s.asama === "iptal") return "iptal";
   if (kalanTutar(s) <= 0) return "tahsil_edildi";
   if (s.vadeTarihi < bugun) return "gecikti";
   if (tahsilEdilen(s) > 0) return "kismi";
@@ -120,6 +127,8 @@ export function tahsilatRaporu(
 ): TahsilatRaporSatiri[] {
   const kovalar = new Map<string, TahsilatRaporSatiri>();
   for (const s of siparisler) {
+    // İptal edilen sipariş beklenen alacak değil (migration 187).
+    if (s.asama === "iptal") continue;
     const ay = siparisAyi(s, eksen);
     const para = s.paraBirimi || "TRY";
     const anahtar = `${s.sorumluId ?? ""}|${ay}|${para}`;

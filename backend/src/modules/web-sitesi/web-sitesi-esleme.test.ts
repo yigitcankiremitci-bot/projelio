@@ -3,8 +3,16 @@ import { createHmac } from "node:crypto";
 import { describe, test } from "node:test";
 import {
   anahtariAyikla,
+  baglantiYonetebilir,
   bildirimImzasi,
+  epostaCoz,
   ipOzelMi,
+  musteriFiyatiEkle,
+  portalYetkileriCoz,
+  siparisDisKimligi,
+  siparisIstegiCoz,
+  siteMusterisi,
+  siteSiparisi,
   siteUrunu,
   sitedeGorunur,
   sonrakiDenemeGecikmesiMs,
@@ -172,5 +180,138 @@ describe("web sitesi: stok isteği", () => {
       const r = stokIstegiCoz(g);
       assert.ok("hata" in r, JSON.stringify(g)?.slice(0, 60));
     }
+  });
+});
+
+describe("web sitesi B2B: müşteri fiyatı", () => {
+  const satir = { id: "u1", name: "Sprey", price: "100.00", tax_rate: "10", status: "active" };
+
+  test("iskonto KDV hariç fiyata, sonra KDV — kuruşu kuruşuna", () => {
+    const u = musteriFiyatiEkle(siteUrunu(satir), satir, 12.5);
+    assert.equal(u.discount_rate, 12.5);
+    assert.equal(u.list_price_with_tax, 110);
+    assert.equal(u.customer_price, 87.5);
+    assert.equal(u.customer_price_with_tax, 96.25);
+  });
+
+  test("iskontosuz müşteri liste fiyatını görür; fiyatsız ürün null", () => {
+    const u = musteriFiyatiEkle(siteUrunu(satir), satir, null);
+    assert.equal(u.discount_rate, 0);
+    assert.equal(u.customer_price_with_tax, 110);
+    const f = musteriFiyatiEkle(siteUrunu({ ...satir, price: null }), { ...satir, price: null }, 10);
+    assert.equal(f.customer_price, null);
+    assert.equal(f.customer_price_with_tax, null);
+  });
+});
+
+describe("web sitesi B2B: müşteri yükü (beyaz liste)", () => {
+  test("vergi no, telefon, e-posta, adres ayrıntısı çıkmaz", () => {
+    const m = siteMusterisi({
+      id: "p1",
+      display_name: "Merkez Eczanesi",
+      legal_name: "Merkez Ecz. Ltd.",
+      tax_number: "1234567890",
+      phone: "+90 555",
+      email: "a@b.com",
+      address: { city: "İzmir", district: "Bornova", line1: "Gizli sk. 5", postalCode: "35000" },
+      status: "active",
+      iskonto_orani: "7.50",
+    });
+    assert.deepEqual(m, {
+      id: "p1",
+      display_name: "Merkez Eczanesi",
+      legal_name: "Merkez Ecz. Ltd.",
+      city: "İzmir",
+      district: "Bornova",
+      status: "active",
+      discount_rate: 7.5,
+    });
+  });
+});
+
+describe("web sitesi B2B: sipariş isteği", () => {
+  const musteri = "11111111-1111-4111-8111-111111111111";
+
+  test("geçerli istek; aynı ürün iki satırda toplanır, fiyat yok sayılır", () => {
+    const r = siparisIstegiCoz({
+      customer_id: musteri,
+      reference: "SIP-1",
+      note: "  kapıya  ",
+      items: [
+        { sku: "A", quantity: 2, price: 1 },
+        { sku: "A", quantity: 3 },
+      ],
+    });
+    assert.ok("istek" in r);
+    assert.equal(r.istek.referans, "SIP-1");
+    assert.equal(r.istek.not, "kapıya");
+    assert.equal(r.istek.portalKullaniciId, null);
+    assert.deepEqual(r.istek.kalemler.map((k) => [k.sku, k.miktar]), [["A", 5]]);
+  });
+
+  test("müşteri yok, adet sıfır, bozuk portal kullanıcısı → hata", () => {
+    assert.ok("hata" in siparisIstegiCoz({ reference: "R", items: [{ sku: "A", quantity: 1 }] }));
+    assert.ok("hata" in siparisIstegiCoz({ customer_id: musteri, reference: "R", items: [{ sku: "A", quantity: 0 }] }));
+    assert.ok("hata" in siparisIstegiCoz({ customer_id: musteri, reference: "R", items: [{ sku: "A", quantity: -1 }] }));
+    assert.ok("hata" in siparisIstegiCoz({ customer_id: musteri, reference: "R", items: [] }));
+    assert.ok("hata" in siparisIstegiCoz({ customer_id: musteri, reference: "R", portal_user_id: "x", items: [{ sku: "A", quantity: 1 }] }));
+  });
+
+  test("dış kimlik bağlantıya önekli: iki şirketin aynı referansı çakışmaz", () => {
+    assert.notEqual(siparisDisKimligi("b1", "SIP-1"), siparisDisKimligi("b2", "SIP-1"));
+    assert.equal(siparisDisKimligi("b1", "SIP-1"), "b1:SIP-1");
+  });
+});
+
+describe("web sitesi B2B: portal kullanıcısı", () => {
+  test("yetkiler ayıklanır, sıralanır; dizi değilse null", () => {
+    assert.deepEqual(portalYetkileriCoz(["fiyat_gor", "admin", "siparis_ver", "fiyat_gor"]), ["siparis_ver", "fiyat_gor"]);
+    assert.deepEqual(portalYetkileriCoz([]), []);
+    assert.equal(portalYetkileriCoz("siparis_ver"), null);
+  });
+
+  test("e-posta küçük harfe iner, bozuğu reddedilir", () => {
+    assert.equal(epostaCoz("  Ali@Eczane.COM "), "ali@eczane.com");
+    assert.equal(epostaCoz("ali@"), null);
+    assert.equal(epostaCoz(5), null);
+  });
+});
+
+describe("web sitesi B2B: sipariş yükü", () => {
+  test("tahsilat çıkmaz, aşama İngilizce, sku eklenir", () => {
+    const o = siteSiparisi(
+      {
+        id: "s1",
+        siparisNo: "SIP-1",
+        partyId: "p1",
+        asama: "onaylandi",
+        kaynak: "web_sitesi",
+        siparisTarihi: "2026-11-09",
+        paraBirimi: "TRY",
+        tutar: 192.5,
+        kalemler: [{ productId: "u1", miktar: 2, birimFiyat: 96.25, listeBirimFiyat: 110, tutar: 192.5 }],
+        tahsilatlar: [{ id: "t1", tutar: 50 }],
+        createdAt: "2026-11-09T10:00:00Z",
+      } as any,
+      new Map([["u1", "SPR-30"]])
+    );
+    assert.equal(o.status, "approved");
+    assert.equal(o.source, "website");
+    assert.equal(o.items[0].sku, "SPR-30");
+    assert.equal(o.items[0].unit_price, 96.25);
+    assert.equal(o.total, 192.5);
+    assert.ok(!("tahsilatlar" in o) && !("payments" in o) && !("paid" in o));
+  });
+});
+
+describe("web sitesi: bağlantıyı kim yönetir", () => {
+  test("izinli listedeki kişi şirkette çalışıyorsa sahibi olmasa da yönetir", () => {
+    for (const rol of ["owner", "department_manager", "member", "staff"]) assert.equal(baglantiYonetebilir(rol, true), true, rol);
+  });
+  test("taşeron ve şirketi göremeyen asla; listede olmayan sahip de değil", () => {
+    assert.equal(baglantiYonetebilir("subcontractor", true), false);
+    assert.equal(baglantiYonetebilir("none", true), false);
+    assert.equal(baglantiYonetebilir("owner", false), false);
+    assert.equal(baglantiYonetebilir("member", false), false);
   });
 });

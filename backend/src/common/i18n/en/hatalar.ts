@@ -930,7 +930,7 @@ export const hatalar: TranslationDict = {
   "Mağaza bulunamadı": "Store not found",
   // Web sitesi eklentisi
   "Web sitesi eklentisi şimdilik yalnızca izinli hesaplara açık": "The website plugin is currently available to approved accounts only",
-  "Web sitesi bağlantısını yalnızca şirketin kurucusu yönetebilir": "Only the company's founder can manage the website connection",
+  "Web sitesi bağlantısını yalnızca bu şirkette çalışan izinli kişiler yönetebilir": "Only permitted people working in this company can manage the website connection",
   "Web sitesi eklentisi bu sunucuda henüz açılmadı": "The website plugin isn't enabled on this server yet",
   "Bağlantı adı 1-80 karakter olmalı": "The connection name must be 1-80 characters",
   "Bildirim adresi https:// ile başlayan, herkese açık bir adres olmalı": "The webhook URL must be a public address starting with https://",
@@ -1194,4 +1194,22 @@ export const hatalar: TranslationDict = {
     "This is a service job: task budgets are price items for your work; they aren't paid or recorded as expenses in your Kasa. Enter the client's payment as income in the project budget.",
   "Geçersiz pano düzeni": "Invalid board layout",
   "Geçersiz pano kapsamı": "Invalid board scope",
+  // Sipariş aşaması ve B2B portal (migration 187-188)
+  "Geçersiz sipariş aşaması": "Invalid order stage",
+  "Sipariş zaten bu aşamada": "The order is already at this stage",
+  "İptal edilen sipariş yeniden açılamaz": "A cancelled order can't be reopened",
+  "Onaylanan sipariş Alındı'ya geri alınamaz; gerekiyorsa iptal edin": "An approved order can't go back to Received; cancel it if needed",
+  "Onaylanan sipariş silinemez; önce iptal edin (stok geri eklenir)": "An approved order can't be deleted; cancel it first (stock is added back)",
+  "Onaylanan siparişin ürünleri ve adetleri değiştirilemez; gerekiyorsa iptal edip yenisini açın":
+    "Products and quantities of an approved order can't be changed; cancel it and create a new one if needed",
+  "İptal edilen siparişin ürünleri değiştirilemez": "Products of a cancelled order can't be changed",
+  "Siparişin aşaması bu arada değişti; sayfayı yenileyin": "The order's stage changed in the meantime; refresh the page",
+  "Tahsilatı olan sipariş iptal edilemez; önce tahsilatları geri al": "An order with collections can't be cancelled; reverse the collections first",
+  "İskonto oranı 0 ile 100 arasında olmalı": "Discount rate must be between 0 and 100",
+  "Bu müşterinin şirketinde etkin bir web sitesi bağlantısı yok": "This customer's company has no active website connection",
+  "Portal yetkileri geçersiz": "Invalid portal permissions",
+  "Ad en çok 120 karakter olabilir": "Name can be at most 120 characters",
+  "Bu e-posta bu portalda zaten açık bir hesaba bağlı": "This email is already linked to an active account on this portal",
+  "Portal kullanıcısı bulunamadı": "Portal user not found",
+  "Portal kullanıcısının durumu geçersiz": "Invalid portal user status",
 };

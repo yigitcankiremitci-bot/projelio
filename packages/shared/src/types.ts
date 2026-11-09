@@ -809,6 +809,12 @@ export interface UrunIceAktarmaSonucu {
   ornek: { satir: number; ad: string; fiyat?: number; paraBirimi?: string; stokKodu?: string }[];
   /** Satır tavanına gelindiyse kalanların başladığı satır. */
   kalanIlkSatir?: number;
+  /** "Mevcut ürünleri güncelle" seçiliyse stok koduyla eşleşip güncellenecek ürün sayısı. */
+  guncellenecek?: number;
+  /** Yalnızca uygulamada: gerçekten güncellenen. */
+  guncellenen?: number;
+  /** Güncellemede stok da yazılıyor mu. */
+  stokGuncellenir?: boolean;
 }
 
 /**
@@ -878,6 +884,8 @@ export interface Party {
   notes?: string;
   /** Müşteriler defterinde tekrar aranacak gün (YYYY-AA-GG, migration 160). */
   sonrakiArama?: string;
+  /** Müşteriye özel iskonto yüzdesi (12.5 = %12,5), KDV hariç liste fiyatına (migration 188). */
+  iskontoOrani?: number;
 
   createdBy?: string;
   createdAt: string;
@@ -4651,7 +4659,10 @@ export interface BilgiKartiSayfasi {
 export type OdemeYontemi = "nakit" | "havale" | "kredi_karti" | "cek" | "senet" | "diger";
 
 /** Saklanmaz, tahsilatlardan hesaplanır (bkz. siparisDurumu). */
-export type SiparisDurumu = "bekliyor" | "kismi" | "tahsil_edildi" | "gecikti";
+export type SiparisDurumu = "bekliyor" | "kismi" | "tahsil_edildi" | "gecikti" | "iptal";
+
+/** Siparişin aşaması (migration 187) — tahsilat durumundan BAĞIMSIZ, bkz. siparisAsamasi.ts. */
+export type SiparisAsamasi = "alindi" | "onaylandi" | "hazirlaniyor" | "yolda" | "teslim_edildi" | "iptal";
 
 export interface MusteriTahsilati {
   id: string;
@@ -4727,7 +4738,13 @@ export interface MusteriSiparisi {
    * Belgesi o kayda bağlı, ay klasöründe ve ay sonu arşivinde.
    */
   fatura?: { id: string; faturaNo?: string; tarih?: string };
-  kaynak?: "elle" | "shopify" | "excel";
+  kaynak?: "elle" | "shopify" | "excel" | "web_sitesi";
+  /** Siparişin aşaması (migration 187); stok kuralı buna bağlı. */
+  asama: SiparisAsamasi;
+  asamaDegistiAt?: string;
+  /** Siteden geldiyse bağlantı ve siparişi veren portal kullanıcısı (migration 188). */
+  webSitesiBaglantiId?: string;
+  portalKullaniciId?: string;
   tutar: number;
   paraBirimi: string;
   siparisTarihi: string;
@@ -4928,6 +4945,31 @@ export interface WebSitesiSirlari {
   baglanti: WebSitesiBaglantisi;
   anahtar?: string;
   webhookSiri?: string;
+}
+
+/** B2B portal yetkileri (migration 188). Sipariş verme sunucuda da denetlenir. */
+export type PortalYetkisi = "siparis_ver" | "fiyat_gor" | "siparis_gecmisi";
+
+/** Müşteri kartındaki "Web portalı" bölümünün bir kullanıcısı. Şifre YOK — portalda. */
+export interface PortalKullanicisi {
+  id: string;
+  baglantiId: string;
+  baglantiAdi: string;
+  partyId: string;
+  eposta: string;
+  ad: string | null;
+  yetkiler: PortalYetkisi[];
+  durum: "aktif" | "kapali";
+  createdAt: string;
+  kapatildiAt: string | null;
+}
+
+/** Müşteri kartının portal bölümü: bağlantı yoksa `baglantilar` boş, bölüm görünmez. */
+export interface MusteriPortalOzeti {
+  baglantilar: { id: string; ad: string }[];
+  kullanicilar: PortalKullanicisi[];
+  /** Kullanıcı açıp kapatabilir mi (müşteri kartını düzenleyebilen). */
+  yazabilir: boolean;
 }
 
 /** Tanıtım sitesinin bülten abonesi (Admin > Bülten, migration 149). */

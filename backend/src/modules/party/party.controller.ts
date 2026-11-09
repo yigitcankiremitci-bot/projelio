@@ -612,6 +612,13 @@ export class PartyController {
     return this.siparisService.guncelle(id, body ?? {}, req.user.userId);
   }
 
+  /** Siparişin aşaması (migration 187); onay/iptal stok kuralını tetikler. */
+  @Patch("siparisler/:id/asama")
+  async siparisAsamasi(@Param("id") id: string, @Body() body: { asama?: string }, @Req() req: any) {
+    await this.access.assertNotSubcontractor(req.user.userId, "partners");
+    return this.siparisService.asamaDegistir(id, body?.asama, req.user.userId);
+  }
+
   @Delete("siparisler/:id")
   async siparisSil(@Param("id") id: string, @Req() req: any) {
     await this.access.assertNotSubcontractor(req.user.userId, "partners");

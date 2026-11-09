@@ -17,15 +17,20 @@ import { AccessService } from "../../common/access/access.service";
 import { createTokenCrypto } from "../../common/crypto/token-crypto";
 import { getApiPublicUrl } from "../../common/config/env";
 import { fetchWithTimeout } from "../../common/http/fetch-with-timeout";
+import { SiparisService } from "../party/siparis.service";
 import {
   ANAHTAR_ONEKI,
   AZAMI_DENEME,
   SIR_ONEKI,
   anahtarOzeti,
   anahtariAyikla,
+  baglantiYonetebilir,
   bildirimImzasi,
   ipOzelMi,
+  musteriFiyatiEkle,
   siteAdresiCoz,
+  sitePortalKullanicisi,
+  siteSiparisi,
   siteUrunu,
   sitedeGorunur,
   sonrakiDenemeGecikmesiMs,
@@ -39,7 +44,7 @@ const sirCrypto = createTokenCrypto("WEB_SITESI_SIR_ENC_KEY");
 
 // dil:anahtar-baslangic — istisna mesajları (sözlük: common/i18n/en/hatalar.ts)
 const HATA_IZIN = "Web sitesi eklentisi şimdilik yalnızca izinli hesaplara açık";
-const HATA_YETKI = "Web sitesi bağlantısını yalnızca şirketin kurucusu yönetebilir";
+const HATA_YETKI = "Web sitesi bağlantısını yalnızca bu şirkette çalışan izinli kişiler yönetebilir";
 const HATA_YAPILANDIRMA = "Web sitesi eklentisi bu sunucuda henüz açılmadı";
 const HATA_AD = "Bağlantı adı 1-80 karakter olmalı";
 const HATA_WEBHOOK = "Bildirim adresi https:// ile başlayan, herkese açık bir adres olmalı";
@@ -55,6 +60,7 @@ const API_HATA_ANAHTAR = "Missing or invalid API key. Use `Authorization: Bearer
 const API_HATA_URUN_YOK = "Product not found.";
 const API_HATA_URUN_EKSIK = "Some products were not found.";
 const API_PING_METNI = "Projelio connection test";
+const API_HATA_MUSTERI_YOK = "Customer not found.";
 // dil:atla-bitis
 
 /** Site başına dakikalık istek tavanı — yanlış yazılmış bir döngü sunucuyu yormasın. */
@@ -95,7 +101,7 @@ export interface SiteKimligi {
  *   · satış/iadeyi BİLDİRİR            POST /v1/site/stock-movements
  *   · ürün değişince bildirim ALIR     Projelio → webhook adresi (imzalı)
  *
- * İki istemci türü var: şirket kurucusu (JWT, kartı yönetir) ve site (anahtar,
+ * İki istemci türü var: şirketin kurucusu ya da şirkette çalışan izinli kişi (JWT, kartı yönetir — bkz. baglantiYonetebilir) ve site (anahtar,
  * yalnızca /v1/site uçları). Anahtar şirkete bağlı, kişiye değil: kurucu
  * ayrılsa da site çalışmaya devam eder.
  *
@@ -112,7 +118,8 @@ export class WebSitesiService {
 
   constructor(
     private supabase: SupabaseService,
-    private access: AccessService
+    private access: AccessService,
+    private siparisler: SiparisService
   ) {}
 
   private get db() {
@@ -134,7 +141,7 @@ export class WebSitesiService {
   private async yonetebilmeli(organizationId: string, userId: string): Promise<void> {
     if (!(await this.izinli(userId))) throw new ForbiddenException(HATA_IZIN);
     const a = await this.access.organizationAccess(organizationId, userId);
-    if (!a.canManage) throw new ForbiddenException(HATA_YETKI);
+    if (!baglantiYonetebilir(a.role, true)) throw new ForbiddenException(HATA_YETKI);
   }
 
   private async baglantiyiAl(id: string, userId: string): Promise<BaglantiSatiri> {
@@ -158,7 +165,7 @@ export class WebSitesiService {
     const bos: WebSitesiOzeti = { izinli, yapilandirildi: sirCrypto.isConfigured(), apiKoku: this.apiKoku(), baglantilar: [] };
     if (!izinli) return bos;
     const a = await this.access.organizationAccess(organizationId, userId);
-    if (!a.canManage) return { ...bos, izinli: false };
+    if (!baglantiYonetebilir(a.role, izinli)) return { ...bos, izinli: false };
 
     const { data, error } = await this.db
       .from("web_sitesi_baglantilari")
@@ -348,7 +355,8 @@ export class WebSitesiService {
     const simdi = new Date().toISOString();
     const satirlar = (data ?? []).map((p: any) => ({
       baglanti_id: b.id,
-      product_id: p.id,
+      tur: "urun",
+      kayit_id: p.id,
       organization_id: b.organization_id,
       eklendi_at: simdi,
       deneme: 0,
@@ -356,7 +364,7 @@ export class WebSitesiService {
       son_hata: null,
     }));
     for (let i = 0; i < satirlar.length; i += 500) {
-      const { error: e } = await this.db.from("web_sitesi_kuyrugu").upsert(satirlar.slice(i, i + 500), { onConflict: "baglanti_id,product_id" });
+      const { error: e } = await this.db.from("web_sitesi_kuyrugu").upsert(satirlar.slice(i, i + 500), { onConflict: "baglanti_id,tur,kayit_id" });
       if (e) throw e;
     }
   }
@@ -406,12 +414,40 @@ export class WebSitesiService {
     return m;
   }
 
+  /**
+   * Bağlantının şirketindeki, Müşteriler defterinde duran ve arşivde olmayan
+   * müşteri. Başka şirketin müşteri kimliği yazılırsa "yok" gibi davranılır
+   * (varlığı bile sızmasın). B2B uçları ve müşteri fiyatı buradan geçer.
+   */
+  async siteMusterisiniBul(site: SiteKimligi, id: unknown): Promise<any> {
+    if (!uuidMi(id)) throw new NotFoundException(API_HATA_MUSTERI_YOK);
+    const { data, error } = await this.db
+      .from("party")
+      .select("id, organization_id, display_name, legal_name, address, status, iskonto_orani, modules, roles, archived_at, owner_user_id, job_id")
+      .eq("id", id)
+      .eq("organization_id", site.organizationId)
+      .is("archived_at", null)
+      .maybeSingle<any>();
+    if (error) throw error;
+    // Migration 153 öncesi satırlarda modules boş olabilir: o kayıtlar müşteri defterinde.
+    const moduller: string[] = data?.modules ?? ["crm_musteri"];
+    if (!data || !moduller.includes("crm_musteri")) throw new NotFoundException(API_HATA_MUSTERI_YOK);
+    return data;
+  }
+
+  private async musteriIskontosu(site: SiteKimligi, musteriId: unknown): Promise<number | null | undefined> {
+    if (musteriId === undefined || musteriId === "") return undefined;
+    const m = await this.siteMusterisiniBul(site, musteriId);
+    return m.iskonto_orani === null ? null : Number(m.iskonto_orani);
+  }
+
   async urunler(
     site: SiteKimligi,
-    sorgu: { page?: string; per_page?: string; sku?: string; category?: string }
+    sorgu: { page?: string; per_page?: string; sku?: string; category?: string; customer_id?: string }
   ): Promise<{ data: SiteUrunu[]; page: number; per_page: number; has_more: boolean }> {
     const sayfa = Math.max(1, Math.floor(Number(sorgu.page) || 1));
     const adet = Math.min(SAYFA_AZAMI, Math.max(1, Math.floor(Number(sorgu.per_page) || SAYFA_VARSAYILAN)));
+    const iskonto = await this.musteriIskontosu(site, sorgu.customer_id);
     let q = this.db
       .from("products")
       .select("*")
@@ -430,7 +466,10 @@ export class WebSitesiService {
     const satirlar = (data ?? []).slice(0, adet);
     const gorseller = await this.gorselleriOku(satirlar.map((r: any) => r.id));
     return {
-      data: satirlar.map((r: any) => siteUrunu(r, gorseller.get(r.id))),
+      data: satirlar.map((r: any) => {
+        const u = siteUrunu(r, gorseller.get(r.id));
+        return iskonto === undefined ? u : musteriFiyatiEkle(u, r, iskonto);
+      }),
       page: sayfa,
       per_page: adet,
       has_more: (data ?? []).length > adet,
@@ -438,14 +477,16 @@ export class WebSitesiService {
   }
 
   /** `ref` ürün kimliği ya da stok kodu (SKU). */
-  async urun(site: SiteKimligi, ref: string): Promise<SiteUrunu> {
+  async urun(site: SiteKimligi, ref: string, musteriId?: string): Promise<SiteUrunu> {
+    const iskonto = await this.musteriIskontosu(site, musteriId);
     let q = this.db.from("products").select("*").eq("organization_id", site.organizationId);
     q = uuidMi(ref) ? q.eq("id", ref) : q.eq("sku", ref);
     const { data, error } = await q.is("archived_at", null).limit(1).maybeSingle<any>();
     if (error) throw error;
     if (!data || !sitedeGorunur(data)) throw new NotFoundException(API_HATA_URUN_YOK);
     const gorseller = await this.gorselleriOku([data.id]);
-    return siteUrunu(data, gorseller.get(data.id));
+    const u = siteUrunu(data, gorseller.get(data.id));
+    return iskonto === undefined ? u : musteriFiyatiEkle(u, data, iskonto);
   }
 
   /**
@@ -523,14 +564,17 @@ export class WebSitesiService {
   // ============================================================ Giden bildirimler
 
   /**
-   * Kuyruktan bir tur. Ürünün SON hâli okunur (kuyruk yalnızca "bu ürün
-   * değişti" der); görünürse product.updated, değilse product.deleted.
+   * Kuyruktan bir tur (188'den beri üç tür). Kuyruk yalnızca "bu kayıt
+   * değişti" der; gönderimde kaydın SON hâli okunur:
+   *   urun             → product.updated / product.deleted (görünmüyorsa)
+   *   portal_kullanici → portal_user.upserted / portal_user.disabled
+   *   siparis          → order.updated
    */
   async kuyruguIsle(): Promise<{ gonderildi: number; hata: number; birakildi: number }> {
     const sonuc = { gonderildi: 0, hata: 0, birakildi: 0 };
     const { data: satirlar, error } = await this.db
       .from("web_sitesi_kuyrugu")
-      .select("baglanti_id, product_id, eklendi_at, deneme")
+      .select("baglanti_id, tur, kayit_id, eklendi_at, deneme")
       .lte("sonraki_deneme_at", new Date().toISOString())
       .order("sonraki_deneme_at", { ascending: true })
       .limit(KUYRUK_TURU);
@@ -544,10 +588,20 @@ export class WebSitesiService {
       .in("id", baglantiIdleri);
     const bMap = new Map((baglantilar ?? []).map((b: any) => [b.id, b]));
 
-    const urunIdleri = [...new Set(satirlar.map((s: any) => s.product_id))];
-    const { data: urunler } = await this.db.from("products").select("*").in("id", urunIdleri);
-    const uMap = new Map((urunler ?? []).map((u: any) => [u.id, u]));
+    const idler = (tur: string) => [...new Set(satirlar.filter((s: any) => s.tur === tur).map((s: any) => s.kayit_id))];
+    const urunIdleri = idler("urun");
+    const uMap = new Map<string, any>();
+    if (urunIdleri.length) {
+      const { data: urunler } = await this.db.from("products").select("*").in("id", urunIdleri);
+      for (const u of urunler ?? []) uMap.set((u as any).id, u);
+    }
     const gorseller = await this.gorselleriOku(urunIdleri);
+    const kullaniciIdleri = idler("portal_kullanici");
+    const kMap = new Map<string, any>();
+    if (kullaniciIdleri.length) {
+      const { data: k } = await this.db.from("web_sitesi_portal_kullanicilari").select("*").in("id", kullaniciIdleri);
+      for (const x of k ?? []) kMap.set((x as any).id, x);
+    }
 
     // Bir sitenin adresi ölüyse aynı turda ona 50 kez çarpmayalım.
     const dusenSiteler = new Map<string, string>();
@@ -560,13 +614,17 @@ export class WebSitesiService {
         continue;
       }
       if (dusenSiteler.has(b.id)) continue;
-      const u = uMap.get(s.product_id);
-      const olay = sitedeGorunur(u) ? "product.updated" : "product.deleted";
-      const veri = olay === "product.updated" ? { product: siteUrunu(u, gorseller.get(u.id)) } : { product: { id: s.product_id, sku: u?.sku ?? null } };
+
+      const olay = await this.olayHazirla(s, uMap, gorseller, kMap);
+      if (!olay) {
+        // Kayıt artık yok (silinmiş portal kullanıcısı/sipariş): söylenecek bir şey kalmadı.
+        await this.kuyruktanSil(s);
+        continue;
+      }
 
       let gonderim: { ok: boolean; durum?: number; hata?: string };
       try {
-        gonderim = await this.gonder(b.webhook_adresi, sirCrypto.decrypt(b.webhook_sir_sifreli), olay, veri);
+        gonderim = await this.gonder(b.webhook_adresi, sirCrypto.decrypt(b.webhook_sir_sifreli), olay.ad, olay.veri);
       } catch (err) {
         gonderim = { ok: false, hata: (err as Error).message };
       }
@@ -587,7 +645,8 @@ export class WebSitesiService {
           .from("web_sitesi_kuyrugu")
           .update({ deneme, sonraki_deneme_at: new Date(Date.now() + sonrakiDenemeGecikmesiMs(deneme)).toISOString(), son_hata: gonderim.hata ?? null })
           .eq("baglanti_id", s.baglanti_id)
-          .eq("product_id", s.product_id)
+          .eq("tur", s.tur)
+          .eq("kayit_id", s.kayit_id)
           .eq("eklendi_at", s.eklendi_at);
         sonuc.hata++;
       }
@@ -603,16 +662,56 @@ export class WebSitesiService {
     return sonuc;
   }
 
+  private async olayHazirla(
+    s: { tur: string; kayit_id: string },
+    uMap: Map<string, any>,
+    gorseller: Map<string, { url: string; sort_order: number }[]>,
+    kMap: Map<string, any>
+  ): Promise<{ ad: string; veri: unknown } | null> {
+    if (s.tur === "urun") {
+      const u = uMap.get(s.kayit_id);
+      return sitedeGorunur(u)
+        ? { ad: "product.updated", veri: { product: siteUrunu(u, gorseller.get(u.id)) } }
+        : { ad: "product.deleted", veri: { product: { id: s.kayit_id, sku: u?.sku ?? null } } };
+    }
+    if (s.tur === "portal_kullanici") {
+      const k = kMap.get(s.kayit_id);
+      if (!k) return null;
+      return {
+        ad: k.durum === "aktif" ? "portal_user.upserted" : "portal_user.disabled",
+        veri: { portal_user: sitePortalKullanicisi(k) },
+      };
+    }
+    if (s.tur === "siparis") {
+      const siparis = await this.siparisler.tekilIc(s.kayit_id);
+      if (!siparis) return null;
+      return { ad: "order.updated", veri: { order: siteSiparisi(siparis, await this.skulariOku(siparis)) } };
+    }
+    return null;
+  }
+
+  /** Siparişin kalemlerindeki ürünlerin stok kodları (yanıtta sku görünsün). */
+  async skulariOku(...siparisler: { kalemler: { productId?: string }[] }[]): Promise<Map<string, string | null>> {
+    const ids = [...new Set(siparisler.flatMap((x) => x.kalemler.map((k) => k.productId).filter(Boolean) as string[]))];
+    const m = new Map<string, string | null>();
+    for (let i = 0; i < ids.length; i += 200) {
+      const { data } = await this.db.from("products").select("id, sku").in("id", ids.slice(i, i + 200));
+      for (const p of data ?? []) m.set((p as any).id, (p as any).sku ?? null);
+    }
+    return m;
+  }
+
   /**
-   * Gönderim sürerken ürün yeniden değiştiyse tetikleyici `eklendi_at`'i
+   * Gönderim sürerken kayıt yeniden değiştiyse tetikleyici `eklendi_at`'i
    * tazelemiştir; o satır SİLİNMEZ ki yeni hâl de gönderilsin.
    */
-  private async kuyruktanSil(s: { baglanti_id: string; product_id: string; eklendi_at: string }): Promise<void> {
+  private async kuyruktanSil(s: { baglanti_id: string; tur: string; kayit_id: string; eklendi_at: string }): Promise<void> {
     await this.db
       .from("web_sitesi_kuyrugu")
       .delete()
       .eq("baglanti_id", s.baglanti_id)
-      .eq("product_id", s.product_id)
+      .eq("tur", s.tur)
+      .eq("kayit_id", s.kayit_id)
       .eq("eklendi_at", s.eklendi_at);
   }
 

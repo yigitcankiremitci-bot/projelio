@@ -12,6 +12,12 @@ Kod: `backend/src/modules/web-sitesi/` (saf kurallar `web-sitesi-esleme.ts`),
 arayüz `apps/web/src/components/WebSitesiSection.tsx` (Organizasyonu düzenle >
 Web sitesi), tablo/tetikleyici/fonksiyon `database/migrations/186_web_sitesi_eklentisi.sql`.
 
+**B2B sipariş portalı** (migration 187 + 188, 2026-11-09): aynı bağlantının
+üstünde müşteriye özel fiyat, portal hesapları ve sipariş. Kod
+`web-sitesi-b2b.service.ts`; müşteri kartında Siparişler sekmesinin üstündeki
+"Web portalı" bölümü `apps/web/src/components/musteri/MusteriPortali.tsx`.
+Ayrıntı aşağıda "B2B sipariş portalı" başlığında.
+
 ## Sunucu kurulumu (bir kez)
 
 1. Migration 186'yı uygula (`./deploy/migrate.sh uygula`).
@@ -28,10 +34,17 @@ Web sitesi), tablo/tetikleyici/fonksiyon `database/migrations/186_web_sitesi_ekl
 
 ## Kullanıcı tarafı
 
-Şirket kurucusu: Organizasyonu düzenle > **Web sitesi** > ad + (isteğe bağlı)
+Kartı **izin listesindeki ve şirkette çalışan** kişi yönetir: kurucu, şirket
+üyesi, departman çalışanı ya da yöneticisi (taşeron hiçbir zaman). Yani siteyi
+kodlayan geliştirici şirkete departman çalışanı olarak eklenir, e-postası
+`WEB_SITESI_EPOSTALARI`'na yazılır ve kurucunun hesabına girmeden bağlantıyı
+kendisi açar. ⚠ Listedeki kişi çalıştığı HER şirkette bağlantı açabilir —
+anahtar o şirketin ürünlerini okur ve stoğunu düşürür; listeyi dar tutun.
+
+Organizasyonu düzenle > **Web sitesi** > ad + (isteğe bağlı)
 site adresi + webhook adresi > **Bağlantı oluştur**. Çıkan **API anahtarı**
 (`psite_…`) bir kez gösterilir; **imza sırrı** (`whsec_…`) sonradan "İmza
-sırrını göster" ile yeniden okunabilir. İkisini sitenin geliştiricisine iletir.
+sırrını göster" ile yeniden okunabilir. Bağlantıyı geliştirici açmadıysa ikisi ona iletilir.
 
 Hangi ürünler sitede: **arşivde olmayan ve durumu "Satışta"** olan her ürün.
 Ürün satış dışına alınır ya da arşivlenirse site `product.deleted` alır.
@@ -140,7 +153,7 @@ kalkınca webhook adresinize `POST` gelir. Ürün art arda değişirse **tek**
 bildirim gelir ve her zaman ürünün **son hâlini** taşır — fark değil tam kayıt.
 
 ```
-X-Projelio-Event: product.updated | product.deleted | ping
+X-Projelio-Event: product.updated | product.deleted | portal_user.upserted | portal_user.disabled | order.updated | ping
 X-Projelio-Timestamp: 1731150000
 X-Projelio-Signature: sha256=<hex>
 ```
@@ -180,3 +193,128 @@ function projelioImzasiGecerli(hamGovde, basliklar, sir) {
    (ürünü `id` ile eşle; SKU değişebilir, `id` değişmez).
 3. Webhook ucunu yaz, Projelio kartında "Bağlantıyı dene" ile `ping` al.
 4. Ödeme onayına `POST /stock-movements` ekle; iptal/iadeye `type: "return"`.
+   (B2B portal siparişinde değil — aşağıya bakın.)
+
+## B2B sipariş portalı
+
+Müşteri (ör. eczane) portala girer, kendi fiyatını görür, sipariş verir;
+sipariş Projelio'da **Alındı** aşamasında açılır, şirket onaylayınca stok düşer.
+
+### Kurallar (kullanıcı kararları, 2026-11-09)
+
+- **Portal hesabını Projelio açar, kullanıcı veritabanı portalda.** Projelio
+  şifre TUTMAZ, şifre Projelio'dan GEÇMEZ. Müşteri kartında "Portal kullanıcısı
+  oluştur" → portala imzalı `portal_user.upserted` gider, portal kendi
+  kullanıcısını açar ve şifre belirleme e-postasını kendisi gönderir.
+  Kapatınca `portal_user.disabled`. Bir müşterinin birden çok portal
+  kullanıcısı olabilir; bir e-posta aynı portalda aynı anda tek açık hesaba bağlı.
+- **Yetkiler**: `siparis_ver`, `fiyat_gor`, `siparis_gecmisi`. Projelio
+  `siparis_ver`'i siparişte doğrular (`portal_user_id` gönderilirse); fiyatı ve
+  geçmişi göstermemek **portalın** sorumluluğu (bu uçlar sitenin sunucusundan
+  çağrılır, kullanıcıyı tanımaz).
+- **Fiyat**: liste fiyatı herkese aynı, KDV **hariç** girilir; müşterinin
+  iskontosu (`%`, müşteri kartında) önce KDV hariç fiyata uygulanır, sonra KDV
+  eklenir, her adım kuruşa yuvarlanır (`packages/shared/src/iskontoluFiyat.ts`,
+  testleri kuruş kuruş). Portal fiyatı **kendisi hesaplamasın**: sunucudan
+  hesaplanmış alır, yoksa yuvarlama farkıyla sipariş tutarından ayrışır.
+- **Stok sipariş gelince DÜŞMEZ.** Projelio'da onaylanınca (Alındı → Onaylandı /
+  Hazırlanıyor / Yolda / Teslim edildi'ye ilk geçiş) **bir kez** düşer; onaydan
+  sonra iptal edilirse geri eklenir. Onaydan sonra Alındı'ya dönülmez; iptal
+  geri alınmaz. Onaylı siparişin ürün/adetleri kilitli. Tahsilatı olan sipariş
+  iptal edilmez; iptal edilen sipariş alacakta sayılmaz.
+- Aynı kural elle açılan siparişlerde de geçerli (yeni siparişin varsayılan
+  aşaması Onaylandı). Shopify ve Excel siparişlerinde aşama var, stok değişmez.
+- **Portal siparişi için `/stock-movements` KULLANMAYIN** — stok onayda düşer;
+  ikisini birden çağırmak stoğu iki kez düşürür. `/stock-movements` sitenin
+  kendi perakende satışı içindir.
+- Ürünler Excel'den gelirse: Ürünler > Excel ile yükle > "Stok kodu aynı olan
+  mevcut ürünleri güncelle" (stok ayrıca işaretlenmedikçe yazılmaz).
+
+### Müşteriye özel fiyatla ürünler
+
+```bash
+curl "https://api.projelio.app/v1/site/products?customer_id=<müşteri id>" -H "Authorization: Bearer psite_..."
+```
+
+Her ürüne şunlar eklenir (fiyatı olmayan üründe `null`):
+
+```json
+{ "price": 100, "tax_rate": 10, "discount_rate": 12.5,
+  "list_price_with_tax": 110, "customer_price": 87.5, "customer_price_with_tax": 96.25 }
+```
+
+`GET /products/:ref?customer_id=…` de aynı. Ürünlerde `min_stock` (kritik stok) da var.
+
+### Müşteri
+
+```
+GET /v1/site/customers/:id
+→ { "id", "display_name", "legal_name", "city", "district", "status": "active|passive|blocked", "discount_rate" }
+```
+
+Bilerek dar: vergi no, telefon, e-posta, adres ayrıntısı ve tahsilat **çıkmaz**.
+Yalnızca bağlantının şirketinin, Müşteriler defterindeki, arşivde olmayan
+kaydı; başkası `404 Customer not found.`
+
+### Sipariş vermek
+
+```bash
+curl -X POST https://api.projelio.app/v1/site/orders \
+  -H "Authorization: Bearer psite_..." -H "Content-Type: application/json" \
+  -d '{
+    "customer_id": "…",
+    "reference": "PORTAL-10045",
+    "portal_user_id": "…",
+    "note": "Salı teslim",
+    "items": [ { "sku": "SPR-30", "quantity": 2 }, { "product_id": "…", "quantity": 1 } ]
+  }'
+```
+
+- Yanıt `201 { "created": true, "order": {…} }`. Aynı `reference` tekrar
+  gelirse sipariş yeniden açılmaz: `200 { "created": false, "order": {…mevcut…} }`
+  — ağ kopunca güvenle yeniden deneyin.
+- İstekteki fiyat **yok sayılır**; birim fiyat sunucuda ürün + müşteri
+  iskontosu + KDV'den hesaplanır. Siparişte fiyatlar **KDV dahil**
+  (`unit_price`, `list_unit_price`, `total`).
+- Reddedilir (hiçbir şey yazılmaz): müşteri pasif/engelli, ürün yok / satışta
+  değil / fiyatsız, adet ≤ 0, farklı para birimleri, `portal_user_id` bu
+  müşterinin açık ve `siparis_ver` yetkili kullanıcısı değil. Tek kalem
+  geçersizse sipariş hiç açılmaz.
+- Sipariş Projelio'da bağlantıya özel "Web sitesi: <bağlantı adı>" satış
+  kanalında açılır (ilk siparişte kendiliğinden); vade ve ödeme yöntemi o
+  kanalın varsayılanından gelir.
+
+Sipariş yükü:
+
+```json
+{ "id": "…", "reference": "PORTAL-10045", "customer_id": "…",
+  "status": "received|approved|preparing|shipped|delivered|cancelled",
+  "status_changed_at": "…", "source": "website|other", "portal_user_id": "…",
+  "order_date": "2026-11-09", "currency": "TRY", "total": 288.75, "note": "…",
+  "items": [ { "product_id": "…", "sku": "SPR-30", "name": "…", "quantity": 2, "unit": "adet",
+               "list_unit_price": 110, "unit_price": 96.25, "total": 192.5 } ],
+  "created_at": "…" }
+```
+
+### Sipariş geçmişi ve portal kullanıcıları
+
+```
+GET /v1/site/customers/:id/orders          → { "data": [ sipariş… ] }  (en çok 100, yeniden eskiye; tahsilat YOK)
+GET /v1/site/portal-users[?customer_id=]   → { "data": [ { "id", "customer_id", "email", "name", "permissions", "active" } ] }
+```
+
+`portal-users` webhook kaçırıldıysa portalın kullanıcı listesini eşitlemesi için.
+
+### B2B webhook olayları
+
+```json
+{ "event": "portal_user.upserted", "data": { "portal_user": { "id", "customer_id", "email", "name", "permissions": ["siparis_ver", "fiyat_gor", "siparis_gecmisi"], "active": true } } }
+{ "event": "portal_user.disabled", "data": { "portal_user": { …, "active": false } } }
+{ "event": "order.updated",        "data": { "order": { …sipariş… } } }
+```
+
+- `portal_user.upserted` açılışta ve her değişiklikte (ad, yetki, yeniden açma)
+  gelir: kullanıcıyı `id` ile ekleyin ya da güncelleyin; ilk gelişte şifre
+  belirleme e-postasını gönderin.
+- `order.updated` yalnızca portaldan gelmiş siparişlerde, aşama / tutar / not
+  değişince gelir. Kuyruk kayıt başına tek satır: art arda değişiklikte son hâl gelir.

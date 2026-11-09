@@ -3,7 +3,7 @@
 import * as assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import type { ModuleMemberRole } from "@projelio/shared";
-import { NO_ACCESS, decideAccess, type AccessFacts } from "./module-access";
+import { NO_ACCESS, decideAccess, sayilanDepartmanlar, type AccessFacts } from "./module-access";
 
 // Modül sisteminin en güvenlik-kritik mantığı: kim neyi yapabilir.
 // Yetki tablosu docs/moduller/05-mevcut-kod-ile-uzlasma.md içinde tanımlı;
@@ -154,5 +154,40 @@ describe("decideAccess — serbest çalışan senaryosu", () => {
   test("modüle atanan kişi yazabilir", () => {
     const a = decideAccess(MODULE, facts({ moduleMemberRoles: ["employee"] }));
     assert.equal(a.canWrite, true);
+  });
+});
+
+describe("sayilanDepartmanlar — liste ile kart aynı departmanlara bakar", () => {
+  const SATIS = "satis";
+  const FINANS = "finans";
+  const YONETIM = "yonetim";
+
+  test("departman verilmezse (kart): modülün evi + Yönetim", () => {
+    assert.deepEqual(sayilanDepartmanlar([SATIS], YONETIM).sort(), [SATIS, YONETIM].sort());
+  });
+
+  test("modülün evi Yönetim'se tek kez sayılır", () => {
+    assert.deepEqual(sayilanDepartmanlar([YONETIM], YONETIM), [YONETIM]);
+  });
+
+  test("Yönetim'den açılan liste kartla aynı karara varır (2026-11-09 hatası)", () => {
+    // Liste Yönetim adresinden açılıyor; kart departmansız soruyor. İkisi de
+    // Yönetim'i saymalı, yoksa yönetici listeyi görüp kartı açamaz.
+    assert.deepEqual(sayilanDepartmanlar([SATIS], YONETIM, YONETIM), [YONETIM]);
+    assert.ok(sayilanDepartmanlar([SATIS], YONETIM).includes(YONETIM));
+  });
+
+  test("modülün evi olmayan departmandan istek yetki VERMEZ", () => {
+    // Finans yöneticisi adresi elle değiştirip müşteri listesinin yöneticisi olamaz.
+    assert.deepEqual(sayilanDepartmanlar([SATIS], YONETIM, FINANS), []);
+  });
+
+  test("evden istek o departmanla sınırlı kalır", () => {
+    assert.deepEqual(sayilanDepartmanlar([SATIS, FINANS], YONETIM, SATIS), [SATIS]);
+  });
+
+  test("şirkette Yönetim yoksa yalnızca ev", () => {
+    assert.deepEqual(sayilanDepartmanlar([SATIS], null), [SATIS]);
+    assert.deepEqual(sayilanDepartmanlar([SATIS], null, FINANS), []);
   });
 });

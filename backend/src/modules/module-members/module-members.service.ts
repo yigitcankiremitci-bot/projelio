@@ -1,10 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModuleAccess, ModuleMember, ModuleMemberRole } from "@projelio/shared";
-import { departmaniAcik, modulunEvi } from "@projelio/shared";
+import { departmaniAcik, modulunEvi, MUAF_DEPARTMAN_ANAHTARI } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { requireOneOf, optionalOneOf, requireUuid } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
-import { NO_ACCESS, decideAccess } from "./module-access";
+import { NO_ACCESS, decideAccess, sayilanDepartmanlar } from "./module-access";
 
 function mapModuleMember(row: any): ModuleMember {
   return {
@@ -94,12 +94,10 @@ export class ModuleMembersService {
       });
     }
 
-    // Departman üyeliği. departmentId verilmişse yalnızca o departmana,
-    // verilmemişse modülün etkin olduğu tüm departmanlara bakılır — böylece
-    // "modül hangi departmanda açık?" bilgisi çağıranın sorumluluğu olmaktan çıkar.
-    const departmentIds = departmentId
-      ? [departmentId]
-      : await this.departmentsWithModule(organizationId, moduleKey);
+    // Departman üyeliği: modülün evi + Yönetim (bkz. sayilanDepartmanlar).
+    // departmentId verilmişse yalnızca o departmana, o da bu kümedeyse
+    // bakılır — liste ile kart aynı kararı versin.
+    const departmentIds = await this.sayilanDepartmanlariBul(organizationId, moduleKey, departmentId);
 
     let isDepartmentManager = false;
     let isDepartmentMember = false;
@@ -179,6 +177,22 @@ export class ModuleMembersService {
   }
 
   /** Modülün bir organizasyonda hangi departmanlarda etkinleştirildiği. */
+  private async sayilanDepartmanlariBul(organizationId: string, moduleKey: string, istenen?: string): Promise<string[]> {
+    const [evler, { data: yonetim }] = await Promise.all([
+      this.departmentsWithModule(organizationId, moduleKey),
+      this.supabase.client
+        .from("departments")
+        .select("id")
+        .eq("organization_id", organizationId)
+        .eq("catalog_key", MUAF_DEPARTMAN_ANAHTARI)
+        .is("archived_at", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    return sayilanDepartmanlar(evler, (yonetim as any)?.id ?? null, istenen);
+  }
+
   private async departmentsWithModule(organizationId: string, moduleKey: string): Promise<string[]> {
     const { data } = await this.supabase.client
       .from("organization_modules")
@@ -223,9 +237,9 @@ export class ModuleMembersService {
   }
 
   /**
-   * Modülde ekibi yönetebilenler (canManageTeam): organizasyon sahibi, modülün
-   * evindeki departman yöneticileri ve modül yöneticileri. Kural
-   * resolveOrganizationAccess ile AYNI kaynaktan (departmentsWithModule) —
+   * Modülde ekibi yönetebilenler (canManageTeam): organizasyon sahibi, modülün evi
+   * + Yönetim departmanlarının yöneticileri ve modül yöneticileri. Kural
+   * resolveOrganizationAccess ile AYNI kaynaktan (sayilanDepartmanlariBul) —
    * "kime haber verilir" ile "kim hepsini görür" ayrışmasın.
    * `departmentId` modülün ilk evi: bildirim bağlantısı oraya gider.
    */
@@ -234,9 +248,10 @@ export class ModuleMembersService {
     moduleKey: string
   ): Promise<{ kisiler: string[]; departmentId: string | null }> {
     const kisiler = new Set<string>();
-    const [{ data: org }, departmanlar, { data: modulYoneticileri }] = await Promise.all([
+    const [{ data: org }, evler, departmanlar, { data: modulYoneticileri }] = await Promise.all([
       this.supabase.client.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle(),
       this.departmentsWithModule(organizationId, moduleKey),
+      this.sayilanDepartmanlariBul(organizationId, moduleKey),
       this.supabase.client
         .from("module_members")
         .select("user_id")
@@ -257,7 +272,7 @@ export class ModuleMembersService {
         .eq("status", "approved");
       for (const r of (yoneticiler ?? []) as any[]) if (r.user_id) kisiler.add(r.user_id);
     }
-    return { kisiler: [...kisiler], departmentId: departmanlar[0] ?? null };
+    return { kisiler: [...kisiler], departmentId: evler[0] ?? null };
   }
 
   private async assertCanManageTeam(

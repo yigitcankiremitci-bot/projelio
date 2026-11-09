@@ -72,3 +72,26 @@ export function decideAccess(moduleKey: string, facts: AccessFacts): ModuleAcces
 
   return NO_ACCESS(moduleKey);
 }
+
+/**
+ * Modüle departman üyeliğiyle erişimde HANGİ departmanların sayıldığı — liste
+ * ve kayıt kontrolünün tek kaynağı.
+ *
+ * NEDEN: liste uçları istemcinin gönderdiği `departmentId`deki üyeliğe
+ * bakıyordu, kayıt uçları (kart, portal, sipariş) ise modülün evine. Modülün
+ * evi değişince (ör. Satış departmanı açılınca Müşteriler Yönetim'den oraya
+ * geçti) Yönetim yöneticisi listeyi görüp kartı açamıyordu (2026-11-09).
+ * Tersi de açıktı: Finans yöneticisi adresi elle `/departments/<finans>/modules/
+ * crm_musteri` yapınca müşteri listesinin yöneticisi oluyordu.
+ *
+ * Kural: modülün ev departman(lar)ı + YÖNETİM (şirketin yönetimi her modülü
+ * görür; departmanı açılmamış modüllerin zaten evi). İstenen departman bu
+ * kümede değilse departman üyeliği HİÇ sayılmaz (modüle doğrudan atanma ve
+ * sahiplik ayrıca geçerli).
+ */
+export function sayilanDepartmanlar(evler: readonly string[], yonetimId: string | null, istenen?: string): string[] {
+  const izinli = new Set(evler);
+  if (yonetimId) izinli.add(yonetimId);
+  if (istenen) return izinli.has(istenen) ? [istenen] : [];
+  return [...izinli];
+}

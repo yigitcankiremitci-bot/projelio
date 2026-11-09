@@ -147,11 +147,10 @@ export default function AnasayfaPanosu({
               tanim.ciz(kart.boyut)
             ) : (
               <>
-                <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, marginBottom: "auto", paddingBottom: 10 }}>
-                  <tanim.Icon size={19} color={c.accentDark} />
-                  {tanim.adGoster && (
-                    <span style={{ fontSize: 14, color: c.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tanim.ad}</span>
-                  )}
+                {/* Sağda rozet ya da hızlı düğme olabilir, uzun ad onların altına girmesin. */}
+                <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, marginBottom: "auto", paddingBottom: 10, paddingRight: 30 }}>
+                  <tanim.Icon size={17} color={c.accentDark} />
+                  <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tanim.ad}</span>
                 </span>
                 {tanim.ciz(kart.boyut)}
               </>

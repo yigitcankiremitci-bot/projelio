@@ -68,8 +68,6 @@ export interface PanoKartTanimi {
   etkilesimli?: boolean;
   /** Çizim kartın tamamını kaplar (görsel kartlar): simge satırı çizilmez. */
   tamKaplama?: boolean;
-  /** Simge tek başına anlatamıyorsa ad da yazılır: yirmi modülün yirmi simgesi yok. */
-  adGoster?: boolean;
   /** Sağ üstte kartı açmadan yapılan tek iş. */
   hizliEylem?: { ad: string; calistir: () => void };
   ciz: (boyut: PanoBoyut) => ReactNode;
@@ -142,10 +140,14 @@ function LioOzeti() {
 }
 
 /** Ofisin kuşbakışı çizimi; renkler temadan, karanlıkta da oda seçilsin. */
-function OfisOzeti() {
+function OfisOzeti({ ad }: { ad: string }) {
   const c = useThemeColors();
   return (
     <div style={{ position: "relative", flex: 1, minHeight: 130, background: c.background, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <span style={{ position: "absolute", top: 14, left: 14, zIndex: 1, display: "flex", alignItems: "center", gap: 7, fontSize: 14, fontWeight: 500, color: c.textPrimary }}>
+        <IconLayers size={17} color={c.accentDark} />
+        {ad}
+      </span>
       <svg viewBox="0 0 160 120" width="100%" height="100%" style={{ position: "absolute", inset: 0 }} aria-hidden="true">
         <path d="M80 16 148 54 80 92 12 54z" fill={c.border} />
         <path d="M12 54v14l68 38V92z" fill={ozetRengi("ofis-sol")} opacity={0.75} />
@@ -495,7 +497,7 @@ export function useSirketKatalogu({
     ekle(true, { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: `${kok}?tab=modules`, ciz: () => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} /> });
     ekle(acik.has("files"), { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: `${kok}?tab=files`, ciz: () => <SirketDosyalarOzeti organizationId={organizationId} /> });
     ekle(acik.has("flow"), { id: "akis", ad: t("Sosyal"), grup: "temel", Icon: IconMessageCircle, boyut: "kucuk", hedef: `${kok}?tab=flow`, ciz: () => <AkisOzeti organizationId={organizationId} /> });
-    ekle(true, { id: "ofis", ad: t("3D ofis"), grup: "temel", Icon: IconLayers, boyut: "kucuk", tamKaplama: true, hedef: `/yeni?ofis=${encodeURIComponent(organizationId)}`, ciz: () => <OfisOzeti /> });
+    ekle(true, { id: "ofis", ad: t("3D ofis"), grup: "temel", Icon: IconLayers, boyut: "kucuk", tamKaplama: true, hedef: `/yeni?ofis=${encodeURIComponent(organizationId)}`, ciz: () => <OfisOzeti ad={t("3D ofis")} /> });
     ekle(prefs.showLio, { id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
     liste.push(...aracTanimlari(t, organizationId));
     for (const m of moduller ?? []) {
@@ -507,7 +509,6 @@ export function useSirketKatalogu({
         grup: "modul",
         Icon: IconSparkle,
         boyut: "kucuk",
-        adGoster: true,
         hizliEylem: modulHizliEylemi(t, m),
         // Modül bir departmana aittir: o kapsamda açılmazsa buraya girilen
         // kayıtlar departman sayfasında görünmez (bkz. lib/modulYeri.ts).
@@ -530,7 +531,7 @@ export function useSerbestKatalogu({ isler, projeler }: { isler: Job[]; projeler
       { id: "isler", ad: t("İşler"), grup: "temel", Icon: IconBriefcase, boyut: "orta", hedef: "/?tab=jobs", turCapasi: "dashboard-tab-jobs", ciz: (b) => <IslerOzeti isler={isler} boyut={b} /> },
       { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: "/?tab=files", turCapasi: "dashboard-tab-files", ciz: () => <KisiselDosyalarOzeti isler={isler} /> },
       { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/?tab=modules", turCapasi: "dashboard-tab-modules", ciz: () => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} /> },
-      { id: "ofis", ad: t("3D stüdyo"), grup: "temel", Icon: IconLayers, boyut: "kucuk", tamKaplama: true, hedef: "/yeni?ofis=studyo", ciz: () => <OfisOzeti /> },
+      { id: "ofis", ad: t("3D stüdyo"), grup: "temel", Icon: IconLayers, boyut: "kucuk", tamKaplama: true, hedef: "/yeni?ofis=studyo", ciz: () => <OfisOzeti ad={t("3D stüdyo")} /> },
     ];
     if (prefs.showLio) {
       liste.push({ id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
@@ -567,7 +568,6 @@ export function useSerbestKatalogu({ isler, projeler }: { isler: Job[]; projeler
         grup: "modul",
         Icon: IconSparkle,
         boyut: "kucuk",
-        adGoster: true,
         hizliEylem: modulHizliEylemi(t, m),
         hedef: m.jobId ? `/jobs/${m.jobId}/modules/${m.moduleKey}` : "/?tab=modules",
         ciz: () => <ModulOzeti modul={m} />,

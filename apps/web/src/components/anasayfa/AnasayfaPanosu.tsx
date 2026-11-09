@@ -155,7 +155,8 @@ export default function AnasayfaPanosu({ pano, katalog }: { pano: AnasayfaPano; 
   useLayoutEffect(() => {
     const el = izgaraRef.current;
     if (!el) return;
-    const olc = () => setKolonSayisi(getComputedStyle(el).gridTemplateColumns.split(" ").length || 4);
+    // grid-template-columns değil: boşluk kutucuklarının açtığı örtük sütunlar da ona sayılıyor (bkz. index.css .pano-izgara).
+    const olc = () => setKolonSayisi(Number.parseInt(getComputedStyle(el).getPropertyValue("--pano-kolon"), 10) || 4);
     olc();
     const izleyici = new ResizeObserver(olc);
     izleyici.observe(el);

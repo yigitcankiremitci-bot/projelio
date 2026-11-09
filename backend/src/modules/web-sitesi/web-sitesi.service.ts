@@ -48,6 +48,15 @@ const HATA_YOK = "Web sitesi bağlantısı bulunamadı";
 const HATA_WEBHOOK_YOK = "Önce bir bildirim adresi girin";
 // dil:anahtar-bitis
 
+// Sitenin geliştiricisine giden İngilizce API metinleri: dış sözleşmenin
+// parçası, kullanıcı arayüzünde görünmez ve çevrilmez.
+// dil:atla-baslangic
+const API_HATA_ANAHTAR = "Missing or invalid API key. Use `Authorization: Bearer psite_...`.";
+const API_HATA_URUN_YOK = "Product not found.";
+const API_HATA_URUN_EKSIK = "Some products were not found.";
+const API_PING_METNI = "Projelio connection test";
+// dil:atla-bitis
+
 /** Site başına dakikalık istek tavanı — yanlış yazılmış bir döngü sunucuyu yormasın. */
 const DAKIKALIK_TAVAN = 300;
 const SAYFA_VARSAYILAN = 50;
@@ -321,7 +330,7 @@ export class WebSitesiService {
   async dene(id: string, userId: string): Promise<{ ok: boolean; durum?: number; hata?: string }> {
     const b = await this.baglantiyiAl(id, userId);
     if (!b.webhook_adresi) throw new BadRequestException(HATA_WEBHOOK_YOK);
-    const sonuc = await this.gonder(b.webhook_adresi, await this.sirOku(b.id), "ping", { message: "Projelio bağlantı denemesi" });
+    const sonuc = await this.gonder(b.webhook_adresi, await this.sirOku(b.id), "ping", { message: API_PING_METNI });
     await this.sonucuYaz(b.id, sonuc);
     return sonuc;
   }
@@ -357,7 +366,7 @@ export class WebSitesiService {
   /** Anahtarı bağlantıya çevirir; dakikalık tavanı uygular. */
   async siteyiBul(yetki: string | undefined): Promise<SiteKimligi> {
     const anahtar = anahtariAyikla(yetki);
-    if (!anahtar) throw new UnauthorizedException("Missing or invalid API key. Use `Authorization: Bearer psite_...`.");
+    if (!anahtar) throw new UnauthorizedException(API_HATA_ANAHTAR);
     const { data, error } = await this.db
       .from("web_sitesi_baglantilari")
       .select("id, organization_id")
@@ -365,7 +374,7 @@ export class WebSitesiService {
       .eq("durum", "aktif")
       .maybeSingle<any>();
     if (error) throw error;
-    if (!data) throw new UnauthorizedException("Missing or invalid API key. Use `Authorization: Bearer psite_...`.");
+    if (!data) throw new UnauthorizedException(API_HATA_ANAHTAR);
 
     const dakika = Math.floor(Date.now() / 60_000);
     const s = this.sayac.get(data.id);
@@ -434,7 +443,7 @@ export class WebSitesiService {
     q = uuidMi(ref) ? q.eq("id", ref) : q.eq("sku", ref);
     const { data, error } = await q.is("archived_at", null).limit(1).maybeSingle<any>();
     if (error) throw error;
-    if (!data || !sitedeGorunur(data)) throw new NotFoundException("Product not found.");
+    if (!data || !sitedeGorunur(data)) throw new NotFoundException(API_HATA_URUN_YOK);
     const gorseller = await this.gorselleriOku([data.id]);
     return siteUrunu(data, gorseller.get(data.id));
   }
@@ -480,7 +489,7 @@ export class WebSitesiService {
       else urunBazinda.set(p.id, { ...p, miktar: k.miktar });
     }
     if (eksik.length) {
-      throw new UnprocessableEntityException({ message: "Some products were not found.", not_found: eksik });
+      throw new UnprocessableEntityException({ message: API_HATA_URUN_EKSIK, not_found: eksik });
     }
 
     const kalemler = [...urunBazinda.values()];

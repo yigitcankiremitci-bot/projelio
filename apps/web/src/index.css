@@ -698,3 +698,177 @@ html[data-klavye="acik"] [data-klavyede-gizle] {
 html[data-klavye="acik"] [data-klavyede-alt-bosluk] {
   padding-bottom: 16px !important;
 }
+
+/*
+ * Kenar çubuğunun dibindeki kişi satırı (bkz. SidebarKisi). Yazı renkleri
+ * .sidebar-nav-btn ile aynı: kenar çubuğu her temada koyu.
+ * Negatif alt pay aside'ın 20 px'lik dolgusunu kapatıyor: sticky satır
+ * kaydırırken altından liste görünmesin.
+ */
+.sidebar-kisi-kap {
+  position: sticky;
+  bottom: -20px;
+  margin: auto -14px -20px;
+  padding: 8px 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-kisi {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sidebar-kisi-profil {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-kisi-profil:hover,
+.sidebar-kisi-qr:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sidebar-kisi-foto {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #c7ccd6;
+}
+
+.sidebar-kisi-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.sidebar-kisi-yazi {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.sidebar-kisi-ad,
+.sidebar-kisi-unvan {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-kisi-ad {
+  font-size: 14px;
+  color: #e7eaf0;
+}
+
+.sidebar-kisi-unvan {
+  font-size: 12px;
+  color: #9aa6b4;
+}
+
+.sidebar-kisi-qr {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #9aa6b4;
+  cursor: pointer;
+}
+
+/*
+ * Anasayfa panosu. Sütun sayısı EKRANA değil panonun kendi genişliğine bağlı:
+ * kenar çubuğu açılınca aynı ekranda pano daralıyor, medya sorgusu bunu görmez.
+ */
+.pano {
+  container-type: inline-size;
+}
+
+.pano-izgara {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(132px, auto);
+  gap: 12px;
+}
+
+@container (max-width: 860px) {
+  .pano-izgara {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 560px) {
+  .pano-izgara {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.pano-hucre {
+  position: relative;
+  min-width: 0;
+  grid-column: span 1;
+}
+
+.pano-hucre[data-boyut="orta"] {
+  grid-column: span 2;
+}
+
+.pano-hucre[data-boyut="genis"] {
+  grid-column: 1 / -1;
+}
+
+.pano-kart {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 14px;
+  transition: transform 160ms ease;
+}
+
+@media (hover: hover) {
+  .pano-kart:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.pano-izgara--duzenleme .pano-kart {
+  cursor: grab;
+}
+
+.pano-denetim {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px;
+  border-radius: 8px;
+}
+
+.pano-denetim button:disabled {
+  opacity: 0.35;
+}

@@ -33,6 +33,7 @@ export * from "./kartvizit";
 export * from "./kartvizitLogo";
 export * from "./projeTakvimi";
 export * from "./anasayfaSirasi";
+export * from "./anasayfaPano";
 export * from "./ofisDuzeni";
 export * from "./karakterGorunumu";
 export * from "./departmanKurali";

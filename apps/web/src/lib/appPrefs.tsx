@@ -65,7 +65,7 @@ export function AppPrefsProvider({ children }: { children: ReactNode }) {
   const [reduceMotion, setReduceMotionState] = useState(() => readBool(KEYS.reduceMotion, false));
   const [showLio, setShowLioState] = useState(() => readBool(KEYS.showLio, true));
   const [showPresence, setShowPresenceState] = useState(() => readBool(KEYS.showPresence, true));
-  const [sidebarDefaultOpen, setSidebarDefaultOpenState] = useState(() => readBool(KEYS.sidebarDefaultOpen, true));
+  const [sidebarDefaultOpen, setSidebarDefaultOpenState] = useState(() => readBool(KEYS.sidebarDefaultOpen, false));
   const [statsOpen, setStatsOpenState] = useState(() => readBool(KEYS.statsOpen, false));
 
   // Animasyonlar CSS'te kapatılıyor (bkz. index.css [data-reduce-motion="1"]):

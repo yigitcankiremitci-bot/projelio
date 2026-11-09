@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Department, ModuleCatalogEntry, Organization, Task } from "@projelio/shared";
-import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
 import EditOrganizationModal from "../components/EditOrganizationModal";
@@ -15,30 +13,37 @@ import SirketEkibiPanel, { SirketEkibiPanelHandle } from "../components/iseAlim/
 import OrgBudgetPanel, { OrgBudgetPanelHandle } from "../components/OrgBudgetPanel";
 import QuickFileUploadModal from "../components/QuickFileUploadModal";
 import BilgiKartiModal from "../components/bilgiKarti/BilgiKartiModal";
-import OrgTabs, { CORE_ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
+import { CORE_ORG_TABS, ORG_TABS, OrgTab, visibleOrgTabs } from "../components/OrgTabs";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
 import { modulDepartmani } from "../lib/modulYeri";
-import ProfileCard from "../components/ProfileCard";
-import AiCreditsChip from "../components/AiCreditsChip";
-import { useAppPrefs } from "../lib/appPrefs";
-import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton, coverBadgeStyle } from "../components/EntityCover";
-import { useCoverTheme } from "../theme/useCoverTheme";
+import AskLioButton from "../components/AskLioButton";
+import { coverActionButton } from "../components/EntityCover";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
-import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { usePageHeader } from "../lib/pageHeader";
 import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useThemeColors } from "../theme/useThemeColors";
 import { pageGutter } from "../lib/layout";
-import { IconUser, IconCalendar, IconSettings, IconLayers, IconIdCard } from "../components/icons";
-import OfisDavetKarti from "../components/OfisDavetKarti";
+import { IconSettings, IconIdCard } from "../components/icons";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
-import { bicimDili } from "../lib/i18n/depo";
-import ReorderButtons from "../components/ReorderButtons";
-import { anasayfaSirasiniCoz, bolumuTasi, type AnasayfaBolumu } from "@projelio/shared";
-import { getAnasayfaSirasi, setAnasayfaSirasi } from "../lib/anasayfaSirasi";
+import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
+import AnasayfaPanosu, { OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import { SIRKET_VARSAYILAN_PANO, useSirketKatalogu } from "../components/anasayfa/ozetKartlari";
+import { useAnasayfaPano } from "../lib/useAnasayfaPano";
+
+// Eskiden anasayfada alt alta duran bölümler artık özet kartı; her birinin tam
+// görünümü kendi adresinde. Sahibinin kapatabildiği sekmelerden (ENTITY_TAB_KEYS)
+// ayrı tutuluyor: bunlar hiçbir zaman "kapatılabilir sekme" olmadı.
+const PANO_GORUNUMLERI = ["departments", "team", "modules"];
+const GORUNUM_ADLARI: Record<string, string> = {
+  departments: "Departmanlar", // dil:anahtar
+  team: "Ekip", // dil:anahtar
+  modules: "Modüller", // dil:anahtar
+};
+type EklemeHedefi = "products" | "team" | "departments" | "modules";
 
 // Şirket AKIŞINDA görev/tamamlanan-görev karışımı yok: paylaşımlar ile görevler
 // ayrı şeyler ve akışın altına görev listesi asmak ikisini karıştırıyordu.
@@ -49,11 +54,9 @@ const NO_TASKS: Task[] = [];
 
 // Not: bir organizasyonun (şirket/işletme) "İşler" görünümü yoktur — iş (job) kavramı
 // yalnızca serbest çalışan ve taşeron hesaplarına özgüdür. Şirket içi çalışma
-// Departmanlar üzerinden yürütülür (bkz. DepartmentsPanel). Anasayfa/Sosyal/
-// Departmanlar/Ürün-Hizmet/Dosyalar, JobTabs ile aynı sekme görünümünde
-// gösterilir (bkz. OrgTabs). Anasayfa varsayılan sekmedir ve organizasyonun
-// özetini (Ürün/Hizmet + Departmanlar + Modüller) gösterir; Departmanlar
-// sekmesi ise yalnızca departman yönetimi içindir.
+// Departmanlar üzerinden yürütülür (bkz. DepartmentsPanel). Sayfanın açılış
+// görünümü kişinin kendi dizdiği özet panosudur; kartlar Sosyal, Görevler, Kasa
+// gibi tam görünümleri (?tab=) açar.
 export default function OrganizationDetail() {
   const { id } = useParams();
   // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
@@ -61,9 +64,7 @@ export default function OrganizationDetail() {
   const navigate = useNavigate();
   const c = useThemeColors();
   const t = useT();
-  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
-  const prefs = useAppPrefs();
   const gutter = pageGutter(isDesktop);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [editing, setEditing] = useState(false);
@@ -78,6 +79,7 @@ export default function OrganizationDetail() {
   // Anasayfadaki birleşik "+" menüsünün departman seçicisi (Dosya ekle) ve
   // modül sekmelerinin departman kapsamı için tüm departman listesi burada tutulur.
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmanlarHazir, setDepartmanlarHazir] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   // Shopify bağlantısından dönüş: sonuç şirket ayarlarındaki Shopify kartında
@@ -108,13 +110,16 @@ export default function OrganizationDetail() {
   const hiddenTabs = organization?.hiddenTabs;
   const openCoreTabs = visibleOrgTabs(access, hiddenTabs).map((t) => t.key);
   const requestedTab: OrgTab =
-    CORE_ORG_TABS.includes(tabParam ?? "") || openModuleTab ? (tabParam as OrgTab) : "home";
+    CORE_ORG_TABS.includes(tabParam ?? "") || PANO_GORUNUMLERI.includes(tabParam ?? "") || openModuleTab
+      ? (tabParam as OrgTab)
+      : "home";
   // Kapalı bir çekirdek sekme istendiyse Anasayfa'ya düş (modül sekmeleri kendi
   // yetkisini sunucuda kontrol eder).
   const activeTab: OrgTab =
     CORE_ORG_TABS.includes(requestedTab) && !openCoreTabs.includes(requestedTab) ? "home" : requestedTab;
+  // Yeni kayıt olarak yazılır: tam görünümden tarayıcının geri tuşu panoya dönsün.
   const setActiveTab = (next: OrgTab) => {
-    setSearchParams(next === "home" ? {} : { tab: next }, { replace: true });
+    setSearchParams(next === "home" ? {} : { tab: next });
   };
   const feedRef = useRef<FeedPanelHandle>(null);
   const departmentsRef = useRef<DepartmentsPanelHandle>(null);
@@ -123,42 +128,32 @@ export default function OrganizationDetail() {
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   const ekipRef = useRef<SirketEkibiPanelHandle>(null);
   const [addingFile, setAddingFile] = useState(false);
-  // Anasayfa bölümlerinin kullanıcının dizdiği sırası. Asıl kayıt hesapta
-  // (viewerHomeSections, cihazlar arası); cihaz kopyası ilk boyamayı ve
-  // sunucu kaydı olmayan durumu karşılar (bkz. lib/anasayfaSirasi).
-  const [bolumSirasi, setBolumSirasi] = useState<AnasayfaBolumu[]>(() => getAnasayfaSirasi(id ?? ""));
+  // "+" menüsünden seçilen ekleme, ilgili panel kurulduğunda açılır: paneller
+  // artık anasayfada değil kendi görünümünde yaşıyor, ref ancak geçişten sonra dolu.
+  const [bekleyenEkleme, setBekleyenEkleme] = useState<EklemeHedefi | null>(null);
   useEffect(() => {
-    if (id) setBolumSirasi(getAnasayfaSirasi(id));
-  }, [id]);
-  const hesaptakiSira = organization?.id === id ? organization?.viewerHomeSections : undefined;
-  useEffect(() => {
-    if (!id || !hesaptakiSira) return;
-    const sira = anasayfaSirasiniCoz(hesaptakiSira);
-    setBolumSirasi(sira);
-    setAnasayfaSirasi(id, sira);
-  }, [id, hesaptakiSira?.join(",")]);
-  const bolumuKaydir = (bolum: AnasayfaBolumu, yon: -1 | 1) => {
-    if (!id) return;
-    const yeni = bolumuTasi(bolumSirasi, bolum, yon);
-    setBolumSirasi(yeni);
-    setAnasayfaSirasi(id, yeni);
-    // Kaydedilemezse (çevrimdışı, migration yok) sıra bu cihazda yine geçerli;
-    // bir görünüm tercihi için hata göstermeye değmez.
-    api.patch(`/organizations/${id}/home-sections`, { bolumler: yeni }).catch(() => {});
+    if (!bekleyenEkleme || activeTab !== bekleyenEkleme) return;
+    if (bekleyenEkleme === "products") productsRef.current?.openAdd();
+    if (bekleyenEkleme === "team") ekipRef.current?.openHire();
+    if (bekleyenEkleme === "departments") departmentsRef.current?.openAdd();
+    if (bekleyenEkleme === "modules") modulesRef.current?.openAdd();
+    setBekleyenEkleme(null);
+  }, [bekleyenEkleme, activeTab]);
+  const eklemeyiAc = (hedef: EklemeHedefi) => {
+    setBekleyenEkleme(hedef);
+    setActiveTab(hedef);
   };
-  const siralamaOklari = (bolum: AnasayfaBolumu): ReactNode => {
-    const i = bolumSirasi.indexOf(bolum);
-    return (
-      <ReorderButtons
-        direction="row"
-        isFirst={i === 0}
-        isLast={i === bolumSirasi.length - 1}
-        onMoveUp={() => bolumuKaydir(bolum, -1)}
-        onMoveDown={() => bolumuKaydir(bolum, 1)}
-        iconColor={c.textSecondary}
-      />
-    );
-  };
+
+  const katalog = useSirketKatalogu({
+    organizationId: id ?? "",
+    access,
+    hiddenTabs,
+    departmanlar: departments,
+    departmanlarHazir,
+    modulKatalogu: moduleCatalog,
+  });
+  const pano = useAnasayfaPano(id ?? "me", SIRKET_VARSAYILAN_PANO);
+  const [duzenleme, setDuzenleme] = useDuzenlemeModu(`${id}:${activeTab}`);
 
   const reload = () => {
     if (!id) return;
@@ -168,10 +163,12 @@ export default function OrganizationDetail() {
       .then((depts) => {
         setDepartments(depts);
         setProductDepartmentId(depts.find((d) => d.catalogKey === "urun_yonetimi")?.id);
+        setDepartmanlarHazir(true);
       })
       .catch(() => {
         setDepartments([]);
         setProductDepartmentId(undefined);
+        setDepartmanlarHazir(true);
       });
   };
 
@@ -185,141 +182,73 @@ export default function OrganizationDetail() {
   }, [organization?.name]);
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
-  const coverRef = useRef<HTMLDivElement>(null);
-  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
-  const backRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   // Geri, şirkete hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
   const back = useBackTarget({ to: "/organizations", label: t("Organizasyonlar") });
   // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
   useGezintiAdi(organization?.name);
-  usePageHeader(organization?.name, coverRef, [organization?.name, back.to, back.label, back.geriGit], {
-    ...back,
-    sourceRef: backRef,
-  });
-  // Kaydırılınca sabit başlığın en üst bandında da sekmeler görünsün diye
-  // (bkz. ProjectDetail'deki aynı desen).
-  // Akıştaki sekme çubuğunun DOM öğesi: sabit şerit ancak bu çubuk yukarı kayıp
-  // gözden kaybolduktan sonra belirsin, yoksa sekmeler bir an iki kez görünür
-  // (bkz. lib/pageHeader PageHeaderTabs.sourceRef).
-  const tabsRef = useRef<HTMLDivElement>(null);
 
-  usePageHeaderTabs(
-    // Mobilde de kaydediliyor: orada sayfanın kendi sekme çubuğu kaydırınca
-    // sabit şeridin altında kalıp erişilemez oluyordu (bkz. App.tsx).
-    <OrgTabs
-      active={activeTab}
-      onChange={setActiveTab}
-      moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
-      access={access}
-      hiddenTabs={hiddenTabs}
-      style={{ marginBottom: 0 }}
-      scrollable
-    />,
-    [activeTab, moduleTabs, access, hiddenTabs],
-    tabsRef
-  );
+  const anasayfada = activeTab === "home";
+  const panoyaDon = { to: id ? `/organizations/${id}` : "/", label: t("Ana Sayfa") };
+  const gorunumAdi =
+    openModuleTab?.name ??
+    (GORUNUM_ADLARI[activeTab] ? t(GORUNUM_ADLARI[activeTab]) : t(ORG_TABS.find((s) => s.key === activeTab)?.label ?? ""));
+  const baslik = anasayfada ? (organization?.name ?? "…") : gorunumAdi;
+  const geriHedefi = anasayfada ? back : panoyaDon;
+  // sourceRef bilerek verilmiyor: geri düğmesi en üst bantta doğuyor ve yüzen hap
+  // "kaynak çizgiyi geçti" sayıp sayfa kaydırılmadan açılıyordu; kaynak yokken
+  // hap şeritle birlikte, ancak başlık yukarı kayınca belirir.
+  usePageHeader(baslik, headerRef, [baslik, geriHedefi.to, geriHedefi.label, anasayfada && back.geriGit], geriHedefi);
 
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <EntityCover
-        coverRef={coverRef}
-        back={
-          <div ref={backRef}>
-            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
-          </div>
+      <AnasayfaBaslik
+        baslik={baslik}
+        baslikRef={headerRef}
+        geri={
+          <GeriDugmesi
+            to={geriHedefi.to}
+            etiket={geriHedefi.label}
+            geriGit={anasayfada ? back.geriGit : undefined}
+          />
         }
-        coverImageUrl={organization?.coverImageUrl}
-        seed={organization?.id}
-        height={270}
-        title={organization?.name ?? "…"}
-        lioSubject={
-          organization ? { kind: "organizasyon", title: organization.name, id: organization.id } : undefined
-        }
-        description={organization?.description}
-        meta={
-          organization && (
+        araclar={
+          anasayfada ? (
             <>
-              <span style={coverBadgeStyle(cover)}>{t(ORG_TYPE_LABEL[organization.orgType])}</span>
-              {organization.ownerName && (
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={cover.secondary} />
-                  {organization.ownerName}
-                </span>
+              {organization && <AskLioButton subject={{ kind: "organizasyon", title: organization.name, id: organization.id }} size={28} withBackground />}
+              {/* Taşerona gösterilmiyor: sunucu kartı zaten reddediyor
+                  (bkz. bilgiKartiYetkisiKarari) ve açılmayan bir düğme, yetki
+                  sorununu hata gibi gösteriyordu. canViewCommercial tam olarak
+                  bu ayrımı taşıyor. */}
+              {access?.canViewCommercial !== false && (
+                <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} title={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
+                  <IconIdCard size={20} color={c.textSecondary} />
+                </button>
               )}
-              {organization.groupName && (
-                <Link
-                  to={`/groups/${organization.groupId}`}
-                  style={{ display: "flex", alignItems: "center", gap: 5, color: cover.secondary }}
-                >
-                  <IconLayers size={12} color={cover.secondary} />
-                  {organization.groupName}
-                </Link>
-              )}
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={cover.secondary} />
-                {t("{tarih} kuruldu", { tarih: new Date(organization.createdAt).toLocaleDateString(bicimDili()) })}
-              </span>
-            </>
-          )
-        }
-        // Şirket sahibi giriş yapınca doğrudan buraya düşüyor (bkz. Dashboard
-        // redirectTo): burası onun anasayfası, kişi kartı dar ekranda da olmalı.
-        // Mobilde kart kapağın üstüne bindirilir (asideOnMobile) ve anasayfadaki
-        // gibi küçültülür — ekran kenarına dayamayı EntityCover üstleniyor.
-        // collapsible: mobilde yalnızca fotoğraf durur, kapsül dokununca yandan
-        // kayarak çıkar — kapak fotoğrafının köşesi sürekli kapalı kalmasın.
-        aside={
-          // Rozet her ekranda kartın ALTINDA — anasayfa, şirket ve holding
-          // sayfaları aynı düzende olsun. Telefonda yan yana dizilen satır
-          // 375 px'lik ekranda 412 px'e çıkıp rozeti ekranın SOLUNA, başlığın
-          // üstüne itiyordu; masaüstünde de yan yana durmak sayfalar arasında
-          // tutarsızlık yaratıyordu (bkz. Dashboard). Masaüstündeki geniş
-          // boşluk, kartın hover'da büyüyüp rozetin üstüne binmemesi için.
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-              gap: isDesktop ? 12 : 8,
-            }}
-          >
-            <ProfileCard compact={!isDesktop} collapsible />
-            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
-          </div>
-        }
-        asideOnMobile
-        action={
-          <div style={{ display: "flex", gap: 8 }}>
-            {/* Taşerona gösterilmiyor: sunucu kartı zaten reddediyor
-                (bkz. bilgiKartiYetkisiKarari) ve açılmayan bir düğme, yetki
-                sorununu hata gibi gösteriyordu. canViewCommercial tam olarak
-                bu ayrımı taşıyor. */}
-            {access?.canViewCommercial !== false && (
-              <button onClick={() => setBilgiKarti(true)} aria-label={t("Şirket bilgi kartı")} style={coverActionButton(c)}>
-                <IconIdCard size={20} color={c.textSecondary} />
+              <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} title={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
+                <IconSettings size={20} color={c.textSecondary} />
               </button>
-            )}
-            <button onClick={() => setEditing(true)} aria-label={t("Organizasyonu düzenle")} style={coverActionButton(c)}>
-              <IconSettings size={20} color={c.textSecondary} />
-            </button>
-          </div>
+              <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} />
+            </>
+          ) : undefined
         }
       />
 
-      <div style={{ padding: `8px ${gutter}px 28px` }}>
-        <div ref={tabsRef}>
-          <OrgTabs
-            active={activeTab}
-            onChange={setActiveTab}
-            moduleTabs={moduleTabs.map((m) => ({ key: m.key, label: m.name, isNew: m.isNew }))}
-            access={access}
-            hiddenTabs={hiddenTabs}
+      {anasayfada && (
+        <>
+          <HomeAddFabRegistrar
+            urunEklenebilir={access?.canViewCommercial !== false}
+            eklemeyiAc={eklemeyiAc}
+            setAddingFile={setAddingFile}
+            onGelirGider={() => setActiveTab("budget")}
           />
-        </div>
-        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
+          <AnasayfaPanosu pano={pano} katalog={katalog} duzenleme={duzenleme} onDuzenlemeBitti={() => setDuzenleme(false)} />
+        </>
+      )}
 
+      <div style={{ padding: anasayfada ? 0 : `0 ${gutter}px 28px` }}>
         {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi; modülün ait
             olduğu departmanın kapsamıyla açılır (departman sayfasıyla aynı veri). */}
         {openModuleTab && id && (
@@ -338,58 +267,23 @@ export default function OrganizationDetail() {
           </>
         )}
 
-        {activeTab === "home" && (
+        {activeTab === "departments" && <DepartmentsPanel ref={departmentsRef} organizationId={id} layout="grid" />}
+        {activeTab === "team" && (
           <>
-            <HomeAddFabRegistrar
-              productsRef={productsRef}
-              departmentsRef={departmentsRef}
-              modulesRef={modulesRef}
-              ekipRef={ekipRef}
-              setAddingFile={setAddingFile}
-              onGelirGider={() => setActiveTab("budget")}
-            />
-            {/* Bölümler kullanıcının dizdiği sırayla; her başlığın sağındaki
-                oklar bölümü bir yukarı/aşağı taşır. Paneller her sırada kurulu
-                kalır — "+" menüsü ref'lerle onlara ulaşıyor. */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
-              {bolumSirasi.map((bolum, i) => {
-                const oklar = siralamaOklari(bolum);
-                // 3D ofis daveti bölümlerin ortasında durur; sıralama
-                // oklarına katılmaz, kullanıcı bölümleri dizince yerinde kalır.
-                const davet =
-                  id && i === Math.ceil(bolumSirasi.length / 2) ? <OfisDavetKarti key="ofis-davet" tur="sirket" organizationId={id} /> : null;
-                const panel = (() => {
-                switch (bolum) {
-                  case "products":
-                    return (
-                      <ProductsPanel
-                        key={bolum}
-                        ref={productsRef}
-                        organizationId={id}
-                        departmentId={productDepartmentId}
-                        useFab={false}
-                        basliktaSag={oklar}
-                      />
-                    );
-                  case "departments":
-                    return (
-                      <DepartmentsPanel key={bolum} ref={departmentsRef} organizationId={id} useFab={false} basliktaSag={oklar} />
-                    );
-                  case "team":
-                    return <SirketEkibiPanel key={bolum} ref={ekipRef} organizationId={id} basliktaSag={oklar} />;
-                  case "modules":
-                    return <ModulesPanel key={bolum} ref={modulesRef} organizationId={id} basliktaSag={oklar} />;
-                }
-                })();
-                return davet ? [davet, panel] : panel;
-              })}
-            </div>
+            <TekFabRegistrar label={t("İşe al")} onClick={() => ekipRef.current?.openHire()} />
+            <SirketEkibiPanel ref={ekipRef} organizationId={id} />
+          </>
+        )}
+        {activeTab === "modules" && (
+          <>
+            <TekFabRegistrar label={t("Modül ekle")} onClick={() => modulesRef.current?.openAdd()} />
+            <ModulesPanel ref={modulesRef} organizationId={id} />
           </>
         )}
         {activeTab === "tasks" && <OrgTasksPanel organizationId={id} organizationName={organization?.name} />}
         {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
         {activeTab === "products" && access?.canViewCommercial !== false && (
-          <ProductsPanel organizationId={id} departmentId={productDepartmentId} layout="grid" />
+          <ProductsPanel ref={productsRef} organizationId={id} departmentId={productDepartmentId} layout="grid" />
         )}
         {activeTab === "budget" && access?.canViewBudget === true && (
           <>
@@ -460,46 +354,50 @@ function BudgetFabRegistrar({ budgetRef }: { budgetRef: React.RefObject<OrgBudge
   return null;
 }
 
-// Anasayfa sekmesindeki tek "+" düğmesi, sık kullanılan beş ekleme eylemini
-// birden temsil eder — tıklanınca job-choice ile aynı küçük seçim menüsü
-// (butonun üstüne doğru açılan liste) çıkar (bkz. BottomNav/ProjectFabAction.options).
-// Departman ve modül ekleme de burada (2026-09): ayrı Departmanlar sekmesi
-// kaldırıldı ve anasayfa başlıklarına düğme koymak kalabalık buldu; ekleme
-// eylemlerinin tek adresi bu menü. Modül önce departman seçtirir
-// (bkz. AddModuleModal).
+// Tam görünümlerde tek eylemli "+" (paneller kendi FAB'ını kaydetmiyor). Hook
+// neden ayrı bileşende: bkz. yukarıdaki FlowFabRegistrar notu.
+function TekFabRegistrar({ label, onClick }: { label: string; onClick: () => void }) {
+  useProjectFabAction({ label, onClick }, [label]);
+  return null;
+}
+
+// Anasayfadaki tek "+" düğmesi, sık kullanılan ekleme eylemlerini birden temsil
+// eder — tıklanınca job-choice ile aynı küçük seçim menüsü (butonun üstüne doğru
+// açılan liste) çıkar (bkz. BottomNav/ProjectFabAction.options). Paneller artık
+// kendi görünümlerinde; seçim ilgili görünümü açıp formu orada başlatır.
 function HomeAddFabRegistrar({
-  productsRef,
-  departmentsRef,
-  modulesRef,
-  ekipRef,
+  urunEklenebilir,
+  eklemeyiAc,
   setAddingFile,
   onGelirGider,
 }: {
-  productsRef: React.RefObject<ProductsPanelHandle | null>;
-  departmentsRef: React.RefObject<DepartmentsPanelHandle | null>;
-  modulesRef: React.RefObject<ModulesPanelHandle | null>;
-  ekipRef: React.RefObject<SirketEkibiPanelHandle | null>;
+  urunEklenebilir: boolean;
+  eklemeyiAc: (hedef: EklemeHedefi) => void;
   setAddingFile: (value: boolean) => void;
   onGelirGider: () => void;
 }) {
   const t = useT();
+  const eklemeyiAcRef = useRef(eklemeyiAc);
+  eklemeyiAcRef.current = eklemeyiAc;
+  const onGelirGiderRef = useRef(onGelirGider);
+  onGelirGiderRef.current = onGelirGider;
   useProjectFabAction(
     {
       label: t("Ekle"),
       options: [
-        { label: t("Ürün ekle"), onClick: () => productsRef.current?.openAdd() },
+        ...(urunEklenebilir ? [{ label: t("Ürün ekle"), onClick: () => eklemeyiAcRef.current("products") }] : []),
         // Kişiyi gerçekten şirkete alır: davet + departman/modül seçimi
         // (bkz. SirketEkibiPanel). Eskiden yalnızca İK modülüne kayıt açıyordu.
-        { label: t("İşe al"), onClick: () => ekipRef.current?.openHire() },
+        { label: t("İşe al"), onClick: () => eklemeyiAcRef.current("team") },
         // Gelir/gider artık bir modül kaydı değil, defterin kendisi: kısayol
-        // Bütçe sekmesine götürüyor (bkz. migration 104, tek defter kararı).
-        { label: t("Gelir/gider ekle"), onClick: onGelirGider },
-        { label: t("Departman ekle"), onClick: () => departmentsRef.current?.openAdd() },
-        { label: t("Modül ekle"), onClick: () => modulesRef.current?.openAdd() },
+        // Kasa görünümüne götürüyor (bkz. migration 104, tek defter kararı).
+        { label: t("Gelir/gider ekle"), onClick: () => onGelirGiderRef.current() },
+        { label: t("Departman ekle"), onClick: () => eklemeyiAcRef.current("departments") },
+        { label: t("Modül ekle"), onClick: () => eklemeyiAcRef.current("modules") },
         { label: t("Dosya ekle"), onClick: () => setAddingFile(true) },
       ],
     },
-    [productsRef, departmentsRef, modulesRef, ekipRef, setAddingFile, onGelirGider]
+    [urunEklenebilir, setAddingFile]
   );
   return null;
 }

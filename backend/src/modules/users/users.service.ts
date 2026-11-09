@@ -8,7 +8,7 @@ import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.u
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
 import { demoHesabindaYasak } from "../../common/demo-hesap";
 import type { Locale, Sector, TeamSize, UseCase, UserRole } from "@projelio/shared";
-import { isLocale, SECTORS, TEAM_SIZES, USE_CASES } from "@projelio/shared";
+import { isLocale, panoDuzeniniCoz, panoKapsamiGecerliMi, SECTORS, TEAM_SIZES, USE_CASES, type PanoKart } from "@projelio/shared";
 
 const AVATAR_BUCKET = "avatars";
 
@@ -169,6 +169,40 @@ export class UsersService {
     private supabase: SupabaseService,
     private readonly diller: KullaniciDiliService
   ) {}
+
+  /**
+   * Kişinin anasayfa panosu. Okunamazsa (ör. migration 183 uygulanmadan) sayfa
+   * DÜŞMEZ, `null` döner: arayüz cihazdaki kopyaya ya da varsayılana geçer.
+   */
+  async anasayfaPanosunuOku(userId: string, kapsam: string): Promise<{ kartlar: PanoKart[] | null }> {
+    if (!panoKapsamiGecerliMi(kapsam)) throw new BadRequestException("Geçersiz pano kapsamı");
+    const { data, error } = await this.supabase.client
+      .from("anasayfa_panolari")
+      .select("kartlar")
+      .eq("user_id", userId)
+      .eq("kapsam", kapsam)
+      .maybeSingle();
+    if (error || !data) return { kartlar: null };
+    return { kartlar: panoDuzeniniCoz(data.kartlar) };
+  }
+
+  /**
+   * Satırda yalnızca kişinin kendi görünüm tercihi var, şirketin verisi yok;
+   * bu yüzden kapsam için ayrıca şirket yetkisi aranmıyor.
+   */
+  async anasayfaPanosunuKaydet(userId: string, kapsam: string, ham: unknown): Promise<{ kartlar: PanoKart[] }> {
+    if (!panoKapsamiGecerliMi(kapsam)) throw new BadRequestException("Geçersiz pano kapsamı");
+    const kartlar = panoDuzeniniCoz(ham);
+    if (!kartlar) throw new BadRequestException("Geçersiz pano düzeni");
+    const { error } = await this.supabase.client
+      .from("anasayfa_panolari")
+      .upsert(
+        { user_id: userId, kapsam, kartlar, updated_at: new Date().toISOString() },
+        { onConflict: "user_id,kapsam" }
+      );
+    if (error) throw error;
+    return { kartlar };
+  }
 
   /**
    * Kullanıcı adı alınmış mı?

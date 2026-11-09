@@ -83,6 +83,21 @@ export class UsersController {
     return this.usersService.updateLocale(req.user.userId, locale);
   }
 
+  // Anasayfa panosunun kişisel düzeni: kartlar, sıraları ve boyutları (bkz.
+  // migration 183). Kapsam serbest çalışan için "me", şirket için şirket kimliği.
+  @Get("me/anasayfa-pano/:kapsam")
+  anasayfaPanosu(@Req() req: any, @Param("kapsam") kapsam: string) {
+    return this.usersService.anasayfaPanosunuOku(req.user.userId, kapsam);
+  }
+
+  @Patch("me/anasayfa-pano/:kapsam")
+  anasayfaPanosunuKaydet(@Req() req: any, @Param("kapsam") kapsam: string, @Body("kartlar") kartlar: unknown) {
+    // Demo hesabı herkese açık ve ORTAK: bir ziyaretçinin düzeni sonraki herkesin
+    // panosunu değiştirirdi. Düzen yalnızca o ziyaretçinin tarayıcısında kalır.
+    if (req.user.role === "demo") return { kartlar: null };
+    return this.usersService.anasayfaPanosunuKaydet(req.user.userId, kapsam, kartlar);
+  }
+
   /**
    * Görülen eğitim turları. Eskiden yalnızca localStorage'daydı, yani her yeni
    * tarayıcıda eğitim baştan açılıyordu (bkz. migration 093).

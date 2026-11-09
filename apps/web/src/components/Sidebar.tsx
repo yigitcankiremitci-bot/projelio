@@ -5,6 +5,7 @@ import { useSidebarStyle } from "../theme/useSidebarStyle";
 import { IconChevronLeft, IconSettings } from "./icons";
 import { SIDEBAR_WIDTH, DRAWER_WIDTH_CSS, Z, safeTop } from "../lib/layout";
 import SidebarTree from "./SidebarTree";
+import SidebarKisi from "./SidebarKisi";
 import HomeTargetModal from "./HomeTargetModal";
 import { useHomeTarget, DEFAULT_HOME_TARGET } from "../lib/homeTarget";
 import { tourAnchor } from "../lib/tour/types";
@@ -215,6 +216,12 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
             </div>
           );
         })}
+
+        {/* marginTop:auto kısa listede satırı dibe iter, sticky ise uzun ağaçta
+            kaydırırken görünür tutar (bkz. index.css .sidebar-kisi). */}
+        <div className="sidebar-kisi-kap" style={{ background: sidebarStyle.background }}>
+          <SidebarKisi />
+        </div>
 
       {/* Buradaki alt öbek kaldırıldı: "Ayarlar" yukarıdaki gezinme listesine
           taşındı, "Çıkış yap" ise yalnızca Ayarlar > Hesap'ta duruyor. Çıkışın

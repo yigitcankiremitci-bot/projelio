@@ -7,19 +7,18 @@ import OrganizationCard from "../components/OrganizationCard";
 import EditGroupModal from "../components/EditGroupModal";
 import FilesPanel from "../components/FilesPanel";
 import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
-import ProfileCard from "../components/ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
+import AskLioButton from "../components/AskLioButton";
 import { useAppPrefs } from "../lib/appPrefs";
-import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
-import { useCoverTheme } from "../theme/useCoverTheme";
+import { coverActionButton } from "../components/EntityCover";
+import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { pageGutter } from "../lib/layout";
-import { IconUser, IconCalendar, IconSettings } from "../components/icons";
+import { IconSettings } from "../components/icons";
 import { usePageHeader } from "../lib/pageHeader";
 import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useT } from "../lib/i18n";
-import { bicimDili } from "../lib/i18n/depo";
 
 // Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
 // bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
@@ -30,7 +29,6 @@ export default function GroupDetail() {
   const navigate = useNavigate();
   const c = useThemeColors();
   const t = useT();
-  const cover = useCoverTheme();
   const isDesktop = useIsDesktop();
   const prefs = useAppPrefs();
   const gutter = pageGutter(isDesktop);
@@ -54,65 +52,36 @@ export default function GroupDetail() {
   }, [group?.name]);
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
-  const coverRef = useRef<HTMLDivElement>(null);
-  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
-  const backRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   // Geri, holdinge hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
   const back = useBackTarget({ to: "/groups", label: t("Gruplar") });
   // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
   useGezintiAdi(group?.name);
-  usePageHeader(group?.name, coverRef, [group?.name, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
+  // sourceRef bilerek verilmiyor: geri düğmesi en üst bantta doğuyor ve yüzen hap
+  // "kaynak çizgiyi geçti" sayıp sayfa kaydırılmadan açılıyordu; kaynak yokken
+  // hap şeritle birlikte, ancak başlık yukarı kayınca belirir.
+  usePageHeader(group?.name, headerRef, [group?.name, back.to, back.label, back.geriGit], back);
 
   if (!id) return null;
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
-      <EntityCover
-        coverRef={coverRef}
-        back={
-          <div ref={backRef}>
-            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
-          </div>
-        }
-        coverImageUrl={group?.coverImageUrl}
-        seed={group?.id}
-        height={270}
-        title={group?.name ?? "…"}
-        lioSubject={group ? { kind: "grup", title: group.name, id: group.id } : undefined}
-        description={group?.description}
-        meta={
-          group && (
-            <>
-              {group.ownerName && (
-                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                  <IconUser size={12} color={cover.secondary} />
-                  {group.ownerName}
-                </span>
-              )}
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <IconCalendar size={12} color={cover.secondary} />
-                {t("{tarih} kuruldu", { tarih: new Date(group.createdAt).toLocaleDateString(bicimDili()) })}
-              </span>
-            </>
-          )
-        }
-        aside={
-          // Rozet kartın altında: anasayfa ve şirket sayfasıyla aynı düzen.
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: isDesktop ? 12 : 8 }}>
-            <ProfileCard />
+      <AnasayfaBaslik
+        baslik={group?.name ?? "…"}
+        baslikRef={headerRef}
+        geri={<GeriDugmesi to={back.to} etiket={back.label} geriGit={back.geriGit} />}
+        araclar={
+          <>
             {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
-          </div>
-        }
-        action={
-          <button onClick={() => setEditing(true)} aria-label={t("Grubu düzenle")} style={coverActionButton(c)}>
-            <IconSettings size={20} color={c.textSecondary} />
-          </button>
+            {group && <AskLioButton subject={{ kind: "grup", title: group.name, id: group.id }} size={28} withBackground />}
+            <button onClick={() => setEditing(true)} aria-label={t("Grubu düzenle")} title={t("Grubu düzenle")} style={coverActionButton(c)}>
+              <IconSettings size={20} color={c.textSecondary} />
+            </button>
+          </>
         }
       />
 
-      <div style={{ padding: `14px ${gutter}px 28px` }}>
-        {/* Telefonda geri bağlantısı kapakta değil burada (bkz. EntityCover). */}
-        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
+      <div style={{ padding: `0 ${gutter}px 28px` }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Organizasyonlar")}</h2>
 
         {organizations.length === 0 ? (

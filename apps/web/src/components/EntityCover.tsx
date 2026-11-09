@@ -10,7 +10,6 @@ import { useT } from "../lib/i18n";
 import { useCoverTheme } from "../theme/useCoverTheme";
 import { IconChevronDown, IconChevronLeft } from "./icons";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
-import ProfileCard, { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
 import AiCreditsChip from "./AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
 
@@ -61,6 +60,9 @@ const ASIDE_TOP_CLEARANCE = BELL_BAND_BOTTOM - COVER_PADDING;
  * kopyalanmıştı ve avatar küçültülünce burası eski genişlikte yer ayırmaya
  * devam ederdi — başlık aynı sıkışıklıkta kalırdı.
  */
+// Kapak köşesinde kişi kartı dururken onun genişliğiydi; kart kenar çubuğuna
+// taşındı ama yüzen düğmelerin payı olarak aynı ölçü korunuyor.
+const PROFILE_CARD_MOBILE_WIDTH = 64;
 const MOBILE_ASIDE_RESERVE = PROFILE_CARD_MOBILE_WIDTH;
 /**
  * Dar ekranda bindirilen kartın (fotoğraf + altındaki Lio rozeti) kapladığı
@@ -519,17 +521,8 @@ function MobileCollapsibleCover({
             </span>
           </button>
           <div style={{ flex: 1 }} />
-          {/* Kişi kartı akışta yalnızca fotoğraf kadar yer tutar; dokununca
-              açılan kapsül sola doğru, başlığın ÜSTÜNE taşar (katlı kart,
-              bkz. ProfileCard collapsible). */}
-          <div style={{ position: "relative", flexShrink: 0, width: kartGenisligi, height: kartGenisligi, zIndex: 2 }}>
-            {/* Sarmalayıcı dokunuşa kapalı: katlı kartın kutusu sola, açma
-                düğmesinin üstüne uzanıyor. Fotoğraf ve açık kapsül kendi
-                pointerEvents: auto değerleriyle dokunuş almaya devam eder. */}
-            <div style={{ position: "absolute", right: 0, top: 0, pointerEvents: "none" }}>
-              <ProfileCard compact collapsible avatarSize={titleInTopRow ? TOP_ROW_AVATAR : undefined} />
-            </div>
-          </div>
+          {/* Kişi kartının yeri: kart kenar çubuğuna taşındı, satırın dengesi aynı kalsın. */}
+          <div style={{ flexShrink: 0, width: kartGenisligi, height: kartGenisligi }} />
         </div>
 
         {titleInTopRow && fotoSeridi}

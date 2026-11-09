@@ -15,7 +15,6 @@ import ProductsPanel from "../components/ProductsPanel";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import FilesPanel from "../components/FilesPanel";
 import DepartmentSettingsModal from "../components/DepartmentSettingsModal";
-import ProfileCard from "../components/ProfileCard";
 import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
 import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
@@ -283,14 +282,6 @@ export default function DepartmentDetail() {
           justifyContent: "flex-end",
         }}
       >
-        {/* Kişi kartı: diğer anasayfalarla aynı bileşen, kapak görselinin üstüne bindirilmiş —
-            sağ üstteki kapak düzenleme ikonlarının altında, yer kaplamadan. */}
-        {/* Kişi kartı sağ üstteki sabit düğmelerin ALTINDAN başlar; bandı
-            elle yazmak yerine tek kaynaktan türetiyoruz (bkz. lib/layout). */}
-        <div style={{ position: "absolute", top: safeTop(TOP_CHROME_BOTTOM + 14), right: 14, zIndex: 3 }}>
-          <ProfileCard />
-        </div>
-
         <div style={{ paddingRight: 90 }}>
           <div ref={backRef} style={{ marginBottom: 10 }}>
             <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} onDark />

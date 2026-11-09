@@ -630,18 +630,19 @@ export default function App() {
   // telefonda (dar ekran) sidebar kaybolur, alt menü (BottomNav) ve
   // sol üstte yüzen logo geri gelir. Pencere yeniden boyutlandırıldığında canlı güncellenir.
   const isDesktop = useIsDesktop();
-  // Sidebar artık masaüstünde de mobilde de açılıp kapanabiliyor: masaüstünde
-  // varsayılan açık (eski davranış), mobilde varsayılan kapalı (üstteki oka
-  // basılınca bir çekmece gibi açılır). Ekran genişliği eşiği aşıldığında
-  // (masaüstü <-> mobil geçişinde) varsayılana geri dönülür.
+  // Sidebar masaüstünde de mobilde de açılıp kapanabiliyor ve varsayılanı KAPALI
+  // (sol üstteki okla açılır): sayfa ilk açıldığında içerik öne çıksın diye.
+  // Ekran genişliği eşiği aşıldığında (masaüstü <-> mobil geçişinde) varsayılana
+  // geri dönülür.
   //
-  // Masaüstündeki varsayılan Ayarlar > Gezinme'den değiştirilebilir; mobilde
-  // çekmece her zaman kapalı başlar (açık başlasa içeriğin üstünü örterdi).
+  // Masaüstünde açık başlatmak isteyen anasayfadaki Özelleştir'den ya da
+  // Ayarlar > Gezinme'den açar — daha önce bu ayarı elle değiştirmiş olanın
+  // seçimi kayıtlı olduğu için korunur. Mobilde çekmece her zaman kapalı başlar.
   const prefs = useAppPrefs();
   // Yükleme tepsisi görünürken kişi şeridi onun üstüne çıkar; sayı buradan
   // geliyor ki iki bileşen aynı gerçeği ayrı ayrı hesaplamasın.
   const uploadCount = useUploads().length;
-  const sidebarDefault = isDesktop && getSidebarDefaultOpen(true);
+  const sidebarDefault = isDesktop && getSidebarDefaultOpen(false);
   const [sidebarOpen, setSidebarOpen] = useState(sidebarDefault);
   useEffect(() => {
     setSidebarOpen(sidebarDefault);
@@ -752,9 +753,11 @@ export default function App() {
   // Mobilde kendi menüsü gizlendiği için alt menü (BottomNav) yerinde kalır.
   const sakinEkrani = location.pathname === "/sakin" || location.pathname === "/yeni";
   const kenarAcik = sidebarOpen && !sakinEkrani;
-  const isCoverPage = /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(
-    location.pathname
-  );
+  // Kök adres de bu gruba girer: serbest çalışanın anasayfası artık kendi üst
+  // satırını en tepeden başlatıyor (bkz. components/anasayfa/AnasayfaBaslik).
+  const isCoverPage =
+    location.pathname === "/" ||
+    /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(location.pathname);
 
   // Kapağı olmayan ama sabit şeride ihtiyaç duyan sayfalar: Yapılacaklar panosu
   // uzun, sekmeler ve Sırala/Seç ise yalnızca en tepedeki başlık satırında —
@@ -810,7 +813,18 @@ export default function App() {
           içerik sütununu (yalnızca masaüstünde ve açıkken) onun genişliği kadar
           sağa kaydırıyoruz. Mobilde sidebar bir çekmece/overlay olduğu için
           içerik hiçbir zaman kaymaz. */}
-      <div style={{ marginLeft: isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0, minHeight: "100vh", position: "relative" }}>
+      <div
+        style={
+          {
+            marginLeft: isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0,
+            minHeight: "100vh",
+            position: "relative",
+            // Anasayfa başlığının sol payı: açma oku görünürken başlık onun altına
+            // girmesin (bkz. AnasayfaBaslik).
+            "--ust-sol-bosluk": isDesktop && kenarAcik ? "0px" : "62px",
+          } as React.CSSProperties
+        }
+      >
         {!isCoverPage && !sakinEkrani && (
           <div
             style={{

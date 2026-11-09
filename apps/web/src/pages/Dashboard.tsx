@@ -9,40 +9,25 @@ import { useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../l
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
-import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
-import ProfileCard, { PROFILE_CARD_MOBILE_WIDTH } from "../components/ProfileCard";
-import AiCreditsChip from "../components/AiCreditsChip";
-import { useAppPrefs } from "../lib/appPrefs";
-import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
+import { IconBuilding, IconLayers, IconChevronRight } from "../components/icons";
+import { usePageHeader } from "../lib/pageHeader";
+import { pageGutter } from "../lib/layout";
 import BudgetPanel from "../components/BudgetPanel";
 import AllFilesPanel from "../components/AllFilesPanel";
 import DashboardModulesPanel from "../components/DashboardModulesPanel";
 import DashboardAssignedModules from "../components/DashboardAssignedModules";
 import ModuleSurface from "../components/ModuleSurface";
 import { useModuleTabs } from "../lib/useModuleTabs";
-import { tourAnchor } from "../lib/tour/types";
-import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
-import OfisDavetKarti from "../components/OfisDavetKarti";
+import AnasayfaBaslik, { GeriDugmesi } from "../components/anasayfa/AnasayfaBaslik";
+import AnasayfaPanosu, { OzellestirDugmesi, useDuzenlemeModu } from "../components/anasayfa/AnasayfaPanosu";
+import { SERBEST_VARSAYILAN_PANO, useSerbestKatalogu } from "../components/anasayfa/ozetKartlari";
+import { useAnasayfaPano } from "../lib/useAnasayfaPano";
 
-// Sabit sekmeler + (varsa) terfi etmiş modül sekmeleri. Modül sekmeleri
-// "Modüller"in soluna girer: kullanıcı en sık kullandığı modülü çekirdek
-// sekmelerin hemen yanında bulur, katalog en sağda kalır.
-// Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
-type DashboardTab = "jobs" | "budget" | "files" | "modules" | (string & {});
-
-// Etiketler modül düzeyinde durduğu için burada çevrilemez; Türkçe metin
-// anahtar olarak kalır, çeviri kullanıldığı yerde (t(sekme.label)) yapılır.
-const coreTabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] = [
-  { key: "jobs", label: "İşler", icon: IconFolder }, // dil:anahtar
-  // Etiket "Kasa": sayfa bir plan değil, gerçekleşen gelir/gider defteri.
-  // Anahtar "budget" olarak KALDI — adresler (?tab=budget), kayıtlı "Ana Sayfa"
-  // hedefleri ve tur çapaları o değere bağlı.
-  { key: "budget", label: "Kasa", icon: IconActivity }, // dil:anahtar
-  { key: "files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
-];
-
-const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconSparkle }; // dil:anahtar
+// Anasayfanın kendisi özet panosu ("home"). Diğerleri bir kartın açtığı tam
+// görünümler; adresleri (?tab=budget gibi) kenar çubuğu ve kayıtlı "Ana Sayfa"
+// hedefleri kullandığı için aynen kaldı. Modül anahtarları da gelebilir.
+type DashboardTab = "home" | "jobs" | "budget" | "files" | "modules" | (string & {});
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -115,42 +100,30 @@ export default function Dashboard() {
       .catch(() => setRedirectTo(null));
   }, []);
 
-  // Sekme, URL'deki ?tab= ile eşleşir: sidebar'dan doğrudan "/?tab=budget" ya da
-  // "/?tab=files" gibi bir bağlantıyla gelindiğinde ilgili sekme açık başlasın diye.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Görünüm, URL'deki ?tab= ile eşleşir: kenar çubuğundan "/?tab=budget" gibi
+  // bir bağlantıyla gelindiğinde ilgili tam görünüm açık başlasın diye.
+  const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   // Terfi etmiş modüller: puanlama ve slot sayısı useModuleTabs içinde
   // (bkz. lib/moduleLayout.ts). Serbest çalışan bağlamı — organizasyon yok.
   const moduleTabs = useModuleTabs();
   const openModuleTab = moduleTabs.find((m) => m.key === tabParam);
   const tab: DashboardTab =
-    tabParam === "budget" || tabParam === "files" || tabParam === "modules" || openModuleTab
+    tabParam === "jobs" || tabParam === "budget" || tabParam === "files" || tabParam === "modules" || openModuleTab
       ? (tabParam as DashboardTab)
-      : "jobs";
-  const setTab = (next: DashboardTab) => {
-    setSearchParams(next === "jobs" ? {} : { tab: next }, { replace: true });
-  };
-  const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder; isNew?: boolean }[] = [
-    ...coreTabs,
-    ...moduleTabs.map((m) => ({ key: m.key, label: m.name, icon: IconSparkle, isNew: m.isNew })),
-    catalogTab,
-  ];
+      : "home";
   const [jobs, setJobs] = useState<Job[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const c = useThemeColors();
   const t = useT();
   const gridRef = useRef<HTMLDivElement>(null);
   const joinedGridRef = useRef<HTMLDivElement>(null);
-  // Sabit şeridin ölçtüğü öğeler (bkz. lib/pageHeader): başlık satırı "kapak"
-  // yerine geçer, sekme çubuğunun kopyası ise ancak aslı ekrandan çıkınca belirir.
+  // Sabit şeridin ölçtüğü öğe (bkz. lib/pageHeader): başlık satırı "kapak" yerine geçer.
   const headerRef = useRef<HTMLDivElement>(null);
-  const tabsRef = useRef<HTMLDivElement>(null);
-  // Sabit şeritteki sekme KOPYASI yana kayıyor (akıştaki çubuk sarıyor, kaymıyor).
-  const stickyTabsRef = useDragScroll<HTMLDivElement>();
   // Masaüstünde sol sidebar'da zaten Organizasyonlar/Gruplar linkleri var;
   // bu kısayol satırı sadece sidebar'ın kaybolduğu mobil görünümde gösterilir.
   const isDesktop = useIsDesktop();
-  const prefs = useAppPrefs();
+  const gutter = pageGutter(isDesktop);
   // Kısayollar da nav ile aynı kuralı izler: yalnızca erişilebilir en az bir
   // organizasyon/grup varsa gösterilir.
   const { showOrganizations, showGroups } = useNavVisibility();
@@ -222,61 +195,20 @@ export default function Dashboard() {
         ? t("Kasam")
         : tab === "files"
           ? t("Dosyalarım")
-          : t("Modüller");
+          : tab === "modules"
+            ? t("Modüller")
+            : t("Ana Sayfa");
 
-  // Sekme düğmeleri tek yerde üretilir: hem sayfadaki çubuk hem kaydırınca beliren
-  // şerit aynı diziyi kullanır, böylece ikisi hiçbir zaman ayrışmaz.
-  const tabButtons = tabs.map((sekme) => {
-    const isActive = tab === sekme.key;
-    return (
-      <button
-        key={sekme.key}
-        type="button"
-        {...tourAnchor(`dashboard-tab-${sekme.key}`)}
-        onClick={() => setTab(sekme.key)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 7,
-          padding: "9px 14px",
-          border: "none",
-          background: "transparent",
-          color: isActive ? c.textPrimary : c.textSecondary,
-          fontSize: 15,
-          fontWeight: 500,
-          // Etiket kelime ortasından bölünmesin; sığmıyorsa sekmenin tamamı
-          // alt satıra insin.
-          whiteSpace: "nowrap",
-          flexShrink: 0,
-          borderBottom: `2px solid ${isActive ? c.accent : "transparent"}`,
-          marginBottom: -1,
-        }}
-      >
-        <sekme.icon size={15} color={isActive ? c.accentDark : c.textSecondary} />
-        {t(sekme.label)}
-        {/* Terfi görünür olur, düşüş sessizdir: yeni gelen sekme tek
-            seferlik bir noktayla kendini tanıtır. */}
-        {sekme.isNew && (
-          <span
-            title={t("Sık kullandığın için üste alındı")}
-            style={{ width: 6, height: 6, borderRadius: "50%", background: c.accent, flexShrink: 0 }}
-          />
-        )}
-      </button>
-    );
-  });
+  const katalog = useSerbestKatalogu({ isler: visibleJobs, kullaniciId: myUserId });
+  const pano = useAnasayfaPano("me", SERBEST_VARSAYILAN_PANO);
+  const [duzenleme, setDuzenleme] = useDuzenlemeModu(tab);
 
   // Kaydırınca tepede beliren sabit şerit (bkz. App.tsx CoverStickyHeader).
-  // Anasayfanın kapağı yok; "kapak" rolünü başlık + kişi kartı satırı üstlenir.
-  // Taşeron hesabında anasayfa tek çalışma ekranı olduğu için sekmelerin aşağı
-  // inince kaybolması burada en çok hissedilen eksikti.
-  // Şerit kopyası sarmaz, yana kaydırılır: 68 px'lik bantta ikinci satır yeri yok.
-  usePageHeader(pageTitle, headerRef, [pageTitle]);
-  usePageHeaderTabs(
-    <div ref={stickyTabsRef} style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>{tabButtons}</div>,
-    [tab, tabs.length],
-    tabsRef
-  );
+  const anasayfaEtiketi = t("Ana Sayfa");
+  // sourceRef bilerek verilmiyor: geri düğmesi en üst bantta doğuyor ve yüzen hap
+  // "kaynak çizgiyi geçti" sayıp sayfa kaydırılmadan açılıyordu; kaynak yokken
+  // hap şeritle birlikte, ancak başlık yukarı kayınca belirir.
+  usePageHeader(pageTitle, headerRef, [pageTitle, tab], tab === "home" ? undefined : { to: "/", label: anasayfaEtiketi });
 
   // Hesap tipi belirlenene kadar "İşlerim" görünümünü göstermeyelim (yanlış görünüm
   // bir an için parlayıp kaybolmasın); organizasyon/grup sahibiyse oraya yönlendir.
@@ -284,103 +216,22 @@ export default function Dashboard() {
   if (redirectTo) return <Navigate to={redirectTo} replace />;
 
   return (
-    // Mobilde üst boşluk kısılıyor: App zaten HEADER_HEIGHT (76 px) kadar
-    // paddingTop veriyor ve yüzen logo 58 px'de bitiyor — üstüne 28 px daha
-    // eklenince logo ile "İşlerim" başlığı arasında boşluk kalıyordu.
-    // Masaüstünde yer sıkıntısı yok, orada 28 px korunuyor.
-    <div
-      style={{
-        minHeight: "100vh",
-        background: c.background,
-        padding: isDesktop ? 28 : "6px 16px 28px",
-        // Kişi kartının kapsülü sayfa dolgusunu aşıp ekran kenarına dayanıyor
-        // (bkz. ProfileCard bleedRight). Taşan kısım burada kırpılıyor: hem
-        // yatay kaydırma çubuğu doğmuyor hem de kapsül tam kenarda bitiyor.
-        overflowX: "hidden",
-      }}
-    >
-      <div
-        ref={headerRef}
-        style={{
-          display: "flex",
-          flexDirection: isDesktop ? "row" : "column",
-          alignItems: isDesktop ? "center" : "stretch",
-          justifyContent: "space-between",
-          gap: isDesktop ? 16 : 8,
-          marginBottom: isDesktop ? 20 : 12,
-        }}
-      >
-        {/* Telefonda kapaklı sayfalarla aynı model (bkz. EntityCover
-            MobileCollapsibleCover): başlık ile yalnızca fotoğraf tek satırda,
-            fotoğrafa dokununca kapsül sola doğru açılır. Bakiye başlığın altında. */}
-        {!isDesktop ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 6 }}>
-              <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
-              {prefs.showLio && <AiCreditsChip compact />}
-            </div>
-            <div style={{ position: "relative", flexShrink: 0, width: PROFILE_CARD_MOBILE_WIDTH, height: PROFILE_CARD_MOBILE_WIDTH, zIndex: 2 }}>
-              <div style={{ position: "absolute", right: 0, top: 0, pointerEvents: "none" }}>
-                <ProfileCard compact collapsible />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <h1 style={{ fontSize: 22, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{pageTitle}</h1>
-        )}
-        {/* Hem masaüstünde hem mobilde sağa dayalı: kartın kendi kompozisyonu
-            (sağa hizalı metin, sağdaki avatar, transformOrigin: right) sağ kenara
-            yaslandığında doğru duruyor. */}
-        {isDesktop && (
-        <div
-          style={{
-            display: "flex",
-            // Lio kredisi rozeti kartın ALTINDA, sütun olarak. Yanına konamıyor:
-            // kart sağ kenara dayanmak (bleedRight) üzerine kurulu, yani sağında
-            // yer yok; solunda ise başlık ile kart arasına sıkışıp ikisinden de
-            // kopuk duruyordu.
-            flexDirection: "column",
-            // Kart sağa dayalı olduğu için rozet de sağa hizalı. Rozet BİLEREK
-            // taşmıyor: sayfanın geri kalanı (başlık, sekmeler) gibi normal
-            // dolgu kenarında bitiyor, taşan tek şey kartın kendisi.
-            alignItems: "flex-end",
-            // Kart üstte hover'da scale(1.15) ile büyüyor (bkz. ProfileCard,
-            // transformOrigin: right center) — aşağı doğru ~5 px taşıyor.
-            // Boşluk bunu karşılayacak kadar, yoksa büyüyen kart rozetin
-            // üstüne biniyor.
-            gap: isDesktop ? 12 : 8,
-          }}
-        >
-          {/* Tam sayfa dolgusu kadar: kart kenara dayanır ama avatar kırpılmaz. */}
-          <ProfileCard bleedRight={isDesktop ? 28 : 16} compact={!isDesktop} />
-          {/* Lio gizlenmişse (Ayarlar > Yardımcılar) rozet de görünmez —
-              kullanmadığı bir aracın bakiyesi anasayfada yer kaplamasın. */}
-          {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
-        </div>
-        )}
-      </div>
+    <div style={{ minHeight: "100vh", background: c.background }}>
+      <AnasayfaBaslik
+        baslik={pageTitle}
+        baslikRef={headerRef}
+        geri={tab === "home" ? undefined : <GeriDugmesi to="/" etiket={anasayfaEtiketi} />}
+        araclar={tab === "home" ? <OzellestirDugmesi acik={duzenleme} onClick={() => setDuzenleme(!duzenleme)} /> : undefined}
+      />
 
-      {/* İşler / Kasa sekmeleri.
-          flexWrap: sekmeler sığmadığında (dar ekran ya da Ayarlar'dan büyütülmüş
-          yazı ölçeği) yan yana ezilip üst üste binmek yerine alt satıra geçer.
-          Ekran genişliğine göre değil, gerçekten yer kalmadığında kırıldığı için
-          ayrı bir mobil/masaüstü dalına gerek yok. */}
-      <div
-        ref={tabsRef}
-        {...tourAnchor("dashboard-tabs")}
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 4,
-          marginBottom: 24,
-          borderBottom: `1px solid ${c.border}`,
-        }}
-      >
-        {tabButtons}
-      </div>
+      {tab === "home" && (
+        <AnasayfaPanosu pano={pano} katalog={katalog} duzenleme={duzenleme} onDuzenlemeBitti={() => setDuzenleme(false)} />
+      )}
 
-      {/* Terfi etmiş modül: sekmenin içeriği modülün kendisi. jobId, modülün en
-          son çalışıldığı iştir (bkz. myJobModuleStats). */}
+      {tab !== "home" && (
+      <div style={{ padding: `0 ${gutter}px 28px` }}>
+      {/* Terfi etmiş modül: içeriği modülün kendisi. jobId, modülün en son
+          çalışıldığı iştir (bkz. myJobModuleStats). */}
       {openModuleTab && (
         <ModuleSurface
           moduleKey={openModuleTab.key}
@@ -474,11 +325,6 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {/* 3D stüdyo daveti: iş ızgaralarının arasında, sayfanın ortasında. */}
-            <div style={{ margin: "28px 0" }}>
-              <OfisDavetKarti tur="studyo" />
-            </div>
-
             {splitView && (
               <SectionHeading
                 title={t("Katıldıklarım")}
@@ -502,6 +348,8 @@ export default function Dashboard() {
             <DashboardAssignedModules jobs={visibleJobs} />
           </>
         ))}
+      </div>
+      )}
     </div>
   );
 }

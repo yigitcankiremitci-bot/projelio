@@ -1177,4 +1177,6 @@ export const hatalar: TranslationDict = {
   "Bu modülün sekmesi yok": "This module has no tabs",
   "Bu iş bir hizmet işi: görev bütçeleri yaptığın işin fiyat kalemleri, ödenmez ve Kasa'ya gider yazılmaz. Müşterinin ödemesini proje bütçesine gelir olarak gir.":
     "This is a service job: task budgets are price items for your work; they aren't paid or recorded as expenses in your Kasa. Enter the client's payment as income in the project budget.",
+  "Geçersiz pano düzeni": "Invalid board layout",
+  "Geçersiz pano kapsamı": "Invalid board scope",
 };

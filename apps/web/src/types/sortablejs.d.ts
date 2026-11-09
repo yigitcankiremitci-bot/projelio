@@ -15,6 +15,9 @@ declare module "sortablejs" {
     // listesine bırakılması).
     group?: string | { name: string; pull?: boolean | "clone"; put?: boolean | string[] };
     sort?: boolean;
+    /** Yalnızca bu seçiciye uyan çocuklar taşınır. */
+    draggable?: string;
+    fallbackOnBody?: boolean;
     // Sürükleme geçici olarak kapatılabilsin diye (bkz. TaskColumn'da seçim
     // modu): Sortable örneğini yok edip yeniden kurmak, sürüklemenin tam
     // ortasında olan bir render'da hareketi yarıda kesiyordu.

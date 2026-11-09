@@ -1,6 +1,7 @@
 import type { TranslationDict } from "@projelio/shared";
 import { ortak } from "./ortak";
 import { gezinme } from "./gezinme";
+import { anasayfaPano } from "./anasayfaPano";
 import { kimlik } from "./kimlik";
 import { ayarlar } from "./ayarlar";
 import { gorevler } from "./gorevler";
@@ -63,6 +64,7 @@ import { projelioPosta } from "./projelioPosta";
 export const en: TranslationDict = {
   ...ortak,
   ...gezinme,
+  ...anasayfaPano,
   ...kimlik,
   ...baslangic,
   ...ilkAdimlar,

@@ -219,9 +219,12 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
 
         {/* marginTop:auto kısa listede satırı dibe iter, sticky ise uzun ağaçta
             kaydırırken görünür tutar (bkz. index.css .sidebar-kisi). */}
-        <div className="sidebar-kisi-kap" style={{ background: sidebarStyle.background }}>
-          <SidebarKisi />
-        </div>
+        {/* Eski görünümde kişi kartı sayfanın kendisinde, ikinci kez gösterilmez. */}
+        {!location.pathname.startsWith("/uiv1") && (
+          <div className="sidebar-kisi-kap" style={{ background: sidebarStyle.background }}>
+            <SidebarKisi />
+          </div>
+        )}
 
       {/* Buradaki alt öbek kaldırıldı: "Ayarlar" yukarıdaki gezinme listesine
           taşındı, "Çıkış yap" ise yalnızca Ayarlar > Hesap'ta duruyor. Çıkışın

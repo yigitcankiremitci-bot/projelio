@@ -1,0 +1,161 @@
+import { useRef, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import type { Group, Organization } from "@projelio/shared";
+import { api } from "../api/client";
+import { useLiveRoom } from "../lib/liveRoom";
+import OrganizationCard from "../components/OrganizationCard";
+import EditGroupModal from "../components/EditGroupModal";
+import FilesPanel from "../components/FilesPanel";
+import ScopeBudgetPanel from "../components/butce/ScopeBudgetPanel";
+import ProfileCard from "./ProfileCard";
+import AiCreditsChip from "../components/AiCreditsChip";
+import { useAppPrefs } from "../lib/appPrefs";
+import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "./EntityCover";
+import { useCoverTheme } from "../theme/useCoverTheme";
+import { useThemeColors } from "../theme/useThemeColors";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { pageGutter } from "../lib/layout";
+import { IconUser, IconCalendar, IconSettings } from "../components/icons";
+import { usePageHeader } from "../lib/pageHeader";
+import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
+import { useT } from "../lib/i18n";
+import { bicimDili } from "../lib/i18n/depo";
+
+// Not: "İşler" (job) kavramı yalnızca serbest çalışan/taşeron hesaplarına özgüdür;
+// bir holding doğrudan iş değil, organizasyon (ve onların departmanlarını) yönetir.
+export default function GroupDetail() {
+  const { id } = useParams();
+  // Aynı sayfadaki kullanıcılar: canlı tazeleme + "kim burada" (bkz. lib/liveRoom.ts).
+  useLiveRoom(id ? `group:${id}` : null);
+  const navigate = useNavigate();
+  const c = useThemeColors();
+  const t = useT();
+  const cover = useCoverTheme();
+  const isDesktop = useIsDesktop();
+  const prefs = useAppPrefs();
+  const gutter = pageGutter(isDesktop);
+  const [group, setGroup] = useState<Group | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [editing, setEditing] = useState(false);
+
+  const reload = () => {
+    if (!id) return;
+    api.get<Group>(`/groups/${id}`).then(setGroup).catch(() => setGroup(null));
+    api.get<Organization[]>(`/groups/${id}/organizations`).then(setOrganizations).catch(() => setOrganizations([]));
+  };
+
+  useEffect(reload, [id]);
+
+  useEffect(() => {
+    if (group?.name) document.title = `${group.name} · Projelio`;
+    return () => {
+      document.title = "Projelio";
+    };
+  }, [group?.name]);
+
+  // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
+  const coverRef = useRef<HTMLDivElement>(null);
+  // Akıştaki geri bağlantısının DOM öğesi: şerittekiler ancak bu kaybolunca belirir.
+  const backRef = useRef<HTMLDivElement>(null);
+  // Geri, holdinge hangi sayfadan girildiyse oraya döner (bkz. lib/backTarget).
+  const back = useBackTarget({ to: "/groups", label: t("Gruplar") });
+  // Buradan açılan modülün geri bağlantısı bu sayfaya dönebilsin.
+  useGezintiAdi(group?.name);
+  usePageHeader(group?.name, coverRef, [group?.name, back.to, back.label, back.geriGit], { ...back, sourceRef: backRef });
+
+  if (!id) return null;
+
+  return (
+    <div style={{ minHeight: "100vh", background: c.background }}>
+      <EntityCover
+        coverRef={coverRef}
+        back={
+          <div ref={backRef}>
+            <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} />
+          </div>
+        }
+        coverImageUrl={group?.coverImageUrl}
+        seed={group?.id}
+        height={270}
+        title={group?.name ?? "…"}
+        lioSubject={group ? { kind: "grup", title: group.name, id: group.id } : undefined}
+        description={group?.description}
+        meta={
+          group && (
+            <>
+              {group.ownerName && (
+                <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                  <IconUser size={12} color={cover.secondary} />
+                  {group.ownerName}
+                </span>
+              )}
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <IconCalendar size={12} color={cover.secondary} />
+                {t("{tarih} kuruldu", { tarih: new Date(group.createdAt).toLocaleDateString(bicimDili()) })}
+              </span>
+            </>
+          )
+        }
+        aside={
+          // Rozet kartın altında: anasayfa ve şirket sayfasıyla aynı düzen.
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: isDesktop ? 12 : 8 }}>
+            <ProfileCard />
+            {prefs.showLio && <AiCreditsChip compact={!isDesktop} />}
+          </div>
+        }
+        action={
+          <button onClick={() => setEditing(true)} aria-label={t("Grubu düzenle")} style={coverActionButton(c)}>
+            <IconSettings size={20} color={c.textSecondary} />
+          </button>
+        }
+      />
+
+      <div style={{ padding: `14px ${gutter}px 28px` }}>
+        {/* Telefonda geri bağlantısı kapakta değil burada (bkz. EntityCover). */}
+        <MobileBackRow backRef={backRef} to={back.to} label={back.label} geriGit={back.geriGit} />
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Organizasyonlar")}</h2>
+
+        {organizations.length === 0 ? (
+          <div style={{ border: `1px dashed ${c.border}`, borderRadius: 12, padding: 24, textAlign: "center", color: c.textSecondary, fontSize: 15, marginBottom: 24 }}>
+            {t("Bu gruba bağlı organizasyon yok. Bu sayfadayken alttaki \"+\" butonuyla ekleyebilirsin.")}
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14, marginBottom: 24 }}>
+            {organizations.map((o) => (
+              <OrganizationCard key={o.id} organization={o} />
+            ))}
+          </div>
+        )}
+
+        {/* HOLDİNG KASASI — hiyerarşinin en üstü.
+            Buradaki rakamlar bağlı TÜM organizasyonların (ve onların
+            departman/iş/proje kademelerinin) toplamıdır; holdinge doğrudan
+            girilen gelir/giderler de aynı ekranda ama ayrı satırlarda durur.
+            Hiçbir tutar iki kez sayılmaz: bir kayıt yalnızca tek bir kademeye
+            aittir (bkz. butce-hiyerarsi.service.ts).
+
+            Holdingi olmayan kullanıcıda bu kademe hiç yoktur; son durak
+            organizasyon ya da serbest çalışanın kişisel Kasa'sıdır. */}
+        <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+          <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "0 0 14px" }}>{t("Holding kasası")}</h2>
+          {id && <ScopeBudgetPanel scopeType="group" scopeId={id} />}
+        </div>
+
+        {/* Hiyerarşi: gruba bağlı organizasyonların departmanlarındaki tüm dosyalar. */}
+        <div style={{ marginTop: 8, paddingTop: 24, borderTop: `1px solid ${c.border}` }}>
+          {id && <FilesPanel groupId={id} />}
+        </div>
+      </div>
+
+      {editing && group && (
+        <EditGroupModal
+          group={group}
+          onClose={() => setEditing(false)}
+          onSaved={reload}
+          onDeleted={() => navigate("/groups")}
+          onArchived={() => navigate("/groups")}
+        />
+      )}
+    </div>
+  );
+}

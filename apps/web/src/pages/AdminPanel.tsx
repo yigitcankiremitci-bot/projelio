@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { User } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -197,7 +197,18 @@ export default function AdminPanel() {
 
   return (
     <div style={{ minHeight: "100vh", background: c.background, padding: `${isDesktop ? 28 : 20}px ${gutter}px 40px` }}>
-      <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: "0 0 8px" }}>{t("Admin paneli")}</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <h1 style={{ color: c.textPrimary, fontSize: 22, fontWeight: 500, margin: 0 }}>{t("Admin paneli")}</h1>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: "4px 16px" }}>
+          <Link to="/uiv1" style={{ color: c.accentDark, fontSize: 14, whiteSpace: "nowrap" }}>
+            {t("Eski görünümü aç")}
+          </Link>
+          {/* Tanıtım sitesi ayrı uygulama, bu yüzden Link değil düz adres. */}
+          <a href="https://projelio.app/tr/uiv1" target="_blank" rel="noreferrer" style={{ color: c.accentDark, fontSize: 14, whiteSpace: "nowrap" }}>
+            {t("Eski tanıtım sayfasını aç")}
+          </a>
+        </div>
+      </div>
       <p style={{ color: c.textSecondary, fontSize: 16, margin: "0 0 22px" }}>
         {t("Kullanıcılar, proje istatistikleri ve sistem durumu burada listelenir.")}
       </p>

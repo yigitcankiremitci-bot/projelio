@@ -22,6 +22,7 @@ export const anasayfaPano: TranslationDict = {
   "Modül özetleri": "Module summaries",
   "Panodan kaldır": "Remove from board",
   "Panon boş. Özelleştir'den istediğin kartları ekleyebilirsin.": "Your board is empty. Add cards from Customize.",
+  "Eski görünümü aç": "Open old interface",
   "Son hareket": "Last activity",
   "Tüm ayarlar": "All settings",
   "Özelleştir": "Customize",

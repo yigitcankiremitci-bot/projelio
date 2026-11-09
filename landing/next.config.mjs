@@ -22,6 +22,13 @@ const nextConfig = {
     return [
       { source: "/:lang(tr|en)/credits", destination: "/:lang/lio-units", permanent: true },
       { source: "/credits", destination: "/lio-units", permanent: true },
+      // Eski arayüz uygulamada yaşıyor, projelio.app ise tanıtım sitesi. Geçici:
+      // yeni tasarım oturunca kalkacak, tarayıcılar kalıcı diye önbelleğe almasın.
+      {
+        source: "/uiv1/:path*",
+        destination: `${process.env.NEXT_PUBLIC_APP_URL ?? "https://app.projelio.app"}/uiv1/:path*`,
+        permanent: false,
+      },
     ];
   },
 };

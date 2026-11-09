@@ -83,6 +83,9 @@ const DepartmentDetail = lazy(() => import("./pages/DepartmentDetail"));
 const ModulePage = lazy(() => import("./pages/ModulePage"));
 const Groups = lazy(() => import("./pages/Groups"));
 const GroupDetail = lazy(() => import("./pages/GroupDetail"));
+const DashboardV1 = lazy(() => import("./uiv1/Dashboard"));
+const OrganizationDetailV1 = lazy(() => import("./uiv1/OrganizationDetail"));
+const GroupDetailV1 = lazy(() => import("./uiv1/GroupDetail"));
 const CalendarView = lazy(() => import("./pages/Calendar"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 const Settings = lazy(() => import("./pages/Settings"));
@@ -642,7 +645,9 @@ export default function App() {
   // Yükleme tepsisi görünürken kişi şeridi onun üstüne çıkar; sayı buradan
   // geliyor ki iki bileşen aynı gerçeği ayrı ayrı hesaplamasın.
   const uploadCount = useUploads().length;
-  const sidebarDefault = isDesktop && getSidebarDefaultOpen(false);
+  // Eski görünümde (bkz. uiv1/README.md) çekmecenin varsayılanı o zamanki gibi açık.
+  const eskiGorunum = location.pathname === "/uiv1" || location.pathname.startsWith("/uiv1/");
+  const sidebarDefault = isDesktop && getSidebarDefaultOpen(eskiGorunum);
   const [sidebarOpen, setSidebarOpen] = useState(sidebarDefault);
   useEffect(() => {
     setSidebarOpen(sidebarDefault);
@@ -757,14 +762,15 @@ export default function App() {
   // satırını en tepeden başlatıyor (bkz. components/anasayfa/AnasayfaBaslik).
   const isCoverPage =
     location.pathname === "/" ||
-    /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(location.pathname);
+    /^\/(jobs|projects|operations|organizations|departments|groups)\/[^/]+$/.test(location.pathname) ||
+    /^\/uiv1\/(organizations|groups)\/[^/]+$/.test(location.pathname);
 
   // Kapağı olmayan ama sabit şeride ihtiyaç duyan sayfalar: Yapılacaklar panosu
   // uzun, sekmeler ve Sırala/Seç ise yalnızca en tepedeki başlık satırında —
   // aşağı inince erişilemez oluyorlardı. Orada "kapak" rolünü sayfanın kendi
   // başlık satırı üstlenir (bkz. TasksOverview usePageHeader).
   const hasStickyHeader =
-    isCoverPage || location.pathname === "/tasks" || location.pathname === "/";
+    isCoverPage || location.pathname === "/tasks" || location.pathname === "/" || location.pathname === "/uiv1";
 
   const c = useThemeColors();
   const t = useT();
@@ -933,6 +939,9 @@ export default function App() {
             <Suspense fallback={<SayfaYukleniyor />}>
               <Routes>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/uiv1" element={<DashboardV1 />} />
+                <Route path="/uiv1/organizations/:id" element={<OrganizationDetailV1 />} />
+                <Route path="/uiv1/groups/:id" element={<GroupDetailV1 />} />
                 <Route path="/jobs/:id" element={<JobDetail />} />
                 <Route path="/projects/:id" element={<KeyedProjectDetail />} />
                 <Route path="/operations/:id" element={<OperationDetail />} />

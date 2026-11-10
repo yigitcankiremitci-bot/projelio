@@ -1,9 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import type { DepartmentMember } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import { decideDepartmentAccess } from "../departments/department-access";
 import { KoltukService } from "../../common/koltuk/koltuk.service";
+import { EmailService } from "../auth/email.service";
+import { getWebAppUrl } from "../../common/config/env";
+import { kadroDavetiEpostasi } from "./kadro-daveti-eposta";
 
 function mapDepartmentMember(row: any): DepartmentMember {
   return {
@@ -29,11 +32,27 @@ function mapDepartmentMember(row: any): DepartmentMember {
 // inviteEmail ile — sonra ilgili kişi daveti onaylar (respond).
 @Injectable()
 export class DepartmentMembersService {
+  private readonly logger = new Logger(DepartmentMembersService.name);
+
   constructor(
     private supabase: SupabaseService,
     private notificationsService: NotificationsService,
-    private koltuklar: KoltukService
+    private koltuklar: KoltukService,
+    private emailService: EmailService
   ) {}
+
+  /** E-postayı küçük harfe çevirip o adresin Projelio hesabını arar (yoksa null). */
+  private async epostaninHesabi(eposta: string): Promise<{ id: string; locale?: string | null } | null> {
+    // ilike: kayıtlı adres büyük harf içeriyor olabilir; joker karakterler kaçırılır.
+    const desen = eposta.replace(/[\\%_]/g, (k) => `\\${k}`);
+    const { data } = await this.supabase.client
+      .from("users")
+      .select("id, locale")
+      .ilike("email", desen)
+      .limit(1)
+      .maybeSingle();
+    return (data as any) ?? null;
+  }
 
   private async assertOrgOwner(departmentId: string, userId?: string): Promise<string> {
     const { data: dept, error } = await this.supabase.client
@@ -143,6 +162,19 @@ export class DepartmentMembersService {
     // kendisi onaylayacaktı. Yetki zaten assertOrgOwner'dan geçti, kayıt
     // doğrudan onaylı açılır ve bildirim gitmez — kurucu böylece kendini bir
     // departmana yönetici (sorumlu) olarak atayabiliyor.
+    const davetEpostasi = data.userId ? undefined : data.inviteEmail?.trim().toLowerCase();
+    // E-postayla davet edilen kişinin zaten hesabı varsa davet doğrudan ona
+    // bağlanır: uygulama içi bildirimi alır ve departman sayfasında daveti
+    // görür. Bağlanmazsa kayıt `invited` olarak user_id'siz kalıyor ve kişi
+    // daveti hiçbir yerde göremiyordu.
+    let aliciDili: string | null | undefined;
+    if (davetEpostasi) {
+      const hesap = await this.epostaninHesabi(davetEpostasi);
+      if (hesap) {
+        data = { ...data, userId: hesap.id, inviteEmail: undefined };
+        aliciDili = hesap.locale;
+      }
+    }
     const kendisi = !!data.userId && data.userId === requestingUserId;
     // Yer yoksa davet bile açılmasın: kişi kabul edince "yer dolu" görmesin.
     // E-postayla davette kişi henüz belli değil; kontrol kabulde (respond).
@@ -176,7 +208,7 @@ export class DepartmentMembersService {
       // link: bildirime tıklayınca doğrudan departman sayfasına gider — orada
       // DepartmentMembersList kendi bekleyen davetini algılayıp Onayla/Reddet
       // düğmelerini gösterir (bkz. respond()).
-      void this.notificationsService.notifyUser(
+      this.notificationsService.notifyUserSafe(
         data.userId,
         "team_invite",
         "Kadro Daveti",
@@ -185,7 +217,44 @@ export class DepartmentMembersService {
       );
     }
 
+    // Yönetici bir e-posta adresi yazdıysa o adrese davet e-postası gider —
+    // kişinin hesabı olsun olmasın. Beklenmez: e-postanın gitmemesi daveti geri almaz.
+    if (davetEpostasi && !kendisi) {
+      void this.davetEpostasiGonder(departmentId, davetEpostasi, !!data.userId, aliciDili, requestingUserId);
+    }
+
     return mapDepartmentMember(row);
+  }
+
+  /** Davet e-postasını hazırlayıp gönderir. HATA FIRLATMAZ, yalnızca loglar. */
+  private async davetEpostasiGonder(
+    departmentId: string,
+    eposta: string,
+    hesabiVar: boolean,
+    dil: string | null | undefined,
+    davetEdenId?: string
+  ): Promise<void> {
+    try {
+      const [{ data: dept }, { data: davetEden }] = await Promise.all([
+        this.supabase.client.from("departments").select("name, organizations(name)").eq("id", departmentId).maybeSingle(),
+        davetEdenId
+          ? this.supabase.client.from("users").select("full_name").eq("id", davetEdenId).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      const mail = kadroDavetiEpostasi({
+        davetEdenAdi: (davetEden as any)?.full_name ?? "Ekip yöneticin",
+        departmanAdi: (dept as any)?.name ?? "Departman",
+        sirketAdi: (dept as any)?.organizations?.name ?? undefined,
+        hesabiVar,
+        davetUrl: `${getWebAppUrl()}/departments/${departmentId}`,
+        eposta,
+        dil: dil === "en" ? "en" : "tr",
+      });
+      const gitti = await this.emailService.sendPrepared(eposta, mail);
+      if (!gitti) this.logger.warn(`Kadro daveti e-postası gönderilemedi: ${eposta}`);
+    } catch (err) {
+      this.logger.warn(`Kadro daveti e-postası hazırlanamadı (${eposta}): ${(err as any)?.message ?? err}`);
+    }
   }
 
   async updatePosition(
@@ -244,7 +313,7 @@ export class DepartmentMembersService {
     departmentId: string,
     userId: string
   ): Promise<{ invite: DepartmentMember | null; departmentName?: string; organizationName?: string }> {
-    const { data: row, error } = await this.supabase.client
+    const { data: bagli, error } = await this.supabase.client
       .from("department_members")
       .select("*, users!department_members_user_id_fkey(full_name, email, username)")
       .eq("department_id", departmentId)
@@ -252,6 +321,27 @@ export class DepartmentMembersService {
       .eq("status", "pending")
       .maybeSingle();
     if (error) throw error;
+    let row: any = bagli;
+    // Davet kişi hesap açmadan önce e-postasına yapılmışsa kayıt user_id'siz
+    // `invited` durumunda bekler; kişiyi e-postasından tanıyıp onu da göster.
+    // Onaylayınca respond() aynı e-posta kontrolüyle kaydı ona bağlar.
+    if (!row) {
+      const { data: kisi } = await this.supabase.client.from("users").select("email").eq("id", userId).maybeSingle();
+      const eposta = (kisi as any)?.email?.trim().toLowerCase();
+      if (eposta) {
+        const { data: epostaIle, error: hata } = await this.supabase.client
+          .from("department_members")
+          .select("*, users!department_members_user_id_fkey(full_name, email, username)")
+          .eq("department_id", departmentId)
+          .is("user_id", null)
+          .eq("invite_email", eposta)
+          .eq("status", "invited")
+          .limit(1)
+          .maybeSingle();
+        if (hata) throw hata;
+        row = epostaIle;
+      }
+    }
     if (!row) return { invite: null };
 
     const { data: dept } = await this.supabase.client

@@ -68,4 +68,13 @@ export const ekipHesaplari: TranslationDict = {
   "Modül seçimi geçersiz.": "Invalid module selection.",
   "Modül, seçilen departmanlardan birine ait olmalı.": "Each module must belong to one of the selected departments.",
   "Seçilen modül bu departmanda açık değil.": "The selected module isn't enabled in this department.",
+  // ─────────────────────────────────────────────── Kadro daveti e-postası (department-members)
+  "{yer} kadrosuna davet edildin": "You've been invited to join {yer}",
+  "{kisi}, seni Projelio'da {yer} kadrosuna davet etti.": "{kisi} invited you to join {yer} on Projelio.",
+  "Daveti görmek ve onaylamak için Projelio'ya giriş yap.": "Sign in to Projelio to view and accept the invitation.",
+  "Daveti kabul etmek için Projelio'ya bu e-posta adresiyle ({eposta}) kayıt ol; davet kayıttan sonra departman sayfasında seni bekliyor olacak.":
+    "To accept, sign up for Projelio with this email address ({eposta}); the invitation will be waiting on the department page after you sign up.",
+  "Daveti gör": "View invitation",
+  "Bu kişiyi tanımıyorsan ya da bu e-postayı beklemiyorsan görmezden gelebilirsin.":
+    "If you don't know this person or weren't expecting this email, you can ignore it.",
 };

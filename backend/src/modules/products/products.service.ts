@@ -45,6 +45,9 @@ const MAX_IMPORT_ROWS = Math.min(Number(process.env.URUN_IMPORT_TAVANI ?? 5000),
 const MAX_GUNCELLEME = 500;
 // Toplu yazmanın parça boyu (bkz. sablondanIceAktar).
 const IMPORT_CHUNK = 100;
+// Görsel sorgusunda tek seferde sorulan ürün kimliği (bkz. loadImagesFor).
+// 200 × 37 karakter ≈ 7,5 KB adres: sınırın çok altında, 5000 ürün ~25 sorgu.
+const GORSEL_SORGU_PARCASI = 200;
 
 /** jsonb dizisini güvenle okur: bozuk/eski satırda kart `.map`'te kırılmasın. */
 function asArray(value: unknown): unknown[] {
@@ -279,15 +282,25 @@ export class ProductsService {
     const byProduct = new Map<string, ProductImage[]>();
     if (productIds.length === 0) return byProduct;
 
-    const { data, error } = await this.supabase.client
-      .from("product_images")
-      .select("*")
-      .in("product_id", productIds)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
-    if (error) throw error;
+    // Kimlikler PARÇA PARÇA sorulur. `.in()` listeyi GET adresine yazar; 3586
+    // ürünlük bir katalogda (Net Sağlık, 2026-11-11) adres ~140 KB'a çıkıyor,
+    // PostgREST isteği reddediyor ve ürün listesinin TAMAMI hata veriyordu —
+    // ürünler veritabanında ve sitede duruyordu ama Projelio'da görünmüyordu.
+    const satirlar: any[] = [];
+    for (let i = 0; i < productIds.length; i += GORSEL_SORGU_PARCASI) {
+      const { data, error } = await this.supabase.client
+        .from("product_images")
+        .select("*")
+        .in("product_id", productIds.slice(i, i + GORSEL_SORGU_PARCASI))
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      satirlar.push(...(data ?? []));
+    }
 
-    for (const row of data ?? []) {
+    // Sıra ürün içinde önemli (kapak = ilk görsel); her ürünün görselleri tek
+    // parçada geldiği için parçaların birleşmesi o sırayı bozmaz.
+    for (const row of satirlar) {
       const image = mapProductImage(row);
       const list = byProduct.get(image.productId);
       if (list) list.push(image);

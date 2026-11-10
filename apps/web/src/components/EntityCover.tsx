@@ -4,7 +4,7 @@ import { COVER_VEIL_HEIGHT, COVER_VEIL_HEIGHT_MOBILE, coverBackground } from "..
 import type { LioSubject } from "../lib/askLio";
 import AskLioButton from "./AskLioButton";
 import { useIsDesktop } from "../lib/useIsDesktop";
-import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop, TOP_CHROME } from "../lib/layout";
+import { COVER_TOP_CLEARANCE, pageGutter, SAFE_TOP, TOP_CHROME_BOTTOM, safeTop, TOP_CHROME, SOL_UST_SAG_KENAR } from "../lib/layout";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { useCoverTheme } from "../theme/useCoverTheme";
@@ -381,7 +381,8 @@ const EXPANDED_PHOTO = 84;
  */
 const TOP_ROW_AVATAR = 40;
 const TOP_ROW_HEIGHT = TOP_ROW_AVATAR + 8;
-const TOP_ROW_LEFT = TOP_CHROME.gutter + 40 + 8;
+// Sol üstte ok + anasayfa simgesi (bkz. lib/layout SOL_UST_SAG_KENAR).
+const TOP_ROW_LEFT = SOL_UST_SAG_KENAR + 8;
 const TOP_ROW_RIGHT = TOP_CHROME.gutter + TOP_CHROME.size * 2 + 4 + 8;
 /** Satır, 44 px'lik düğmelerle aynı dikey merkezde. */
 const TOP_ROW_TOP = TOP_CHROME.top + TOP_CHROME.size / 2 - TOP_ROW_HEIGHT / 2;

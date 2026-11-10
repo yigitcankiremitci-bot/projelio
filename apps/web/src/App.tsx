@@ -26,7 +26,7 @@ import { refreshSession } from "./lib/session";
 import { useEtkinlikSayaci } from "./lib/etkinlikSayaci";
 import { useDemoZiyaret } from "./lib/demoZiyaret";
 import { demoEpostasiMi } from "./lib/demoHesap";
-import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop } from "./lib/layout";
+import { SIDEBAR_WIDTH, pageGutter, Z, TOP_CHROME, SAFE_TOP, safeTop, SOL_UST_DUGME, SOL_UST_ARALIK, SOL_UST_SAG_KENAR } from "./lib/layout";
 import { kabukBildirimDokunusunuDinle, kabukDonusunuDinle } from "./lib/mobilKabuk";
 import UploadTray, { UPLOAD_TRAY_HEIGHT } from "./components/UploadTray";
 import { useUploads } from "./lib/uploadQueue";
@@ -408,7 +408,7 @@ function CoverStickyHeader({
           - masaüstünde sayfanın sekme çubuğu yukarı kayınca (2. aşama) sekmeler,
           - mobilde ise sayfa adı + kişi göstergesi buraya yerleşir; böylece dar
             ekranda ayrı bir başlık satırı açıp şeridi bir kat daha uzatmıyoruz. */}
-      {/* ÜST SATIR — sayfanın kimliği. Solda sidebar oku (14–54),
+      {/* ÜST SATIR — sayfanın kimliği. Solda sidebar oku + anasayfa simgesi (14–100),
           sağda bildirim çanı (14–58) + tur düğmesi (62–106) position:fixed
           duruyor; bu satırın dolgusu tam o boşluğu bırakıyor ve kişi göstergesi
           sağ uçta, çanın hemen yanına düşüyor. */}
@@ -418,7 +418,7 @@ function CoverStickyHeader({
           display: "flex",
           alignItems: "center",
           gap: 12,
-          paddingLeft: sidebarOpen ? 28 : 62,
+          paddingLeft: sidebarOpen ? 28 : SOL_UST_SAG_KENAR + 8,
           paddingRight: 112,
         }}
       >
@@ -867,10 +867,17 @@ export default function App() {
           user={me}
         />
 
-        {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte yalnızca küçük
-            bir ok butonu durur; basınca sidebar açılır. Yanındaki yüzen Projelio
+        {/* Sidebar kapalıyken (masaüstünde veya mobilde) sol üstte küçük bir ok
+            butonu durur; basınca sidebar açılır. Yanındaki yüzen Projelio
             logosu 2026-09'da kaldırıldı: logo sidebar'ın içinde zaten var, kapağın
-            üstünde de başlığa ve kapak fotoğrafına binip kalabalık yaratıyordu. */}
+            üstünde de başlığa ve kapak fotoğrafına binip kalabalık yaratıyordu.
+
+            2026-11'de okun yanına AYNI BOYDA yuvarlak bir anasayfa simgesi geldi:
+            sidebar kapalıyken anasayfaya dönmenin tek yolu sidebar'ı açıp
+            logoya basmaktı. Eski logodan farkı: yazısız, okla aynı 40 px'lik
+            düğme dizisinde, ve kapak başlıkları ona yer ayırıyor (bkz.
+            lib/layout SOL_UST_SAG_KENAR) — üstüne binmiyor. Anasayfadayken
+            gösterilmez: zaten oradayız. */}
         {!sidebarOpen && !sakinEkrani && (
           <>
             <button
@@ -895,6 +902,30 @@ export default function App() {
             >
               <IconChevronRight size={18} color={c.textSecondary} />
             </button>
+            {location.pathname !== "/" && (
+              <Link
+                to="/"
+                aria-label={t("Anasayfa")}
+                title={t("Anasayfa")}
+                style={{
+                  position: "fixed",
+                  top: safeTop(TOP_CHROME.top),
+                  left: TOP_CHROME.gutter + SOL_UST_DUGME + SOL_UST_ARALIK,
+                  zIndex: Z.topChrome,
+                  width: SOL_UST_DUGME,
+                  height: SOL_UST_DUGME,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: c.surface,
+                  border: `1px solid ${c.border}`,
+                  boxShadow: "0 2px 8px rgba(26,31,41,0.12)",
+                }}
+              >
+                <img src="/logo.png" alt="" style={{ width: 22, height: 22 }} />
+              </Link>
+            )}
           </>
         )}
         <NotificationBell />

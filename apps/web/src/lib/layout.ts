@@ -154,6 +154,16 @@ export const TOP_CHROME = {
   gutter: 14,
 } as const;
 
+/**
+ * Sidebar kapalıyken sol üstte duran düğmeler: açma oku + anasayfa simgesi
+ * (bkz. App.tsx). Kapak başlıkları ve sabit şerit soldan bu kadar yer bırakır;
+ * sayı elle yazılırsa düğme eklenince başlık düğmenin altına giriyor.
+ */
+export const SOL_UST_DUGME = 40;
+export const SOL_UST_ARALIK = 6;
+/** İki düğmenin sağ kenarı (ekranın solundan). */
+export const SOL_UST_SAG_KENAR = TOP_CHROME.gutter + SOL_UST_DUGME * 2 + SOL_UST_ARALIK;
+
 /** Sağ üst düğme bandının alt sınırı: altına konan her şey bu değerden sonra başlamalı. */
 export const TOP_CHROME_BOTTOM = TOP_CHROME.top + TOP_CHROME.size + 4;
 

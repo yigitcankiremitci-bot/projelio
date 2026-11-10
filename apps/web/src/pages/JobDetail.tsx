@@ -68,6 +68,10 @@ export default function JobDetail() {
   const [creatingProject, setCreatingProject] = useState(false);
   const [creatingTask, setCreatingTask] = useState(false);
   const [endedOpen, setEndedOpen] = useState(false);
+  // Pasif ve tamamlanan projeler ana ızgaradan ayrı, kapalı başlayan
+  // bölümlerde (bkz. aşağıda anaProjeler) — kapatılmış rutinlerle aynı desen.
+  const [pasifAcik, setPasifAcik] = useState(false);
+  const [bitenAcik, setBitenAcik] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editing, setEditing] = useState(false);
   // İşin bilgi kartı: künye, belgeler ve özet (bkz. BilgiKartiModal).
@@ -354,15 +358,21 @@ export default function JobDetail() {
           .map((node) => (node as HTMLElement).dataset.id!)
           .filter(Boolean);
         const previousIds = projectsRef.current.map((p) => p.id);
+        // Izgarada yalnızca aktif + beklemedeki projeler var (pasif ve
+        // tamamlananlar ayrı bölümlerde). Izgaranın sırası yazılırken diğerleri
+        // listeden DÜŞMEMELİ — sona eklenip korunuyor.
         setProjects((prev) => {
           const byId = new Map(prev.map((p) => [p.id, p]));
-          return ids.map((pid) => byId.get(pid)!).filter(Boolean);
+          const sirali = new Set(ids);
+          return [...ids.map((pid) => byId.get(pid)!).filter(Boolean), ...prev.filter((p) => !sirali.has(p.id))];
         });
         api.patch("/projects/reorder", { ids }).catch(() => reload());
         registerReorderUndo("/projects/reorder", previousIds, ids, reload);
       },
     },
-    [projects.length === 0, activeTab]
+    // Izgara yalnızca ana bölümde proje varken çizilir (bkz. anaProjeler):
+    // pasif/tamamlanandan geri alınan ilk projeyle ızgara yeniden bağlanmalı.
+    [projects.every((p) => p.status === "passive" || p.status === "completed"), activeTab]
   );
 
   // Kaydırınca tepede beliren sabit başlık için (bkz. App.tsx / lib/pageHeader).
@@ -399,6 +409,14 @@ export default function JobDetail() {
   if (!id) return null;
 
   const activeProjects = projects.filter((p) => p.status === "active");
+  // Projeler sekmesinin üç bölümü (kullanıcının kararı, 2026-11-10): ana
+  // ızgarada üzerinde çalışılan ya da geri dönülecek olanlar; artık
+  // çalışılmayan (pasif) ve biten projeler ayrı listelerde, ana ızgarayı
+  // kalabalıklaştırmasınlar. "Arşivlendi" durumu arşiv sayfasına aittir ama
+  // arşivlenmeden o duruma alınmış bir proje kaybolmasın diye ana ızgarada.
+  const pasifProjeler = projects.filter((p) => p.status === "passive");
+  const bitenProjeler = projects.filter((p) => p.status === "completed");
+  const anaProjeler = projects.filter((p) => p.status !== "passive" && p.status !== "completed");
   const activeOperations = operations.filter((o) => o.status === "active");
   // Kapatılan rutinler silinmiyor, yalnızca aktiflerin arasından çıkarılıyor:
   // geçmiş kayıtlarına ve eklerine erişim gerekiyor (bkz. 060).
@@ -417,11 +435,27 @@ export default function JobDetail() {
   // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
   // (bkz. StatGrid — hangisinin çizileceğine bileşenler karar veriyor).
   const stats: StatItem[] = [
-    { label: t("Proje"), value: activeProjects.length },
+    // Proje sayısı durumlarıyla: iş sayfasına bakan kişi "kaç projem yürüyor,
+    // kaçı durdu" sorusunun cevabını kapakta görsün (kullanıcının kararı,
+    // 2026-11-10). Tek kelimelik etiket kuralı (bkz. StatItem.label).
+    { label: t("Aktif"), value: activeProjects.length },
+    { label: t("Beklemede"), value: projects.filter((p) => p.status === "on_hold").length },
+    { label: t("Pasif"), value: pasifProjeler.length },
     { label: t("Rutin"), value: activeOperations.length },
     { label: t("Bekleyen"), value: pendingTasksCount },
     { label: t("Biten"), value: completedTasksCount },
   ];
+
+  // Üç bölümde de aynı kart. Durum kartın üstünden değiştirilince proje kendi
+  // bölümüne kendiliğinden geçer (setProjects → yukarıdaki süzgeçler).
+  const projeKarti = (p: Project) => (
+    <ProjectCard
+      project={p}
+      // Sunucudaki kuralın aynısı: proje sahibi ya da işin sahibi.
+      canManage={Boolean(currentUser && (currentUser.id === p.ownerId || currentUser.id === job?.ownerId))}
+      onStatusChanged={(updated) => setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))}
+    />
+  );
 
   return (
     <div style={{ minHeight: "100vh", background: c.background }}>
@@ -535,20 +569,35 @@ export default function JobDetail() {
                 {t("Bu işte henüz proje yok.")}
               </div>
             ) : (
-              <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
-                {projects.map((p) => (
-                  <div key={p.id} data-id={p.id}>
-                    <ProjectCard
-                      project={p}
-                      // Sunucudaki kuralın aynısı: proje sahibi ya da işin sahibi.
-                      canManage={Boolean(currentUser && (currentUser.id === p.ownerId || currentUser.id === job?.ownerId))}
-                      onStatusChanged={(updated) =>
-                        setProjects((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-                      }
-                    />
+              <>
+                {anaProjeler.length === 0 ? (
+                  <div style={{ color: c.textSecondary, fontSize: 15, padding: "8px 0" }}>
+                    {t("Aktif ya da beklemede proje yok.")}
                   </div>
-                ))}
-              </div>
+                ) : (
+                  <div ref={gridRef} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 14 }}>
+                    {anaProjeler.map((p) => (
+                      <div key={p.id} data-id={p.id}>
+                        {projeKarti(p)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <ProjeBolumu
+                  baslik={t("Pasif projeler")}
+                  projeler={pasifProjeler}
+                  acik={pasifAcik}
+                  onToggle={() => setPasifAcik((v) => !v)}
+                  kart={projeKarti}
+                />
+                <ProjeBolumu
+                  baslik={t("Tamamlanan projeler")}
+                  projeler={bitenProjeler}
+                  acik={bitenAcik}
+                  onToggle={() => setBitenAcik((v) => !v)}
+                  kart={projeKarti}
+                />
+              </>
             )
           )}
 
@@ -806,3 +855,66 @@ export default function JobDetail() {
   );
 }
 
+/**
+ * Projeler sekmesindeki ayrı bölüm (pasif / tamamlanan). Kapatılmış rutinler
+ * bölümüyle aynı görünüm: başlık + sayı + göster/gizle, açılınca soluk ızgara.
+ * Boşsa hiç çizilmez. Izgara sürüklenmiyor: sıralama ana ızgaranın işi.
+ */
+function ProjeBolumu({
+  baslik,
+  projeler,
+  acik,
+  onToggle,
+  kart,
+}: {
+  baslik: string;
+  projeler: Project[];
+  acik: boolean;
+  onToggle: () => void;
+  kart: (p: Project) => React.ReactNode;
+}) {
+  const c = useThemeColors();
+  const t = useT();
+  if (projeler.length === 0) return null;
+  return (
+    <div style={{ marginTop: 28 }}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={acik}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "transparent",
+          border: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontSize: 17,
+          fontWeight: 500,
+          color: c.textPrimary,
+        }}
+      >
+        {baslik}
+        <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
+          {t("{n} proje", { n: projeler.length })} · {acik ? t("gizle") : t("göster")}
+        </span>
+      </button>
+      {acik && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+            gap: 14,
+            marginTop: 12,
+            opacity: 0.72,
+          }}
+        >
+          {projeler.map((p) => (
+            <div key={p.id}>{kart(p)}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

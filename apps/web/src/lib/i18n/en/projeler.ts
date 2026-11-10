@@ -65,6 +65,9 @@ export const projeler: TranslationDict = {
   "Rutin, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır.":
     "A routine is for ongoing, repeating work — monthly maintenance, weekly reporting, social media. Work with an end date belongs in a project.",
   "Kapatılmış rutinler": "Closed routines",
+  "Pasif projeler": "Inactive projects",
+  "Tamamlanan projeler": "Completed projects",
+  "Aktif ya da beklemede proje yok.": "No active or on-hold projects.",
   gizle: "hide",
   göster: "show",
   Bekleyen: "Pending",

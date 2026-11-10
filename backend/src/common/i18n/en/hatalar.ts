@@ -70,7 +70,7 @@ export const hatalar: TranslationDict = {
   "Bu talebi yanıtlama yetkiniz yok": "You don't have permission to respond to this request",
   "Bu çıktıyı düzenleme yetkiniz yok": "You don't have permission to edit this output",
   "Bu çıktıyı yalnızca proje veya iş sahibi düzenleyebilir": "Only the project or job owner can edit this output",
-  "Bu ürünü yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir": "Only the organization owner or the department manager can edit this product",
+  "Bu ürünü yalnızca organizasyon sahibi, departman yöneticisi veya Yönetim yöneticisi düzenleyebilir": "Only the organization owner, the department manager or a Management manager can edit this product",
   "Bu şifreyi görme izniniz yok. Modül yöneticisinden izin isteyebilirsiniz.": "You don't have permission to view this password. You can ask the module manager for access.",
   "Ekipten çıkarma işlemini yalnızca iş sahibi yapabilir": "Only the job owner can remove people from the team",
   "Gelen kutusuna yalnızca bu modüle atanmış kişiler erişebilir.": "Only people assigned to this module can open the inbox.",

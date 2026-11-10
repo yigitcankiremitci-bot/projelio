@@ -16,6 +16,17 @@ describe("çekirdek modüller", () => {
     assert.equal(cekirdekModulAdresi("yonetim_dosya_yonetimi", { departmentId: "d1" }), "/departments/d1?tab=files");
   });
 
+  // Yönetim departmanı olmayan şirkette kart ölü kalıyordu.
+  test("yalnızca şirket kapsamında şirketin sekmesine gider", () => {
+    assert.equal(cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=tasks");
+    assert.equal(cekirdekModulAdresi("yonetim_dosya_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=files");
+    // Departman varsa o kazanır.
+    assert.equal(
+      cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1", departmentId: "d1" }),
+      "/departments/d1?tab=tasks"
+    );
+  });
+
   test("kapsamsız ya da çekirdek olmayan modülde adres yok", () => {
     assert.equal(cekirdekModulAdresi("yonetim_gorev_yonetimi", {}), null);
     assert.equal(cekirdekModulAdresi("fm_fatura", { departmentId: "d1" }), null);

@@ -97,8 +97,8 @@ function ModuleSurfaceContent({
   if (isCekirdekModul(moduleKey)) {
     // Çekirdek modülün kendi paneli yok: verisi kapsamın sekmesinde. replace,
     // yoksa geri düğmesi bu ara sayfaya dönüp kullanıcıyı tekrar sekmeye atardı.
-    const adres = cekirdekModulAdresi(moduleKey, { departmentId, jobId });
-    return adres ? <Navigate to={adres} replace /> : <Bilgi metin={t("Bu modül işin ya da departmanın kendi sekmesinde açılır.")} />;
+    const adres = cekirdekModulAdresi(moduleKey, { departmentId, jobId, organizationId });
+    return adres ? <Navigate to={adres} replace /> : <Bilgi metin={t("Bu modül işin, departmanın ya da şirketin kendi sekmesinde açılır.")} />;
   }
 
   if (isUrunlerModule(moduleKey)) {

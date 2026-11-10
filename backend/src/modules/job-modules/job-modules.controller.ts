@@ -14,12 +14,12 @@ export class JobModulesController {
   @Get("jobs/:jobId/modules")
   async findByJob(@Param("jobId") jobId: string, @Req() req: any) {
     await this.access.assertCanViewJob(jobId, req.user.userId);
-    return this.jobModulesService.findByJob(jobId);
+    return this.jobModulesService.findByJob(jobId, req.user.role);
   }
 
   @Post("jobs/:jobId/modules")
   assign(@Param("jobId") jobId: string, @Body("moduleKey") moduleKey: string, @Req() req: any) {
-    return this.jobModulesService.assign(jobId, moduleKey, req.user.userId);
+    return this.jobModulesService.assign(jobId, moduleKey, req.user.userId, req.user.role);
   }
 
   @Delete("jobs/:jobId/modules/:moduleKey")

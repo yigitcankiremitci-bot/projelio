@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { DepartmentCatalogEntry, ModuleCatalogEntry } from "@projelio/shared";
+import { katalogdaGorunurMu } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 
 function mapDepartmentCatalog(row: any): DepartmentCatalogEntry {
@@ -49,7 +50,9 @@ export class CatalogService {
    * geriye dönük uyumluluk için duruyor ve birincil departmanı gösteriyor.
    * Bkz. 046_party_and_customer_merge.sql
    */
-  async findModules(opts: { departmentKey?: string; freelancerOnly?: boolean } = {}): Promise<ModuleCatalogEntry[]> {
+  async findModules(
+    opts: { departmentKey?: string; freelancerOnly?: boolean; kullaniciRolu?: string | null; tumu?: boolean } = {}
+  ): Promise<ModuleCatalogEntry[]> {
     let keysForDepartment: string[] | null = null;
     if (opts.departmentKey) {
       const { data: mapping, error: mappingError } = await this.supabase.client
@@ -73,7 +76,13 @@ export class CatalogService {
     // departmanı kurulmamış bir şirkette de açık olabiliyor ve kart o zaman
     // gidecek yer bulamıyordu (bkz. apps/web ModulesPanel).
     const byModule = await this.departmentKeysByModule();
-    return (data ?? []).map((row: any) => mapModuleCatalog(row, byModule.get(row.key)));
+    // Pasif modüller yalnızca platform yöneticisine listelenir (bkz. shared
+    // aktifModuller.ts). Rol verilmezse (Lio gibi iç çağıranlar) kullanıcı
+    // gözüyle süzülür: pasif modülü önermesin. `tumu` yalnızca ad çözmek için
+    // (yetki orada ayrıca resolve*Access'te denetlenir).
+    return (data ?? [])
+      .filter((row: any) => opts.tumu || katalogdaGorunurMu(row.key, opts.kullaniciRolu))
+      .map((row: any) => mapModuleCatalog(row, byModule.get(row.key)));
   }
 
   /** module_catalog_departments'ı modül anahtarına göre toplar. */

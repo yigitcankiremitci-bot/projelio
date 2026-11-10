@@ -3,7 +3,7 @@ import { AuthGuard } from "@nestjs/passport";
 import { cevirmen, istekDili } from "../../common/i18n";
 import { CatalogService } from "./catalog.service";
 
-type BaslikliIstek = { headers: Record<string, string | string[] | undefined> };
+type BaslikliIstek = { headers: Record<string, string | string[] | undefined>; user?: { role?: string } };
 
 /**
  * Katalog adları ve açıklamaları veritabanında yalnızca Türkçe duruyor;
@@ -39,7 +39,11 @@ export class CatalogController {
     @Query("freelancer") freelancer?: string
   ) {
     const t = katalogCevirmeni(req);
-    const liste = await this.catalogService.findModules({ departmentKey, freelancerOnly: freelancer === "true" });
+    const liste = await this.catalogService.findModules({
+      departmentKey,
+      freelancerOnly: freelancer === "true",
+      kullaniciRolu: req.user?.role,
+    });
     return liste.map((m) => ({ ...m, name: t(m.name), description: m.description && t(m.description) }));
   }
 }

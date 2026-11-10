@@ -14,7 +14,7 @@ export class OrganizationModulesController {
   @Get("organizations/:organizationId/modules")
   async findByOrganization(@Param("organizationId") organizationId: string, @Req() req: any) {
     await this.access.assertCanViewOrganization(organizationId, req.user.userId);
-    return this.organizationModulesService.findByOrganization(organizationId);
+    return this.organizationModulesService.findByOrganization(organizationId, req.user.role);
   }
 
   // Paket başına modül hakkı (bkz. shared modulHakki.ts): "Modül ekle" ve
@@ -32,9 +32,9 @@ export class OrganizationModulesController {
     @Req() req: any
   ) {
     if (body.moduleKeys?.length) {
-      return this.organizationModulesService.enableMany(organizationId, body.moduleKeys, req.user.userId);
+      return this.organizationModulesService.enableMany(organizationId, body.moduleKeys, req.user.userId, req.user.role);
     }
-    return this.organizationModulesService.enable(organizationId, body.moduleKey!, req.user.userId);
+    return this.organizationModulesService.enable(organizationId, body.moduleKey!, req.user.userId, req.user.role);
   }
 
   @Delete("organizations/:organizationId/modules/:moduleKey")

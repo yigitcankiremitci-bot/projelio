@@ -1213,4 +1213,6 @@ export const hatalar: TranslationDict = {
   "Bu e-posta bu portalda zaten açık bir hesaba bağlı": "This email is already linked to an active account on this portal",
   "Portal kullanıcısı bulunamadı": "Portal user not found",
   "Portal kullanıcısının durumu geçersiz": "Invalid portal user status",
+  // Pasif modül (shared aktifModuller.ts) — yalnızca platform yöneticisi açar
+  "Bu modül şu anda kullanıma kapalı.": "This module isn't available right now.",
 };

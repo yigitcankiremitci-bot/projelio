@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModulHakkiDurumu, OrganizationModule } from "@projelio/shared";
-import { MODUL_HAKKI, modulEklenebilirMi, modulHakkiDurumu } from "@projelio/shared";
+import { katalogdaGorunurMu, MODUL_HAKKI, modulEklenebilirMi, modulHakkiDurumu } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "../billing/abonelik-hakki";
 import { requireUuid } from "../../common/validation/input";
@@ -83,17 +83,36 @@ export class OrganizationModulesService {
     if ("sebep" in karar) throw new BadRequestException(karar.sebep);
   }
 
-  async findByOrganization(organizationId: string): Promise<OrganizationModule[]> {
+  /**
+   * Şirketin açık modülleri. Pasif modüller (bkz. shared aktifModuller.ts)
+   * yalnızca platform yöneticisine listelenir; rol verilmezse süzülür — bu
+   * yüzden modül hakkı da yalnızca kullanıcılara açık modülleri sayar, önceden
+   * açılmış pasif bir modül şirketin hakkını görünmeden doldurmasın.
+   */
+  async findByOrganization(organizationId: string, kullaniciRolu?: string | null): Promise<OrganizationModule[]> {
     const { data, error } = await this.supabase.client
       .from("organization_modules")
       .select("*")
       .eq("organization_id", organizationId);
     if (error) throw error;
-    return (data ?? []).map(mapOrganizationModule);
+    return (data ?? []).filter((r: any) => katalogdaGorunurMu(r.module_key, kullaniciRolu)).map(mapOrganizationModule);
   }
 
-  async enable(organizationId: string, moduleKey: string, requestingUserId?: string): Promise<OrganizationModule> {
+  /** Pasif modülü yalnızca platform yöneticisi açabilir. */
+  private assertAcilabilir(moduleKeys: string[], kullaniciRolu?: string | null): void {
+    if (moduleKeys.some((k) => !katalogdaGorunurMu(k, kullaniciRolu))) {
+      throw new BadRequestException("Bu modül şu anda kullanıma kapalı.");
+    }
+  }
+
+  async enable(
+    organizationId: string,
+    moduleKey: string,
+    requestingUserId?: string,
+    kullaniciRolu?: string | null
+  ): Promise<OrganizationModule> {
     await this.assertOwner(organizationId, requestingUserId);
+    this.assertAcilabilir([moduleKey], kullaniciRolu);
     await this.assertModulHakki(organizationId, [moduleKey]);
     const { data: row, error } = await this.supabase.client
       .from("organization_modules")
@@ -117,9 +136,15 @@ export class OrganizationModulesService {
   }
 
   // Sihirbazda tek seferde birden çok modül seçilir; hepsini idempotent şekilde ekler.
-  async enableMany(organizationId: string, moduleKeys: string[], requestingUserId?: string): Promise<OrganizationModule[]> {
+  async enableMany(
+    organizationId: string,
+    moduleKeys: string[],
+    requestingUserId?: string,
+    kullaniciRolu?: string | null
+  ): Promise<OrganizationModule[]> {
     await this.assertOwner(organizationId, requestingUserId);
     if (!moduleKeys?.length) return [];
+    this.assertAcilabilir(moduleKeys, kullaniciRolu);
     // Hepsi ya da hiçbiri: yarısını açıp yarısını reddetmek, kullanıcının
     // hangisinin açıldığını anlamasını zorlaştırırdı.
     await this.assertModulHakki(organizationId, moduleKeys);
@@ -131,7 +156,7 @@ export class OrganizationModulesService {
       )
       .select("*");
     if (error) throw error;
-    return this.findByOrganization(organizationId);
+    return this.findByOrganization(organizationId, kullaniciRolu);
   }
 
   async disable(organizationId: string, moduleKey: string, requestingUserId?: string): Promise<void> {

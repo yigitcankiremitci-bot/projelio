@@ -108,7 +108,8 @@ import { AiTranscriptionService } from "./ai-transcription.service";
 import { RealtimeGateway } from "../realtime/realtime.gateway";
 import { WhatsappLioService } from "../whatsapp/whatsapp-lio.service";
 import type { LioActivityPayload } from "@projelio/shared";
-import { ajanProjelioAraciMi } from "@projelio/shared";
+import { ajanProjelioAraciMi, katalogdaGorunurMu } from "@projelio/shared";
+import { kullaniciRolu } from "../../common/modul-erisimi";
 import {
   BASE_PROMPT_TOKENS,
   CREDIT_CONFIRM_THRESHOLD,
@@ -7368,7 +7369,7 @@ export class AiAssistantService {
 
   private async moduleDisplayName(moduleKey: string): Promise<string> {
     if (!moduleKey) throw new BadRequestException("moduleKey gerekli");
-    const modules = await this.catalogService.findModules();
+    const modules = await this.catalogService.findModules({ tumu: true });
     const found = modules.find((m) => m.key === moduleKey);
     if (!found) throw new BadRequestException(hataMetni("Bilinmeyen modül: {anahtar}", { anahtar: moduleKey }));
     return found.name;
@@ -7404,12 +7405,16 @@ export class AiAssistantService {
    */
   private async listModulesForUser(userId: string, input: Record<string, any>): Promise<unknown> {
     const wantAvailable = input.includeAvailable === true;
-    const catalog = await this.catalogService.findModules();
-    const nameOf = (key: string) => catalog.find((m) => m.key === key)?.name ?? key;
+    // Ad çözmek için tam katalog; açılabilir öneriler ise kullanıcının gözüyle
+    // (pasif modüller yalnızca platform yöneticisine — shared aktifModuller.ts).
+    const rol = await kullaniciRolu(this.supabase, userId);
+    const tamKatalog = await this.catalogService.findModules({ tumu: true });
+    const catalog = tamKatalog.filter((m) => katalogdaGorunurMu(m.key, rol));
+    const nameOf = (key: string) => tamKatalog.find((m) => m.key === key)?.name ?? key;
 
     if (input.jobId) {
       const jobId = await this.requireOwnJob(userId, input.jobId);
-      const assigned = await this.jobModulesService.findByJob(jobId);
+      const assigned = await this.jobModulesService.findByJob(jobId, rol);
       return pruneEmpty({
         isKimligi: jobId,
         acikModuller: assigned.map((m) => ({ moduleKey: m.moduleKey, ad: nameOf(m.moduleKey) })),

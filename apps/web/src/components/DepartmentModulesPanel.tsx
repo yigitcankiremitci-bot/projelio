@@ -1,3 +1,4 @@
+import AddModuleModal from "./AddModuleModal";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ModuleCatalogEntry, OrganizationModule } from "@projelio/shared";
@@ -13,7 +14,6 @@ import ModuleCard from "./ModuleCard";
 import { IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
-import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
 import { departmanKatalogunuYukle } from "../lib/departmanModulleri";
 
 interface Props {
@@ -150,7 +150,6 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
 
   const activeCatalog = catalog.filter((e) => isEnabled(e.key));
   const modalEntry = modalKey ? catalog.find((e) => e.key === modalKey) ?? null : null;
-  const availableCatalog = catalog.filter((e) => !isEnabled(e.key));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -182,9 +181,10 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
       )}
 
       {adding && (
-        <AddModulesForm
+        // Ayrıntılı ekleme ekranı (tanıtım + kategori) tek yerde: AddModuleModal.
+        <AddModuleModal
           organizationId={organizationId}
-          availableCatalog={availableCatalog}
+          fixedDepartmentId={departmentId}
           onClose={() => setAdding(false)}
           onAdded={() => {
             setAdding(false);
@@ -253,95 +253,3 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
   );
 }
 
-function AddModulesForm({
-  organizationId,
-  availableCatalog,
-  onClose,
-  onAdded,
-}: {
-  organizationId: string;
-  availableCatalog: ModuleCatalogEntry[];
-  onClose: () => void;
-  onAdded: () => void;
-}) {
-  const c = useThemeColors();
-  const t = useT();
-  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const hak = useModulHakki(organizationId);
-  const asiyor = hakkiAsiyor(hak, selectedKeys);
-
-  const toggleKey = (key: string) => {
-    setSelectedKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
-  };
-
-  const handleSave = async () => {
-    if (selectedKeys.length === 0) {
-      setError(t("En az bir modül seç"));
-      return;
-    }
-    setError("");
-    setSaving(true);
-    try {
-      await api.post(`/organizations/${organizationId}/modules`, { moduleKeys: selectedKeys });
-      notifySidebarChanged();
-      onAdded();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("Modül eklenemedi"));
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div style={{ border: `1px solid ${c.border}`, borderRadius: 12, background: c.surface, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t("Bu departmana modül ekle")}</span>
-        <button onClick={onClose} aria-label={t("Kapat")} style={{ background: "transparent", border: "none" }}>
-          <IconX size={16} color={c.textSecondary} />
-        </button>
-      </div>
-
-      {availableCatalog.length === 0 ? (
-        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Bu departmanın modüllerinin hepsi zaten etkin.")}</p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 6 }}>
-          {availableCatalog.map((entry) => {
-            const active = selectedKeys.includes(entry.key);
-            return (
-              <button
-                key={entry.key}
-                onClick={() => toggleKey(entry.key)}
-                style={{
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${active ? c.primary : c.border}`,
-                  background: active ? c.background : "transparent",
-                  fontSize: 13,
-                  color: c.textPrimary,
-                }}
-              >
-                {entry.name}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {availableCatalog.length > 0 && <ModulHakkiBilgisi durum={hak} secilen={selectedKeys} />}
-
-      {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
-
-      {availableCatalog.length > 0 && (
-        <button
-          onClick={handleSave}
-          disabled={saving || asiyor}
-          style={{ padding: "9px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14, fontWeight: 500 }}
-        >
-          {saving ? t("Ekleniyor…") : t("Modülleri ekle")}
-        </button>
-      )}
-    </div>
-  );
-}

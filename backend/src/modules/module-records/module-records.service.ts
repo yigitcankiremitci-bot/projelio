@@ -1,6 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { ModuleRecord, ModuleRecordVersion, ModuleStatsResponse, ModuleUsageStat } from "@projelio/shared";
+import { katalogdaGorunurMu } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { kullaniciRolu } from "../../common/modul-erisimi";
 import { ModuleMembersService } from "../module-members/module-members.service";
 
 function mapModuleRecord(row: any): ModuleRecord {
@@ -369,10 +371,13 @@ export class ModuleRecordsService {
 
     const usage = this.aggregate((records.data ?? []) as any[]);
     const assigned = new Set((assignments.data ?? []).map((a: any) => a.module_key as string));
-    const keys = (enabled.data ?? []).map((e: any) => e.module_key as string);
+    // Pasif modüller (bkz. shared aktifModuller.ts) yalnızca platform yöneticisine.
+    const rol = userId ? await kullaniciRolu(this.supabase, userId) : null;
+    const gorunen = ((enabled.data ?? []) as any[]).filter((e) => katalogdaGorunurMu(e.module_key, rol));
+    const keys = gorunen.map((e: any) => e.module_key as string);
     const names = await this.moduleNames(keys);
 
-    const modules: ModuleUsageStat[] = (enabled.data ?? []).map((e: any) => {
+    const modules: ModuleUsageStat[] = gorunen.map((e: any) => {
       const stat = usage.get(e.module_key);
       return {
         moduleKey: e.module_key,
@@ -425,7 +430,9 @@ export class ModuleRecordsService {
     // Aynı modül birden fazla işe atanmış olabilir; sekme için tek satıra
     // indiriliyor: en erken atama tarihi, en son çalışılan iş.
     const byKey = new Map<string, { jobId: string; enabledAt: string }>();
+    const rol = await kullaniciRolu(this.supabase, userId);
     for (const row of (enabled.data ?? []) as any[]) {
+      if (!katalogdaGorunurMu(row.module_key, rol)) continue;
       const current = byKey.get(row.module_key);
       if (!current || row.created_at < current.enabledAt) {
         byKey.set(row.module_key, { jobId: row.job_id, enabledAt: row.created_at });

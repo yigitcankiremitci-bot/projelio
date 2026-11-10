@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import type { JobModule } from "@projelio/shared";
+import { katalogdaGorunurMu } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 
 function mapJobModule(row: any): JobModule {
@@ -24,15 +25,17 @@ export class JobModulesService {
     if (data.owner_id !== userId) throw new ForbiddenException("Bu işi yalnızca sahibi düzenleyebilir");
   }
 
-  async findByJob(jobId: string): Promise<JobModule[]> {
+  /** Pasif modüller (bkz. shared aktifModuller.ts) yalnızca platform yöneticisine listelenir. */
+  async findByJob(jobId: string, kullaniciRolu?: string | null): Promise<JobModule[]> {
     const { data, error } = await this.supabase.client.from("job_modules").select("*").eq("job_id", jobId);
     if (error) throw error;
-    return (data ?? []).map(mapJobModule);
+    return (data ?? []).filter((r: any) => katalogdaGorunurMu(r.module_key, kullaniciRolu)).map(mapJobModule);
   }
 
-  async assign(jobId: string, moduleKey: string, requestingUserId?: string): Promise<JobModule> {
+  async assign(jobId: string, moduleKey: string, requestingUserId?: string, kullaniciRolu?: string | null): Promise<JobModule> {
     await this.assertOwner(jobId, requestingUserId);
     if (!moduleKey) throw new BadRequestException("Modül anahtarı gerekli");
+    if (!katalogdaGorunurMu(moduleKey, kullaniciRolu)) throw new BadRequestException("Bu modül şu anda kullanıma kapalı.");
 
     const { data: catalogRow, error: catalogError } = await this.supabase.client
       .from("module_catalog")

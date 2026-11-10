@@ -5,6 +5,7 @@ import { SupabaseService } from "../../database/supabase.service";
 import { requireOneOf, optionalOneOf, requireUuid } from "../../common/validation/input";
 import { NotificationsService } from "../notifications/notifications.service";
 import { NO_ACCESS, decideAccess, sayilanDepartmanlar } from "./module-access";
+import { moduleErisebilir } from "../../common/modul-erisimi";
 
 function mapModuleMember(row: any): ModuleMember {
   return {
@@ -78,6 +79,9 @@ export class ModuleMembersService {
     departmentId?: string
   ): Promise<ModuleAccess> {
     if (!userId) return NO_ACCESS(moduleKey);
+    // Pasif modül (bkz. shared aktifModuller.ts) şirket sahibine bile kapalı;
+    // bu yüzden sahiplik kısa devresinden ÖNCE bakılır.
+    if (!(await moduleErisebilir(this.supabase, moduleKey, userId))) return NO_ACCESS(moduleKey);
 
     const { data: org } = await this.supabase.client
       .from("organizations")
@@ -145,6 +149,7 @@ export class ModuleMembersService {
   /** Serbest çalışan tarafı: iş sahibi tam yetkili, atanan kişiler yazabilir. */
   async resolveJobAccess(jobId: string, moduleKey: string, userId?: string): Promise<ModuleAccess> {
     if (!userId) return NO_ACCESS(moduleKey);
+    if (!(await moduleErisebilir(this.supabase, moduleKey, userId))) return NO_ACCESS(moduleKey);
 
     const { data: job } = await this.supabase.client.from("jobs").select("owner_id").eq("id", jobId).maybeSingle();
     if (!job) throw new NotFoundException("İş bulunamadı");

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { modulAktifMi } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 
 /**
@@ -653,18 +654,25 @@ interface Props {
 
 export default function ModuleEmblem({ moduleKey, size = 40, radius }: Props) {
   const c = useThemeColors();
+  // Pasif modül (bkz. shared aktifModuller.ts) yalnızca platform yöneticisine
+  // görünür; onda da renksiz çizilir ki kullanıcılara açık modüllerle
+  // karıştırılmasın. Simge her yüzeyde (kart, kenar çubuğu, anasayfa, çipler)
+  // bu bileşenden geçtiği için ayrım tek yerde.
+  const pasif = !modulAktifMi(moduleKey);
+  const ana = pasif ? c.textSecondary : c.primary;
+  const vurgu = pasif ? c.textSecondary : c.accent;
   const stroke = {
     fill: "none",
-    stroke: c.primary,
+    stroke: ana,
     strokeWidth: 1.8,
     strokeLinecap: "round",
     strokeLinejoin: "round",
   };
   const paint: Paint = {
     s: stroke,
-    as: { ...stroke, stroke: c.accent, strokeWidth: 2.2 },
-    P: c.primary,
-    A: c.accent,
+    as: { ...stroke, stroke: vurgu, strokeWidth: 2.2 },
+    P: ana,
+    A: vurgu,
     S: c.surface,
   };
   const glyph = Math.round(size * 0.64);
@@ -683,8 +691,11 @@ export default function ModuleEmblem({ moduleKey, size = 40, radius }: Props) {
         borderRadius: radius ?? Math.round(size * 0.28),
         // Zemin iki rengin çok açık bir karışımı: kartın beyazından ayrışacak
         // kadar, başlığın önüne geçmeyecek kadar.
-        background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 16%, ${c.surface}), color-mix(in srgb, ${c.primary} 7%, ${c.surface}))`,
-        border: radius ? "none" : `1px solid color-mix(in srgb, ${c.accent} 20%, ${c.border})`,
+        background: pasif
+          ? c.background
+          : `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 16%, ${c.surface}), color-mix(in srgb, ${c.primary} 7%, ${c.surface}))`,
+        border: radius ? "none" : pasif ? `1px dashed ${c.border}` : `1px solid color-mix(in srgb, ${c.accent} 20%, ${c.border})`,
+        opacity: pasif ? 0.75 : 1,
       }}
     >
       <svg width={glyph} height={glyph} viewBox="0 0 32 32">

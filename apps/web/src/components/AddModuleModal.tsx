@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import ModuleEmblem from "./ModuleEmblem";
+import { PasifRozeti } from "./ModuleCard";
 import { useT } from "../lib/i18n";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
@@ -234,6 +235,7 @@ function ModulKarti({
   const c = useThemeColors();
   const t = useT();
   const tanitim = MODUL_TANITIMLARI[entry.key];
+  const pasif = !modulAktifMi(entry.key);
   const ozet = tanitim ? t(tanitim.ozet) : entry.description ? t(entry.description) : "";
 
   return (
@@ -244,15 +246,18 @@ function ModulKarti({
         gap: 8,
         padding: 12,
         borderRadius: 10,
-        border: `1.5px solid ${secili ? c.primary : c.border}`,
-        background: secili ? c.background : c.surface,
+        border: `1.5px ${pasif && !secili ? "dashed" : "solid"} ${secili ? c.primary : c.border}`,
+        background: secili || pasif ? c.background : c.surface,
         opacity: acik ? 0.7 : 1,
       }}
     >
       <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
         <ModuleEmblem moduleKey={entry.key} size={36} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{entry.name}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 15, fontWeight: 600, color: pasif ? c.textSecondary : c.textPrimary }}>
+            <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{entry.name}</span>
+            {pasif && <PasifRozeti />}
+          </div>
           {ozet && <div style={{ fontSize: 13, color: c.textSecondary, lineHeight: 1.45, marginTop: 2 }}>{ozet}</div>}
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ModuleCatalogEntry } from "@projelio/shared";
+import { modulAktifMi } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
 import { IconX } from "./icons";
 import ModuleEmblem from "./ModuleEmblem";
@@ -27,6 +28,9 @@ const CARD_HEIGHT = 128;
 export default function ModuleCard({ entry, departmentId, to, onClick, onRemove, removeDisabled }: Props) {
   const c = useThemeColors();
   const t = useT();
+  // Pasif modül yalnızca platform yöneticisine görünür (shared aktifModuller.ts);
+  // soluk ve kesik çizgili, kullanıcılara açık olanlarla karışmasın.
+  const pasif = !modulAktifMi(entry.key);
   const content = (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
@@ -36,14 +40,17 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
             margin: 0,
             fontSize: 15,
             fontWeight: 500,
-            color: c.textPrimary,
+            color: pasif ? c.textSecondary : c.textPrimary,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
           }}
         >
           {entry.name}
         </h3>
+        {pasif && <PasifRozeti />}
       </div>
       {entry.description && (
         <p
@@ -66,9 +73,9 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
 
   const cardStyle = {
     display: "block",
-    border: `1px solid ${c.border}`,
+    border: `1px ${pasif ? "dashed" : "solid"} ${c.border}`,
     borderRadius: 12,
-    background: c.surface,
+    background: pasif ? c.background : c.surface,
     height: CARD_HEIGHT,
     overflow: "hidden",
     position: "relative",
@@ -156,4 +163,26 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
   }
 
   return <div style={cardStyle}>{content}</div>;
+}
+
+/** Pasif modül etiketi — yalnızca yöneticinin gördüğü kartlarda. */
+export function PasifRozeti() {
+  const c = useThemeColors();
+  const t = useT();
+  return (
+    <span
+      title={t("Yalnızca yöneticiler görür; kullanıcılara kapalı.")}
+      style={{
+        flexShrink: 0,
+        fontSize: 11,
+        fontWeight: 500,
+        color: c.textSecondary,
+        border: `1px dashed ${c.border}`,
+        borderRadius: 6,
+        padding: "1px 6px",
+      }}
+    >
+      {t("Pasif")}
+    </span>
+  );
 }

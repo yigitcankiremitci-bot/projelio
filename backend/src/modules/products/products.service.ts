@@ -9,6 +9,7 @@ import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-ima
 import { safeExternalUrl } from "../../common/safe-url";
 import { hataMetni } from "../../common/i18n/index";
 import type { SheetData } from "../ai-assistant/ai-sheet-import";
+import { TABLO_SATIR_SINIRI } from "../party/musteri-sablonu";
 import { mevcutUrunleriAyikla, planUrunImport } from "./urun-sablonu";
 
 const COVER_BUCKET = "product-covers";
@@ -31,10 +32,17 @@ const MAX_LIST_TEXT = 300;
 // adı yüzlerce sevkiyatta geçebilir; kart bir özet, defterin kendisi değil.
 const MAX_RELATED = 60;
 
-// Excel'den tek seferde açılan en fazla ürün. Müşteri aktarımındaki tavanla
-// aynı gerekçe: istek makul sürede bitsin, yanlış dosya yüzlerce kart açmasın.
-// Kalanlar için önizleme hangi satırdan devam edileceğini söylüyor.
-const MAX_IMPORT_ROWS = 500;
+// Excel'den tek seferde açılan en fazla YENİ ürün. 500'dü; bir eczane
+// deposunun stok listesi (3586 kalem, 2026-11-10) sekiz ayrı yükleme
+// istiyordu. Yeni ürünler IMPORT_CHUNK'lık parçalarla yazılıyor, 5000 satır
+// ~50 sorgu. Okunan satır sınırının (TABLO_SATIR_SINIRI) BİLEREK altında:
+// üstünde olsaydı fazlası sessizce düşer, "kalanlar için N. satırdan
+// başlatın" uyarısı hiç çıkmazdı. Yanlış dosyaya karşı koruma önizleme adımı.
+const MAX_IMPORT_ROWS = Math.min(Number(process.env.URUN_IMPORT_TAVANI ?? 5000), TABLO_SATIR_SINIRI - 1);
+// Var olan ürünlerin güncellenmesi tavanı ayrı ve düşük kalıyor: her ürünün
+// kendi yaması var, tek tek yazılıyor — 5000 tekil sorgu isteği zaman aşımına
+// sokardı.
+const MAX_GUNCELLEME = 500;
 // Toplu yazmanın parça boyu (bkz. sablondanIceAktar).
 const IMPORT_CHUNK = 100;
 
@@ -551,8 +559,8 @@ export class ProductsService {
 
     let guncellenen = 0;
     const hatalar: { satir: number; sebep: string }[] = [];
-    // Tek tek: her ürünün ayrı yaması var; satır tavanı yeni ürünlerle ortak.
-    for (const g of guncellenecek.slice(0, MAX_IMPORT_ROWS)) {
+    // Tek tek: her ürünün ayrı yaması var; bu yüzden tavanı ayrı (MAX_GUNCELLEME).
+    for (const g of guncellenecek.slice(0, MAX_GUNCELLEME)) {
       if (!Object.keys(g.patch).length) {
         guncellenen++;
         continue;
@@ -583,7 +591,7 @@ export class ProductsService {
         }
         const cevrilen = this.translateWriteError(tekHata);
         // Sunucu tarafı bir sorun (ör. migration eksik) her satırda aynıdır:
-        // 500 satırı tek tek denemek yerine hemen yüzeye çıkar.
+        // binlerce satırı tek tek denemek yerine hemen yüzeye çıkar.
         if (cevrilen instanceof ServiceUnavailableException) throw cevrilen;
         hatalar.push({ satir: g.satir, sebep: cevrilen.message || "kaydedilemedi" });
       }

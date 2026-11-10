@@ -18,7 +18,6 @@ import { kartvizitSosyalNormallestir, type BaglantiOnem, type Locale, type Party
 import { BadRequestException } from "@nestjs/common";
 import {
   cellText,
-  MAX_RETAINED_ROWS,
   normalizeKey,
   parseCsv,
   resolveColumn,
@@ -573,18 +572,28 @@ export async function musteriSablonuOlustur(dil: Locale = "tr", tur: SablonTuru 
 // ============================================================ Okuma
 
 /**
+ * Şablon yüklemesinde (müşteri, ürün) bir sayfadan okunan azami satır.
+ *
+ * Lio'nun ek dosya sınırından (MAX_RETAINED_ROWS, 5000) AYRI: o satırlar
+ * konuşma boyunca sunucu belleğinde tutuluyor, bunlar istek bitince atılıyor.
+ * İçe aktarma tavanları (5000) bunun altında kalmalı ki tavanı aşan dosyada
+ * "kalanlar için N. satırdan başlatın" uyarısı çıkabilsin.
+ */
+export const TABLO_SATIR_SINIRI = 10000;
+
+/**
  * Excel'le tek yüklemede açılacak azami müşteri kartı.
  *
  * Eskiden Lio'nun genel satır tavanını (MAX_IMPORT_ROWS, 300) kullanıyordu;
  * gerçek bir müşteri listesi (317 eczane, 2026-11-10) buna takıldı ve
  * kullanıcı dosyayı bölmek zorunda kaldı. Kartlar createMany'de 100'lük
- * parçalarla yazılıyor, 2000 satır ~20 sorgu.
+ * parçalarla yazılıyor, 5000 satır ~50 sorgu.
  *
- * MAX_RETAINED_ROWS'un (okunan satır, 5000) BİLEREK altında: tavan okunanı
- * aşsaydı 5000'den sonraki satırlar sessizce düşer, "kalanlar için N.
- * satırdan başlatın" uyarısı hiç çıkmazdı.
+ * TABLO_SATIR_SINIRI'nın BİLEREK altında: tavan okunan satırı aşsaydı
+ * fazlası sessizce düşer, "kalanlar için N. satırdan başlatın" uyarısı hiç
+ * çıkmazdı.
  */
-export const MUSTERI_IMPORT_TAVANI = Math.min(Number(process.env.MUSTERI_IMPORT_TAVANI ?? 2000), MAX_RETAINED_ROWS - 1);
+export const MUSTERI_IMPORT_TAVANI = Math.min(Number(process.env.MUSTERI_IMPORT_TAVANI ?? 5000), TABLO_SATIR_SINIRI - 1);
 
 /**
  * Yüklenen dosyanın sayfaları (.xlsx ya da .csv).
@@ -596,7 +605,7 @@ export async function tabloyuOku(buffer: Buffer, dosyaAdi: string): Promise<Shee
   const ad = dosyaAdi.toLocaleLowerCase("tr");
   if (ad.endsWith(".csv")) {
     const rows = parseCsv(buffer.toString("utf8"));
-    return rows.length ? [{ name: SABLON_SAYFA_ADI, rows: rows.slice(0, MAX_RETAINED_ROWS) }] : [];
+    return rows.length ? [{ name: SABLON_SAYFA_ADI, rows: rows.slice(0, TABLO_SATIR_SINIRI) }] : [];
   }
   if (ad.endsWith(".xls")) {
     throw new BadRequestException("Eski Excel biçimi (.xls) okunamıyor. Dosyayı .xlsx olarak kaydedip tekrar yükleyin.");
@@ -612,7 +621,7 @@ export async function tabloyuOku(buffer: Buffer, dosyaAdi: string): Promise<Shee
   wb.eachSheet((sheet) => {
     const rows: string[][] = [];
     sheet.eachRow({ includeEmpty: false }, (row) => {
-      if (rows.length >= MAX_RETAINED_ROWS) return;
+      if (rows.length >= TABLO_SATIR_SINIRI) return;
       // row.values seyrek dizi: boş hücreler DELİK. Array.from delikleri
       // doldurur; yoksa sütun sırası kayar ve telefon adın yerine yazılırdı.
       const values = Array.isArray(row.values) ? Array.from(row.values.slice(1)) : [];

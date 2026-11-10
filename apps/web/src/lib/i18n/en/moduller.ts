@@ -1074,8 +1074,8 @@ export const moduller: TranslationDict = {
   "Kendi ürün listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.":
     "Your own product list works too (.xlsx or .csv); recognized columns are imported.",
   "Projelio ürün şablonu": "Projelio product template",
-  "Tek seferde en fazla 500 ürün eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
-    "At most 500 products are added at once. For the rest, start the file from row {n} and upload it again.",
+  "Tek seferde en fazla {m} ürün eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
+    "At most {m} products are added at once. For the rest, start the file from row {n} and upload it again.",
   "{n} satır okundu, eklenecek yeni ürün/hizmet yok.": "{n} rows read, no new products/services to add.",
   "{n} satır okundu, {m} ürün/hizmet eklenecek.": "{n} rows read, {m} products/services will be added.",
   "{n} ürün/hizmet eklendi.": "{n} products/services added.",

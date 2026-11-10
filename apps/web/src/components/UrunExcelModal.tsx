@@ -299,7 +299,9 @@ export default function UrunExcelModal({ organizationId, departmentId, onClose, 
             )}
             {sonuc.kalanIlkSatir && (
               <div style={{ color: c.warning }}>
-                {t("Tek seferde en fazla 500 ürün eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.", {
+                {t("Tek seferde en fazla {m} ürün eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.", {
+                  // Tavana gelindiyse açılacak ürün sayısı tavanın kendisi (sunucu: MAX_IMPORT_ROWS).
+                  m: sonuc.acilacak,
                   n: sonuc.kalanIlkSatir,
                 })}
               </div>

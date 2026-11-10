@@ -51,8 +51,17 @@ export interface ModulHakkiDurumu {
   kalan: number | null;
 }
 
-export function modulHakkiDurumu(planKey: string, acikModuller: string[]): ModulHakkiDurumu {
-  const hak = planKey in MODUL_HAKKI ? MODUL_HAKKI[planKey] : MODUL_HAKKI.free;
+/**
+ * `ayricalik`: şirket sahibine yöneticinin verdiği ek hak (bkz. ayricalik.ts) —
+ * paketin üstüne eklenir; sınırsız bayrağı paketi de sınırsız yapar.
+ */
+export function modulHakkiDurumu(
+  planKey: string,
+  acikModuller: string[],
+  ayricalik?: { ekstraModul: number; sinirsizModul: boolean } | null
+): ModulHakkiDurumu {
+  const paketHakki = planKey in MODUL_HAKKI ? MODUL_HAKKI[planKey] : MODUL_HAKKI.free;
+  const hak = paketHakki === null || ayricalik?.sinirsizModul ? null : paketHakki + (ayricalik?.ekstraModul ?? 0);
   const kullanilan = new Set(acikModuller.filter(modulSayilirMi)).size;
   return { planKey, hak, kullanilan, kalan: hak === null ? null : Math.max(0, hak - kullanilan) };
 }

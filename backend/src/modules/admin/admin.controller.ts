@@ -95,6 +95,12 @@ export class AdminController {
     return { ok: true };
   }
 
+  // Ek modül / kişi / departman hakkı (bkz. shared ayricalik.ts).
+  @Post("kullanicilar/:id/ayricaliklar")
+  async ayricaliklariGuncelle(@Param("id", ParseUUIDPipe) id: string, @Body() body: unknown, @Req() req: any) {
+    return this.kullanicilar.ayricaliklariGuncelle(req.user.userId, id, body);
+  }
+
   @Post("kullanicilar/:id/eposta-dogrula")
   async epostayiDogrula(@Param("id", ParseUUIDPipe) id: string, @Req() req: any) {
     await this.kullanicilar.epostayiDogrula(req.user.userId, id);

@@ -15,6 +15,7 @@ import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { applyOrder } from "../../common/reorder.util";
 import { tumSayfalar } from "../../common/liste-tavani";
 import { SupabaseService } from "../../database/supabase.service";
+import { AyricalikService } from "../../common/ayricalik/ayricalik.service";
 import { removeStaleUploadsInFolder } from "../../common/storage/public-upload.util";
 import { decideDepartmentAccess } from "./department-access";
 import { detectImageUpload, UPLOAD_CACHE_CONTROL } from "../../common/upload-image.util";
@@ -49,7 +50,8 @@ function mapDepartment(row: any): Department {
 export class DepartmentsService {
   constructor(
     private supabase: SupabaseService,
-    private kullaniciDili: KullaniciDiliService
+    private kullaniciDili: KullaniciDiliService,
+    private ayricalik: AyricalikService
   ) {}
 
   // Organizasyonu sadece sahibi yönetebilir (organizations modülündeki desenle aynı).
@@ -293,7 +295,9 @@ export class DepartmentsService {
    * yönetici dışındaki kişiler (kadroda onaylı ya da ayrılık onayı bekleyen,
    * tekil). Kural packages/shared/src/departmanKurali.ts'te.
    */
-  private async kadroGercekleri(organizationId: string): Promise<{ departmanSayisi: number; kisiler: Set<string> }> {
+  private async kadroGercekleri(
+    organizationId: string
+  ): Promise<{ departmanSayisi: number; kisiler: Set<string>; ekstraDepartman: number }> {
     const { data: org } = await this.supabase.client
       .from("organizations")
       .select("owner_id")
@@ -322,14 +326,16 @@ export class DepartmentsService {
       if (kadroError) throw kadroError;
       for (const k of kadro ?? []) if (k.user_id !== org.owner_id) kisiler.add(k.user_id);
     }
-    return { departmanSayisi: sayilan, kisiler };
+    // Yöneticinin sahibe verdiği ek departman hakkı (bkz. shared ayricalik.ts).
+    const { ekstraDepartman } = await this.ayricalik.kullanicinin(org.owner_id);
+    return { departmanSayisi: sayilan, kisiler, ekstraDepartman };
   }
 
   /** "Departman ekle" ekranı için kuralın bugünkü durumu (yalnızca sahip). */
   async kuralDurumu(organizationId: string, requestingUserId: string): Promise<DepartmanKuraliDurumu> {
     await this.assertOrgOwner(organizationId, requestingUserId);
-    const { departmanSayisi, kisiler } = await this.kadroGercekleri(organizationId);
-    return departmanKuraliDurumu(departmanSayisi, kisiler.size);
+    const { departmanSayisi, kisiler, ekstraDepartman } = await this.kadroGercekleri(organizationId);
+    return departmanKuraliDurumu(departmanSayisi, kisiler.size, ekstraDepartman);
   }
 
   /**
@@ -361,7 +367,7 @@ export class DepartmentsService {
     if (!["manager", "employee", "subcontractor"].includes(rol)) throw new BadRequestException("Geçersiz kadro rolü.");
     // Yönetim yöneticinin kendi departmanı: kişi istemez, sayıya girmez.
     const muaf = data.catalogKey === MUAF_DEPARTMAN_ANAHTARI;
-    const { departmanSayisi, kisiler } = await this.kadroGercekleri(organizationId);
+    const { departmanSayisi, kisiler, ekstraDepartman } = await this.kadroGercekleri(organizationId);
     if (ilkKisiId) {
       if (ilkKisiId === requestingUserId && !muaf) {
         throw new BadRequestException("Departmanın ilk kişisi yönetici dışında biri olmalı.");
@@ -375,7 +381,7 @@ export class DepartmentsService {
     const sonra = new Set(kisiler);
     if (ilkKisiId) sonra.add(ilkKisiId);
     if (!muaf) {
-      const karar = departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: ilkKisiId ? sonra.size : 0 });
+      const karar = departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: ilkKisiId ? sonra.size : 0, ekstraDepartman });
       if ("sebep" in karar) throw new BadRequestException(karar.sebep);
     }
 

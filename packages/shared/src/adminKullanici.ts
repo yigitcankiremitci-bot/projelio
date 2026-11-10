@@ -1,4 +1,5 @@
 import type { AccountType, UserRole } from "./types";
+import type { KullaniciAyricaliklari } from "./ayricalik";
 import type { Locale } from "./i18n";
 import { KULLANICI_ADI_DESENI } from "./ekipHesaplari";
 
@@ -120,6 +121,8 @@ export interface AdminKullaniciDetayi {
   silmeOnizleme: { blocker: string | null; silinecekIsler: string[]; korunacakIsler: string[] } | null;
   /** Son 30 günün günlük süresi (Europe/Istanbul günü, eskiden yeniye; boş günler 0). */
   gunlukEtkinlik: { gun: string; saniye: number }[];
+  /** Yöneticinin verdiği ek haklar (bkz. ayricalik.ts); null = migration 192 uygulanmadı. */
+  ayricaliklar: KullaniciAyricaliklari | null;
   /** Migration 108 uygulanmadıysa askı/geri alma/işlem kaydı çalışmaz. */
   migrationEksik: boolean;
 }

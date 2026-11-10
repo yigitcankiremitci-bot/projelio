@@ -5,6 +5,7 @@ import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "../../modules/billing
 import { requireUuid } from "../validation/input";
 import { isSubcontractorAccount } from "../access/subcontractor";
 import { hataMetni } from "../i18n/index";
+import { AyricalikService } from "../ayricalik/ayricalik.service";
 
 /**
  * Departman kadrosunda koltuk sayılan durumlar. 'leave_pending' (son yöneticinin
@@ -26,7 +27,10 @@ const SAYILAN_KADRO = ["approved", "leave_pending"];
  */
 @Injectable()
 export class KoltukService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private ayricalik: AyricalikService
+  ) {}
 
   async durum(organizationId: string): Promise<KoltukDurumu> {
     const { sinir, kisiler } = await this.sinirVeKisiler(organizationId);
@@ -71,7 +75,7 @@ export class KoltukService {
     if (orgHatasi) throw orgHatasi;
     if (!org) throw new NotFoundException("Organizasyon bulunamadı");
 
-    const [abonelikler, uyeler, departmanlar] = await Promise.all([
+    const [abonelikler, uyeler, departmanlar, ayricalik] = await Promise.all([
       this.supabase.client
         .from("subscriptions")
         .select("plan_key, koltuk, status, source, current_period_end")
@@ -83,6 +87,7 @@ export class KoltukService {
         .eq("organization_id", organizationId)
         .eq("status", "approved"),
       this.supabase.client.from("departments").select("id").eq("organization_id", organizationId),
+      this.ayricalik.kullanicinin(org.owner_id),
     ]);
     for (const sonuc of [abonelikler, uyeler, departmanlar]) if (sonuc.error) throw sonuc.error;
 
@@ -114,7 +119,9 @@ export class KoltukService {
     const gecerli = (abonelikler.data ?? []).filter((a: any) =>
       abonelikDonemiGecerli({ status: a.status, source: a.source, currentPeriodEnd: a.current_period_end })
     );
-    const sinir = sirketKoltukSiniri(gecerli.map((a: any) => ({ planKey: a.plan_key, koltuk: a.koltuk })));
+    // Yöneticinin sahibe verdiği ek kişi paketin üstüne eklenir (bkz. shared ayricalik.ts).
+    const sinir =
+      sirketKoltukSiniri(gecerli.map((a: any) => ({ planKey: a.plan_key, koltuk: a.koltuk }))) + ayricalik.ekstraKisi;
     return { sinir, kisiler: adaylar };
   }
 

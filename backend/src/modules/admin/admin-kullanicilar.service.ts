@@ -3,6 +3,9 @@ import { BadRequestException, ConflictException, Injectable, Logger } from "@nes
 import {
   adminKullaniciDurumu,
   adminYeniKullaniciDogrula,
+  ayricalikDogrula,
+  ayricalikSatiriniCevir,
+  type KullaniciAyricaliklari,
   gunlukEtkinligiDoldur,
   type AdminKrediHareketi,
   type AdminKullaniciDetayi,
@@ -59,7 +62,8 @@ type IslemTuru =
   | "kredi_geri_al"
   | "silme_planla"
   | "silmeyi_iptal_et"
-  | "hemen_sil";
+  | "hemen_sil"
+  | "ayricalik_guncelle";
 
 @Injectable()
 export class AdminKullanicilarService {
@@ -118,7 +122,7 @@ export class AdminKullanicilarService {
     const row = satirlar[0];
     if (!row) throw new BadRequestException("Kullanıcı bulunamadı.");
 
-    const [bakiye, abonelik, isler, orglar, gruplar, hareketler, sonKullanim, islemler, etkinlik] = await Promise.all([
+    const [bakiye, abonelik, isler, orglar, gruplar, hareketler, sonKullanim, islemler, etkinlik, ayricaliklar] = await Promise.all([
       this.supabase.client
         .from("ai_credit_balances")
         .select("user_id, balance, lifetime_purchased, lifetime_spent")
@@ -147,6 +151,7 @@ export class AdminKullanicilarService {
         .maybeSingle(),
       migrationEksik ? Promise.resolve([]) : this.islemKaydi(userId),
       this.etkinlikDetayi(userId),
+      this.ayricaliklariOku(userId),
     ]);
 
     const kullanici = this.satiriCevir(row, bakiye.data, abonelik.error ? null : abonelik.data, etkinlik.ozet);
@@ -168,6 +173,7 @@ export class AdminKullanicilarService {
       islemler,
       silmeOnizleme,
       gunlukEtkinlik: gunlukEtkinligiDoldur(etkinlik.gunler, istanbulGunu()),
+      ayricaliklar,
       migrationEksik,
     };
   }
@@ -336,6 +342,62 @@ export class AdminKullanicilarService {
       .is("email_verified_at", null);
     if (error) throw error;
     await this.kaydet(adminId, userId, "eposta_dogrula");
+  }
+
+  // ============================================================ Ayrıcalıklar
+
+  /**
+   * Kullanıcının ek haklarını yazar (kurallar: shared ayricalik.ts). Hepsi
+   * sıfırsa satır silinir — "ayrıcalığı var mı" sorusu satırın varlığına
+   * bakılarak da cevaplanabilsin. Yönetici kendine de verebilir: bu bir
+   * yetki değil, kendi şirketindeki sınırı genişletmek; işlem kaydına düşer.
+   */
+  async ayricaliklariGuncelle(adminId: string, userId: string, girdi: unknown): Promise<KullaniciAyricaliklari> {
+    await this.hedefiDogrula(adminId, userId, "ayrıcalık verme", { kendineIzinVer: true });
+    const sonuc = ayricalikDogrula(girdi);
+    if ("hata" in sonuc) throw new BadRequestException(sonuc.hata);
+    const a = sonuc.ayricalik;
+    const once = await this.ayricaliklariOku(userId);
+    if (once === null) throw new BadRequestException("Ayrıcalık tablosu yok: önce migration 192 uygulanmalı.");
+
+    const bos = !a.sinirsizModul && a.ekstraModul === 0 && a.ekstraKisi === 0 && a.ekstraDepartman === 0;
+    const { error } = bos
+      ? await this.supabase.client.from("kullanici_ayricaliklari").delete().eq("user_id", userId)
+      : await this.supabase.client.from("kullanici_ayricaliklari").upsert(
+          {
+            user_id: userId,
+            ekstra_modul: a.ekstraModul,
+            sinirsiz_modul: a.sinirsizModul,
+            ekstra_kisi: a.ekstraKisi,
+            ekstra_departman: a.ekstraDepartman,
+            not_metni: a.not,
+            updated_by: adminId,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+    if (error) throw error;
+    const sonra = (await this.ayricaliklariOku(userId)) ?? a;
+    await this.kaydet(adminId, userId, "ayricalik_guncelle", {
+      once: { ekstraModul: once.ekstraModul, sinirsizModul: once.sinirsizModul, ekstraKisi: once.ekstraKisi, ekstraDepartman: once.ekstraDepartman },
+      sonra: { ekstraModul: sonra.ekstraModul, sinirsizModul: sonra.sinirsizModul, ekstraKisi: sonra.ekstraKisi, ekstraDepartman: sonra.ekstraDepartman },
+      not: a.not,
+    });
+    return sonra;
+  }
+
+  /** null = tablo yok (migration 192 uygulanmadı); panel bölümü uyarı gösterir. */
+  private async ayricaliklariOku(userId: string): Promise<KullaniciAyricaliklari | null> {
+    const { data, error } = await this.supabase.client
+      .from("kullanici_ayricaliklari")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) {
+      this.logger.warn(`Ayrıcalık okunamadı (${userId}): ${error.message}`);
+      return null;
+    }
+    return ayricalikSatiriniCevir(data);
   }
 
   // ============================================================ Kredi

@@ -4,6 +4,7 @@ import { katalogdaGorunurMu, MODUL_HAKKI, modulEklenebilirMi, modulHakkiDurumu }
 import { SupabaseService } from "../../database/supabase.service";
 import { abonelikDonemiGecerli, HAK_VEREN_DURUMLAR } from "../billing/abonelik-hakki";
 import { requireUuid } from "../../common/validation/input";
+import { AyricalikService } from "../../common/ayricalik/ayricalik.service";
 
 function mapOrganizationModule(row: any): OrganizationModule {
   return {
@@ -18,7 +19,10 @@ function mapOrganizationModule(row: any): OrganizationModule {
 // hangi modülleri etkinleştirdiğini tutar (module_catalog referansıyla).
 @Injectable()
 export class OrganizationModulesService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(
+    private supabase: SupabaseService,
+    private ayricalik: AyricalikService
+  ) {}
 
   private async assertOwner(organizationId: string, userId?: string): Promise<void> {
     if (!userId) return;
@@ -51,13 +55,14 @@ export class OrganizationModulesService {
       .maybeSingle();
     if (!org) throw new NotFoundException("Organizasyon bulunamadı");
 
-    const [{ data: abonelikler, error }, acik] = await Promise.all([
+    const [{ data: abonelikler, error }, acik, ayricalik] = await Promise.all([
       this.supabase.client
         .from("subscriptions")
         .select("plan_key, status, source, current_period_end")
         .or(`and(scope.eq.organization,organization_id.eq.${organizationId}),and(scope.eq.user,user_id.eq.${org.owner_id})`)
         .in("status", HAK_VEREN_DURUMLAR),
       this.findByOrganization(organizationId),
+      this.ayricalik.kullanicinin(org.owner_id),
     ]);
     if (error) throw error;
 
@@ -73,7 +78,7 @@ export class OrganizationModulesService {
       if (gecerli && a.plan_key in MODUL_HAKKI && buyukluk(a.plan_key) > buyukluk(planKey)) planKey = a.plan_key;
     }
     const anahtarlar = acik.map((m) => m.moduleKey);
-    return { durum: modulHakkiDurumu(planKey, anahtarlar), acik: anahtarlar };
+    return { durum: modulHakkiDurumu(planKey, anahtarlar, ayricalik), acik: anahtarlar };
   }
 
   /** Modül hakkı yetmiyorsa açılışı reddeder. */

@@ -6,6 +6,7 @@ import { KullaniciDiliModule } from "./common/i18n/kullanici-dili.service";
 import { AccessModule } from "./common/access/access.module";
 import { HesapDurumuModule } from "./common/hesap-durumu/hesap-durumu.service";
 import { KoltukModule } from "./common/koltuk/koltuk.service";
+import { AyricalikModule } from "./common/ayricalik/ayricalik.service";
 import { AuthModule } from "./modules/auth/auth.module";
 import { UsersModule } from "./modules/users/users.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
@@ -88,6 +89,8 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     HesapDurumuModule,
     // Şirketin kişi hakkı; üye ekleyen her modül sorar (bkz. shared koltukHakki.ts).
     KoltukModule,
+    // Yöneticinin kullanıcıya verdiği ek haklar (bkz. shared ayricalik.ts).
+    AyricalikModule,
     AuthModule,
     UsersModule,
     ProjectsModule,

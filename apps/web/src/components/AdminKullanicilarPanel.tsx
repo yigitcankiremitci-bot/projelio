@@ -3,6 +3,7 @@ import {
   ADMIN_KULLANICI_DURUMLARI,
   ADMIN_KULLANICI_DURUM_ETIKETI,
   ADMIN_MESAJ_SINIRI,
+  AYRICALIK_TAVANI,
   etkinlikSuresiYaz,
   gunlukEtkinligiDoldur,
   krediHareketiGeriAlinabilirMi,
@@ -10,6 +11,7 @@ import {
   type AdminKullaniciDetayi,
   type AdminKullaniciDurumu,
   type AdminKullaniciSatiri,
+  type KullaniciAyricaliklari,
   type ThemeColors,
 } from "@projelio/shared";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -676,6 +678,16 @@ function KullaniciDetayModal({ userId, onClose, onDegisti }: { userId: string; o
             </div>
           </Bolum>
 
+          {/* ---------------------------------------------------- Ayrıcalıklar */}
+          <AyricalikBolumu
+            c={c}
+            ayricaliklar={detay.ayricaliklar}
+            kilitli={Boolean(kilitli)}
+            kaydet={(girdi) =>
+              calistir(() => adminKullanicilar.ayricaliklariGuncelle(u.id, girdi), t("Ayrıcalıklar kaydedildi."))
+            }
+          />
+
           {/* ---------------------------------------------------- Kredi */}
           <Bolum c={c} baslik={t("Lio Bakiyesi")}>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 24, marginBottom: 12 }}>
@@ -1034,6 +1046,7 @@ const ISLEM_ETIKETI: Record<string, string> = {
   silme_planla: "Silmeyi planladı", // dil:anahtar
   silmeyi_iptal_et: "Silmeyi iptal etti", // dil:anahtar
   hemen_sil: "Kalıcı olarak sildi", // dil:anahtar
+  ayricalik_guncelle: "Ayrıcalıkları değiştirdi", // dil:anahtar
 };
 
 /** Kayıttaki ayrıntının kısa hâli: miktar, sebep, rol geçişi. */
@@ -1042,6 +1055,9 @@ function islemDetayi(detail: Record<string, unknown> | undefined): string {
   const parcalar: string[] = [];
   if (typeof detail.miktar === "number") parcalar.push(sayi(detail.miktar));
   if (typeof detail.once === "string" && typeof detail.sonra === "string") parcalar.push(`${detail.once} → ${detail.sonra}`);
+  // Ayrıcalık değişikliği: yalnızca yeni değerler, kısa biçimde.
+  if (detail.sonra && typeof detail.sonra === "object") parcalar.push(ayricalikOzeti(detail.sonra as Partial<KullaniciAyricaliklari>));
+  if (typeof detail.not === "string" && detail.not) parcalar.push(detail.not);
   if (typeof detail.sebep === "string" && detail.sebep) parcalar.push(detail.sebep);
   if (typeof detail.aciklama === "string" && detail.aciklama) parcalar.push(detail.aciklama);
   if (typeof detail.baslik === "string" && detail.baslik) {
@@ -1049,6 +1065,121 @@ function islemDetayi(detail: Record<string, unknown> | undefined): string {
     parcalar.push(`"${detail.baslik}"${kanallar ? ` ${kanallar}` : ""}`);
   }
   return parcalar.join(" · ");
+}
+
+/** "+2 modül · +3 kişi" gibi kısa özet; hiçbiri yoksa "yok". */
+function ayricalikOzeti(a: Partial<KullaniciAyricaliklari>): string {
+  const p: string[] = [];
+  if (a.sinirsizModul) p.push("∞ modül");
+  else if (a.ekstraModul) p.push(`+${a.ekstraModul} modül`);
+  if (a.ekstraKisi) p.push(`+${a.ekstraKisi} kişi`);
+  if (a.ekstraDepartman) p.push(`+${a.ekstraDepartman} departman`);
+  return p.length ? p.join(" · ") : "yok";
+}
+
+/**
+ * Paketle kısıtlanan hakları kişiye özel genişletme (kurallar: shared
+ * ayricalik.ts). Hak şirket sahibine verilir ve sahibi olduğu şirketlerde
+ * geçer; değerler paketin ÜSTÜNE eklenir.
+ */
+function AyricalikBolumu({
+  c,
+  ayricaliklar,
+  kilitli,
+  kaydet,
+}: {
+  c: ThemeColors;
+  ayricaliklar: KullaniciAyricaliklari | null | undefined;
+  kilitli: boolean;
+  kaydet: (girdi: Omit<KullaniciAyricaliklari, "guncellendi">) => void;
+}) {
+  const t = useT();
+  const [ekstraModul, setEkstraModul] = useState("0");
+  const [sinirsizModul, setSinirsizModul] = useState(false);
+  const [ekstraKisi, setEkstraKisi] = useState("0");
+  const [ekstraDepartman, setEkstraDepartman] = useState("0");
+  const [not, setNot] = useState("");
+
+  // Sunucudan gelen değer değişince (kayıttan sonra tazelenen detay) formu eşitle.
+  useEffect(() => {
+    setEkstraModul(String(ayricaliklar?.ekstraModul ?? 0));
+    setSinirsizModul(Boolean(ayricaliklar?.sinirsizModul));
+    setEkstraKisi(String(ayricaliklar?.ekstraKisi ?? 0));
+    setEkstraDepartman(String(ayricaliklar?.ekstraDepartman ?? 0));
+    setNot(ayricaliklar?.not ?? "");
+  }, [ayricaliklar]);
+
+  if (ayricaliklar === null) {
+    return (
+      <Bolum c={c} baslik={t("Ayrıcalıklar")}>
+        <Uyari c={c}>{t("Migration 192 uygulanmadığı için ayrıcalık verilemiyor.")}</Uyari>
+      </Bolum>
+    );
+  }
+
+  const tamSayi = (s: string) => /^\d+$/.test(s.trim()) && Number(s) <= AYRICALIK_TAVANI;
+  const gecerli = tamSayi(ekstraModul) && tamSayi(ekstraKisi) && tamSayi(ekstraDepartman);
+  const sayiAlani = (etiket: string, deger: string, degistir: (v: string) => void, kapali = false) => (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, color: c.textSecondary, flex: "0 0 140px" }}>
+      {etiket}
+      <input
+        value={kapali ? "∞" : deger}
+        disabled={kilitli || kapali}
+        onChange={(e) => degistir(e.target.value.replace(/[^0-9]/g, ""))}
+        inputMode="numeric"
+        style={inputStyle(c)}
+      />
+    </label>
+  );
+
+  return (
+    <Bolum c={c} baslik={t("Ayrıcalıklar")}>
+      <p style={{ color: c.textSecondary, fontSize: 13, margin: "0 0 12px" }}>
+        {t(
+          "Paketin üstüne eklenen haklar. Kişinin sahibi olduğu şirketlerde geçer; ayrıcalık kaldırılınca açık olanlar kapanmaz, yalnızca yenisi açılamaz."
+        )}
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-end" }}>
+        {sayiAlani(t("Ek modül"), ekstraModul, setEkstraModul, sinirsizModul)}
+        {sayiAlani(t("Ek kişi"), ekstraKisi, setEkstraKisi)}
+        {sayiAlani(t("Ek departman"), ekstraDepartman, setEkstraDepartman)}
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: c.textPrimary, paddingBottom: 9 }}>
+          <input type="checkbox" checked={sinirsizModul} disabled={kilitli} onChange={(e) => setSinirsizModul(e.target.checked)} />
+          {t("Modül sınırı yok")}
+        </label>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+        <input
+          value={not}
+          disabled={kilitli}
+          onChange={(e) => setNot(e.target.value)}
+          placeholder={t("Not: neden verildi (yalnızca yöneticiler görür)")}
+          style={{ ...inputStyle(c), flex: "1 1 260px" }}
+        />
+        <button
+          type="button"
+          disabled={kilitli || !gecerli}
+          style={birincilButon(c)}
+          onClick={() =>
+            kaydet({
+              ekstraModul: Number(ekstraModul),
+              sinirsizModul,
+              ekstraKisi: Number(ekstraKisi),
+              ekstraDepartman: Number(ekstraDepartman),
+              not: not.trim() || null,
+            })
+          }
+        >
+          {t("Kaydet")}
+        </button>
+      </div>
+      {ayricaliklar?.guncellendi && (
+        <p style={{ color: c.textSecondary, fontSize: 12.5, margin: "8px 0 0" }}>
+          {t("Son değişiklik: {tarih}", { tarih: tarih(ayricaliklar.guncellendi, true) })}
+        </p>
+      )}
+    </Bolum>
+  );
 }
 
 // ================================================================ Küçük parçalar

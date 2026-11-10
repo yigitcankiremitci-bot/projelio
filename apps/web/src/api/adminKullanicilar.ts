@@ -5,6 +5,7 @@ import type {
   AdminMesajSonucu,
   AdminYeniKullaniciGirdisi,
   AdminYeniKullaniciSonucu,
+  KullaniciAyricaliklari,
   UserRole,
 } from "@projelio/shared";
 import { api } from "./client";
@@ -25,6 +26,8 @@ export const adminKullanicilar = {
   oturumlariKapat: (id: string) => api.post<{ ok: true }>(`/admin/kullanicilar/${id}/oturumlari-kapat`, {}),
   rolDegistir: (id: string, rol: UserRole) => api.post<{ ok: true }>(`/admin/kullanicilar/${id}/rol`, { rol }),
   epostayiDogrula: (id: string) => api.post<{ ok: true }>(`/admin/kullanicilar/${id}/eposta-dogrula`, {}),
+  ayricaliklariGuncelle: (id: string, girdi: Omit<KullaniciAyricaliklari, "guncellendi">) =>
+    api.post<KullaniciAyricaliklari>(`/admin/kullanicilar/${id}/ayricaliklar`, girdi),
 
   krediYukle: (id: string, miktar: number, aciklama?: string) =>
     api.post<KrediBakiyesi>(`/admin/kullanicilar/${id}/kredi/yukle`, { miktar, aciklama }),

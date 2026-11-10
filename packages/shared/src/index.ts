@@ -41,6 +41,7 @@ export * from "./karakterGorunumu";
 export * from "./departmanKurali";
 export * from "./modulHakki";
 export * from "./koltukHakki";
+export * from "./ayricalik";
 export * from "./modulEvi";
 export * from "./ajan";
 export * from "./muze";

@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import type { DepartmanGecisiDurumu } from "@projelio/shared";
 import { defaultLocale, departmanSayilirMi, departmanSiniri, gecisSeciminiDogrula } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
+import { AyricalikService } from "../../common/ayricalik/ayricalik.service";
 import { cevirmen } from "../../common/i18n";
 import { KullaniciDiliService } from "../../common/i18n/kullanici-dili.service";
 import { FilesService } from "../files/files.service";
@@ -23,7 +24,8 @@ export class DepartmanGecisiService {
   constructor(
     private supabase: SupabaseService,
     private files: FilesService,
-    private kullaniciDili: KullaniciDiliService
+    private kullaniciDili: KullaniciDiliService,
+    private ayricalik: AyricalikService
   ) {}
 
   /**
@@ -99,7 +101,8 @@ export class DepartmanGecisiService {
       organizationName: org.name,
       departmanlar,
       kisiSayisi: kisiler.size,
-      sinir: departmanSiniri(kisiler.size),
+      // Sahibe verilmiş ek departman hakkı geçişte de geçerli (bkz. shared ayricalik.ts).
+      sinir: departmanSiniri(kisiler.size, (await this.ayricalik.kullanicinin(userId)).ekstraDepartman),
       yonetimVar: tum.some((d: any) => !departmanSayilirMi(d.catalog_key)),
     };
   }

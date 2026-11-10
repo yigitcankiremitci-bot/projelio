@@ -38,8 +38,8 @@ export function departmanSayilirMi(catalogKey: string | null | undefined): boole
 }
 
 /** Departman sayısı sınırı; null = sınır yok (10 kişi ve üstü). */
-export function departmanSiniri(kisiSayisi: number): number | null {
-  return kisiSayisi + 1 < KUCUK_SIRKET_SINIRI ? kisiSayisi : null;
+export function departmanSiniri(kisiSayisi: number, ekstraDepartman = 0): number | null {
+  return kisiSayisi + 1 < KUCUK_SIRKET_SINIRI ? kisiSayisi + ekstraDepartman : null;
 }
 
 export interface DepartmanAcmaGercekleri {
@@ -50,6 +50,12 @@ export interface DepartmanAcmaGercekleri {
    * (yeni katılan biriyse bir artmış hâli).
    */
   kisiSayisiSonra: number;
+  /**
+   * Yöneticinin şirket sahibine verdiği ek departman hakkı (bkz. ayricalik.ts).
+   * Küçük şirket sınırını bu kadar yukarı taşır; "departman ilk kişisiyle
+   * doğar" kuralını DEĞİŞTİRMEZ — boş departman yine açılmaz.
+   */
+  ekstraDepartman?: number;
 }
 
 export type DepartmanAcmaKarari = { acilabilir: true } | { acilabilir: false; sebep: string };
@@ -63,7 +69,8 @@ export function departmanAcilabilirMi(g: DepartmanAcmaGercekleri): DepartmanAcma
   }
   // Yönetici de bir kişi: "10 kişiden az" toplamı soruyor.
   const toplam = g.kisiSayisiSonra + 1;
-  if (toplam < KUCUK_SIRKET_SINIRI && g.departmanSayisi + 1 > g.kisiSayisiSonra) {
+  const ekstra = g.ekstraDepartman ?? 0;
+  if (toplam < KUCUK_SIRKET_SINIRI && g.departmanSayisi + 1 > g.kisiSayisiSonra + ekstra) {
     return {
       acilabilir: false,
       sebep: `${KUCUK_SIRKET_SINIRI} kişiden küçük şirketlerde departman sayısı, yönetici dışındaki kişi sayısını geçemez (${g.kisiSayisiSonra} kişi, ${g.departmanSayisi} departman). Bu işleri yöneticide yürütebilir ya da yeni biriyle birlikte departman açabilirsin.`,
@@ -83,12 +90,12 @@ export interface DepartmanKuraliDurumu {
   yeniKisiyle: DepartmanAcmaKarari;
 }
 
-export function departmanKuraliDurumu(departmanSayisi: number, kisiSayisi: number): DepartmanKuraliDurumu {
+export function departmanKuraliDurumu(departmanSayisi: number, kisiSayisi: number, ekstraDepartman = 0): DepartmanKuraliDurumu {
   return {
     departmanSayisi,
     kisiSayisi,
-    mevcutKisiyle: departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: kisiSayisi }),
-    yeniKisiyle: departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: kisiSayisi + 1 }),
+    mevcutKisiyle: departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: kisiSayisi, ekstraDepartman }),
+    yeniKisiyle: departmanAcilabilirMi({ departmanSayisi, kisiSayisiSonra: kisiSayisi + 1, ekstraDepartman }),
   };
 }
 

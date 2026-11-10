@@ -1148,6 +1148,8 @@ export const hatalar: TranslationDict = {
   "Lio'nun yazabilmesi için bir konu ya da birkaç not yazın.": "Write a subject or a few notes so Lio can draft.",
   "Kapak özelliği henüz etkin değil (veritabanı güncellemesi bekleniyor).":
     "Covers aren't enabled yet (database update pending).",
+  "Önce bir kapak fotoğrafı yükle": "Upload a cover photo first",
+  "Geçersiz kapak konumu": "Invalid cover position",
   // Satış kanalları, çok kalemli sipariş, sipariş içe aktarma (migration 168)
   "Bir siparişte en çok 200 kalem olabilir": "An order can have at most 200 line items",
   "Bu adda bir satış kanalı zaten var": "A sales channel with this name already exists",

@@ -92,6 +92,29 @@ export class PersonalTodosService {
 
 
   /**
+   * Panodaki atanan ÜST görevlerin alt görevleri — kullanıcıya atanmış olsun
+   * olmasın. Yapılacaklar'da görev/alt görev düzeni proje içindeki gibi
+   * çalışsın diye (kart açılınca alt görevler, alt görev ekleme). Panonun
+   * kendisine (v_personal_board) KATILMIYOR: pano "bana atananlar"dır ve
+   * ana sayfa sayaçları, gecikme rozetleri oradan sayılıyor — başkasının alt
+   * görevi orada benim gecikmem gibi görünürdü.
+   */
+  async panoAltGorevleri(userId: string): Promise<Task[]> {
+    const { data, error } = await this.supabase.client
+      .from("v_personal_board")
+      .select("item_id")
+      // Tek ve vazgeçilmez izolasyon filtresi.
+      .eq("board_user_id", userId)
+      .eq("source", "assigned")
+      .eq("is_hidden", false)
+      .is("parent_task_id", null);
+    if (error) throw error;
+    const ustIdler = (data ?? []).map((row: any) => row.item_id as string);
+    if (ustIdler.length === 0) return [];
+    return this.tasksService.altGorevleriGetir(ustIdler, userId);
+  }
+
+  /**
    * Görev bu kullanıcıya atanmış mı? Bir görevin birden fazla atananı olabildiği
    * için (bkz. migration 053) kontrol `tasks.assigned_to` üzerinden yapılamaz:
    * o yalnızca BİRİNCİL atanandır, ikinci kişi olarak eklenen biri kendi

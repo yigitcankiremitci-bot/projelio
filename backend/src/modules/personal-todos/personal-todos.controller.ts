@@ -65,6 +65,12 @@ export class PersonalTodosController {
     });
   }
 
+  /** Panodaki üst görevlerin alt görevleri (bkz. PersonalTodosService.panoAltGorevleri). */
+  @Get("board/subtasks")
+  panoAltGorevleri(@Req() req: any) {
+    return this.personalTodosService.panoAltGorevleri(req.user.userId);
+  }
+
   // NOT: "todos/:id" ile çakışmasın diye ondan önce tanımlı.
   // Bu ikisi, proje/departman kanbanlarındaki PATCH /tasks/:id/status ve
   // PATCH /tasks/reorder ile aynı sözleşmeyi taşır; sayfa da aynı TaskColumn

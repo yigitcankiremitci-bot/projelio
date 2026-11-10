@@ -23,6 +23,7 @@ import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
+import { altGorevHatasiniBildir, gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
 // (bkz. DepartmentTasksPanel, JobTasksPanel, OutputsPanel, ProcessPanel)
@@ -61,9 +62,21 @@ const DEFAULT_FILTER: Filter = "personal";
  *
  * Görünüm ve etkileşimler proje/departman kanbanlarıyla ORTAK TaskColumn
  * bileşeninden gelir — kart tasarımı, tamamlama onayı, çift tıkla ad değiştirme,
- * sürükle-bırak ve geri alma her yerde birebir aynı davranır. Bu sayfaya özgü
- * tek fark, kartların alt görev içermemesi (kişisel görevlerin alt görevi yok,
- * atanan görevlerin alt görevleri ise kendi projelerinde yaşar).
+ * sürükle-bırak ve geri alma her yerde birebir aynı davranır.
+ *
+ * ALT GÖREVLER (2026-11): eskiden burada hiç yoktu — TaskColumn yalnızca üst
+ * görevleri kart yapıyor, alt görevleri üst görevin içinde açıyor; panoda üst
+ * görevi olmayan alt görev bu yüzden hiç çizilmiyordu, panodaki üst görevin
+ * (bana atanmamış) alt görevleri de gelmiyordu. Artık proje içindeki gibi:
+ *  - panodaki üst görevin TÜM alt görevleri kartın içinde (`altGorevler`,
+ *    GET /todos/board/subtasks — taşeron kuralı sunucuda),
+ *  - bana atanmış ama üst görevi panoda olmayan alt görev kendi kartıyla
+ *    (bkz. TaskColumn "yetim" alt görev),
+ *  - alt görev ekleme, sürükleyerek seviye değiştirme, sıralama.
+ * `altGorevler` PANOYA KARIŞMAZ (items'a girmez): pano "bana atananlar"dır;
+ * başkasının alt görevi ana sayfa sayaçlarında benim işim gibi görünmemeli.
+ * O kartlardaki eylemler panonun değil görevin kendi uçlarına gider (/tasks).
+ * Kişisel görevlerin alt görevi yok.
  */
 export default function TasksOverview() {
   const c = useThemeColors();
@@ -73,6 +86,8 @@ export default function TasksOverview() {
   // Pano yalnızca masaüstünde yana kayıyor; dar ekranda sütunlar alt alta.
   const boardScrollRef = useDragScroll<HTMLDivElement>(isDesktop);
   const [items, setItems] = useState<PersonalBoardItem[]>([]);
+  // Panodaki üst görevlerin alt görevleri (bkz. dosya başı). Panonun parçası değil.
+  const [altGorevler, setAltGorevler] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   // Filtre URL'de tutuluyor — ama HATIRLANMIYOR.
   //
@@ -152,6 +167,14 @@ export default function TasksOverview() {
       .then((data) => setItems(data ?? []))
       .catch(() => setItems([]))
       .finally(() => setLoading(false));
+    // "Kişisel" sekmesinde atanan görev yok, dolayısıyla alt görevleri de yok.
+    // Hata panoyu düşürmesin: alt görevler gelmezse kartlar eskisi gibi durur.
+    if (filter === "personal") setAltGorevler([]);
+    else
+      api
+        .get<Task[]>("/todos/board/subtasks")
+        .then((data) => setAltGorevler(data ?? []))
+        .catch(() => setAltGorevler([]));
   }, [filter]);
 
   useEffect(load, [load]);
@@ -199,7 +222,7 @@ export default function TasksOverview() {
     [items, sort, seciliListe]
   );
 
-  const tasks: Task[] = useMemo(
+  const panoGorevleri: Task[] = useMemo(
     () =>
       sortedItems.map((i) => ({
         id: i.itemId,
@@ -223,6 +246,20 @@ export default function TasksOverview() {
     [sortedItems]
   );
 
+  // Alt görevler yalnızca üst görevleri EKRANDAYSA eklenir: liste ya da sekme
+  // üst görevi gizlediyse alt görevleri de gizlenir (yoksa üstsüz kart olarak
+  // panoya düşerlerdi). Panoda zaten olan (bana atanmış) alt görev tekrar
+  // eklenmez. Sıra projedeki sırayla aynı.
+  const ekAltGorevler: Task[] = useMemo(() => {
+    const panodakiler = new Set(panoGorevleri.map((g) => g.id));
+    return altGorevler
+      .filter((g) => g.parentTaskId && panodakiler.has(g.parentTaskId) && !panodakiler.has(g.id))
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }, [panoGorevleri, altGorevler]);
+  const ekGorevById = useMemo(() => new Map(ekAltGorevler.map((g) => [g.id, g])), [ekAltGorevler]);
+  const tasks: Task[] = useMemo(() => [...panoGorevleri, ...ekAltGorevler], [panoGorevleri, ekAltGorevler]);
+  const tasksRef = useLatestRef(tasks);
+
   /**
    * Karta çift tıklandığında görevin yaşadığı sayfaya götürür ve orada kartı
    * parlatır (bkz. ProjectDetail — location.state.highlightTaskId).
@@ -231,7 +268,10 @@ export default function TasksOverview() {
    */
   const openTaskSource = useCallback(
     (task: Task) => {
-      const item = items.find((i) => i.itemId === task.id);
+      const ek = ekGorevById.get(task.id);
+      const item = ek
+        ? { source: "assigned" as const, projectId: ek.projectId, departmentId: ek.departmentId }
+        : items.find((i) => i.itemId === task.id);
       if (!item || item.source === "personal") return;
       // Geri bağlantısı SADECE sayfaya değil, tam olarak bulunduğumuz yere
       // dönsün: açık sekme ve çıkılan kart adreste taşınıyor (bkz.
@@ -252,7 +292,7 @@ export default function TasksOverview() {
         });
       }
     },
-    [items, navigate, filter]
+    [items, ekGorevById, navigate, filter]
   );
 
   /** Karta hangi işten geldiğini yazan alt satır. Kişisel kartlarda boş. */
@@ -323,7 +363,33 @@ export default function TasksOverview() {
   const setStatus = useCallback(
     (itemId: string, status: TaskStatus, registerUndo = true) => {
       const source = sourceById.get(itemId);
-      if (!source) return;
+      if (!source) {
+        // Panoda olmayan alt görev: görevin kendi ucuna gider (proje kanbanıyla aynı).
+        const ek = ekGorevById.get(itemId);
+        if (!ek) return;
+        const onceki = ek.status;
+        const yaz = (durum: TaskStatus) =>
+          setAltGorevler((prev) => prev.map((g) => (g.id === itemId ? { ...g, status: durum } : g)));
+        yaz(status);
+        api.patchKuyruklu(`/tasks/${itemId}/status`, { status }).catch((err) => {
+          gorevDurumHatasiniBildir(err);
+          load();
+        });
+        if (registerUndo && onceki !== status) {
+          pushUndo({
+            label: t("Görev durumu"),
+            run: async () => {
+              await api.patch(`/tasks/${itemId}/status`, { status: onceki });
+              load();
+            },
+            redo: async () => {
+              await api.patch(`/tasks/${itemId}/status`, { status });
+              load();
+            },
+          });
+        }
+        return;
+      }
       const previousStatus = itemsRef.current.find((i) => i.itemId === itemId)?.status;
 
       setItems((prev) => prev.map((i) => (i.itemId === itemId ? { ...i, status } : i)));
@@ -344,11 +410,33 @@ export default function TasksOverview() {
         });
       }
     },
-    [sourceById, itemsRef, pushUndo, load]
+    [sourceById, ekGorevById, itemsRef, pushUndo, load]
   );
 
   const handleReorder = (ids: string[]) => {
     if (!ids.length) return;
+    // Alt görev sırası (kartın içindeki liste): kişisel pano sırası değil,
+    // görevin projedeki sırası — proje kanbanıyla aynı uç. Bana atanmış alt
+    // görevler de gerçek görev olduğu için aynı istekte.
+    const gorevlerNow = new Map(tasksRef.current.map((g) => [g.id, g]));
+    if (ids.every((id) => gorevlerNow.get(id)?.parentTaskId)) {
+      const oncekiIdler = tasksRef.current.filter((g) => ids.includes(g.id)).map((g) => g.id);
+      const sira = new Map(ids.map((id, index) => [id, index]));
+      setAltGorevler((prev) => prev.map((g) => (sira.has(g.id) ? { ...g, sortOrder: sira.get(g.id)! } : g)));
+      api.patch("/tasks/reorder", { ids }).catch(() => load());
+      pushUndo({
+        label: t("Görev sırası"),
+        run: async () => {
+          await api.patch("/tasks/reorder", { ids: oncekiIdler });
+          load();
+        },
+        redo: async () => {
+          await api.patch("/tasks/reorder", { ids });
+          load();
+        },
+      });
+      return;
+    }
     const affected = new Set(ids);
     const previousIds = itemsRef.current.filter((i) => affected.has(i.itemId)).map((i) => i.itemId);
 
@@ -477,7 +565,7 @@ export default function TasksOverview() {
   };
 
   const handleToggleComplete = (itemId: string) => {
-    const item = items.find((i) => i.itemId === itemId);
+    const item = items.find((i) => i.itemId === itemId) ?? ekGorevById.get(itemId);
     if (!item) return;
     if (item.status === "completed") {
       const previous = previousStatusRef.current[itemId] ?? "todo";
@@ -504,6 +592,7 @@ export default function TasksOverview() {
   };
 
   const handleRenamed = (updated: Task) => {
+    setAltGorevler((prev) => prev.map((g) => (g.id === updated.id ? { ...g, ...updated } : g)));
     setItems((prev) =>
       prev.map((i) =>
         i.itemId === updated.id
@@ -541,17 +630,20 @@ export default function TasksOverview() {
     return { ...task, deadline };
   };
 
+  // Kişisel görevin alt görevi yok (bkz. TaskColumn canHaveSubtasks).
+  const canHaveSubtasks = useCallback((task: Task) => sourceById.get(task.id) !== "personal", [sourceById]);
+
   // "Üzerinde çalışıyorum" yalnızca gerçek görevlerde anlamlı: users.active_task_id
   // tasks tablosuna FK, kişisel bir görev oraya yazılamaz.
   const canToggleActive = useCallback(
-    (task: Task) => sourceById.get(task.id) === "assigned",
-    [sourceById]
+    (task: Task) => sourceById.get(task.id) === "assigned" || ekGorevById.has(task.id),
+    [sourceById, ekGorevById]
   );
 
   // Diğer sayfalarla aynı davranış (bkz. ProjectDetail.handleToggleActive):
   // aynı göreve tekrar basmak işareti kaldırır.
   const handleToggleActive = (taskId: string) => {
-    if (sourceById.get(taskId) !== "assigned") return;
+    if (sourceById.get(taskId) !== "assigned" && !ekGorevById.has(taskId)) return;
     const turningOn = activeTaskId !== taskId;
     setActiveTaskId(turningOn ? taskId : undefined);
     api.patch(`/tasks/${taskId}/active-worker`, { active: turningOn }).catch(() => {
@@ -560,6 +652,15 @@ export default function TasksOverview() {
   };
 
   const openEditor = async (task: Task) => {
+    if (ekGorevById.has(task.id)) {
+      // Panoda olmayan alt görev: tam kayıt görevin kendi ucundan (erişim orada).
+      try {
+        setEditingTask(await api.get<Task>(`/tasks/${task.id}`));
+      } catch {
+        load();
+      }
+      return;
+    }
     const item = items.find((i) => i.itemId === task.id);
     if (!item) return;
     if (item.source === "personal") {
@@ -571,6 +672,41 @@ export default function TasksOverview() {
     } catch {
       // görev çekilemedi (başkasına atanmış olabilir); pano tazelensin
       load();
+    }
+  };
+
+  /**
+   * Alt görev ekleme — proje kanbanıyla aynı kural (bkz. JobDetail.handleCreateSubtask):
+   * alt görev üst görevin kapsamında açılır, durumunu ve tarihini ondan alır.
+   * Kişisel görevin alt görevi yok; TaskColumn ekleme kutusunu yine de
+   * gösterebileceği için burada sessizce reddediliyor.
+   */
+  const handleCreateSubtask = async (parentTaskId: string, title: string) => {
+    const parent = tasksRef.current.find((g) => g.id === parentTaskId);
+    if (!parent || sourceById.get(parentTaskId) === "personal") return;
+    const yol = parent.projectId
+      ? `/projects/${parent.projectId}/tasks`
+      : parent.departmentId
+        ? `/departments/${parent.departmentId}/tasks`
+        : null;
+    if (!yol) return;
+    const payload = { title, status: parent.status, deadline: parent.deadline || undefined, parentTaskId };
+    try {
+      let olusan = await api.post<Task>(yol, payload);
+      setAltGorevler((prev) => [...prev, olusan]);
+      pushUndo({
+        label: t("Görev oluşturma"),
+        run: async () => {
+          await api.delete(`/tasks/${olusan.id}`);
+          load();
+        },
+        redo: async () => {
+          olusan = await api.post<Task>(yol, payload);
+          load();
+        },
+      });
+    } catch (err) {
+      altGorevHatasiniBildir(err);
     }
   };
 
@@ -821,6 +957,9 @@ export default function TasksOverview() {
                 onToggleSelect={selection.toggleSelect}
                 highlightTaskId={highlightTaskId}
                 onOpenSource={openTaskSource}
+                onCreateSubtask={handleCreateSubtask}
+                canHaveSubtasks={canHaveSubtasks}
+                onTasksReload={load}
               />
             </div>
           ))}

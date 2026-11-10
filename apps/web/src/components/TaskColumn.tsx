@@ -77,6 +77,12 @@ interface Props {
   // "üzerinde çalışıyorum" yalnızca gerçek görevlerde anlamlıdır (users.active_task_id
   // tasks tablosuna FK). Verilmezse tüm kartlarda gösterilir (eski davranış).
   canToggleActive?: (task: Task) => boolean;
+  /**
+   * Bu kart alt görev alabilir mi? Verilmezse alt görev katmanı açıkken
+   * (onCreateSubtask) her kart alır. Yapılacaklar'daki kişisel görevlerin alt
+   * görevi yok; onlarda açma oku ve "alt görev ekle" görünmemeli.
+   */
+  canHaveSubtasks?: (task: Task) => boolean;
   // Ad değiştirme normalde PATCH /tasks/:id'ye gider. Görevleri başka bir uç
   // noktada yaşayan listeler (Yapılacaklar'daki kişisel kartlar) burayı geçerek
   // kendi isteklerini atar. Güncellenmiş görevi döndürmelidir.
@@ -210,6 +216,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   activeTaskId,
   onToggleActive,
   canToggleActive,
+  canHaveSubtasks,
   onRenameTask,
   getTaskMeta,
   getTaskAvatar,
@@ -309,8 +316,19 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
     completed: c.completed,
   };
 
+  // Üst görevi kimlikten bulmak için harita (aşağıda ghostGroups da kullanıyor):
+  // her alt görev için allTasks.find çağırmak O(n²) olurdu.
+  const gorevById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
+
   // Bu kolonda gerçekten yaşayan üst görevler (kendi statüsü bu kolonla eşleşen).
-  const realTopLevel = allTasks.filter((t) => t.status === status && !t.parentTaskId);
+  //
+  // ÜST GÖREVİ LİSTEDE OLMAYAN alt görev ("yetim") de burada kart olur. Proje
+  // kanbanında üst görev hep listede olduğu için bu durum oluşmaz; Yapılacaklar'da
+  // ise bana atanmış alt görevin üst görevi başkasına atanmış olabilir ve
+  // eskiden o alt görev HİÇBİR YERDE çizilmiyordu (bkz. TasksOverview).
+  const realTopLevel = allTasks.filter(
+    (t) => t.status === status && (!t.parentTaskId || !gorevById.has(t.parentTaskId))
+  );
 
   // Hızlı ekleme kutuları, her eklenen kayıtla bir kart boyu aşağı iner ve
   // ekranın altından çıkardı; kullanıcı yazmayı bırakıp sayfayı kaydırmak
@@ -374,10 +392,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   };
 
   // Sadece Tamamlandı kolonunda: üst görevi henüz tamamlanmamış ama kendisi tamamlanmış alt görevler.
-  // Bunlar üst görevin hayalet (düşük opasiteli) bir başlığı altında gruplanır.
-  // Üst görevi kimlikten bulmak için harita: aşağıdaki döngü her alt görev için
-  // allTasks.find çağırıyordu, yani yine O(n²). Harita tek geçişte kuruluyor.
-  const gorevById = useMemo(() => new Map(allTasks.map((t) => [t.id, t])), [allTasks]);
+  // Bunlar üst görevin hayalet (düşük opasiteli) bir başlığı altında gruplanır
+  // (üst görev haritası yukarıda, realTopLevel'in yanında).
 
 
   const ghostGroups: { parent: Task; subtasks: Task[] }[] = [];
@@ -916,8 +932,12 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
   // ikisinin birbirine karışmaması için bkz. lib/clickIntent.
   const click = useClickIntent();
 
+  /** Bu kart alt görev katmanına katılıyor mu (bkz. Props.canHaveSubtasks). */
+  const altGorevAlir = (gorev: Task) => subtasksEnabled && (canHaveSubtasks?.(gorev) ?? true);
+
   const toggleExpand = (id: string) => {
-    if (!subtasksEnabled) return;
+    const gorev = gorevById.get(id);
+    if (!gorev || !altGorevAlir(gorev)) return;
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1314,7 +1334,8 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       <div ref={topListRef} data-status={status}>
         {realTopLevel.map((gorev) => {
           const subtasks = subtasksOf(gorev.id);
-          const isOpen = subtasksEnabled && expanded.has(gorev.id);
+          const altGorevli = altGorevAlir(gorev);
+          const isOpen = altGorevli && expanded.has(gorev.id);
           const stats = subtaskStats(gorev.id);
           // Gün bazlı karşılaştırma: son günü bugün olan görevler gün bitmeden
           // "gecikmiş" (kırmızı) görünmesin — sadece tarihi gerçekten geçmişse.
@@ -1331,7 +1352,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 className={`task-drag-handle${highlightTaskId === gorev.id ? " task-highlight-flash" : ""}`}
                 // Alt görev sürüklenirken imlecin altındaki kart bu işaretle
                 // bulunur ve kapalıysa kendiliğinden açılır (bkz. handleSubtaskDragMove).
-                data-task-card-id={subtasksEnabled ? gorev.id : undefined}
+                data-task-card-id={altGorevli ? gorev.id : undefined}
                 // Tek tıklama alt görevleri açar/kapar, çift tıklama görevin
                 // kaynağına gider. Çift tıklamada tarayıcı önce İKİ `click`
                 // gönderdiği için tek tıklama işi doğrudan burada yapılamaz:
@@ -1365,7 +1386,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                   borderLeft: `3px solid ${columnAccent[status]}`,
                   borderRadius: 8,
                   padding: "10px 12px",
-                  cursor: subtasksEnabled ? "pointer" : "default",
+                  cursor: altGorevli ? "pointer" : "default",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1572,7 +1593,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                       width: subtasksEnabled ? SUBTASK_COL_WIDTH : undefined,
                     }}
                   >
-                    {subtasksEnabled && (
+                    {altGorevli && (
                       <span
                         style={{
                           display: "inline-flex",

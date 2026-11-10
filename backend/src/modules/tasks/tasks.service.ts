@@ -550,6 +550,39 @@ export class TasksService {
   // Kullanıcı bu projede taşeron değilse null döner (filtrelemeye gerek yok, tüm görevleri görebilir).
   // Taşeronsa: kendisine atanmış görev/alt görevlerin id'lerini, alt görevler ağaçta doğru
   // görünebilsin diye üst görevlerinin id'leriyle birlikte (sadece "kabuk" olarak) döner.
+  /**
+   * Verilen üst görevlerin alt görevleri — Yapılacaklar panosu için (bkz.
+   * PersonalTodosService.panoAltGorevleri). Üst görevler çağıranın KENDİ
+   * panosundan gelir, yani kullanıcıya atanmış görevlerdir; burada ayrıca
+   * taşeron kuralı uygulanır: taşeron olunan projede yalnızca kendisine
+   * atanan alt görevler görünür, proje sayfasında olduğu gibi.
+   */
+  async altGorevleriGetir(parentIds: string[], userId: string): Promise<Task[]> {
+    const satirlar: any[] = [];
+    // Parçalı: `.in()` adres satırına yazılıyor (bkz. common/parcali-liste.ts).
+    for (const parca of parcalara([...new Set(parentIds)])) {
+      const { data, error } = await this.supabase.client
+        .from("tasks")
+        .select(TASK_SELECT)
+        .in("parent_task_id", parca)
+        .is("archived_at", null)
+        .is("skipped_at", null);
+      if (error) throw error;
+      satirlar.push(...(data ?? []));
+    }
+
+    const projeler = [...new Set(satirlar.map((r) => r.project_id as string | null).filter((id): id is string => !!id))];
+    const gorunur = new Map<string, Set<string> | null>();
+    for (const projeId of projeler) gorunur.set(projeId, await this.getVisibleTaskIdsForSubcontractor(projeId, userId));
+
+    return satirlar
+      .filter((r) => {
+        const izinli = r.project_id ? gorunur.get(r.project_id) : null;
+        return !izinli || izinli.has(r.id);
+      })
+      .map(mapTask);
+  }
+
   async getVisibleTaskIdsForSubcontractor(projectId: string, userId: string): Promise<Set<string> | null> {
     const role = await this.getMembershipRole(projectId, userId);
     if (role !== "subcontractor") return null;

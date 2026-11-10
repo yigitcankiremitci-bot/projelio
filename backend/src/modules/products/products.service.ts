@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import type { ModuleRecord, Product, ProductImage, UrunIceAktarmaSonucu, ProductKind, ProductOverview, ProductSpec, ProductStatus, ProductUnit } from "@projelio/shared";
-import { PRODUCT_UNITS, URUN_BAGLANTI_ALANLARI, URUN_STRATEJI_MODUL_KEY, urunIliskiliKayitlar } from "@projelio/shared";
+import { MUAF_DEPARTMAN_ANAHTARI, PRODUCT_UNITS, URUN_BAGLANTI_ALANLARI, URUN_STRATEJI_MODUL_KEY, urunIliskiliKayitlar } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { ModuleRecordsService } from "../module-records/module-records.service";
 import { ModuleMembersService } from "../module-members/module-members.service";
@@ -202,8 +202,15 @@ export class ProductsService {
     private moduleMembers: ModuleMembersService
   ) {}
 
-  // Organizasyon sahibi ya da (ürün bir departmana bağlıysa) o departmanın
-  // onaylı yöneticisi ürün ekleyip düzenleyebilir.
+  // Organizasyon sahibi, (ürün bir departmana bağlıysa) o departmanın onaylı
+  // yöneticisi ya da şirketin YÖNETİM departmanının onaylı yöneticisi ürün
+  // ekleyip düzenleyebilir.
+  //
+  // NEDEN Yönetim: "Ürün Yönetimi" departmanı açılmamış şirkette ürün
+  // departmansız (şirket düzeyinde) yazılıyor ve eski kural bunu yalnızca
+  // sahibe bırakıyordu. Şirkete tam yetkiyle eklenen yönetici (her departmanda
+  // "manager") ürün ekleyemiyordu (2026-11-10, Net Sağlık). Modül tarafında da
+  // Yönetim her modülü görür (bkz. module-access.ts sayilanDepartmanlar).
   private async assertCanManage(organizationId: string, departmentId?: string, userId?: string): Promise<void> {
     if (!userId) return;
     const { data: org } = await this.supabase.client
@@ -214,18 +221,57 @@ export class ProductsService {
     if (!org) throw new NotFoundException("Organizasyon bulunamadı");
     if (org.owner_id === userId) return;
 
-    if (departmentId) {
-      const { data: managerRow } = await this.supabase.client
+    const { data: yonetim } = await this.supabase.client
+      .from("departments")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("catalog_key", MUAF_DEPARTMAN_ANAHTARI)
+      .is("archived_at", null)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const adaylar = [departmentId, (yonetim as any)?.id].filter(Boolean) as string[];
+
+    if (adaylar.length > 0) {
+      const { data: managerRows } = await this.supabase.client
         .from("department_members")
         .select("id")
-        .eq("department_id", departmentId)
+        .in("department_id", adaylar)
         .eq("user_id", userId)
         .eq("role", "manager")
         .eq("status", "approved")
-        .maybeSingle();
-      if (managerRow) return;
+        .limit(1);
+      if ((managerRows ?? []).length > 0) return;
     }
-    throw new ForbiddenException("Bu ürünü yalnızca organizasyon sahibi veya departman yöneticisi düzenleyebilir");
+
+    if (await this.platformAdminiUye(organizationId, userId)) return;
+    throw new ForbiddenException("Bu ürünü yalnızca organizasyon sahibi, departman yöneticisi veya Yönetim yöneticisi düzenleyebilir");
+  }
+
+  // Platform admini (users.role = 'admin') şirkete EKLENDİYSE — herhangi bir
+  // departmanında onaylı üyeyse — ürünleri sahip gibi yönetir. Eklenmediği
+  // şirkete bu yoldan giremez: admin rolü tek başına başkasının kataloğunu
+  // açmaz, şirketin onu kadrosuna almış olması şart (2026-11-10).
+  private async platformAdminiUye(organizationId: string, userId: string): Promise<boolean> {
+    const { data: kisi } = await this.supabase.client.from("users").select("role").eq("id", userId).maybeSingle();
+    if ((kisi as any)?.role !== "admin") return false;
+
+    const { data: departmanlar } = await this.supabase.client
+      .from("departments")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .is("archived_at", null);
+    const idler = (departmanlar ?? []).map((d: any) => d.id as string);
+    if (idler.length === 0) return false;
+
+    const { data: uyelik } = await this.supabase.client
+      .from("department_members")
+      .select("id")
+      .in("department_id", idler)
+      .eq("user_id", userId)
+      .eq("status", "approved")
+      .limit(1);
+    return (uyelik ?? []).length > 0;
   }
 
   /** Verilen ürünlerin fotoğraflarını TEK sorguda çeker (liste ucunda N+1 olmasın). */

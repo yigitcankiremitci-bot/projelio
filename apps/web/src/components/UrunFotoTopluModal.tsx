@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { Product } from "@projelio/shared";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { IconUpload } from "./icons";
@@ -22,6 +22,8 @@ const MAX_GORSEL = 12;
 // Aynı anda kaç yükleme: tek tek gitmek 900 fotoğrafta dakikalar sürüyordu,
 // fazlası hem tarayıcının bağlantı sınırına hem sunucunun hız sınırına takılır.
 const ES_ZAMANLI = 3;
+// Tek fotoğrafın en uzun süresi; yavaş bağlantıda 8 MB'a yetecek kadar.
+const YUKLEME_ZAMAN_ASIMI = 90_000;
 
 const GORSEL_UZANTI = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
 
@@ -72,6 +74,7 @@ export default function UrunFotoTopluModal({ products, onClose, onDone }: Props)
   const [hatalar, setHatalar] = useState<Atlanan[]>([]);
   const [bitti, setBitti] = useState(false);
   const [eksikAcik, setEksikAcik] = useState(false);
+  const [bekleniyor, setBekleniyor] = useState(0);
 
   // Stok kodu ve barkod → ürün. Stok kodu önce: barkod bazen birden çok
   // kalemde aynı (koli/adet), stok kodu deponun kendi benzersiz anahtarı.
@@ -87,6 +90,7 @@ export default function UrunFotoTopluModal({ products, onClose, onDone }: Props)
     const eslesmeyen: Atlanan[] = [];
     const fotografli = new Set<string>();
     const sayac = new Map<string, number>();
+    const gorulen = new Map<string, number>();
     for (const d of [...dosyalar].sort((a, b) => a.name.localeCompare(b.name))) {
       let urun: Product | undefined;
       for (const a of adAdaylari(d.name)) {
@@ -98,7 +102,13 @@ export default function UrunFotoTopluModal({ products, onClose, onDone }: Props)
         continue;
       }
       const mevcut = urun.images?.length ?? (urun.coverImageUrl ? 1 : 0);
-      if (mevcut > 0 && !fotografliDahil) {
+      // Yarıda kalan yüklemeyi yeniden başlatmak için: ürünün ilk `mevcut`
+      // dosyası zaten yüklenmiş sayılır, yalnızca sonrakiler gider. Ürünü
+      // tümden atlamak, ABC_2.jpg'si yüklenemeden kesilen ürünü eksik bırakırdı
+      // (Net Sağlık, 2026-11-11: hız sınırına takılan 1157 fotoğraflık yükleme).
+      const goren = (gorulen.get(urun.id) ?? 0) + 1;
+      gorulen.set(urun.id, goren);
+      if (mevcut > 0 && !fotografliDahil && goren <= mevcut) {
         fotografli.add(urun.id);
         continue;
       }
@@ -132,22 +142,54 @@ export default function UrunFotoTopluModal({ products, onClose, onDone }: Props)
     durdur.current = false;
     let sira = 0;
     let degisti = false;
+    // Hız sınırına (429) takılınca üç işçi BİRLİKTE bekler, aynı dosya yeniden
+    // denenir. Eskiden 429 dosyanın hatası sayılıyordu: sınır dolduktan sonraki
+    // yüzlerce fotoğraf birkaç saniyede "yüklenemedi"ye düşüyordu.
+    let bekleBitis = 0;
+    const bekle = async () => {
+      while (!durdur.current && Date.now() < bekleBitis) {
+        setBekleniyor(Math.ceil((bekleBitis - Date.now()) / 1000));
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      setBekleniyor(0);
+    };
     const isci = async () => {
       while (!durdur.current && sira < is.length) {
         const { dosya, urun } = is[sira++];
         const fd = new FormData();
         fd.append("file", dosya);
-        try {
-          await api.uploadFile<Product>(`/products/${urun.id}/images`, fd);
-          degisti = true;
-        } catch (err) {
-          const sebep = err instanceof Error ? err.message : t("yüklenemedi");
-          setHatalar((h) => [...h, { ad: dosya.name, sebep }]);
+        for (let deneme = 0; ; deneme++) {
+          await bekle();
+          if (durdur.current) break;
+          // Yanıtsız kalan istek kuyruğu kilitlemesin: bir yükleme takılınca
+          // ilerleme son birkaç dosyada sonsuza dek duruyordu.
+          const kes = new AbortController();
+          const zaman = setTimeout(() => kes.abort(), YUKLEME_ZAMAN_ASIMI);
+          try {
+            await api.uploadFile<Product>(`/products/${urun.id}/images`, fd, kes.signal);
+            degisti = true;
+            break;
+          } catch (err) {
+            if (err instanceof ApiError && err.status === 429 && deneme < 20) {
+              bekleBitis = Math.max(bekleBitis, Date.now() + Math.min(err.retryAfterSeconds ?? 60, 60) * 1000);
+              continue;
+            }
+            const sebep = kes.signal.aborted
+              ? t("zaman aşımı")
+              : err instanceof Error
+                ? err.message
+                : t("yüklenemedi");
+            setHatalar((h) => [...h, { ad: dosya.name, sebep }]);
+            break;
+          } finally {
+            clearTimeout(zaman);
+          }
         }
         setBiten((b) => b + 1);
       }
     };
     await Promise.all(Array.from({ length: Math.min(ES_ZAMANLI, is.length) }, isci));
+    setBekleniyor(0);
     setYukleniyor(false);
     setBitti(true);
     if (degisti) onDone();
@@ -309,6 +351,11 @@ export default function UrunFotoTopluModal({ products, onClose, onDone }: Props)
                 ? t("{n} fotoğraf eklendi.", { n: basarili })
                 : t("Yükleniyor: {n} / {m}", { n: biten, m: toplam })}
             </div>
+            {bekleniyor > 0 && (
+              <div style={{ color: c.textSecondary }}>
+                {t("Yükleme sınırına gelindi, {n} sn sonra kendiliğinden devam edecek. Pencereyi kapatmayın.", { n: bekleniyor })}
+              </div>
+            )}
             <div style={{ height: 6, borderRadius: 999, background: c.border, overflow: "hidden" }}>
               <div
                 style={{

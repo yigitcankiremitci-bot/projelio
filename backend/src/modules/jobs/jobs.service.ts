@@ -335,6 +335,12 @@ export class JobsService {
 
   async remove(id: string, requestingUserId?: string): Promise<void> {
     await this.assertOwner(id, requestingUserId);
+    // Rutin programları ÖNCE: operations.job_id'de ON DELETE CASCADE yok
+    // (bkz. 021) ve iş silinirken program varsa yabancı anahtar reddeder.
+    // Rutin programı olan her iş — örnek iş dahil, onda hep bir program var —
+    // bu yüzden iş menüsünden silinemiyordu. Aynı sıra OrnekIsService.sil'de.
+    const { error: programHatasi } = await this.supabase.client.from("operations").delete().eq("job_id", id);
+    if (programHatasi) throw programHatasi;
     const { error } = await this.supabase.client.from("jobs").delete().eq("id", id);
     if (error) throw error;
   }

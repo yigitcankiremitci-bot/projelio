@@ -31,7 +31,7 @@ const YENI_LISTE = "__yeni";
  *
  * İki adımlı: dosya seçilince sunucu yalnızca ÖNİZLER (hiçbir şey yazmaz),
  * kullanıcı "N müşteriyi ekle"ye basınca aynı dosya onizleme=0 ile yeniden
- * gider. Doğrudan yazmak, yanlış dosyada 300 kartı tek tek arşivletmek demekti.
+ * gider. Doğrudan yazmak, yanlış dosyada yüzlerce kartı tek tek arşivletmek demekti.
  * Dosya iki kez gönderiliyor çünkü sunucu iki istek arasında durum tutmuyor
  * (bkz. PartyController.iceAktar).
  */
@@ -322,7 +322,9 @@ export default function MusteriExcelModal({
             )}
             {sonuc.kalanIlkSatir && (
               <div style={{ color: c.warning }}>
-                {t("Tek seferde en fazla 300 satır eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.", {
+                {t("Tek seferde en fazla {m} satır eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.", {
+                  // Tavana gelindiyse açılacak kart sayısı tavanın kendisi (sunucu: MUSTERI_IMPORT_TAVANI).
+                  m: sonuc.acilacak,
                   n: sonuc.kalanIlkSatir,
                 })}
               </div>

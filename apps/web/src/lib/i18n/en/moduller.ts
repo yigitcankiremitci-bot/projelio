@@ -1059,8 +1059,8 @@ export const moduller: TranslationDict = {
   "Uyarılar:": "Warnings:",
   "Tanınmayan sütunlar aktarılmayacak: {liste}": "Unrecognised columns won't be imported: {liste}",
   "Eklenemeyenler:": "Couldn't be added:",
-  "Tek seferde en fazla 300 satır eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
-    "At most 300 rows are added at once. For the rest, start the file from row {n} and upload it again.",
+  "Tek seferde en fazla {m} satır eklenir. Kalanlar için dosyayı {n}. satırdan başlatıp yeniden yükleyin.":
+    "At most {m} rows are added at once. For the rest, start the file from row {n} and upload it again.",
   "{n} müşteriyi ekle": { one: "Add {n} customer", other: "Add {n} customers" },
   "Müşterileri ekle": "Add customers",
   "{n}. satır: {sebep}": "Row {n}: {sebep}",

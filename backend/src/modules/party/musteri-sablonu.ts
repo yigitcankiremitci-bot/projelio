@@ -573,6 +573,20 @@ export async function musteriSablonuOlustur(dil: Locale = "tr", tur: SablonTuru 
 // ============================================================ Okuma
 
 /**
+ * Excel'le tek yüklemede açılacak azami müşteri kartı.
+ *
+ * Eskiden Lio'nun genel satır tavanını (MAX_IMPORT_ROWS, 300) kullanıyordu;
+ * gerçek bir müşteri listesi (317 eczane, 2026-11-10) buna takıldı ve
+ * kullanıcı dosyayı bölmek zorunda kaldı. Kartlar createMany'de 100'lük
+ * parçalarla yazılıyor, 2000 satır ~20 sorgu.
+ *
+ * MAX_RETAINED_ROWS'un (okunan satır, 5000) BİLEREK altında: tavan okunanı
+ * aşsaydı 5000'den sonraki satırlar sessizce düşer, "kalanlar için N.
+ * satırdan başlatın" uyarısı hiç çıkmazdı.
+ */
+export const MUSTERI_IMPORT_TAVANI = Math.min(Number(process.env.MUSTERI_IMPORT_TAVANI ?? 2000), MAX_RETAINED_ROWS - 1);
+
+/**
  * Yüklenen dosyanın sayfaları (.xlsx ya da .csv).
  *
  * Eski .xls bilerek reddediliyor: ExcelJS okuyamıyor ve sessizce boş dönmesi,
@@ -865,7 +879,7 @@ export function planMusteriImport(
  * Eşleşme: vergi no (kesin), e-posta (kesin) ya da normalize ad (bkz.
  * party-dedup: "ABC Ltd. Şti." ~ "abc"). Tek tek kart açılırken yinelenen
  * kart yalnızca UYARI, burada ise ATLAMA sebebi: tek tek girişte kullanıcı
- * uyarıyı görüp karar veriyor, 300 satırlık dosyada göremez — aynı dosyayı iki
+ * uyarıyı görüp karar veriyor, yüzlerce satırlık dosyada göremez — aynı dosyayı iki
  * kez yüklemek her müşteriyi ikiye katlamamalı. Vergi no ayrıca veritabanında
  * tekil; atlamasaydık toplu ekleme o satırda patlardı.
  *

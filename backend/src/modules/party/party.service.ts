@@ -53,8 +53,8 @@ import {
   type Erisimler,
 } from "./baglanti-erisim";
 import { hataMetni } from "../../common/i18n/index";
-import { MAX_IMPORT_ROWS, type SheetData } from "../ai-assistant/ai-sheet-import";
-import { mevcutlariAyikla, planMusteriImport, type MusteriAlani } from "./musteri-sablonu";
+import { type SheetData } from "../ai-assistant/ai-sheet-import";
+import { mevcutlariAyikla, MUSTERI_IMPORT_TAVANI, planMusteriImport, type MusteriAlani } from "./musteri-sablonu";
 
 // Kapsam düzeyindeki yetkinin varsayılan modülü. Kayda bağlı yetki ise
 // kaydın durduğu defterlerden okunur (bkz. baglanti-erisim.ts).
@@ -730,7 +730,7 @@ export class PartyService {
     // satırı göremediği defterdeki kartın adını söylerdi (bkz. checkDuplicates).
     const mevcut = await this.findAll(scope, { includeArchived: true, moduller: await this.okunanModuller(scope, userId) });
     const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
-    const islenecek = yeni.slice(0, MAX_IMPORT_ROWS);
+    const islenecek = yeni.slice(0, MUSTERI_IMPORT_TAVANI);
 
     const sonuc: MusteriIceAktarmaSonucu = {
       onizleme: opts.onizleme !== false,
@@ -749,7 +749,7 @@ export class PartyService {
         telefon: p.party.phone,
         eposta: p.party.email,
       })),
-      kalanIlkSatir: yeni[MAX_IMPORT_ROWS]?.satir,
+      kalanIlkSatir: yeni[MUSTERI_IMPORT_TAVANI]?.satir,
     };
     if (sonuc.onizleme || !islenecek.length) return sonuc;
 

@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { IconX } from "./icons";
 import ModuleEmblem from "./ModuleEmblem";
 import { useT } from "../lib/i18n";
+import { MODUL_TANITIMLARI } from "../lib/modulTanitimlari";
 
 interface Props {
   entry: ModuleCatalogEntry;
@@ -18,6 +19,12 @@ interface Props {
   /** Sağ üstteki kaldırma düğmesi. Verilmezse gösterilmez. */
   onRemove?: () => void;
   removeDisabled?: boolean;
+  /**
+   * Ayrıntılı kart (departman/şirket Modüller sekmesi): büyük simge, özet,
+   * nasıl çalıştığı ve "neler yapabilirsin" maddeleri; yükseklik içeriğe göre.
+   * Verilmezse eski sabit boy, tek satırlık açıklamalı kart.
+   */
+  detayli?: boolean;
 }
 
 // Diğer kartlarla (Departman/Ürün/İş) aynı sabit-boy mantığı ama kapak fotoğrafı
@@ -25,13 +32,24 @@ interface Props {
 // sabit ve eşit olsun".
 const CARD_HEIGHT = 128;
 
-export default function ModuleCard({ entry, departmentId, to, onClick, onRemove, removeDisabled }: Props) {
+export default function ModuleCard({ entry, departmentId, to, onClick, onRemove, removeDisabled, detayli }: Props) {
   const c = useThemeColors();
   const t = useT();
   // Pasif modül yalnızca platform yöneticisine görünür (shared aktifModuller.ts);
   // soluk ve kesik çizgili, kullanıcılara açık olanlarla karışmasın.
   const pasif = !modulAktifMi(entry.key);
-  const content = (
+  const content = detayli ? (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, height: "100%", padding: 18 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, paddingRight: onRemove ? 18 : 0 }}>
+        <ModuleEmblem moduleKey={entry.key} size={56} />
+        <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: pasif ? c.textSecondary : c.textPrimary }}>{entry.name}</h3>
+          {pasif && <PasifRozeti />}
+        </div>
+      </div>
+      <ModulTanitimMetni entry={entry} />
+    </div>
+  ) : (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
         <ModuleEmblem moduleKey={entry.key} />
@@ -76,7 +94,7 @@ export default function ModuleCard({ entry, departmentId, to, onClick, onRemove,
     border: `1px ${pasif ? "dashed" : "solid"} ${c.border}`,
     borderRadius: 12,
     background: pasif ? c.background : c.surface,
-    height: CARD_HEIGHT,
+    height: detayli ? "auto" : CARD_HEIGHT,
     overflow: "hidden",
     position: "relative",
   } as const;
@@ -184,5 +202,42 @@ export function PasifRozeti() {
     >
       {t("Pasif")}
     </span>
+  );
+}
+
+/**
+ * Modülün tanıtım metni (lib/modulTanitimlari.ts): özet, nasıl çalıştığı,
+ * "neler yapabilirsin" maddeleri, kimin için ve nerede açılacağı. "Modül ekle"
+ * ekranı ve Modüller sekmesindeki ayrıntılı kart aynı metni gösterir.
+ * Tanıtımı olmayan (pasif) modülde katalog açıklamasına düşer.
+ */
+export function ModulTanitimMetni({ entry, evAdi }: { entry: ModuleCatalogEntry; evAdi?: string | null }) {
+  const c = useThemeColors();
+  const t = useT();
+  const tanitim = MODUL_TANITIMLARI[entry.key];
+  if (!tanitim) {
+    return entry.description ? (
+      <p style={{ margin: 0, fontSize: 14, color: c.textSecondary, lineHeight: 1.5 }}>{t(entry.description)}</p>
+    ) : null;
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{t(tanitim.ozet)}</p>
+      <p style={{ margin: 0, color: c.textSecondary }}>{t(tanitim.detay)}</p>
+      <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 3, color: c.textPrimary }}>
+        {tanitim.neler.map((madde) => (
+          <li key={madde}>{t(madde)}</li>
+        ))}
+      </ul>
+      <div style={{ color: c.textSecondary, fontSize: 13 }}>
+        <strong style={{ fontWeight: 500 }}>{t("Kimin için:")}</strong> {t(tanitim.kimIcin)}
+        {evAdi && (
+          <>
+            <br />
+            <strong style={{ fontWeight: 500 }}>{t("Nerede açılır:")}</strong> {evAdi}
+          </>
+        )}
+      </div>
+    </div>
   );
 }

@@ -200,13 +200,14 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
           {t("Henüz etkinleştirilmiş modül yok. Sayfadaki \"+\" ile ekleyebilirsin.")}
         </p>
       ) : (
-        // Şirket anasayfasındaki modül kartlarıyla aynı görünüm: sabit boy,
-        // eşit kart. Liste hâli modülleri "ayar satırı" gibi gösteriyordu;
-        // oysa bunlar açılıp içinde çalışılan araçlar.
+        // Ayrıntılı kart: büyük simge + modülün ne yaptığı (bkz. ModuleCard
+        // detayli). Satırdaki kartlar ızgarada eşit boyda uzar. Liste hâli
+        // modülleri "ayar satırı" gibi gösteriyordu; oysa bunlar açılıp içinde
+        // çalışılan araçlar.
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))",
             gap: 12,
           }}
         >
@@ -220,6 +221,7 @@ export default function DepartmentModulesPanel({ organizationId, departmentId, d
             const opensInModal = kartModaldaAcilir(entry.key);
             return (
               <ModuleCard
+                detayli
                 key={entry.key}
                 entry={entry}
                 onClick={openable && opensInModal ? () => setModalKey(entry.key) : undefined}

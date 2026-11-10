@@ -127,6 +127,7 @@ export const ilkAdimlar: TranslationDict = {
   "Uygun görev yok": "No eligible tasks",
   "Kişisel görev silme": "Deleting personal task",
   "Kaynak filtresi": "Source filter",
+  "Süresi geçen": "Overdue",
   "Geri alınacak bir işlem yok": "Nothing to undo",
   "İleri alınacak bir işlem yok": "Nothing to redo",
   "Erişebildiğin projelerde açık görev yok.": "There are no open tasks in the projects you can access.",

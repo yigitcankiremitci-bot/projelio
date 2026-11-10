@@ -23,6 +23,7 @@ import { backState } from "../lib/backTarget";
 import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
 import { departmanAdi } from "../lib/departmanAdi";
+import { suresiGectiMi } from "../lib/gecikme";
 import { altGorevHatasiniBildir, gorevDurumHatasiniBildir } from "../lib/taskBlockNotice";
 
 // Sıra, uygulamadaki diğer tüm kanbanlarla aynı: önce üzerinde çalışılan işler.
@@ -108,6 +109,26 @@ export default function TasksOverview() {
           else params.set("filter", next);
           // Sekme elle değiştirildiyse "şu göreve odaklan" isteği geçersiz.
           params.delete("focus");
+          return params;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  // "Süresi geçen" — kaynak filtresinden BAĞIMSIZ bir anahtar: "İş görevlerim"
+  // ile birlikte "işlerimden gecikenler" gibi okunur. Adreste duruyor ki
+  // karttan çıkıp geri dönen kullanıcı aynı görünüme düşsün; ama kaynak
+  // filtresi gibi HATIRLANMIYOR (bkz. yukarıdaki filtre notu).
+  const sadeceGecikenler = searchParams.get("gecikmis") === "1";
+  const setSadeceGecikenler = useCallback(
+    (acik: boolean) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (acik) params.set("gecikmis", "1");
+          else params.delete("gecikmis");
           return params;
         },
         { replace: true }
@@ -257,7 +278,23 @@ export default function TasksOverview() {
       .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [panoGorevleri, altGorevler]);
   const ekGorevById = useMemo(() => new Map(ekAltGorevler.map((g) => [g.id, g])), [ekAltGorevler]);
-  const tasks: Task[] = useMemo(() => [...panoGorevleri, ...ekAltGorevler], [panoGorevleri, ekAltGorevler]);
+  const tumGorevler: Task[] = useMemo(() => [...panoGorevleri, ...ekAltGorevler], [panoGorevleri, ekAltGorevler]);
+
+  // Süresi geçen filtresi. Kural kırmızı kartlarla aynı (bkz. lib/gecikme).
+  // Kendisi gecikmemiş ama alt görevi gecikmiş üst görev de KALIR: yoksa
+  // gecikmiş alt görev üstsüz kalır ve "yetim" kart olarak ayrıca çizilirdi —
+  // oysa proje içindeki gibi üst görevinin altında görünmesi gerekiyor.
+  const gecikenIdleri = useMemo(() => {
+    const idler = new Set<string>();
+    for (const g of tumGorevler) if (suresiGectiMi(g)) idler.add(g.id);
+    return idler;
+  }, [tumGorevler]);
+  const tasks: Task[] = useMemo(() => {
+    if (!sadeceGecikenler) return tumGorevler;
+    const ustler = new Set<string>();
+    for (const g of tumGorevler) if (g.parentTaskId && gecikenIdleri.has(g.id)) ustler.add(g.parentTaskId);
+    return tumGorevler.filter((g) => gecikenIdleri.has(g.id) || ustler.has(g.id));
+  }, [tumGorevler, gecikenIdleri, sadeceGecikenler]);
   const tasksRef = useLatestRef(tasks);
 
   /**
@@ -760,7 +797,7 @@ export default function TasksOverview() {
   }, [highlightTaskId]);
 
   const filterButtons = (
-    <div role="group" aria-label={t("Kaynak filtresi")} style={{ display: "flex", gap: 4 }}>
+    <div role="group" aria-label={t("Kaynak filtresi")} style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
       {FILTERS.map((f) => (
         <button
           key={f.value}
@@ -782,6 +819,33 @@ export default function TasksOverview() {
           {t(f.label)}
         </button>
       ))}
+      {/* Kaynak filtrelerinden ayrı bir anahtar (bkz. sadeceGecikenler): araya
+          ince bir ayraç, sayı her zaman görünür ki açmadan "kaç tane" bilinsin. */}
+      <span aria-hidden style={{ width: 1, alignSelf: "stretch", margin: "4px 6px", background: c.border }} />
+      <button
+        onClick={() => {
+          selection.clear();
+          setSadeceGecikenler(!sadeceGecikenler);
+        }}
+        aria-pressed={sadeceGecikenler}
+        style={{
+          padding: "8px 16px",
+          fontSize: 15,
+          borderRadius: 8,
+          whiteSpace: "nowrap",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          border: `1px solid ${sadeceGecikenler ? c.danger : c.border}`,
+          background: sadeceGecikenler ? `${c.danger}12` : c.surface,
+          color: sadeceGecikenler ? c.textPrimary : c.textSecondary,
+        }}
+      >
+        {t("Süresi geçen")}
+        {gecikenIdleri.size > 0 && (
+          <span style={{ fontSize: 13, fontWeight: 600, color: c.danger }}>{gecikenIdleri.size}</span>
+        )}
+      </button>
     </div>
   );
 
@@ -815,7 +879,7 @@ export default function TasksOverview() {
   // Sırala/Seç şeritte yeniden beliriyor, aksi halde uzun bir panoda aşağı
   // inildiğinde bu kontrollere hiç erişilemiyordu.
   usePageHeader(t("Yapılacaklar"), headerRef, []);
-  usePageHeaderTabs(filterButtons, [filter, selection.selectionMode], filtersRef);
+  usePageHeaderTabs(filterButtons, [filter, selection.selectionMode, sadeceGecikenler, gecikenIdleri.size], filtersRef);
   usePageHeaderActions(
     { right: sortAndSelect, sourceRef: toolbarRef },
     [sort, selection.selectionMode, selection.selectedIds.size, archiving, movableSelectedIds.length]

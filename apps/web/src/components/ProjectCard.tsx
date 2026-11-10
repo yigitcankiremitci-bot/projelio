@@ -13,6 +13,8 @@ import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { isProjectInSidebar } from "../lib/useSidebarHierarchy";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
+import FileContextMenu from "./FileContextMenu";
+import ProjeKopyaModal from "./projeler/ProjeKopyaModal";
 
 interface Props {
   project: Project;
@@ -46,6 +48,10 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Sağ tık: klonla / şablon olarak kaydet. Menü ve pencereler Link'in DIŞINDA
+  // çizilir — portal olsalar da React olayları Link'e kabarıp sayfayı açardı.
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [kopyaKipi, setKopyaKipi] = useState<"klon" | "sablon" | null>(null);
 
   const handleStatusChange = async (status: ProjectStatus) => {
     const updated = await api.patch<Project>(`/projects/${project.id}`, { status }).catch(() => null);
@@ -81,9 +87,15 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
   };
 
   return (
+    <>
     <Link
       to={`/projects/${project.id}`}
       draggable={false}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setMenu({ x: e.clientX, y: e.clientY });
+      }}
       className="entity-card"
       style={{
         display: "flex",
@@ -207,5 +219,18 @@ export default function ProjectCard({ project, canManage, onStatusChanged }: Pro
         </div>
       </div>
     </Link>
+    {menu && (
+      <FileContextMenu
+        x={menu.x}
+        y={menu.y}
+        onClose={() => setMenu(null)}
+        items={[
+          { label: t("Klonla…"), onClick: () => setKopyaKipi("klon") },
+          { label: t("Şablon olarak kaydet…"), onClick: () => setKopyaKipi("sablon") },
+        ]}
+      />
+    )}
+    {kopyaKipi && <ProjeKopyaModal project={project} kip={kopyaKipi} onClose={() => setKopyaKipi(null)} />}
+    </>
   );
 }

@@ -56,6 +56,7 @@ import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.mod
 import { WorklogModule } from "./modules/worklog/worklog.module";
 import { MuzeModule } from "./modules/muze/muze.module";
 import { OrnekIsModule } from "./modules/ornek-is/ornek-is.module";
+import { ProjeSablonlariModule } from "./modules/proje-sablonlari/proje-sablonlari.module";
 import { EpostaYonetimiModule } from "./modules/eposta-yonetimi/eposta-yonetimi.module";
 import { DemoRandevuModule } from "./modules/demo-randevu/demo-randevu.module";
 import { BultenModule } from "./modules/bulten/bulten.module";
@@ -142,6 +143,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     WorklogModule,
     MuzeModule,
     OrnekIsModule,
+    ProjeSablonlariModule,
     EpostaYonetimiModule,
     // Canlı demo randevuları: herkese açık takvim + Admin > Demo randevuları.
     DemoRandevuModule,

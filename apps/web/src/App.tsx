@@ -766,6 +766,10 @@ export default function App() {
   // Mobilde kendi menüsü gizlendiği için alt menü (BottomNav) yerinde kalır.
   const sakinEkrani = location.pathname === "/sakin" || location.pathname === "/yeni";
   const kenarAcik = sidebarOpen && !sakinEkrani;
+  // Sidebar kapalıyken okun yanındaki anasayfa simgesi (anasayfada gizli).
+  // Başlıkların sol payı da buna bakıyor: iki yer ayrı koşul yazınca simge
+  // Ben/Şirket seçicisinin üstüne biniyordu.
+  const anasayfaSimgesi = !sidebarOpen && !sakinEkrani && location.pathname !== "/";
   // Kök adres de bu gruba girer: serbest çalışanın anasayfası artık kendi üst
   // satırını en tepeden başlatıyor (bkz. components/anasayfa/AnasayfaBaslik).
   const isCoverPage =
@@ -833,9 +837,14 @@ export default function App() {
             marginLeft: isDesktop && kenarAcik ? SIDEBAR_WIDTH : 0,
             minHeight: "100vh",
             position: "relative",
-            // Anasayfa başlığının sol payı: açma oku görünürken başlık onun altına
-            // girmesin (bkz. AnasayfaBaslik).
-            "--ust-sol-bosluk": isDesktop && kenarAcik ? "0px" : "62px",
+            // Anasayfa başlığının sol payı: açma oku (ve yanındaki anasayfa
+            // simgesi) görünürken başlık onların altına girmesin (bkz.
+            // AnasayfaBaslik). 62 elle yazılmıştı; simge eklenince şirket
+            // sayfasında Ben/Şirket seçicisi simgenin altına giriyordu.
+            "--ust-sol-bosluk":
+              isDesktop && kenarAcik
+                ? "0px"
+                : `${(anasayfaSimgesi ? SOL_UST_SAG_KENAR : TOP_CHROME.gutter + SOL_UST_DUGME) + 8}px`,
           } as React.CSSProperties
         }
       >
@@ -902,7 +911,7 @@ export default function App() {
             >
               <IconChevronRight size={18} color={c.textSecondary} />
             </button>
-            {location.pathname !== "/" && (
+            {anasayfaSimgesi && (
               <Link
                 to="/"
                 aria-label={t("Anasayfa")}

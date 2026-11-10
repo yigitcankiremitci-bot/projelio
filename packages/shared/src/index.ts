@@ -46,3 +46,4 @@ export * from "./modulEvi";
 export * from "./ajan";
 export * from "./muze";
 export * from "./aktifModuller";
+export * from "./projeSablonu";

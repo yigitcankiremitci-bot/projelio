@@ -1217,4 +1217,19 @@ export const hatalar: TranslationDict = {
   "Bu modül şu anda kullanıma kapalı.": "This module isn't available right now.",
   "Şirketin proje alanı şirketin parçası; ayrı olarak taşınamaz, silinemez ya da arşivlenemez.":
     "The company's project space is part of the company; it can't be moved, deleted or archived on its own.",
+
+  // ─────────────────────────────────────────────── Proje şablonları
+  "Bu işe proje açmak onay istiyor; kopya ya da şablondan açılamaz. Projeyi Yeni proje ile iste.": "Opening a project in this job needs approval, so it can't be created from a copy or template. Request it with New project.",
+  "Bu şablonu silemezsin": "You can't delete this template",
+  "Hazır şablonlar silinemez": "Built-in templates can't be deleted",
+  "Klonlanacak proje seçilmedi": "No project was selected to clone",
+  "Projenin adı boş olamaz": "The project name can't be empty",
+  "Projenin açılacağı iş seçilmedi": "No job was selected for the project",
+  "Şablon bulunamadı": "Template not found",
+  "Şablona çevrilecek proje seçilmedi": "No project was selected to save as a template",
+  "Şablonun adı boş olamaz": "The template name can't be empty",
+  "Şirket şablonunu yalnızca şirketin sahibi ya da bir departman yöneticisi kaydedebilir": "Only the company owner or a department manager can save a company template",
+
+  // ─────────────────────────────────────────────── Kullanıcı ayrıcalıkları
+  "Ayrıcalık tablosu yok: önce migration 192 uygulanmalı.": "The privileges table is missing: migration 192 must be applied first.",
 };

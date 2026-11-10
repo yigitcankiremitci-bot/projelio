@@ -728,4 +728,17 @@ export const kurumsal: TranslationDict = {
   "Kendi karakterin": "Your own character",
   "Ofise gir": "Enter the office",
   "Stüdyoya gir": "Enter the studio",
+
+  // ─────────────────────────────────────────────── Kullanıcı ayrıcalıkları (admin)
+  "Ayrıcalıklar": "Privileges",
+  "Ek kişi": "Extra seats",
+  "Migration 192 uygulanmadığı için ayrıcalık verilemiyor.": "Privileges can't be granted because migration 192 hasn't been applied.",
+  "Ek departman": "Extra departments",
+  "Ayrıcalıklar kaydedildi.": "Privileges saved.",
+  "Ayrıcalıkları değiştirdi": "Changed privileges",
+  "Son değişiklik: {tarih}": "Last change: {tarih}",
+  "Not: neden verildi (yalnızca yöneticiler görür)": "Note: why it was granted (visible to admins only)",
+  "Modül sınırı yok": "No module limit",
+  "Ek modül": "Extra modules",
+  "Paketin üstüne eklenen haklar. Kişinin sahibi olduğu şirketlerde geçer; ayrıcalık kaldırılınca açık olanlar kapanmaz, yalnızca yenisi açılamaz.": "Rights added on top of the plan. They apply in companies the person owns; removing a privilege doesn't close what's already open, only prevents opening new ones.",
 };

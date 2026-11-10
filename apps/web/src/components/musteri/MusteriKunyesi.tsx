@@ -101,8 +101,7 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
         padding: 14,
         borderRadius: 10,
         background: c.surface,
-        border: `1px solid ${c.border}`,
-        borderLeft: `3px solid ${c.accent}`,
+        border: `1px solid color-mix(in srgb, ${c.accent} 45%, ${c.border})`,
         boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
       }}
     >

@@ -1,6 +1,7 @@
 import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { cevirmenSuAn } from "../lib/i18n";
+import { IconInfo, IconRestore } from "./icons";
 
 /**
  * Uygulamanın hata sınırı — beyaz ekranı bitiren şey.
@@ -108,7 +109,7 @@ export class AppErrorBoundary extends Component<Props, State> {
         }}
       >
         <div style={{ fontSize: 40, lineHeight: 1 }} aria-hidden>
-          {guncellemeVar ? "🔄" : "⚠️"}
+          {guncellemeVar ? <IconRestore size={40} color="#C0813F" /> : <IconInfo size={40} color="#C0813F" />}
         </div>
         <h1 style={{ fontSize: 19, margin: 0, fontWeight: 600 }}>
           {guncellemeVar ? t("Yeni sürüm yayımlandı") : t("Beklenmeyen bir hata oluştu")}

@@ -6,7 +6,7 @@ import { aiChat } from "../api/aiChat";
 import type { AiCreditOrder, AiCreditPackage } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconSparkle, IconCheck } from "./icons";
+import { IconLio, IconCheck } from "./icons";
 import { bicimDili } from "../lib/i18n/depo";
 
 // Modül düzeyinde kanca çağrılamaz: Türkçe metin ANAHTAR olarak duruyor,
@@ -152,7 +152,7 @@ export default function AiCreditTopUp({ onChanged }: Props) {
                     background: active ? c.background : c.surface,
                   }}
                 >
-                  <IconSparkle size={17} color={active ? c.accentDark : c.accent} />
+                  <IconLio size={17} color={active ? c.accentDark : c.accent} />
                   <span style={{ flex: 1 }}>
                     <span style={{ display: "block", fontSize: 15, fontWeight: 500, color: c.textPrimary }}>
                       {t("{n} birim", { n: p.credits.toLocaleString(bicimDili()) })}

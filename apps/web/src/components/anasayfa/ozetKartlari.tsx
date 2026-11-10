@@ -64,7 +64,8 @@ import {
   IconNews,
   IconTrend,
   IconPlus,
-  IconSparkle,
+  IconLio,
+  IconModules,
   IconSend,
   IconStar,
   IconUser,
@@ -921,7 +922,7 @@ function KisiselKasaOzeti({ boyut }: { boyut: PanoBoyut }) {
 /**
  * Kartın içindeki tek görev — kanbandaki kartın küçük kopyası (kullanıcı isteği,
  * 2026-11-09: "anasayfa ve kanban bütünlük içinde olsun"): aynı yüzey, aynı
- * sol renk şeridi (durum rengi), aynı yuvarlak tik. Adına basınca yerine gider.
+ * durum rengi yuvarlak tikin kenarında (sol renk şeridi yerine). Adına basınca yerine gider.
  */
 function GorevSatiri({ gorev, alt, onTamamla }: { gorev: PersonalBoardItem; alt?: boolean; onTamamla: () => void }) {
   const c = useThemeColors();
@@ -930,8 +931,8 @@ function GorevSatiri({ gorev, alt, onTamamla }: { gorev: PersonalBoardItem; alt?
   const hedef = gorev.projectId ? `/projects/${gorev.projectId}` : `/tasks?focus=${gorev.itemId}`;
   const serit = gorev.status === "in_progress" ? c.primary : c.textSecondary;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, marginLeft: alt ? 16 : 0, padding: alt ? "5px 9px" : "8px 10px", borderRadius: 8, border: `1px solid ${c.border}`, borderLeft: `3px solid ${serit}`, background: c.surface }}>
-      <button type="button" onClick={onTamamla} aria-label={t("Tamamlandı olarak işaretle")} title={t("Tamamlandı olarak işaretle")} style={{ width: alt ? 15 : 18, height: alt ? 15 : 18, padding: 0, borderRadius: "50%", border: `1.5px solid ${c.border}`, background: "transparent", flexShrink: 0 }} />
+    <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, marginLeft: alt ? 16 : 0, padding: alt ? "5px 9px" : "8px 10px", borderRadius: 8, border: `1px solid ${c.border}`, background: c.surface }}>
+      <button type="button" onClick={onTamamla} aria-label={t("Tamamlandı olarak işaretle")} title={t("Tamamlandı olarak işaretle")} style={{ width: alt ? 15 : 18, height: alt ? 15 : 18, padding: 0, borderRadius: "50%", border: `1.5px solid ${serit}`, background: "transparent", flexShrink: 0 }} />
       <Link to={hedef} draggable={false} style={{ flex: 1, minWidth: 0, fontSize: alt ? 13 : 14, color: c.textPrimary, textDecoration: "none", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {gorev.title}
       </Link>
@@ -1248,7 +1249,7 @@ export function useSirketKatalogu({
     ekle(true, { id: "departmanlar", ad: t("Departmanlar"), grup: "temel", Icon: IconBuilding, boyut: "kucuk", hedef: `${kok}?tab=departments`, ciz: (b) => <DepartmanlarOzeti departmanlar={departmanlarHazir ? departmanlar : null} boyut={b} tumu={`${kok}?tab=departments`} /> });
     ekle(access?.canViewCommercial !== false, { id: "ekip", ad: t("Ekip"), grup: "temel", Icon: IconUser, boyut: "kucuk", hedef: `${kok}?tab=team`, ciz: (b) => <EkipOzeti organizationId={organizationId} boyut={b} /> });
     ekle(acik.has("products"), { id: "urunler", ad: t("Ürün/Hizmet"), grup: "temel", Icon: IconStar, boyut: "kucuk", hedef: `${kok}?tab=products`, ciz: (b) => <UrunlerOzeti organizationId={organizationId} boyut={b} /> });
-    ekle(true, { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: `${kok}?tab=modules`, ciz: (b) => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} hedefi={(m) => modulHedefi(m.moduleKey)} boyut={b} /> });
+    ekle(true, { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconModules, boyut: "kucuk", hedef: `${kok}?tab=modules`, ciz: (b) => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} hedefi={(m) => modulHedefi(m.moduleKey)} boyut={b} /> });
     ekle(musteriModulu || baglantiModulu, {
       id: "musteri-haritasi",
       ad: musteriModulu && baglantiModulu ? t("Harita") : musteriModulu ? t("Müşteriler") : t("Bağlantı ve İlişkiler"),
@@ -1270,14 +1271,14 @@ export function useSirketKatalogu({
     ekle(acik.has("files"), { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: `${kok}?tab=files`, ciz: () => <SirketDosyalarOzeti organizationId={organizationId} /> });
     ekle(acik.has("flow"), { id: "akis", ad: t("Sosyal"), grup: "temel", Icon: IconMessageCircle, boyut: "kucuk", hedef: `${kok}?tab=flow`, ciz: () => <AkisOzeti organizationId={organizationId} /> });
     ekle(true, { id: "ofis", ad: t("3D ofis"), grup: "temel", Icon: IconLayers, boyut: "kucuk", satir: ofisSatiri, tamKaplama: true, hedef: `/yeni?ofis=${encodeURIComponent(organizationId)}`, ciz: () => <OfisOzeti ad={t("3D ofis")} /> });
-    ekle(prefs.showLio, { id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
+    ekle(prefs.showLio, { id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconLio, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
     liste.push(...aracTanimlari(t, organizationId), ...piyasaKartlari(t));
     for (const m of moduller ?? []) {
       liste.push({
         id: modulKimligi(m.moduleKey),
         ad: m.moduleName,
         grup: "modul",
-        Icon: isMailModule(m.moduleKey) ? IconSend : IconSparkle,
+        Icon: isMailModule(m.moduleKey) ? IconSend : IconModules,
         boyut: isMailModule(m.moduleKey) || sekmeliModulMu(m.moduleKey) ? "orta" : "kucuk",
         satir: isMailModule(m.moduleKey) || sekmeliModulMu(m.moduleKey) ? 2 : undefined,
         // Sekme çiplerine basılıyor: kart bağlantıya sarılmasın.
@@ -1313,11 +1314,11 @@ export function useSerbestKatalogu({ isler, projeler, pano }: { isler: Job[]; pr
       { id: "isler", ad: t("İşler"), grup: "temel", Icon: IconBriefcase, boyut: "kucuk", sabitBoyut: "kucuk", satir: 2, tamKaplama: true, etkilesimli: true, hedef: "/?tab=jobs", turCapasi: "dashboard-tab-jobs", ciz: () => <DesteKarti ad={t("İşler")} Icon={IconBriefcase} tumu="/?tab=jobs" ogeler={isler} yildizlar={yildizlar} yildizla={pano.yildizla} ciz={(j) => <JobCard key={j.id} job={j} projectCount={j.projectCount ?? projeler.filter((p) => p.jobId === j.id).length} />} /> },
       { id: "projeler", ad: t("Projeler"), grup: "temel", Icon: IconActivity, boyut: "orta", sabitBoyut: "orta", hizliEylem: projeHizliEylemi(t), hedef: "/?tab=jobs", ciz: () => <ProjelerGovdesi projeler={projeler} isler={isler} yildizlar={yildizlar} /> },
       { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: "/?tab=files", turCapasi: "dashboard-tab-files", ciz: () => <KisiselDosyalarOzeti isler={isler} /> },
-      { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/?tab=modules", turCapasi: "dashboard-tab-modules", ciz: (b) => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} hedefi={modulHedefi} boyut={b} /> },
+      { id: "moduller", ad: t("Modüller"), grup: "temel", Icon: IconModules, boyut: "kucuk", hedef: "/?tab=modules", turCapasi: "dashboard-tab-modules", ciz: (b) => <ModullerOzeti moduller={moduller ?? []} yukleniyor={moduller === null} hedefi={modulHedefi} boyut={b} /> },
       { id: "ofis", ad: t("3D stüdyo"), grup: "temel", Icon: IconLayers, boyut: "kucuk", satir: ofisSatiri, tamKaplama: true, hedef: "/yeni?ofis=studyo", ciz: () => <OfisOzeti ad={t("3D stüdyo")} /> },
     ];
     if (prefs.showLio) {
-      liste.push({ id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconSparkle, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
+      liste.push({ id: "lio", ad: t("Lio Bakiyesi"), grup: "temel", Icon: IconLio, boyut: "kucuk", hedef: "/settings/lio-units", ciz: () => <LioOzeti /> });
     }
     liste.push(...aracTanimlari(t, "me"), ...piyasaKartlari(t));
     for (const p of projeler.slice(0, RAF_TAVANI)) {
@@ -1338,7 +1339,7 @@ export function useSerbestKatalogu({ isler, projeler, pano }: { isler: Job[]; pr
         id: modulKimligi(m.moduleKey),
         ad: m.moduleName,
         grup: "modul",
-        Icon: isMailModule(m.moduleKey) ? IconSend : IconSparkle,
+        Icon: isMailModule(m.moduleKey) ? IconSend : IconModules,
         boyut: isMailModule(m.moduleKey) || (m.jobId && sekmeliModulMu(m.moduleKey)) ? "orta" : "kucuk",
         satir: isMailModule(m.moduleKey) || (m.jobId && sekmeliModulMu(m.moduleKey)) ? 2 : undefined,
         etkilesimli: (m.jobId && sekmeliModulMu(m.moduleKey)) || undefined,

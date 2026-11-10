@@ -48,15 +48,17 @@
   --radius-lg: 22px;
   --radius-xl: 30px;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
+  /* Düz tasarım (2026-11): yerinde duran kartlar gölgesiz, yalnızca kenar çizgisiyle ayrılır.
+     Gölge yalnızca gerçekten yüzen katmanlarda (açılır menü, açılır pencere, bildirim) — --shadow-lg. */
+  --shadow-sm: none;
+  --shadow: none;
   --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.3);
-  --shadow-glow: 0 20px 70px rgba(192, 129, 63, 0.18);
+  --shadow-glow: 0 0 0 transparent;
 
   --maxw: 1200px;
   --gutter: clamp(20px, 5vw, 40px);
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
@@ -310,22 +312,17 @@ p {
   white-space: nowrap;
 }
 
-.btn:hover {
-  transform: translateY(-1.5px);
-}
-
 .btn:active {
   transform: translateY(0);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--bronze-400), var(--bronze-600));
+  background: var(--bronze-500);
   color: #12151b;
-  box-shadow: 0 8px 26px rgba(192, 129, 63, 0.25);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 12px 34px rgba(192, 129, 63, 0.4);
+  background: var(--bronze-400);
 }
 
 .btn-dark {
@@ -392,8 +389,7 @@ p {
 }
 
 .card-hover:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
+  border-color: rgba(224, 176, 119, 0.45);
   border-color: rgba(224, 176, 119, 0.35);
 }
 
@@ -449,9 +445,7 @@ p {
   position: sticky;
   top: 0;
   z-index: 60;
-  background: rgba(18, 21, 27, 0.72);
-  backdrop-filter: saturate(1.6) blur(14px);
-  -webkit-backdrop-filter: saturate(1.6) blur(14px);
+  background: var(--paper);
   border-bottom: 1px solid transparent;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -567,7 +561,6 @@ p {
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(14px);
   opacity: 0;
   visibility: hidden;
   transform: translate(-50%, 6px);
@@ -1213,7 +1206,7 @@ p {
   color: #fff;
   font-size: 0.72rem;
   font-weight: 550;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-lg);
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.45s ease, transform 0.45s ease;
@@ -1484,7 +1477,6 @@ p {
 .chip:hover:not(:disabled) {
   background: rgba(192, 129, 63, 0.32);
   border-color: rgba(224, 176, 119, 0.55);
-  transform: translateY(-1px);
 }
 
 .chip:disabled {
@@ -1634,8 +1626,7 @@ p {
 }
 
 .module-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow);
+  border-color: rgba(224, 176, 119, 0.45);
 }
 
 .module-card figure {
@@ -1650,10 +1641,6 @@ p {
   height: 100%;
   object-fit: cover;
   transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.module-card:hover img {
-  transform: scale(1.06);
 }
 
 .module-card .body {
@@ -1948,26 +1935,21 @@ table.cmp td:first-child {
 
 .plan ul {
   list-style: none;
-  padding: 22px 0 24px;
+  padding: 0 0 24px;
   margin: 22px 0 0;
   border-top: 1px solid var(--line);
   display: grid;
-  gap: 11px;
+  gap: 0;
+  align-content: start;
   font-size: 0.91rem;
   flex: 1;
 }
 
+/* Tik işaretli liste yerine teknik föy düzeni: her özellik ince bir çizgiyle ayrılan bir satır. */
 .plan li {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
   color: var(--text-soft);
-}
-
-.plan li svg {
-  flex: none;
-  margin-top: 3px;
-  color: var(--ok);
 }
 
 .plan li strong {
@@ -2000,8 +1982,7 @@ table.cmp td:first-child {
 }
 
 .credit-pack:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
+  border-color: rgba(224, 176, 119, 0.45);
 }
 
 .credit-pack[data-selected="true"] {
@@ -2457,8 +2438,10 @@ input[type="range"] {
 
 .demo-account-warn {
   margin-top: 18px;
-  padding-left: 12px;
-  border-left: 3px solid var(--bronze-600);
+  padding: 10px 12px;
+  border: 1px solid rgba(192, 129, 63, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(192, 129, 63, 0.08);
   font-size: 14px;
   line-height: 1.55;
   color: var(--text-soft);
@@ -2626,7 +2609,7 @@ input[type="range"] {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  box-shadow: var(--shadow), var(--shadow-glow);
+  box-shadow: var(--shadow-lg);
   animation: newsletter-popup-in 0.35s ease both;
 }
 
@@ -3249,7 +3232,6 @@ input[type="range"] {
   color: var(--text-faint);
   border-bottom: 1px solid var(--line);
   background: rgba(12, 14, 19, 0.72);
-  backdrop-filter: blur(12px);
 }
 
 .journey-head > span:last-child {
@@ -3830,8 +3812,7 @@ input[type="range"] {
 }
 
 .dept-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
+  border-color: rgba(224, 176, 119, 0.45);
 }
 
 .dept-card[aria-pressed="true"] {
@@ -3854,10 +3835,6 @@ input[type="range"] {
   object-fit: cover;
   pointer-events: none;
   transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
-}
-
-.dept-card:hover img {
-  transform: scale(1.06);
 }
 
 .dept-card-body {
@@ -4427,11 +4404,10 @@ input[type="range"] {
   background: var(--bronze-600);
   border: 1px solid var(--bronze-400);
   color: var(--ink);
-  box-shadow: var(--shadow), var(--shadow-glow);
+  box-shadow: var(--shadow-lg);
   transition: transform 0.16s ease, background 0.2s ease;
 }
 .wa-lio:hover {
-  transform: translateY(-2px) scale(1.04);
   background: var(--bronze-500);
 }
 .wa-lio::after {
@@ -4465,7 +4441,6 @@ input[type="range"] {
 }
 
 .store-badge:hover {
-  transform: translateY(-1.5px);
   border-color: #fff;
 }
 

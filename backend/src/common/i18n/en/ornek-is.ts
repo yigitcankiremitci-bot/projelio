@@ -9,7 +9,7 @@ import type { TranslationDict } from "@projelio/shared";
  * kalır — kendi yazdığı görevler gibi.
  */
 export const ornekIs: TranslationDict = {
-  "🎓 Projelio'yu tanı (örnek)": "🎓 Meet Projelio (sample)",
+  "Projelio'yu tanı (örnek)": "Meet Projelio (sample)",
   "Bu örnek iş, Projelio'nun nasıl çalıştığını göstermek için hazırlandı. İçindeki proje, görevler ve rutin gerçek kayıtlar: aç, düzenle, tamamla, taşı — hiçbir şey bozulmaz. İşin bitince bu sayfadaki \"Örnekleri sil\" düğmesiyle hepsini tek tıkla kaldırabilirsin.":
     "This sample job was set up to show you how Projelio works. The project, tasks and routine inside are real records: open, edit, complete, move them — nothing will break. When you're done, remove all of it in one click with the \"Delete samples\" button on this page.",
 

@@ -4033,7 +4033,7 @@ export class AiAssistantService {
     try {
       await this.executeTool(pending.toolName, pending.input, pending.userId, pending.userRole);
       return record(
-        `✅ ${cevir(locale, RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.")} ` +
+        `${cevir(locale, RESULT_LABELS[pending.toolName] ?? "İşlem tamamlandı.")} ` +
           cevir(locale, "(Bu isteğin geri kalanına devam edemedim, süresi dolmuştu — kalan kısmı tekrar yazar mısın?)")
       );
     } catch (err: any) {

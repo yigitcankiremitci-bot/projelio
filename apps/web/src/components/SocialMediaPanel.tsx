@@ -43,6 +43,8 @@ import {
   IconChevronRight,
   IconEdit,
   IconExternalLink,
+  IconImage,
+  IconPlay,
   IconTrash,
   IconUser,
 } from "./icons";
@@ -622,7 +624,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         ) : (
           // Video'nun karesi yok, görselin adresi de henüz gelmemiş olabilir.
           // İkisinde de kutu YİNE çizilir: "medya var" bilgisi tek başına değerli.
-          <span>{video ? "▶" : "🖼"}</span>
+          video ? <IconPlay size={18} /> : <IconImage size={18} />
         )}
         {/* Birden fazla medya varsa sayısı köşede: kapak tek başına yanıltmasın. */}
         {adet > 1 && (
@@ -680,7 +682,7 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         {adres ? (
           <img src={adres} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <span>{video ? "▶" : "🖼"}</span>
+          video ? <IconPlay size={18} /> : <IconImage size={18} />
         )}
         {adet > 1 && (
           <span
@@ -732,8 +734,8 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
         padding: compact ? "4px 6px" : "6px 7px",
         borderRadius: 6,
         cursor: "pointer",
-        background: `${postColor(post, accounts)}14`,
-        borderLeft: `3px solid ${postColor(post, accounts)}`,
+        background: `${postColor(post, accounts)}1F`,
+        border: `1px solid ${postColor(post, accounts)}55`,
         fontSize: compact ? 12 : 13,
         color: c.textPrimary,
       }}
@@ -1547,7 +1549,6 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
                 borderRadius: 10,
                 background: `${bolumRenk.takvim}10`,
                 border: `1px solid ${bolumRenk.takvim}33`,
-                borderLeft: `3px solid ${bolumRenk.takvim}`,
               }}
             >
               <span style={{ fontSize: 11, color: c.textSecondary }}>{s.label}</span>

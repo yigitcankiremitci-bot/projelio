@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 interface IconProps {
   size?: number;
   color?: string;
@@ -270,12 +272,59 @@ export function IconMessageCircle({ size = 18, color = "currentColor" }: IconPro
   );
 }
 
-// Projelio AI için parıltı ikonu — asistanın her yerdeki görsel imzası.
-export function IconSparkle({ size = 18, color = "currentColor" }: IconProps) {
+// Lio'nun çizgi yüzü: AI ile ilgili her yerin imzası (parıltı ikonu yerine).
+// Geometri brand/assets/lio-face.svg'den ölçeklendi: yuvarlak kafa + iki gülen göz.
+export function IconLio({ size = 18, color = "currentColor" }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
-      <path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" />
+      <circle cx="12" cy="12" r="9" />
+      <path d="M7.6 12.6c.1-2.3 2.8-2.3 2.9 0" />
+      <path d="M13.5 12.6c.1-2.3 2.8-2.3 2.9 0" />
+    </svg>
+  );
+}
+
+// Görsel (fotoğraf) yer tutucusu: emoji yerine.
+export function IconImage({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M20.5 15.5l-4.5-4.5-8.5 8.5" />
+    </svg>
+  );
+}
+
+// Kilit (ofisteki kilitli eşya rozeti).
+export function IconLock({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="10.5" width="14" height="10" rx="2" />
+      <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    </svg>
+  );
+}
+
+/**
+ * Metin satırının içinde duran küçük ikon (eskiden emojinin durduğu yerler: "📎 dosya.pdf").
+ * inline-flex + hafif aşağı kaydırma: ikon yazının taban çizgisine otursun, satır yüksekliği bozulmasın.
+ */
+export function InlineIcon({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden style={{ display: "inline-flex", verticalAlign: "-0.15em", marginRight: 4 }}>
+      {children}
+    </span>
+  );
+}
+
+// Modüller: dört blok, biri dolu (eklenebilir parçalar fikri).
+export function IconModules({ size = 18, color = "currentColor" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4" width="7" height="7" rx="1.6" />
+      <rect x="13" y="4" width="7" height="7" rx="1.6" />
+      <rect x="4" y="13" width="7" height="7" rx="1.6" />
+      <rect x="13" y="13" width="7" height="7" rx="1.6" fill={color} />
     </svg>
   );
 }

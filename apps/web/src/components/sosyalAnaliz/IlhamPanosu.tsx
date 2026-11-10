@@ -11,6 +11,7 @@ import { filesApi, uploadFile } from "../../api/files";
 import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { useT } from "../../lib/i18n";
 import Modal from "../Modal";
+import { IconPaperclip, InlineIcon } from "../icons";
 import BenzerHesapKesfi from "./BenzerHesapKesfi";
 import { MaddeListesi, useAnalizStilleri } from "./ortak";
 
@@ -173,7 +174,7 @@ export default function IlhamPanosu({
                 </div>
               )}
               {ilham.fileName && (
-                <span style={{ fontSize: 12, color: c.textSecondary }}>📎 {ilham.fileName}</span>
+                <span style={{ fontSize: 12, color: c.textSecondary }}><InlineIcon><IconPaperclip size={12} /></InlineIcon>{ilham.fileName}</span>
               )}
 
               {analiz && (
@@ -440,7 +441,7 @@ function IlhamFormu({
           {etiket(t("Referans video ya da görsel (isteğe bağlı)"))}
           {dosya ? (
             <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, color: c.textPrimary }}>
-              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>📎 {dosya.name}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}><InlineIcon><IconPaperclip size={12} /></InlineIcon>{dosya.name}</span>
               <button type="button" onClick={() => setDosya(null)} style={{ ...ikincilDugme, color: c.danger }}>
                 {t("Kaldır")}
               </button>

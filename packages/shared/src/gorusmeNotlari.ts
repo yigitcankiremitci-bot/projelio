@@ -33,17 +33,6 @@ export const GORUSME_TURU_ETIKETI: Record<PartyActivityType, string> = {
 };
 // dil:anahtar-bitis
 
-export const GORUSME_TURU_SIMGESI: Record<PartyActivityType, string> = {
-  arama: "📞",
-  ulasilamadi: "📵",
-  toplanti: "🤝",
-  eposta: "✉️",
-  teklif: "📄",
-  ziyaret: "📍",
-  not: "📝",
-  sistem: "⚙️",
-};
-
 export interface TemasOzeti {
   /** En son görüşme notu (sistem kayıtları sayılmaz). */
   sonTemas?: { type: PartyActivityType; occurredAt: string; userName?: string };

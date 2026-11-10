@@ -156,10 +156,10 @@ export const epostaYonetimi: TranslationDict = {
     "If the company linked you to a department module (e.g. sales or accounting), you can add and update that module's records. Find the module opened to you in the menu and look through its records.",
   "Şirketindeki her çalışma bir İŞ altında toplanır, işin içinde projeler ve görevler olur. İşler şirkete bağlandığı için şirket sayfasından hepsini birlikte görürsün. Görevleri sırayla aç ve açıklamalarındaki adımları dene.":
     "All work in your company lives under a JOB, and jobs contain projects and tasks. Since jobs are linked to the company, you see them all together on the company page. Open the tasks in order and try the steps in their descriptions.",
-  "🎓 Projelio'yu tanı: taşeron (örnek)":
-    "🎓 Meet Projelio: subcontractor (sample)",
-  "🎓 Projelio'yu tanı: şirket (örnek)":
-    "🎓 Meet Projelio: company (sample)",
+  "Projelio'yu tanı: taşeron (örnek)":
+    "Meet Projelio: subcontractor (sample)",
+  "Projelio'yu tanı: şirket (örnek)":
+    "Meet Projelio: company (sample)",
   // Planlı gönderim (migration 123)
   "En fazla 60 gün ilerisine planlanabilir.":
     "You can schedule at most 60 days ahead.",

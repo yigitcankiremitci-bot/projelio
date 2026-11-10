@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Dict } from "@/i18n";
 import { appLinks } from "@/lib/site";
-import { ArrowRight, Send, Sparkle } from "./Icons";
+import { ArrowRight, Send, LioYuz } from "./Icons";
 
 /** Ziyaretçinin demoda gönderebileceği mesaj sayısı. */
 const MESSAGE_LIMIT = 10;
@@ -188,7 +188,7 @@ export default function LioDemo({ dict }: { dict: Dict }) {
         {locked ? (
           <div className="demo-lock">
             <span className="demo-lock-icon" aria-hidden="true">
-              <Sparkle size={22} />
+              <LioYuz size={22} />
             </span>
             <strong>{dict.demo.limitTitle}</strong>
             <p>{dict.demo.limitText}</p>

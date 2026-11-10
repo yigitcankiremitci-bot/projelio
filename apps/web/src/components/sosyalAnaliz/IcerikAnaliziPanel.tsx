@@ -13,7 +13,7 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
-import { IconActivity, IconLayers, IconSparkle, IconStar, IconUser } from "../icons";
+import { IconActivity, IconLayers, IconLio, IconStar, IconUser, InlineIcon } from "../icons";
 import FikirRaporlari from "./FikirRaporlari";
 import { AltSekmeler, IlkKullanimRehberi, useBolumRenkleri, type SekmeSecenegi } from "./gezinme";
 import GonderiAnalizModal from "./GonderiAnalizModal";
@@ -208,7 +208,7 @@ export default function IcerikAnaliziPanel({
     {
       deger: "fikirler",
       baslik: t("Fikirler"),
-      ikon: <IconSparkle size={15} />,
+      ikon: <IconLio size={15} />,
       renk: renk.fikirler,
       aciklama: t("Lio verine, rakiplere ve ilham panona bakıp çekilecek içerik fikirleri üretir; beğendiğini takvime ekle."),
     },
@@ -359,7 +359,6 @@ export default function IcerikAnaliziPanel({
                     gap: 2,
                     background: `${renk.gonderiler}10`,
                     borderColor: `${renk.gonderiler}33`,
-                    borderLeft: `3px solid ${renk.gonderiler}`,
                   }}
                 >
                   <span style={{ fontSize: 11, color: c.textSecondary }}>{k.ad}</span>
@@ -548,7 +547,7 @@ function GonderiSatiri({
           )}
           {handle && <span>@{handle}</span>}
           <PerformansRozeti etiket={perf?.etiket} kat={perf?.kat} t={t} />
-          {gonderi.lioAnaliz && <span style={{ color: c.primary }}>✦ {t("Lio analizi var")}</span>}
+          {gonderi.lioAnaliz && <span style={{ color: c.primary }}><InlineIcon><IconLio size={12} /></InlineIcon>{t("Lio analizi var")}</span>}
         </div>
         {ilkSatir && (
           <span

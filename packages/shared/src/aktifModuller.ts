@@ -25,6 +25,10 @@ export const AKTIF_MODULLER: ReadonlySet<string> = new Set([
   "ekip_hesaplari",
   "oud_tedarik",
   "fm_fatura",
+  // Tek sayfalık formlar / kayıt listesi — kullanıcı kararıyla açıldı (2026-11-10)
+  "pd_marka_kimligi",
+  "kimlik_ve_yon",
+  "bt_yazilim",
   // Çekirdek: verisi işin/departmanın/şirketin kendi sekmesinde
   "yonetim_proje_yonetimi",
   "yonetim_program_yonetimi",

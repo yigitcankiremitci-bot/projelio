@@ -52,9 +52,12 @@ export const Send = (p: P) => (
   </Base>
 );
 
-export const Sparkle = (p: P) => (
+// Lio'nun çizgi yüzü (brand/assets/lio-face.svg): AI ile ilgili her yerde parıltı yerine bu.
+export const LioYuz = (p: P) => (
   <Base {...p}>
-    <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.8 2.8M14.9 14.9l2.8 2.8M17.7 6.3l-2.8 2.8M9.1 14.9l-2.8 2.8" />
+    <circle cx="12" cy="12" r="9" />
+    <path d="M7.6 12.6c.1-2.3 2.8-2.3 2.9 0" />
+    <path d="M13.5 12.6c.1-2.3 2.8-2.3 2.9 0" />
   </Base>
 );
 
@@ -159,8 +162,8 @@ export const Close = (p: P) => (
 );
 
 export const featureIcons = [Board, Calendar, Wallet, Bell, Phone, Folder, Lock, Chart];
-export const lioIcons = [Sparkle, Chat, Check, Chart, Shield, Lock];
-export const securityIcons = [Shield, Lock, Users, Sparkle, Download, Globe];
+export const lioIcons = [LioYuz, Chat, Check, Chart, Shield, Lock];
+export const securityIcons = [Shield, Lock, Users, LioYuz, Download, Globe];
 
 /** WhatsApp marka işareti (dolu). Renk currentColor: sitenin bronz/lacivert paletiyle uyumlu kalır. */
 export const WhatsApp = ({ size = 20, ...rest }: P) => (

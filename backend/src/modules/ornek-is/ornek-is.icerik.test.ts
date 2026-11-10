@@ -34,7 +34,7 @@ describe("ornekIcerik", () => {
   });
 
   it("İngilizcede metinleri çevirir, emojiyi korur", () => {
-    assert.equal(ornekIcerik("en").is.baslik, "🎓 Meet Projelio (sample)");
+    assert.equal(ornekIcerik("en").is.baslik, "Meet Projelio (sample)");
     for (const tur of TURLER) {
       const en = ornekIcerik("en", tur);
       const tr = ornekIcerik("tr", tur);

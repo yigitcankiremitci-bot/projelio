@@ -821,12 +821,7 @@ function NedirKarti({ dict, dene, uyeOl }: { dict: MisafirDict; dene: () => void
         <p>{n.metin}</p>
         <ul>
           {n.nedenler.map((x) => (
-            <li key={x}>
-              <span className="mf-nedir-tik">
-                <Ikon ad="onay" boyut={12} kalinlik={2.6} />
-              </span>
-              {x}
-            </li>
+            <li key={x}>{x}</li>
           ))}
         </ul>
         <div className="mf-nedir-dugmeler">

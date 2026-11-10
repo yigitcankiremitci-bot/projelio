@@ -199,13 +199,14 @@ const JobModulesPanel = forwardRef<JobModulesPanelHandle, Props>(function JobMod
           {t('Bu işe henüz modül eklenmedi. "+" düğmesiyle başlayabilirsin.')}
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))", gap: 12 }}>
           {activeEntries.map((entry) => {
             const openable = isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key]));
             // Kart modalde açılır; çekirdek modül kendi sayfasına (bkz. kartModaldaAcilir).
             const opensInModal = kartModaldaAcilir(entry.key);
             return (
               <ModuleCard
+                detayli
                 key={entry.key}
                 entry={entry}
                 onClick={openable && opensInModal ? () => setModalKey(entry.key) : undefined}

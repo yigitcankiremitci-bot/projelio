@@ -11,6 +11,8 @@ import { notifySidebarChanged } from "../lib/sidebarEvents";
 import { departmanAdi } from "../lib/departmanAdi";
 import { departmaninKatalogu, modulDepartmani } from "../lib/modulYeri";
 import { isCekirdekModul } from "../lib/cekirdekModuller";
+
+const PROJE_YONETIMI_MODULU = "yonetim_proje_yonetimi";
 import { MODUL_KATEGORI_SIRASI, MODUL_TANITIMLARI } from "../lib/modulTanitimlari";
 import ModulHakkiBilgisi, { hakkiAsiyor, useModulHakki } from "./ModulHakkiBilgisi";
 import { IconCheck } from "./icons";
@@ -81,14 +83,17 @@ export default function AddModuleModal({ organizationId, onClose, onAdded, fixed
       .finally(() => setLoading(false));
   }, [organizationId]);
 
-  // Holding modülleri şirkette eklenmez; çekirdek modüllerin (proje, görev,
-  // dosya) ayrıca açılacak bir yüzeyi yok — uygulamanın kendi sekmeleri.
+  // Holding modülleri şirkette eklenmez; çekirdek modüllerin (görev, dosya…)
+  // ayrıca açılacak bir yüzeyi yok — uygulamanın kendi sekmeleri. Proje
+  // yönetimi istisna: şirketin Projeler sekmesini o açıyor (migration 191,
+  // JobsService.sirketProjeAlani). Listeden düşünce şirket projelerine
+  // ulaşmanın yolu kalmamıştı.
   const liste = useMemo(() => {
     const sabitDept = fixedDepartmentId ? departments.find((d) => d.id === fixedDepartmentId) : undefined;
     const kaynak = fixedDepartmentId
       ? departmaninKatalogu(fullCatalog, sabitDept?.catalogKey, departments)
       : fullCatalog;
-    return kaynak.filter((e) => e.scope !== "holding" && !isCekirdekModul(e.key));
+    return kaynak.filter((e) => e.scope !== "holding" && (!isCekirdekModul(e.key) || e.key === PROJE_YONETIMI_MODULU));
   }, [fullCatalog, departments, fixedDepartmentId]);
 
   const evAdi = (entry: ModuleCatalogEntry): string | null => {

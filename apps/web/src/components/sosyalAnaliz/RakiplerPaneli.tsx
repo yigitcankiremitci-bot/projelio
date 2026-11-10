@@ -5,7 +5,7 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili, yuzde } from "../../lib/i18n/depo";
-import { IconActivity, IconLink, IconUser } from "../icons";
+import { IconActivity, IconHeart, IconLink, IconMessageCircle, IconUser, InlineIcon } from "../icons";
 import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { CizgiGrafik } from "./grafikler";
 import { katYazisi, kisaSayi, useAnalizStilleri } from "./ortak";
@@ -613,7 +613,7 @@ function HashtagKarti({
                   {g.caption || t("(açıklama yok)")}
                 </span>
                 <span style={{ fontSize: 11, color: c.textSecondary }}>
-                  ♥ {kisaSayi(g.likeCount)} · 💬 {kisaSayi(g.commentsCount)} · {tarih(g.postedAt)}
+                  <InlineIcon><IconHeart size={11} /></InlineIcon>{kisaSayi(g.likeCount)} · <InlineIcon><IconMessageCircle size={11} /></InlineIcon>{kisaSayi(g.commentsCount)} · {tarih(g.postedAt)}
                 </span>
               </a>
             );

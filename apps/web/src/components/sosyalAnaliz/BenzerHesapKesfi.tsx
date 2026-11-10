@@ -10,7 +10,7 @@ import { socialMediaApi, type SocialScope } from "../../api/socialMedia";
 import { parseServerDate } from "../../lib/dates";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
-import { IconSparkle } from "../icons";
+import { IconLio } from "../icons";
 import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { useAnalizStilleri } from "./ortak";
 
@@ -116,7 +116,7 @@ export default function BenzerHesapKesfi({
   return (
     <div style={{ ...kart, display: "flex", flexDirection: "column", gap: 10, background: `${renk}0D`, borderColor: `${renk}40` }}>
       <BolumBasligi
-        ikon={<IconSparkle size={15} />}
+        ikon={<IconLio size={15} />}
         renk={renk}
         baslik={t("Benzer hesap bul")}
         aciklama={t(

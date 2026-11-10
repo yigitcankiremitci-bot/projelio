@@ -13,7 +13,6 @@ import {
   acilisSekmesiCoz,
   modulSekmeleri,
   GORUSME_TURU_ETIKETI,
-  GORUSME_TURU_SIMGESI,
   aramaDurumu,
   potansiyelMusteriMi,
   ozelSiraAnahtari,
@@ -52,7 +51,7 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconEdit, IconHome, IconIdCard, IconMap, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
+import { IconCalendar, InlineIcon, IconEdit, IconHome, IconIdCard, IconMap, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
@@ -2130,7 +2129,7 @@ function AramaRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
   const [y, a, g] = tarih.split("-");
   return (
     <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
-      📅{" "}
+      <InlineIcon><IconCalendar size={12} /></InlineIcon>
       {durum === "bugun"
         ? t("Bugün aranacak")
         : durum === "gecikti"
@@ -2140,7 +2139,7 @@ function AramaRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
   );
 }
 
-/** Müşteriler satırında son görüşme: "📞 Arandı · 2 gün önce · 3 not". */
+/** Müşteriler satırında son görüşme: "Arama · 2 gün önce · 3 not". */
 function SonTemasSatiri({ p }: { p: Party }) {
   const c = useThemeColors();
   const t = useT();
@@ -2149,7 +2148,7 @@ function SonTemasSatiri({ p }: { p: Party }) {
   return (
     <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
       <span style={{ color: son.type === "ulasilamadi" ? c.danger : c.textSecondary }}>
-        {GORUSME_TURU_SIMGESI[son.type]} {t(GORUSME_TURU_ETIKETI[son.type])} · {timeAgo(son.occurredAt)}
+        {t(GORUSME_TURU_ETIKETI[son.type])} · {timeAgo(son.occurredAt)}
       </span>
       {o.ulasilamadiSerisi >= 2 && <span style={{ color: c.danger }}>{t("({n}. deneme)", { n: o.ulasilamadiSerisi })}</span>}
       {o.notSayisi > 1 && <span>· {t("{n} not", { n: o.notSayisi })}</span>}
@@ -2325,14 +2324,13 @@ function PartyDetail({
     <div
       style={{
         // Açılan alan listeden ayrışsın diye kendi renginde (theme.acilanAlan);
-        // sol vurgu çizgisi ve gölgeyle satırın altında belirgin dursun
+        // vurgulu kenar ve gölgeyle satırın altında belirgin dursun
         // (kullanıcı isteği, 2026-10-20).
         margin: "2px 8px 10px",
         padding: "12px 14px",
         borderRadius: 10,
         background: c.acilanAlan,
-        border: `1px solid ${c.border}`,
-        borderLeft: `3px solid ${c.primary}`,
+        border: `1px solid color-mix(in srgb, ${c.primary} 45%, ${c.border})`,
         boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
         display: "flex",
         flexDirection: "column",

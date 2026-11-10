@@ -1383,13 +1383,14 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
                 style={{
                   background: c.surface,
                   border: `1px solid ${c.border}`,
-                  borderLeft: `3px solid ${columnAccent[status]}`,
                   borderRadius: 8,
                   padding: "10px 12px",
                   cursor: altGorevli ? "pointer" : "default",
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {/* Durum rengi: kartın solundaki şerit yerine başlığın önünde küçük bir nokta. */}
+                  <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: columnAccent[status], flexShrink: 0 }} />
                   {selectionMode && (
                     <button
                       onClick={(e) => {
@@ -2013,7 +2014,6 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               opacity: 0.5,
               background: c.surface,
               border: `1px dashed ${c.border}`,
-              borderLeft: `3px solid ${columnAccent[parent.status]}`,
               borderRadius: 8,
               padding: "8px 12px",
               display: "flex",
@@ -2021,6 +2021,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
               gap: 8,
             }}
           >
+            <span aria-hidden style={{ width: 8, height: 8, borderRadius: "50%", background: columnAccent[parent.status], flexShrink: 0 }} />
             <span
               style={{
                 display: "inline-flex",

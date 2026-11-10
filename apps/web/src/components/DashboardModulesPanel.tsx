@@ -3,7 +3,7 @@ import type { Job, JobModule, ModuleCatalogEntry } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useUndo } from "../lib/undo";
-import { IconSparkle, IconX } from "./icons";
+import { IconModules, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import {
   DIGER_KATEGORI,
@@ -163,7 +163,7 @@ export default function DashboardModulesPanel({ jobs }: Props) {
                   flexShrink: 0,
                 }}
               >
-                <IconSparkle size={13} color={c.textSecondary} />
+                <IconModules size={13} color={c.textSecondary} />
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, color: c.textPrimary }}>{entry.name}</div>

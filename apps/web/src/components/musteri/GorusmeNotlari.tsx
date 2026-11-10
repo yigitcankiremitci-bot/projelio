@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   GORUSME_TURLERI,
   GORUSME_TURU_ETIKETI,
-  GORUSME_TURU_SIMGESI,
   aramaDurumu,
   temasOzeti,
   tekrarAramaOnerileri,
@@ -15,7 +14,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { useCurrentUser } from "../../lib/useCurrentUser";
 import { formatDateTime, timeAgo } from "../../lib/dates";
-import { IconEdit, IconTrash } from "../icons";
+import { IconCalendar, IconEdit, IconTrash, InlineIcon } from "../icons";
 
 /**
  * Müşteri / potansiyel müşteri kartının görüşme notları.
@@ -200,7 +199,7 @@ export default function GorusmeNotlari({
             }}
             style={kucukDugme(tur === k)}
           >
-            {GORUSME_TURU_SIMGESI[k]} {t(GORUSME_TURU_ETIKETI[k])}
+            {t(GORUSME_TURU_ETIKETI[k])}
           </button>
         ))}
       </div>
@@ -271,7 +270,7 @@ export default function GorusmeNotlari({
       {party.sonrakiArama && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12, color: durumRengi }}>
           <span>
-            📅{" "}
+            <InlineIcon><IconCalendar size={12} /></InlineIcon>
             {durum === "gecikti"
               ? t("Arama gecikti · {tarih}", { tarih: gunGoster(party.sonrakiArama) })
               : durum === "bugun"
@@ -304,12 +303,13 @@ export default function GorusmeNotlari({
             return (
               <div
                 key={a.id}
-                // Not kutusuz: yalnızca türün renginde sol çizgi. Her not ayrı
-                // beyaz kutudayken açılan kart üst üste aynı renkli şeritlere
-                // dönüyordu (kullanıcı şikâyeti, 2026-10-27).
+                // Not kutusuz: her not ayrı beyaz kutudayken açılan kart üst üste
+                // kutulara dönüyordu (kullanıcı şikâyeti, 2026-10-27). Türün rengini
+                // etiket hapı taşıyor; notlar yalnızca ince bir alt çizgiyle ayrılır
+                // (sol renk şeridi 2026-11'de kaldırıldı).
                 style={{
-                  borderLeft: `3px solid ${renk}`,
-                  padding: "4px 10px",
+                  borderBottom: `1px solid ${c.border}`,
+                  padding: "6px 0 8px",
                   display: "flex",
                   flexDirection: "column",
                   gap: 4,
@@ -326,7 +326,7 @@ export default function GorusmeNotlari({
                       background: `${renk}1A`,
                     }}
                   >
-                    {GORUSME_TURU_SIMGESI[a.type]} {t(GORUSME_TURU_ETIKETI[a.type])}
+                    {t(GORUSME_TURU_ETIKETI[a.type])}
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
                     {a.userName ?? t("Bilinmeyen kullanıcı")}

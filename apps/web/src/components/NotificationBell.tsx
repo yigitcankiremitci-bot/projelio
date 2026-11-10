@@ -233,9 +233,7 @@ export default function NotificationBell() {
           // yarı saydam koyu bir daire hem fotoğrafların hem düz header'ın
           // üzerinde okunur kalır (bkz. DepartmentDetail'deki kapak düzenleme
           // ikonlarıyla aynı desen).
-          background: "rgba(26,31,41,0.5)",
-          backdropFilter: "blur(6px)",
-          WebkitBackdropFilter: "blur(6px)",
+          background: "rgba(26,31,41,0.78)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",

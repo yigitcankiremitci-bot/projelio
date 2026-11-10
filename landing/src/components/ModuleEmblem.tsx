@@ -511,10 +511,12 @@ const ticket: Draw = ({ s, as }) => (
   </>
 );
 
-const sparkle: Draw = ({ s, A }) => (
+const blocks: Draw = ({ s, A }) => (
   <>
-    <path d="M16 5c.8 5.2 2.8 7.2 8 8-5.2.8-7.2 2.8-8 8-.8-5.2-2.8-7.2-8-8 5.2-.8 7.2-2.8 8-8z" fill={A} />
-    <path d="M24.5 21.5v5M22 24h5" {...s} />
+    <rect x="6" y="6" width="9" height="9" rx="2" {...s} />
+    <rect x="17" y="6" width="9" height="9" rx="2" {...s} />
+    <rect x="6" y="17" width="9" height="9" rx="2" {...s} />
+    <rect x="17" y="17" width="9" height="9" rx="2" fill={A} />
   </>
 );
 
@@ -643,7 +645,7 @@ export default function ModuleEmblem({ moduleKey }: { moduleKey: string }) {
   };
   return (
     <i className="module-emblem" aria-hidden="true">
-      <svg viewBox="0 0 32 32">{(BY_KEY[moduleKey] ?? sparkle)(paint)}</svg>
+      <svg viewBox="0 0 32 32">{(BY_KEY[moduleKey] ?? blocks)(paint)}</svg>
     </i>
   );
 }

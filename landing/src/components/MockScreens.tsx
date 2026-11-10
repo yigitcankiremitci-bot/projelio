@@ -28,7 +28,7 @@ const L = {
     pending: "Bekleyen tahsilat",
     progress: "Bütçe kullanımı",
     chatUser: "Galata işini bitirdim",
-    chatLio: "✅ Görev tamamlandı. Proje ilerlemesi %71 oldu. Sıradaki iş: teklif revizyonu (18:00).",
+    chatLio: "Görev tamamlandı. Proje ilerlemesi %71 oldu. Sıradaki iş: teklif revizyonu (18:00).",
   },
   en: {
     projects: "Active projects",
@@ -51,7 +51,7 @@ const L = {
     pending: "Outstanding",
     progress: "Budget used",
     chatUser: "Finished the Galata job",
-    chatLio: "✅ Task completed. Project progress is now 71%. Next up: proposal revision (18:00).",
+    chatLio: "Task completed. Project progress is now 71%. Next up: proposal revision (18:00).",
   },
 };
 

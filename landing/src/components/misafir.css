@@ -55,7 +55,6 @@
   padding-left: 66px;
   background: var(--mf-yuzey);
   border-bottom: 1px solid var(--mf-cizgi);
-  box-shadow: 0 1px 6px rgba(26, 31, 41, 0.06);
   font-size: 15px;
   font-weight: 500;
   opacity: 0;
@@ -82,7 +81,6 @@
   justify-content: center;
   background: var(--mf-yuzey);
   border: 1px solid var(--mf-cizgi);
-  box-shadow: 0 2px 8px rgba(26, 31, 41, 0.12);
   color: var(--mf-soluk);
 }
 
@@ -104,7 +102,6 @@
   justify-content: center;
   background: var(--mf-yuzey);
   border: 1px solid var(--mf-cizgi);
-  box-shadow: 0 2px 8px rgba(26, 31, 41, 0.12);
   color: var(--mf-soluk);
 }
 .mf-yuvarlak:hover {
@@ -123,7 +120,6 @@
   font-size: 14px !important;
   font-weight: 500 !important;
   white-space: nowrap;
-  box-shadow: 0 2px 8px rgba(26, 31, 41, 0.18);
 }
 .mf-uye:hover {
   filter: brightness(1.06);
@@ -218,9 +214,6 @@
   transition: transform 160ms ease;
 }
 @media (hover: hover) {
-  .mf-kart:hover {
-    transform: translateY(-1px);
-  }
 }
 .mf-kart.mf-tam {
   padding: 0;
@@ -378,16 +371,16 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid var(--mf-cizgi);
-  border-left: 3px solid var(--mf-ana);
   background: var(--mf-yuzey);
 }
+/* Durum rengi sol şeritte değil, tikin halkasında (uygulamadaki ana sayfa kartıyla aynı). */
 .mf-tik {
   width: 18px;
   height: 18px;
   padding: 0;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 1.5px solid var(--mf-cizgi);
+  border: 1.5px solid var(--mf-ana);
   background: transparent;
   display: flex;
   align-items: center;
@@ -927,9 +920,6 @@ button.mf-proje-kutu.kesik:hover {
   box-shadow: 0 4px 14px rgba(26, 31, 41, 0.22);
   transition: transform 150ms ease;
 }
-.mf-fab:hover {
-  transform: scale(1.04);
-}
 
 /* ---------- Ortak düğmeler ---------- */
 .mf-birincil,
@@ -1185,9 +1175,6 @@ button.mf-proje-kutu.kesik:hover {
   transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   filter: drop-shadow(0 4px 10px rgba(26, 31, 41, 0.28));
 }
-.mf-lio-simge:hover > span {
-  transform: scale(1.28);
-}
 .mf-lio-simge img {
   position: absolute;
   inset: 0;
@@ -1248,13 +1235,14 @@ button.mf-proje-kutu.kesik:hover {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 0;
+  border-top: 1px solid var(--mf-cizgi);
   max-width: calc(100% - 120px);
 }
+/* Tikli liste yerine: ince çizgiyle ayrılan sade satırlar. */
 .mf-nedir li {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--mf-cizgi);
   font-size: 14px;
   line-height: 1.4;
 }
@@ -1332,9 +1320,5 @@ a.mf-kart {
   color: var(--mf-yuzey);
   font-size: 14px;
   font-weight: 500;
-  box-shadow: 0 4px 14px rgba(26, 31, 41, 0.22);
   transition: transform 150ms ease;
-}
-a.mf-kart:hover .mf-ofis-gir {
-  transform: translateX(2px);
 }

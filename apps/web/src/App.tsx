@@ -147,8 +147,23 @@ const STICKY_REVEAL = STICKY_TOP_ROW + STICKY_TABS_ROW;
  * görünmüyor. Bir yükleme animasyonu koymak, 50 ms görünüp kaybolan bir
  * titremeden başka bir şey üretmezdi.
  */
+/**
+ * Sayfa parçası inerken: boş ekran yerine Lio'nun çizgi yüzü (kafa çizilir, gözler kırpar).
+ * 250 ms gecikmeli belirir — hızlı açılışta göz kırpar gibi bir an görünüp kaybolmasın.
+ */
 function SayfaYukleniyor() {
-  return <div style={{ padding: 24 }} />;
+  const t = useT();
+  return (
+    <div className="sayfa-yukleniyor" role="status" aria-label={t("Yükleniyor…")}>
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" aria-hidden>
+        <circle className="sy-kafa" cx="12" cy="12" r="9" pathLength={100} />
+        <g className="sy-gozler">
+          <path d="M7.6 12.6c.1-2.3 2.8-2.3 2.9 0" />
+          <path d="M13.5 12.6c.1-2.3 2.8-2.3 2.9 0" />
+        </g>
+      </svg>
+    </div>
+  );
 }
 
 function KeyedProjectDetail() {
@@ -764,7 +779,9 @@ export default function App() {
   // "Sakin Projelio" deneme ana sayfası kendi sol menüsünü çiziyor (bkz.
   // pages/Sakin.tsx); orada uygulamanın kenar çubuğu ve açma oku gizlenir.
   // Mobilde kendi menüsü gizlendiği için alt menü (BottomNav) yerinde kalır.
-  const sakinEkrani = location.pathname === "/sakin" || location.pathname === "/yeni";
+  // 3D ofis (/yeni) 2026-11-10'dan beri kendi menüsünü çizmiyor: anasayfayla aynı
+  // kenar çubuğu orada da görünsün (kullanıcı isteği), bu yüzden listede yok.
+  const sakinEkrani = location.pathname === "/sakin";
   const kenarAcik = sidebarOpen && !sakinEkrani;
   // Sidebar kapalıyken okun yanındaki anasayfa simgesi (anasayfada gizli).
   // Başlıkların sol payı da buna bakıyor: iki yer ayrı koşul yazınca simge

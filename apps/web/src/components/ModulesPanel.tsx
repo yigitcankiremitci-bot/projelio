@@ -5,13 +5,9 @@ import { sonAcilislar, sonKullanimaGoreSirala } from "../lib/sonKullanilanModul"
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import ModuleCard from "./ModuleCard";
-import { useDragScroll } from "../lib/useDragScroll";
 import { useT } from "../lib/i18n";
-import { useIsDesktop } from "../lib/useIsDesktop";
-import ListRowLink, { ListRowStack, ROW_INNER_HEIGHT } from "./ListRowLink";
 import SectionToggle from "./SectionToggle";
 import { useKatlanirBolum } from "../lib/useKatlanirBolum";
-import ModuleEmblem from "./ModuleEmblem";
 import AddModuleModal from "./AddModuleModal";
 import { modulDepartmani, yoneticiModulAdresi } from "../lib/modulYeri";
 import { isOpenableModule } from "../lib/entityModules";
@@ -37,14 +33,10 @@ interface Props {
 // modülleri tek yerde görebilir. İlgili departmanı açılmamış modüller
 // yöneticide durur ve kartları şirket düzeyindeki sayfaya gider (bkz.
 // lib/modulYeri.ts).
-// Bu sayıya kadar tek satır; üstünde iki satıra bölünüp yana kaydırılır.
-const SINGLE_ROW_LIMIT = 4;
 
 const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel({ organizationId, basliktaSag }, ref) {
   const c = useThemeColors();
   const t = useT();
-  const isDesktop = useIsDesktop();
-  const scrollRef = useDragScroll<HTMLDivElement>();
   // Anasayfadaki diğer bölümler gibi başlıktan kapatılabilir (bkz. useKatlanirBolum).
   const [collapsed, toggleCollapsed] = useKatlanirBolum("projelio.anasayfa-moduller-kapali");
   const [enabled, setEnabled] = useState<OrganizationModule[]>([]);
@@ -148,45 +140,21 @@ const ModulesPanel = forwardRef<ModulesPanelHandle, Props>(function ModulesPanel
         >
           {t("Henüz etkinleştirilmiş modül yok. Başlığa çift tıklayarak ya da \"+\" ile modül ekleyebilirsin.")}
         </div>
-      ) : !isDesktop ? (
-        // Telefonda iki satırlık yatay şerit yerine alt alta tek satırlık
-        // düğmeler (bkz. ListRowLink). Hedef, kartınkiyle aynı.
-        <ListRowStack>
-          {activeEntries.map((entry) => {
-            return (
-              <ListRowLink
-                key={entry.key}
-                {...tikla(entry)}
-                icon={<ModuleEmblem moduleKey={entry.key} size={ROW_INNER_HEIGHT} radius="11px 0 0 11px" />}
-                iconBleed
-                label={entry.name}
-              />
-            );
-          })}
-        </ListRowStack>
       ) : (
-        // Anasayfada modüller departman kartlarıyla aynı mantıkta: yana
-        // kaydırmalı, EN FAZLA İKİ SATIR. Tam liste 20+ modülde sayfanın
-        // yarısını kaplıyor ve altındaki hiçbir şey görünmüyordu; burası bir
-        // özet, modül yönetimi departman sayfasında yapılıyor.
-        //
-        // Az sayıda modülde iki satır tuhaf duruyor (üç modül 2+1 diye
-        // bölünürdü), o yüzden eşik altında tek satır kalıyor.
+        // Modüller sekmesi departmanınkiyle aynı: büyük simge, özet, nasıl
+        // çalıştığı ve "neler yapabilirsin" (bkz. ModuleCard detayli). Eskiden
+        // 240px'lik yana kayan şeritti; kullanıcı modülün ne yaptığını
+        // göremiyordu ("modüller küçük ve az detaylı", 2026-11-10). Telefonda
+        // ızgara tek sütuna iner.
         <div
-          ref={scrollRef}
           style={{
             display: "grid",
-            gridAutoFlow: "column",
-            gridTemplateRows: activeEntries.length > SINGLE_ROW_LIMIT ? "repeat(2, auto)" : "auto",
-            gridAutoColumns: "240px",
-            gap: 14,
-            overflowX: "auto",
-            // Kaydırma çubuğu kartların altına yapışmasın.
-            paddingBottom: 6,
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 340px), 1fr))",
+            gap: 12,
           }}
         >
           {activeEntries.map((entry) => (
-            <ModuleCard key={entry.key} entry={entry} {...tikla(entry)} />
+            <ModuleCard detayli key={entry.key} entry={entry} {...tikla(entry)} />
           ))}
         </div>
       )}

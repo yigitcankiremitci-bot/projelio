@@ -164,7 +164,7 @@ export class SosyalLioService {
     if (sikisik.length && !girdi.sikistirilmisKabul) {
       throw new BadRequestException(
         `${sikisik.length} medya WhatsApp tarafından sıkıştırılmış geldi; Instagram'da kalite düşük görünür. ` +
-          `Kullanıcıya şunu öner: dosyayı ataç (📎) > Belge/Dosya olarak yeniden göndersin, kalite korunur. ` +
+          `Kullanıcıya şunu öner: dosyayı ataç simgesi > Belge/Dosya olarak yeniden göndersin, kalite korunur. ` +
           `Kullanıcı "böyle gönder/devam et" derse sikistirilmisKabul=true ile yeniden çağır; ` +
           `dosya olarak gönderirse yeni mediaId ile devam et.`
       );

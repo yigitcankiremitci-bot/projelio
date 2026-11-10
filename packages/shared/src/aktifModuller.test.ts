@@ -7,11 +7,14 @@ describe("aktif modüller", () => {
     assert.equal(modulAktifMi("crm_musteri"), true);
     assert.equal(modulAktifMi("fm_fatura"), true);
     assert.equal(modulAktifMi("yonetim_dosya_yonetimi"), true);
+    assert.equal(modulAktifMi("kimlik_ve_yon"), true);
+    assert.equal(modulAktifMi("pd_marka_kimligi"), true);
+    assert.equal(modulAktifMi("bt_yazilim"), true);
   });
 
   test("genel kayıt listesi modülleri pasif", () => {
     assert.equal(modulAktifMi("ik_bordro_ozluk"), false);
-    assert.equal(modulAktifMi("kimlik_ve_yon"), false);
+    assert.equal(modulAktifMi("bt_donanim"), false);
     assert.equal(modulAktifMi("fm_nakit_akis"), false);
   });
 

@@ -8,7 +8,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { useLioPanelOpen } from "../lib/lioPanel";
 import { useLioCompact, useLioLift } from "../lib/lioBalon";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconSparkle } from "./icons";
+import { IconLio } from "./icons";
 
 /** Bildirim şeridinin ekranda kalma süresi. */
 const VISIBLE_MS = 4000;
@@ -115,7 +115,7 @@ export default function AiLiveActivity() {
         animation: "projelioAiFade .18s ease",
       }}
     >
-      <IconSparkle size={15} color={c.accent} />
+      <IconLio size={15} color={c.accent} />
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {activity.label}
       </span>

@@ -136,7 +136,6 @@
 .yn-nav a:hover {
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  transform: translateX(3px);
 }
 .yn-nav a.on {
   background: rgba(255, 255, 255, 0.11);
@@ -213,7 +212,6 @@
   background: var(--yn-card);
   border: 1px solid var(--yn-line);
   border-radius: 12px;
-  box-shadow: 0 1px 2px rgba(26, 31, 41, 0.03);
   color: var(--yn-ink-3);
 }
 .yn-search input {
@@ -274,7 +272,6 @@
   border: 0;
   border-radius: var(--yn-radius-dugme);
   background: var(--yn-card);
-  box-shadow: 0 1px 2px rgba(26, 31, 41, 0.04);
   color: var(--yn-accent) !important;
   font-weight: 600;
   cursor: pointer;
@@ -438,8 +435,9 @@
 /* ------------------------------------------------------------- kartlar */
 .yn-card {
   background: var(--yn-card);
+  /* Gölge yerine ince kenar (düz tasarım, 2026-11). */
+  border: 1px solid var(--yn-line);
   border-radius: var(--yn-radius);
-  box-shadow: var(--yn-shadow);
 }
 .yn-pad {
   padding: 20px 20px 16px;
@@ -719,7 +717,6 @@
   padding: 0 8px 0 16px;
   background: var(--yn-card);
   border-radius: 14px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--yn-accent) 8%, transparent);
 }
 .yn-lio-input input {
   flex: 1;
@@ -766,8 +763,7 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .yn-proj:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 2px 4px rgba(26, 31, 41, 0.05), 0 14px 30px rgba(26, 31, 41, 0.09);
+  border-color: color-mix(in srgb, var(--yn-accent) 40%, var(--yn-line));
 }
 .yn-proj-body {
   flex: 1;
@@ -911,4 +907,31 @@
   flex: 1;
   height: 100dvh;
   border-radius: 0;
+}
+
+/* 3D ofis sayfası (2026-11-10): uygulamanın kenar çubuğu ve üst şeridi kullanılıyor,
+   sayfada 3D dışında bir şey yok — ofis kalan alanı doldursun. Üstteki 76 px
+   uygulamanın başlık payı (App.tsx HEADER_HEIGHT), gerisi kenar boşlukları. */
+.yn {
+  min-height: 0;
+}
+.yn-body {
+  padding: 0 24px 20px;
+}
+.yn-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.yn-baslik:empty {
+  display: none;
+}
+.yn .of {
+  height: max(460px, calc(100vh - 76px - 40px));
+}
+@media (max-width: 767px) {
+  .yn-body {
+    padding: 0 12px 12px;
+  }
+  .yn .of {
+    height: max(420px, calc(100vh - 76px - 140px));
+  }
 }

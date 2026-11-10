@@ -1061,8 +1061,8 @@ function islemDetayi(detail: Record<string, unknown> | undefined): string {
   if (typeof detail.sebep === "string" && detail.sebep) parcalar.push(detail.sebep);
   if (typeof detail.aciklama === "string" && detail.aciklama) parcalar.push(detail.aciklama);
   if (typeof detail.baslik === "string" && detail.baslik) {
-    const kanallar = [detail.bildirim === true ? "🔔" : "", detail.eposta === true ? "✉" : ""].filter(Boolean).join(" ");
-    parcalar.push(`"${detail.baslik}"${kanallar ? ` ${kanallar}` : ""}`);
+    const kanallar = [detail.bildirim === true ? "bildirim" : "", detail.eposta === true ? "e-posta" : ""].filter(Boolean).join(" + ");
+    parcalar.push(`"${detail.baslik}"${kanallar ? ` (${kanallar})` : ""}`);
   }
   return parcalar.join(" · ");
 }

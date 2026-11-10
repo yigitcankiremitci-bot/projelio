@@ -13,7 +13,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useIsDesktop } from "../../lib/useIsDesktop";
 import { useTour } from "../../lib/tour/TourContext";
 import type { TourPlacement } from "../../lib/tour/types";
-import { IconX, IconChevronLeft, IconChevronRight, IconCheck } from "../icons";
+import { IconX, IconChevronLeft, IconChevronRight, IconCheck, IconPause, IconPlay, IconSpeaker } from "../icons";
 import { useT } from "../../lib/i18n";
 
 const OVERLAY_Z = 300;
@@ -322,7 +322,7 @@ export default function TourOverlay() {
               aria-label={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
               title={voiceEnabled ? t("Sesi kapat") : t("Sesi aç")}
             >
-              <span aria-hidden style={{ fontSize: 15 }}>{voiceEnabled ? "🔊" : "🔇"}</span>
+              <IconSpeaker size={16} muted={!voiceEnabled} />
             </button>
           )}
 
@@ -334,7 +334,7 @@ export default function TourOverlay() {
               aria-label={speaking ? t("Duraklat") : t("Devam et")}
               title={speaking ? t("Duraklat") : t("Devam et")}
             >
-              <span aria-hidden style={{ fontSize: 13 }}>{speaking ? "❚❚" : "▶"}</span>
+              {speaking ? <IconPause size={15} /> : <IconPlay size={15} />}
             </button>
           )}
 

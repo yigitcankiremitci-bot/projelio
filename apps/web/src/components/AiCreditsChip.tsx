@@ -4,7 +4,7 @@ import { aiChat } from "../api/aiChat";
 import type { AiCredits } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
-import { IconSparkle } from "./icons";
+import { IconLio } from "./icons";
 import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
@@ -83,7 +83,7 @@ export default function AiCreditsChip({ compact = false }: Props) {
         whiteSpace: "nowrap",
       }}
     >
-      <IconSparkle size={compact ? 13 : 15} color={isLow ? c.accentDark : c.accent} />
+      <IconLio size={compact ? 13 : 15} color={isLow ? c.accentDark : c.accent} />
       <span style={{ fontWeight: 500 }}>{balance}</span>
       {/* Küçük rozette yalnızca simge + sayı: telefonda rozet kapağın
           üstünde, fotoğrafın altında duruyor ve etiketle birlikte başlığın

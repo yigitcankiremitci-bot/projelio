@@ -5,7 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import MailMessageModal from "./MailMessageModal";
 import ProjelioYeniEpostaModal from "./ProjelioYeniEpostaModal";
 import { getSocket } from "../lib/liveRoom";
-import { IconTrash } from "./icons";
+import { IconPaperclip, IconTrash, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
 
@@ -591,7 +591,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
                 }}
               >
                 {m.sendError && <span style={{ color: c.danger }}>{t("Gönderilemedi")} · </span>}
-                {m.hasAttachments ? "📎 " : ""}
+                {m.hasAttachments ? <InlineIcon><IconPaperclip size={12} /></InlineIcon> : null}
                 {m.preview}
               </span>
             </button>

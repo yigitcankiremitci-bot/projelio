@@ -3,7 +3,7 @@ import type { MailAccount } from "@projelio/shared";
 import { mailboxApi } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
-import { IconSparkle } from "./icons";
+import { IconLio, IconPaperclip, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
 
 interface Props {
@@ -192,7 +192,7 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
               cursor: lioYaziyor ? "default" : "pointer",
             }}
           >
-            <IconSparkle size={14} color={c.accent} />
+            <IconLio size={14} color={c.accent} />
             {lioYaziyor ? t("Lio yazıyor…") : text.trim() ? t("Lio ile geliştir") : t("Lio ile taslak")}
           </button>
           {onceki && !lioYaziyor && (
@@ -243,7 +243,7 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
               cursor: "pointer",
             }}
           >
-            📎 {t("Dosya ekle")}
+            <InlineIcon><IconPaperclip size={14} /></InlineIcon>{t("Dosya ekle")}
           </button>
           {files.map((f, i) => (
             <span

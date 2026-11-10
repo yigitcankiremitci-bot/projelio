@@ -6,7 +6,7 @@ import { parseMessageLinks } from "../lib/messageLinks";
 import { useT } from "../lib/i18n";
 import { COARSE_POINTER } from "./AutoGrowTextarea";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
-import { IconSparkle, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile, IconExternalLink } from "./icons";
+import { IconLio, IconX, IconPlus, IconTrash, IconSend, IconPaperclip, IconFile, IconExternalLink } from "./icons";
 import { aiChat } from "../api/aiChat";
 import { filesApi } from "../api/files";
 import type { ProjectFile } from "@projelio/shared";
@@ -1574,7 +1574,7 @@ export default function AiAssistantPanel({
                   cursor: "pointer",
                 }}
               >
-                <IconSparkle size={14} color="#fff" />
+                <IconLio size={14} color="#fff" />
                 {t("Modeli yükselt ve devam et")}
               </button>
               <button
@@ -1598,7 +1598,7 @@ export default function AiAssistantPanel({
           {sending && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, color: c.textSecondary, fontSize: 13 }}>
               <span style={{ animation: "projelioAiPulse 1.2s ease infinite" }}>
-                <IconSparkle size={15} color={c.accent} />
+                <IconLio size={15} color={c.accent} />
               </span>
               {t("Düşünüyor…")}
             </div>

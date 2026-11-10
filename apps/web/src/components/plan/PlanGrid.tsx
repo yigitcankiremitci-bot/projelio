@@ -388,9 +388,9 @@ function DayColumn({
                 height: TUM_GUN_SATIR_YUKSEKLIGI - 2,
                 flexShrink: 0,
                 borderRadius: 5,
-                border: `1px solid ${c.border}`,
-                borderLeft: `3px solid ${e.takvimRengi ?? c.accent}`,
-                background: c.background,
+                // Sol şerit yerine takvimin renginde hafif bir zemin + kenar (takvim uygulamalarındaki gibi).
+                border: `1px solid color-mix(in srgb, ${e.takvimRengi ?? c.accent} 45%, ${c.border})`,
+                background: `color-mix(in srgb, ${e.takvimRengi ?? c.accent} 14%, ${c.background})`,
                 color: c.textPrimary,
                 fontSize: 11,
                 textAlign: "left",
@@ -600,11 +600,9 @@ function BlockCard({
         width,
         height,
         borderRadius: 7,
-        // Sol kenardaki renk şeridi odak alanını metni okumadan ayırt ettirir.
-        borderLeft: `3px solid ${accent}`,
-        border: `1px solid ${c.border}`,
-        borderLeftWidth: 3,
-        borderLeftColor: accent,
+        // Odak alanı metni okumadan ayırt edilsin: eskiden sol kenarda renk şeridi vardı,
+        // şimdi kenarın tamamı odak renginde ve etiketsiz blok o renkte hafifçe tonlanıyor.
+        border: `1px solid color-mix(in srgb, ${accent} 50%, ${c.border})`,
         // Etiketli blok etiketin renginde tonlanır; etiketsizde eski görünüm
         // (bitmiş = yeşil ton). Etiketli bitmiş blokta yeşile dönmüyoruz:
         // renk etiketi anlatıyor, bitmişliği onay kutusu ve üstü çizili başlık.
@@ -614,7 +612,7 @@ function BlockCard({
             ? `${etiketRengi}${done ? "24" : "38"}`
             : done
               ? "rgba(46,158,91,0.10)"
-              : c.surface,
+              : `color-mix(in srgb, ${accent} 10%, ${c.surface})`,
         boxShadow: "0 1px 2px rgba(26,31,41,0.06)",
         padding: "3px 6px",
         overflow: "hidden",
@@ -740,9 +738,8 @@ function EtkinlikKutusu({
         width,
         height,
         borderRadius: 7,
-        border: `1px dashed ${c.border}`,
-        borderLeft: `3px solid ${e.takvimRengi ?? c.accent}`,
-        background: c.background,
+        border: `1px dashed color-mix(in srgb, ${e.takvimRengi ?? c.accent} 55%, ${c.border})`,
+        background: `color-mix(in srgb, ${e.takvimRengi ?? c.accent} 12%, ${c.background})`,
         padding: "3px 6px",
         overflow: "hidden",
         cursor: "pointer",

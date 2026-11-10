@@ -98,7 +98,6 @@
 }
 .muze-kucuk:hover,
 .muze-kucuk:focus-visible {
-  transform: translateY(-3px);
   box-shadow: 0 16px 30px rgba(20, 12, 4, 0.34), inset 0 1px 0 rgba(255, 220, 170, 0.12);
 }
 .muze-kucuk:focus-visible {

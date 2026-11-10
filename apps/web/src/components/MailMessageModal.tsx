@@ -3,7 +3,7 @@ import type { MailMessageDetail, MailProvider } from "@projelio/shared";
 import { mailboxApi } from "../api/mailbox";
 import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
-import { IconExternalLink, IconSparkle } from "./icons";
+import { IconExternalLink, IconLio, IconPaperclip, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
 
@@ -195,7 +195,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
           </span>
           {message.attachments.length > 0 && !projelio && (
             <span style={{ fontSize: 11, color: c.textSecondary }}>
-              📎 {message.attachments.map((a) => a.name).join(", ")} {t("— indirmek için Outlook'ta açın")}
+              <InlineIcon><IconPaperclip size={12} /></InlineIcon>{message.attachments.map((a) => a.name).join(", ")} {t("— indirmek için Outlook'ta açın")}
             </span>
           )}
           {message.attachments.length > 0 && projelio && (
@@ -215,7 +215,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                       cursor: "pointer",
                     }}
                   >
-                    📎 {a.name}
+                    <InlineIcon><IconPaperclip size={12} /></InlineIcon>{a.name}
                   </button>
                 ) : (
                   <span
@@ -223,7 +223,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                     title={t("Bu ek kaydedilemedi ya da gönderilen bir iletinin eki; indirilemez.")}
                     style={{ fontSize: 12, padding: "3px 9px", color: c.textSecondary }}
                   >
-                    📎 {a.name}
+                    <InlineIcon><IconPaperclip size={12} /></InlineIcon>{a.name}
                   </span>
                 )
               )}
@@ -370,7 +370,7 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
                   color: c.textPrimary,
                 }}
               >
-                <IconSparkle size={14} color={c.accent} />
+                <IconLio size={14} color={c.accent} />
                 {drafting ? t("Lio yazıyor…") : t("Lio ile taslak")}
               </button>
               <span style={{ fontSize: 11, color: c.textSecondary, flex: "1 1 200px" }}>

@@ -310,7 +310,6 @@ button:focus-visible {
 .sidebar-nav-btn:hover {
   background: rgba(255, 255, 255, 0.07);
   color: #fff;
-  transform: translateX(3px);
 }
 
 .sidebar-nav-btn:active {
@@ -679,10 +678,6 @@ button:focus-visible {
   transition: transform 0.18s ease;
 }
 
-.entity-card:hover .module-emblem svg {
-  transform: translateY(-1px) scale(1.07);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .module-emblem svg {
     transition: none;
@@ -867,9 +862,6 @@ html[data-klavye="acik"] [data-klavyede-alt-bosluk] {
 }
 
 @media (hover: hover) {
-  .pano-kart:hover {
-    transform: translateY(-1px);
-  }
 }
 
 /* Boş hücreler: üstüne gelince + belirir, dokunmatikte hover olmadığı için soluk durur. */
@@ -1163,4 +1155,63 @@ html[data-klavye="acik"] [data-klavyede-alt-bosluk] {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Sayfa yükleniyor (App.tsx > SayfaYukleniyor): Lio'nun yüzü çizilir, gözler kırpar.
+   Gecikmeli belirme: hızlı yüklemede hiç görünmesin, ekran da boş kalmasın. */
+.sayfa-yukleniyor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  color: var(--color-accent, #c0813f);
+  opacity: 0;
+  animation: sy-belir 0.3s ease 0.25s forwards;
+}
+.sayfa-yukleniyor .sy-kafa {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  transform-origin: 12px 12px;
+  transform: rotate(-90deg);
+  animation: sy-ciz 1.6s ease-in-out infinite;
+}
+.sayfa-yukleniyor .sy-gozler {
+  transform-origin: 12px 11.6px;
+  animation: sy-kirp 1.6s ease-in-out infinite;
+}
+@keyframes sy-belir {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sy-ciz {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  50% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -100;
+  }
+}
+@keyframes sy-kirp {
+  0%,
+  42%,
+  58%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.15);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sayfa-yukleniyor .sy-kafa {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .sayfa-yukleniyor .sy-gozler {
+    animation: none;
+  }
 }

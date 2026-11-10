@@ -4,7 +4,7 @@ import { abonelikKoltukSiniri, type BillingOverview, type BillingPlanView, type 
 import { billingApi, type KisiArtirmaOnizleme } from "../api/billing";
 import { kabuktaMi } from "../lib/mobilKabuk";
 import { ApiError } from "../api/client";
-import { IconSparkle, IconStar } from "../components/icons";
+import { IconWallet, IconStar } from "../components/icons";
 import Anahtar from "../components/Anahtar";
 import PayTRKartFormu from "../components/PayTRKartFormu";
 import { demoEpostasiMi } from "../lib/demoHesap";
@@ -389,7 +389,7 @@ export default function BillingPage() {
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 9, opacity: 0.8, fontSize: 13 }}>
-            <IconSparkle size={16} color={c.accent} />
+            <IconWallet size={16} color={c.accent} />
             {t("Mevcut paketin")}
           </div>
           <div style={{ fontSize: 30, fontWeight: 600, margin: "8px 0 2px", letterSpacing: -0.5 }}>

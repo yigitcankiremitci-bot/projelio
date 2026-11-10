@@ -206,11 +206,11 @@ export const en: Dict = {
     remaining: "demo messages left",
     limitTitle: "You've used up the demo",
     limitText:
-      "Lio's real work starts on your own projects, not here. Create a free account and let Lio work on your actual tasks, budget and customers from day one.",
+      "That's the end of the demo. Create a free account and let Lio work on your actual tasks, budget and customers from day one.",
     limitCta: "Create a free account",
     limitReset: "Restart the demo",
     greeting:
-      "Hi, I'm Lio 👋\nI'm connected to a sample Projelio account. Tap one of the examples below or write your own sentence.",
+      "Hi, I'm Lio\nI'm connected to a sample Projelio account. Tap one of the examples below or write your own sentence.",
     fallback:
       "This demo has a limited set of sample scenarios. The real Lio understands the full range of task, project, budget, customer and reporting commands.\n\nTry one of the ready-made questions below, or open a free account and talk to Lio using your own data.",
     scenarios: [
@@ -218,37 +218,37 @@ export const en: Dict = {
         chip: "What's on my plate today?",
         user: "What's on my plate today?",
         reply:
-          "You have 4 items today 👇\n\n1. Galata Residences — homepage design · 16:00\n2. Aydın Construction — proposal revision · 18:00\n3. Share the team meeting notes · today\n4. Upload July invoices · overdue ⚠️\n\nWrite \"start 1\" and I'll move the first one to In progress.",
+          "You have 4 items today\n\n1. Galata Residences — homepage design · 16:00\n2. Aydın Construction — proposal revision · 18:00\n3. Share the team meeting notes · today\n4. Upload July invoices · overdue\n\nWrite \"start 1\" and I'll move the first one to In progress.",
       },
       {
         chip: "Start 1",
         user: "Start 1",
         reply:
-          "✅ \"Galata Residences — homepage design\" started.\n\nStatus: In progress\nTime tracking on · I'll remind you at 16:00\nProject progress: 62% → 62% (71% once the task is done)",
+          "\"Galata Residences — homepage design\" started.\n\nStatus: In progress\nTime tracking on · I'll remind you at 16:00\nProject progress: 62% → 62% (71% once the task is done)",
       },
       {
         chip: "How much revenue came in this week?",
         user: "How much revenue came in this week?",
         reply:
-          "📊 Week of Aug 5–11\n\nRevenue: ₺148,500 (4 payments)\nExpenses: ₺37,200\nNet: ₺111,300 · +18% vs. last week\n\nOutstanding: ₺62,000 (2 invoices, 9 days late on average)\nFor details: \"list overdue invoices\"",
+          "Week of Aug 5–11\n\nRevenue: ₺148,500 (4 payments)\nExpenses: ₺37,200\nNet: ₺111,300 · +18% vs. last week\n\nOutstanding: ₺62,000 (2 invoices, 9 days late on average)\nFor details: \"list overdue invoices\"",
       },
       {
         chip: "Where do we stand with Aydın Construction?",
         user: "Where do we stand with Aydın Construction?",
         reply:
-          "🏢 Aydın Construction Inc. — Customer record\n\nOpen projects: 2 · Total budget ₺320,000\nLast contact: Aug 6, proposal sent (6 days ago)\nPending: Proposal revision — today 18:00\nOpen invoice: ₺62,000, 3 days past due\n\nSuggestion: sending the revision today keeps the deal on track to close within 7 days.",
+          "Aydın Construction Inc. — Customer record\n\nOpen projects: 2 · Total budget ₺320,000\nLast contact: Aug 6, proposal sent (6 days ago)\nPending: Proposal revision — today 18:00\nOpen invoice: ₺62,000, 3 days past due\n\nSuggestion: sending the revision today keeps the deal on track to close within 7 days.",
       },
       {
         chip: "Send me the weekly summary",
         user: "Send me the weekly summary",
         reply:
-          "📬 Your weekly summary:\n\n• Completed tasks: 23 (17 last week)\n• Overdue tasks: 3 — all in Production\n• Active projects: 7 · Closed this week: 1\n• Team utilisation: 78%\n\nBiggest bottleneck: the \"Proposal approval\" step — 4 items wait an average of 3.2 days there.\n\nWant me to send this automatically every Monday at 09:00?",
+          "Your weekly summary:\n\n• Completed tasks: 23 (17 last week)\n• Overdue tasks: 3 — all in Production\n• Active projects: 7 · Closed this week: 1\n• Team utilisation: 78%\n\nBiggest bottleneck: the \"Proposal approval\" step — 4 items wait an average of 3.2 days there.\n\nWant me to send this automatically every Monday at 09:00?",
       },
       {
         chip: "Create a task for tomorrow",
         user: "Create a task to send Mehmet the contract draft tomorrow at 11:00",
         reply:
-          "✅ Task created.\n\nTitle: Send Mehmet the contract draft\nDate: Tomorrow 11:00\nAssignee: You\nProject: Aydın Construction — Phase 2\nLabel: Legal\n\nI set a reminder 30 minutes before. To reassign, just write \"assign to Ayşe\".",
+          "Task created.\n\nTitle: Send Mehmet the contract draft\nDate: Tomorrow 11:00\nAssignee: You\nProject: Aydın Construction — Phase 2\nLabel: Legal\n\nI set a reminder 30 minutes before. To reassign, just write \"assign to Ayşe\".",
       },
     ],
   },
@@ -345,7 +345,7 @@ export const en: Dict = {
   lio: {
     eyebrow: "Lio · AI assistant",
     title: "Your team's fastest colleague",
-    lede: "Lio isn't a chatbot — it genuinely acts on your Projelio data. Say what you need in your own words and it understands and executes.",
+    lede: "Lio acts on your Projelio data: it opens tasks, assigns people and pulls up expenses. Say what you need in your own words and it understands and executes.",
     items: [
       {
         title: "Natural language",
@@ -365,7 +365,7 @@ export const en: Dict = {
       },
       {
         title: "Points out the bottleneck",
-        text: "It sees which step things pile up at and tells you why. You get to decide instead of reading reports.",
+        text: "It sees which step things pile up at and tells you why. You stay focused on the decision.",
       },
       {
         title: "Respects permissions",
@@ -403,7 +403,7 @@ export const en: Dict = {
     scenes: [
       { kicker: "Signal", title: "Work starts with a sentence.", text: "“Assign the Galata homepage to Ayşe for 11:00 tomorrow.” Lio doesn't ask for the date, the person and the project one by one." },
       { kicker: "Context", title: "Lio connects the pieces.", text: "It gathers the customer, the latest thread, the current budget and team workload around the same decision." },
-      { kicker: "Action", title: "One command, the whole system updates.", text: "The task is created, an owner assigned, the calendar shifts and the budget view refreshes. What's left is deciding, not data entry." },
+      { kicker: "Action", title: "One command, the whole system updates.", text: "The task is created, an owner assigned, the calendar shifts and the budget view refreshes, all from one sentence." },
       { kicker: "Foresight", title: "It tells you before you ask.", text: "Lio doesn't just wait for commands. It spots the stuck step, estimates the impact and suggests the right move." },
     ],
     command: "Assign the Galata homepage to Ayşe for 11:00 tomorrow.",
@@ -443,7 +443,7 @@ export const en: Dict = {
 
   screenshots: {
     eyebrow: "See it on screen",
-    title: "Not complicated, and never crowded",
+    title: "Simple screens, fewer clicks",
     lede: "The Projelio interface is built around one job: showing what needs doing today at a glance.",
     items: [
       {

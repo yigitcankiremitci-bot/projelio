@@ -43,6 +43,7 @@ import {
 import KarakterDuzenleyici from "./KarakterDuzenleyici";
 import { api, ApiError } from "../../api/client";
 import { ajanApi } from "../../api/ajan";
+import { IconLock } from "../icons";
 import AjanPaneli from "../ajan/AjanPaneli";
 import type { AjanDurumu } from "@projelio/shared";
 import "./OfisOyunu.css";
@@ -158,98 +159,6 @@ const yerelDuzenAnahtari = (kapsam: string) => `projelio:ofis-duzeni:${kapsam}`;
 /** Karakter ucu henüz yayında değilken (404) kendi karakterin tarayıcıda tutulur. */
 const yerelKarakterAnahtari = (kisi: string) => `projelio:ofis-karakter:${kisi}`;
 
-// Küçük resimler (motorun çizdiği) gelene kadar ve metin içinde kullanılan yedek simgeler.
-const SIMGE: Record<EsyaTuru, string> = {
-  bitki: "🪴",
-  agac: "🌵",
-  monstera: "🪴",
-  inceMonstera: "🪴",
-  salonBitkisi: "🪴",
-  buyukKaktus: "🌵",
-  kaktusKucuk: "🌵",
-  bitkiliSehpa: "🌱",
-  agacBuyuk: "🌳",
-  puf: "🛋️",
-  kanepe: "🛋️",
-  armut: "🫘",
-  dinlenmeKoltugu: "🪑",
-  ikiliKanepe: "🛋️",
-  tasarimKanepe: "🛋️",
-  koseKoltuk: "🛋️",
-  kitaplik: "📚",
-  dolap: "🗄️",
-  yanSehpa: "🪵",
-  ortaSehpa: "🪵",
-  alcakSehpa: "🪵",
-  alcakRaf: "🗃️",
-  askilik: "🧥",
-  copKovasi: "🗑️",
-  calismaKosesi: "💻",
-  masaTakimi: "🍽️",
-  lamba: "💡",
-  modernLamba: "💡",
-  hali: "🟣",
-  haliYuvarlak: "🟠",
-  haliCizgili: "🟫",
-  kure: "🌍",
-  saat: "🕰️",
-  somine: "🔥",
-  havuz: "⛲",
-  akvaryum: "🐠",
-  roket: "🚀",
-  heykel: "🏆",
-  radyoSehpasi: "📻",
-  hoparlorler: "🔊",
-  satranc: "♟️",
-  boksTorbasi: "🥊",
-  medya: "📺",
-  kosuBandi: "🏃",
-  langirt: "⚽",
-  masaTenisi: "🏓",
-  oyun: "🕹️",
-  piyano: "🎹",
-  bilardo: "🎱",
-  suSebili: "🚰",
-  buzdolabi: "🧊",
-  kahve: "☕",
-  barTezgahi: "🍸",
-  otomat: "🥤",
-  minderPuf: "🟫",
-  yerMinderi: "🟫",
-  barTaburesi: "🪑",
-  yuvarlakSandalye: "🪑",
-  minderliBank: "🪑",
-  uzanmaKoltugu: "🛋️",
-  tasarimBerjer: "🛋️",
-  okumaKosesi: "📖",
-  uzanmaliKanepe: "🛋️",
-  buyukKoseKanepe: "🛋️",
-  koliYigini: "📦",
-  komodin: "🗄️",
-  kareSehpa: "🪵",
-  alcakKitaplik: "📚",
-  camSehpa: "🪟",
-  tvDolabi: "🗄️",
-  kapakliKitaplik: "📚",
-  ahsapMasa: "🪵",
-  yuvarlakMasa: "🪵",
-  genisKitaplik: "📚",
-  koseMasa: "🖥️",
-  yemekMasasi: "🍽️",
-  camToplantiMasasi: "🪟",
-  haliPaspas: "🟫",
-  oyuncakAyi: "🧸",
-  kareLambader: "💡",
-  haliKare: "🟦",
-  haliDikdortgen: "🟪",
-  haliKoseli: "🟩",
-  eskiTelevizyon: "📺",
-  ocak: "🍳",
-  buzdolabiDik: "🧊",
-  barKosesi: "🍹",
-  buzdolabiBuyuk: "🧊",
-  mutfakTezgahi: "🚰",
-};
 
 /** Departman (stüdyoda iş) adından etiket simgesi ve rengi — referans görseldeki oda kartları gibi. */
 function odaGorunumu(ad: string, sira: number, studyo = false): { ikon: string; ton: string } {
@@ -1155,7 +1064,7 @@ export default function OfisOyunu({
       {yerlestirilen && (
         <div className="of-hud of-ipucu">
           <span>
-            {SIMGE[yerlestirilen.tur]} <b>{yerlestirilenKat?.ad}</b> — yerleştirmek için zemine tıkla
+            <b>{yerlestirilenKat?.ad}</b> — yerleştirmek için zemine tıkla
           </span>
           <button type="button" className="of-btn" onClick={() => motorRef.current?.dondur()}>
             Döndür (R)
@@ -1171,7 +1080,7 @@ export default function OfisOyunu({
       {secili && seciliKat && (
         <div className="of-hud of-secim" style={{ left: secili.x, top: secili.y }}>
           <b>
-            {SIMGE[seciliKat.tur]} {seciliKat.ad}
+            {seciliKat.ad}
           </b>
           <div>
             <button type="button" className="of-btn" onClick={() => (setYerlestirilen({ tur: seciliKat.tur, id: secili.id }), setSecili(null))}>
@@ -1217,8 +1126,8 @@ export default function OfisOyunu({
             return (
               <button key={k.tur} type="button" className="of-urun" disabled={kilitli || yetmez} onClick={() => satinAl(k.tur)} tabIndex={magaza ? 0 : -1}>
                 <span className="of-u-simge">
-                  {resimler[k.tur] ? <img src={resimler[k.tur]} alt="" className={kilitli ? "kilitli" : ""} /> : SIMGE[k.tur]}
-                  {kilitli && <span className="of-u-kilit">🔒</span>}
+                  {resimler[k.tur] ? <img src={resimler[k.tur]} alt="" className={kilitli ? "kilitli" : ""} /> : <span className="of-yer-tutucu" aria-hidden="true" />}
+                  {kilitli && <span className="of-u-kilit"><IconLock size={14} /></span>}
                 </span>
                 <b>{k.ad}</b>
                 <small className={yetmez && !kilitli ? "eksik" : ""}>{kilitli ? `Seviye ${k.seviye}` : <><span className="of-coin sm" />{k.fiyat}</>}</small>
@@ -1559,7 +1468,7 @@ function DuzenCubugu({
               }}
               title={`${k.ad} ekle`}
             >
-              {resimler[k.tur] ? <img src={resimler[k.tur]} alt="" /> : <span aria-hidden="true">{SIMGE[k.tur]}</span>}
+              {resimler[k.tur] ? <img src={resimler[k.tur]} alt="" /> : <span className="of-yer-tutucu" aria-hidden="true" />}
               <small>{k.ad}</small>
             </button>
           ))}

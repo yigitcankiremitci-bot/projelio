@@ -22,9 +22,10 @@ export interface ModulTanitimi {
   kategori: ModulKategorisi;
 }
 
-export type ModulKategorisi = "Satış ve müşteri" | "Pazarlama" | "Finans" | "Operasyon" | "Ekip ve erişim";
+export type ModulKategorisi = "Yönetim" | "Satış ve müşteri" | "Pazarlama" | "Finans" | "Operasyon" | "Ekip ve erişim";
 
 export const MODUL_KATEGORI_SIRASI: ModulKategorisi[] = [
+  "Yönetim",
   "Satış ve müşteri",
   "Pazarlama",
   "Finans",
@@ -33,6 +34,54 @@ export const MODUL_KATEGORI_SIRASI: ModulKategorisi[] = [
 ];
 
 export const MODUL_TANITIMLARI: Record<string, ModulTanitimi> = {
+  yonetim_proje_yonetimi: {
+    kategori: "Yönetim",
+    ozet: "Şirketin projelerini görevleri, çıktıları ve takvimiyle tek yerden yönet.",
+    detay:
+      "Açınca şirketin kendi Projeler sekmesi gelir: her proje görevlerine, alt görevlerine, teslim edilecek çıktılarına, bütçesine ve takvimine ayrılır. Görevleri ekipten kişilere atarsın, onlar Yapılacaklar listelerinde görür. Biten projeler müzede şirketin bütün çalışanlarına görünür; bir projeyi klonlayabilir ya da şablon olarak kaydedip yenisini ondan açabilirsin.",
+    neler: [
+      "Projeleri görev, çıktı ve bütçeyle planla",
+      "Görevleri ekibe ata, ilerlemeyi izle",
+      "Projeyi klonla ya da şablondan başlat",
+    ],
+    kimIcin: "Birden çok projeyi aynı anda yürüten her ekip.",
+  },
+  kimlik_ve_yon: {
+    kategori: "Yönetim",
+    ozet: "Şirketin ne için var olduğunu ve nereye gittiğini tek sayfada yaz.",
+    detay:
+      "Vizyon, misyon, değerler ve tek cümlelik konumlandırma bir sayfada durur. Hedefler, işe alım ilanları ve müşteri iletişimi aynı cümleye dayanır. Geçerlilik ve gözden geçirme tarihiyle sayfanın bayatlamadığından emin olursun.",
+    neler: [
+      "Vizyon, misyon ve değerleri yaz",
+      "Kime hizmet ettiğini ve konumlandırmanı netleştir",
+      "Gözden geçirme tarihi koy, güncel tut",
+    ],
+    kimIcin: "Kurucular ve şirketin yönünü belirleyen yöneticiler.",
+  },
+  pd_marka_kimligi: {
+    kategori: "Pazarlama",
+    ozet: "Markanın vaadini, kişiliğini, ses tonunu ve görsel kurallarını tek sayfada topla.",
+    detay:
+      "Markanın kimin gözünde neyin alternatifi olduğu, ne vaat ettiği ve nasıl konuştuğu adım adım yazılır. Renk, yazı tipi, logo ve temas noktaları da aynı sayfada durur. Teklif, reklam ve sosyal medya metinleri aynı kurallara dayanır.",
+    neler: [
+      "Konum, vaat ve kanıtları belirle",
+      "Ses tonu ve yazım kurallarını yaz",
+      "Görsel kimliği ve temas noktalarını kaydet",
+    ],
+    kimIcin: "Markasını tutarlı göstermek isteyen şirketler ve serbest çalışanlar.",
+  },
+  bt_yazilim: {
+    kategori: "Operasyon",
+    ozet: "Kullandığın yazılımları ve abonelikleri yenileme tarihleriyle takip et.",
+    detay:
+      "Şirkette kullanılan her araç sağlayıcısı, lisans türü ve yenileme tarihiyle listelenir. Yenilemesi yaklaşan ve süresi dolan abonelikler ayrı sayılır; habersiz yenilenen ya da kapanan bir araç yüzünden iş durmaz.",
+    neler: [
+      "Yazılımları ve abonelikleri listele",
+      "Yenileme tarihi yaklaşanları gör",
+      "Süresi dolan lisansları yakala",
+    ],
+    kimIcin: "Birden çok yazılım aboneliği olan ekipler.",
+  },
   crm_musteri: {
     kategori: "Satış ve müşteri",
     ozet: "Müşterilerini, siparişlerini ve tahsilatlarını tek yerde takip et.",

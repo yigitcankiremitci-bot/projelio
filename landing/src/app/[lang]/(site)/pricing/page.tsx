@@ -5,7 +5,7 @@ import { appLinks, path, site } from "@/lib/site";
 import PricingTables from "@/components/PricingTables";
 import { canliFiyatlar } from "@/lib/plans";
 import Faq from "@/components/Faq";
-import { ArrowRight, CheckSmall } from "@/components/Icons";
+import { ArrowRight } from "@/components/Icons";
 
 export async function generateMetadata({
   params,
@@ -61,11 +61,8 @@ export default async function PricingPage({ params }: { params: Promise<{ lang: 
               }}
             >
               {dict.pricing.addons.items.map((item) => (
-                <li key={item} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                  <span style={{ color: "var(--ok)", marginTop: 3 }}>
-                    <CheckSmall />
-                  </span>
-                  <span className="muted">{item}</span>
+                <li key={item} className="muted" style={{ paddingTop: 10, borderTop: "1px solid var(--line)" }}>
+                  {item}
                 </li>
               ))}
             </ul>

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Dict, Locale } from "@/i18n";
-import { Check, Sparkle } from "./Icons";
+import { Check, LioYuz } from "./Icons";
 
 /**
  * Kendi kendine oynayan ürün animasyonu.
@@ -20,7 +20,7 @@ const L = {
     card: "Ana sayfa tasarımı",
     cardMeta: ["Galata · yarın 11:00", "Galata · süre işliyor", "Galata · süre işliyor", "Galata · bugün bitti"],
     lio: "Yarın 11:00'e Galata ana sayfa tasarımını aç",
-    lioReply: "✅ Görev oluşturuldu · Galata · yarın 11:00",
+    lioReply: "Görev oluşturuldu · Galata · yarın 11:00",
     budget: "Proje bütçesi",
     revenue: "Bu ay gelir",
     toast: "Haftalık rapor hazır — 23 iş tamamlandı",
@@ -38,7 +38,7 @@ const L = {
     card: "Homepage design",
     cardMeta: ["Galata · tomorrow 11:00", "Galata · tracking", "Galata · tracking", "Galata · done today"],
     lio: "Open the Galata homepage design for tomorrow 11:00",
-    lioReply: "✅ Task created · Galata · tomorrow 11:00",
+    lioReply: "Task created · Galata · tomorrow 11:00",
     budget: "Project budget",
     revenue: "Revenue this month",
     toast: "Weekly report ready — 23 tasks completed",
@@ -112,7 +112,7 @@ export default function LiveProduct({ dict, locale }: { dict: Dict; locale: Loca
           {/* Lio komut satırı */}
           <div className="live-lio" data-active={step === 0}>
             <span className="live-lio-avatar">
-              <Sparkle size={14} />
+              <LioYuz size={14} />
             </span>
             <span className="live-lio-text">{step === 0 ? t.lio : t.lioReply}</span>
           </div>

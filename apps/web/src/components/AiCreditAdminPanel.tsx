@@ -7,7 +7,7 @@ import {
   type AiModelSettingsResponse,
   type AiProviderBalance,
 } from "../api/aiChat";
-import { IconSparkle } from "./icons";
+import { IconLio } from "./icons";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
@@ -184,7 +184,7 @@ export default function AiCreditAdminPanel({ bolum }: { bolum: "bakiye" | "sagla
           gap: 8,
         }}
       >
-        <IconSparkle size={18} color={c.accent} />
+        <IconLio size={18} color={c.accent} />
         {bolum === "bakiye" ? t("Lio Bakiyesi yönetimi") : t("AI sağlayıcıları")}
       </h2>
 

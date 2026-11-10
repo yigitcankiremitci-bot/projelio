@@ -5,7 +5,7 @@ import { useT } from "../lib/i18n";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { useThemeColors } from "../theme/useThemeColors";
 import Anahtar from "./Anahtar";
-import { IconInfo, IconSparkle, IconX } from "./icons";
+import { IconInfo, IconLio, IconX } from "./icons";
 import { bicimDili } from "../lib/i18n/depo";
 
 interface Props {
@@ -144,7 +144,7 @@ export default function LioYardimiKutusu({ moduleKey, kapsam, departmentId, canW
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <Anahtar checked={durum.enabled} onChange={cevir} disabled={!canWrite} label={t("Lio yardımı")} />
-          <IconSparkle size={15} color={durum.enabled ? c.accent : c.textSecondary} />
+          <IconLio size={15} color={durum.enabled ? c.accent : c.textSecondary} />
           <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{t("Lio yardımı")}</span>
         </div>
 

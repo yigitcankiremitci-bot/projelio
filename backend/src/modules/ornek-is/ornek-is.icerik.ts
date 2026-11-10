@@ -68,7 +68,7 @@ export function ornekTuru(hesapTipi: string | null | undefined): OrnekTur {
 // dil:anahtar-baslangic — örnek iş metinleri: çeviri içerik üretilirken yapılıyor.
 const BIREYSEL: OrnekIcerik = {
   is: {
-    baslik: "🎓 Projelio'yu tanı (örnek)",
+    baslik: "Projelio'yu tanı (örnek)",
     aciklama:
       "Bu örnek iş, Projelio'nun nasıl çalıştığını göstermek için hazırlandı. İçindeki proje, görevler ve rutin gerçek kayıtlar: aç, düzenle, tamamla, taşı — hiçbir şey bozulmaz. İşin bitince bu sayfadaki \"Örnekleri sil\" düğmesiyle hepsini tek tıkla kaldırabilirsin.",
   },
@@ -174,7 +174,7 @@ const BIREYSEL: OrnekIcerik = {
 
 const SIRKET: OrnekIcerik = {
   is: {
-    baslik: "🎓 Projelio'yu tanı: şirket (örnek)",
+    baslik: "Projelio'yu tanı: şirket (örnek)",
     aciklama:
       "Bu örnek iş, şirketini Projelio'da nasıl yöneteceğini göstermek için hazırlandı ve şirketine bağlı. İçindeki proje, görevler ve rutin gerçek kayıtlar: aç, düzenle, tamamla — hiçbir şey bozulmaz. İşin bitince bu sayfadaki \"Örnekleri sil\" düğmesiyle hepsini tek tıkla kaldırabilirsin.",
   },
@@ -279,7 +279,7 @@ const SIRKET: OrnekIcerik = {
 
 const TASERON: OrnekIcerik = {
   is: {
-    baslik: "🎓 Projelio'yu tanı: taşeron (örnek)",
+    baslik: "Projelio'yu tanı: taşeron (örnek)",
     aciklama:
       "Bu örnek iş, bir şirkete hizmet verirken Projelio'yu nasıl kullanacağını göstermek için hazırlandı. İçindeki proje, görevler ve rutin gerçek kayıtlar: aç, düzenle, tamamla — hiçbir şey bozulmaz. İşin bitince bu sayfadaki \"Örnekleri sil\" düğmesiyle hepsini tek tıkla kaldırabilirsin.",
   },

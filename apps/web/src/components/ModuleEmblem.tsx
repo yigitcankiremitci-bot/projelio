@@ -517,10 +517,12 @@ const ticket: Draw = ({ s, as }) => (
   </>
 );
 
-const sparkle: Draw = ({ s, A }) => (
+const blocks: Draw = ({ s, A }) => (
   <>
-    <path d="M16 5c.8 5.2 2.8 7.2 8 8-5.2.8-7.2 2.8-8 8-.8-5.2-2.8-7.2-8-8 5.2-.8 7.2-2.8 8-8z" fill={A} />
-    <path d="M24.5 21.5v5M22 24h5" {...s} />
+    <rect x="6" y="6" width="9" height="9" rx="2" {...s} />
+    <rect x="17" y="6" width="9" height="9" rx="2" {...s} />
+    <rect x="6" y="17" width="9" height="9" rx="2" {...s} />
+    <rect x="17" y="17" width="9" height="9" rx="2" fill={A} />
   </>
 );
 
@@ -632,7 +634,7 @@ function drawFor(moduleKey: string): Draw {
   const exact = BY_KEY[moduleKey];
   if (exact) return exact;
   const family = BY_PREFIX.find(([prefix]) => moduleKey.startsWith(prefix));
-  return family ? family[1] : sparkle;
+  return family ? family[1] : blocks;
 }
 
 /** Testler ve olası başka yüzeyler için: bu anahtarın kendine özgü bir çizimi var mı. */

@@ -3,7 +3,7 @@ import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { aiChat } from "../api/aiChat";
 import type { AiCredits as AiCreditsData, AiCreditTransaction } from "../api/aiChat";
-import { IconSparkle } from "../components/icons";
+import { IconLio } from "../components/icons";
 import AiCreditTopUp from "../components/AiCreditTopUp";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { demoEpostasiMi } from "../lib/demoHesap";
@@ -115,7 +115,7 @@ export default function AiCreditsPage() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 9, opacity: 0.8, fontSize: 13 }}>
-          <IconSparkle size={16} color={c.accent} />
+          <IconLio size={16} color={c.accent} />
           {t("Kullanılabilir bakiye")}
         </div>
         <div style={{ fontSize: 38, fontWeight: 600, margin: "8px 0 2px", letterSpacing: -0.5 }}>

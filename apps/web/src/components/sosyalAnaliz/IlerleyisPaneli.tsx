@@ -136,7 +136,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
       <span style={{ fontSize: 11, color: c.textSecondary }}>{birikiyor}</span>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8 }}>
-        <div style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33`, borderLeft: `3px solid ${renk}` }}>
+        <div style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33` }}>
           <span style={{ fontSize: 11, color: c.textSecondary }}>
             {t("Son {n} günde kazanılan izlenme", { n: ozet.gunSayisi || 7 })}
           </span>
@@ -155,7 +155,7 @@ export default function IlerleyisPaneli({ scope, hesaplar, medya }: Props) {
         {takipciSerileri.map(({ hesap: h, noktalar }) => {
           const fark = noktalar[noktalar.length - 1].deger - noktalar[0].deger;
           return (
-            <div key={h.accountId} style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33`, borderLeft: `3px solid ${renk}` }}>
+            <div key={h.accountId} style={{ ...kart, padding: "8px 12px", display: "flex", flexDirection: "column", gap: 2, background: `${renk}10`, borderColor: `${renk}33` }}>
               <span style={{ fontSize: 11, color: c.textSecondary }}>
                 {t("@{handle} takipçi", { handle: h.handle })}
               </span>

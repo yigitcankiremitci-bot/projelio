@@ -9,7 +9,7 @@ import { LONG_PRESS_DELAY, useSortableList } from "../../lib/useSortableList";
 import type { AnasayfaPano } from "../../lib/useAnasayfaPano";
 import { tourAnchor } from "../../lib/tour/types";
 import { useT } from "../../lib/i18n";
-import { IconDoor, IconPlus, IconSparkle, IconX } from "../icons";
+import { IconDoor, IconPlus, IconLio, IconX } from "../icons";
 import PanoEkle from "./PanoEkle";
 import type { PanoKartTanimi } from "./ozetKartlari";
 
@@ -367,7 +367,7 @@ export default function AnasayfaPanosu({ pano, katalog }: { pano: AnasayfaPano; 
 
               {tanim.hizliEylem && (
                 <button type="button" className="no-drag pano-hizli" onClick={tanim.hizliEylem.calistir} aria-label={tanim.hizliEylem.ad} title={tanim.hizliEylem.ad} style={{ border: `1px solid ${c.border}`, background: c.surface }}>
-                  {tanim.hizliEylem.ikon === "lio" ? <IconSparkle size={14} color={c.accentDark} /> : <IconPlus size={14} color={c.textSecondary} />}
+                  {tanim.hizliEylem.ikon === "lio" ? <IconLio size={14} color={c.accentDark} /> : <IconPlus size={14} color={c.textSecondary} />}
                 </button>
               )}
 

@@ -231,7 +231,7 @@ export function AltSekmeler<T extends string>({
             padding: "8px 10px",
             borderRadius: 8,
             background: `${aktif.renk}12`,
-            borderLeft: `3px solid ${aktif.renk}`,
+            border: `1px solid ${aktif.renk}33`,
           }}
         >
           <span style={{ display: "flex", color: aktif.renk, marginTop: 1 }}>

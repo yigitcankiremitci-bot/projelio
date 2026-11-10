@@ -174,9 +174,8 @@ export function CoverStats({ items }: { items: StatItem[] }) {
         // KENDİ renginden değil app'in temasından geliyor (bkz. useCoverTheme) —
         // karanlık modda beyaz kalırsa üstündeki (de karanlık modda açık renge
         // dönen) yazılar okunmaz olurdu.
-        background: cover.dark ? "rgba(18,21,27,0.72)" : "rgba(255,255,255,0.72)",
+        background: cover.dark ? "rgba(18,21,27,0.92)" : "rgba(255,255,255,0.94)",
         border: cover.dark ? "1px solid rgba(255,255,255,0.14)" : "1px solid rgba(26,31,41,0.08)",
-        backdropFilter: "blur(2px)",
       }}
     >
       {items.map((it) => (

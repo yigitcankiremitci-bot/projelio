@@ -9,7 +9,7 @@ import { useRefreshOnUndo, useReorderUndo, useWithoutPendingDeletes } from "../l
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { useNavVisibility } from "../lib/useNavVisibility";
 import { onJobInvitesChanged } from "../lib/jobInvites";
-import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconSparkle } from "../components/icons";
+import { IconBuilding, IconLayers, IconChevronRight, IconFolder, IconActivity, IconFile, IconModules } from "../components/icons";
 import ProfileCard, { PROFILE_CARD_MOBILE_WIDTH } from "./ProfileCard";
 import AiCreditsChip from "../components/AiCreditsChip";
 import { useAppPrefs } from "../lib/appPrefs";
@@ -42,7 +42,7 @@ const coreTabs: { key: DashboardTab; label: string; icon: typeof IconFolder }[] 
   { key: "files", label: "Dosyalar", icon: IconFile }, // dil:anahtar
 ];
 
-const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconSparkle }; // dil:anahtar
+const catalogTab = { key: "modules" as DashboardTab, label: "Modüller", icon: IconModules }; // dil:anahtar
 
 const gridStyle: React.CSSProperties = {
   display: "grid",
@@ -132,7 +132,7 @@ export default function Dashboard() {
   };
   const tabs: { key: DashboardTab; label: string; icon: typeof IconFolder; isNew?: boolean }[] = [
     ...coreTabs,
-    ...moduleTabs.map((m) => ({ key: m.key, label: m.name, icon: IconSparkle, isNew: m.isNew })),
+    ...moduleTabs.map((m) => ({ key: m.key, label: m.name, icon: IconModules, isNew: m.isNew })),
     catalogTab,
   ];
   const [jobs, setJobs] = useState<Job[]>([]);

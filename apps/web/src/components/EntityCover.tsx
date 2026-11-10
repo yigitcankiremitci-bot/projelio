@@ -196,7 +196,6 @@ export function CoverBackLink({
             ? "0 3px 12px rgba(0,0,0,0.5)"
             : "0 3px 10px rgba(26,31,41,0.14)"
           : "none",
-        backdropFilter: floating ? "blur(6px)" : undefined,
         fontSize: 13,
         color: fg,
         whiteSpace: "nowrap",

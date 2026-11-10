@@ -33,7 +33,7 @@ import {
   IconLogout,
   IconChevronRight,
   IconArchive,
-  IconSparkle,
+  IconLio,
   IconStar,
   IconUser,
   IconFile,
@@ -282,7 +282,7 @@ function PaketVeBakiye() {
       )}
       {kutu(
         () => navigate("/settings/lio-units"),
-        <IconSparkle size={20} color={c.accent} />,
+        <IconLio size={20} color={c.accent} />,
         t("Lio Bakiyem"),
         bakiye === null ? null : t("{bakiye} birim", { bakiye: Math.round(bakiye).toLocaleString(bicimDili()) }),
         t("Bakiye yükle")

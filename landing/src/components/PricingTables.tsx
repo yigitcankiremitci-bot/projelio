@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Dict, Locale } from "@/i18n";
 import { checkoutHref, formatNumber, formatTRY, formatUSD, path } from "@/lib/site";
-import { CheckSmall } from "./Icons";
 
 type Plan = Dict["pricing"]["plans"][number];
 
@@ -174,10 +173,7 @@ export default function PricingTables({
 
               <ul>
                 {plan.features.map((f) => (
-                  <li key={f}>
-                    <CheckSmall />
-                    <span>{f}</span>
-                  </li>
+                  <li key={f}>{f}</li>
                 ))}
               </ul>
 

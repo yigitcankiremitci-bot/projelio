@@ -205,11 +205,11 @@ export const tr = {
     remaining: "deneme mesajı kaldı",
     limitTitle: "Deneme mesajlarınız bitti",
     limitText:
-      "Lio'nun asıl işi burada değil, sizin projelerinizde başlıyor. Ücretsiz hesap açın; Lio ilk günden itibaren kendi görevleriniz, bütçeniz ve müşterileriniz üzerinde çalışsın.",
+      "Deneme burada bitiyor. Ücretsiz hesap açın; Lio ilk günden itibaren kendi görevleriniz, bütçeniz ve müşterileriniz üzerinde çalışsın.",
     limitCta: "Ücretsiz hesap aç",
     limitReset: "Demoyu baştan başlat",
     greeting:
-      "Merhaba, ben Lio 👋\nÖrnek bir Projelio hesabına bağlıyım. Aşağıdakilerden birine dokunun ya da kendi cümlenizle yazın.",
+      "Merhaba, ben Lio\nÖrnek bir Projelio hesabına bağlıyım. Aşağıdakilerden birine dokunun ya da kendi cümlenizle yazın.",
     fallback:
       "Bu demo sürümünde sınırlı sayıda örnek senaryo tanımlı. Gerçek Lio; görev, proje, bütçe, müşteri ve rapor komutlarının tamamını anlıyor.\n\nAşağıdaki hazır sorulardan birini deneyebilir ya da ücretsiz hesap açıp kendi verinizle konuşabilirsiniz.",
     scenarios: [
@@ -217,37 +217,37 @@ export const tr = {
         chip: "Bugün ne yapmam gerekiyor?",
         user: "Bugün ne yapmam gerekiyor?",
         reply:
-          "Bugün için 4 işiniz var 👇\n\n1. Galata Sitesi — ana sayfa tasarımı · 16:00\n2. Aydın Yapı — teklif revizyonu · 18:00\n3. Ekip toplantısı notlarını paylaş · bugün\n4. Temmuz faturalarını yükle · gecikmiş ⚠️\n\n\"1'i başlat\" yazarsanız ilkini devam edene alırım.",
+          "Bugün için 4 işiniz var\n\n1. Galata Sitesi — ana sayfa tasarımı · 16:00\n2. Aydın Yapı — teklif revizyonu · 18:00\n3. Ekip toplantısı notlarını paylaş · bugün\n4. Temmuz faturalarını yükle · gecikmiş\n\n\"1'i başlat\" yazarsanız ilkini devam edene alırım.",
       },
       {
         chip: "1'i başlat",
         user: "1'i başlat",
         reply:
-          "✅ \"Galata Sitesi — ana sayfa tasarımı\" başlatıldı.\n\nDurum: Devam ediyor\nSüre takibi açıldı · 16:00'da hatırlatacağım\nProje ilerlemesi: %62 → %62 (görev tamamlanınca %71)",
+          "\"Galata Sitesi — ana sayfa tasarımı\" başlatıldı.\n\nDurum: Devam ediyor\nSüre takibi açıldı · 16:00'da hatırlatacağım\nProje ilerlemesi: %62 → %62 (görev tamamlanınca %71)",
       },
       {
         chip: "Bu hafta ne kadar gelir girdi?",
         user: "Bu hafta ne kadar gelir girdi?",
         reply:
-          "📊 5–11 Ağustos haftası\n\nGelir: ₺148.500 (4 tahsilat)\nGider: ₺37.200\nNet: ₺111.300 · geçen haftaya göre +%18\n\nBekleyen tahsilat: ₺62.000 (2 fatura, ortalama 9 gün gecikme)\nDetay için: \"gecikmiş faturaları listele\"",
+          "5–11 Ağustos haftası\n\nGelir: ₺148.500 (4 tahsilat)\nGider: ₺37.200\nNet: ₺111.300 · geçen haftaya göre +%18\n\nBekleyen tahsilat: ₺62.000 (2 fatura, ortalama 9 gün gecikme)\nDetay için: \"gecikmiş faturaları listele\"",
       },
       {
         chip: "Aydın Yapı ile son durum ne?",
         user: "Aydın Yapı ile son durum ne?",
         reply:
-          "🏢 Aydın Yapı A.Ş. — Müşteri kartı\n\nAçık proje: 2 · Toplam bütçe ₺320.000\nSon temas: 6 Ağustos, teklif gönderildi (6 gün önce)\nBekleyen: Teklif revizyonu — bugün 18:00\nAçık fatura: ₺62.000, vadesi 3 gün geçti\n\nÖneri: Revizyonu bugün gönderirseniz teklif 7 gün içinde kapanma olasılığını koruyor.",
+          "Aydın Yapı A.Ş. — Müşteri kartı\n\nAçık proje: 2 · Toplam bütçe ₺320.000\nSon temas: 6 Ağustos, teklif gönderildi (6 gün önce)\nBekleyen: Teklif revizyonu — bugün 18:00\nAçık fatura: ₺62.000, vadesi 3 gün geçti\n\nÖneri: Revizyonu bugün gönderirseniz teklif 7 gün içinde kapanma olasılığını koruyor.",
       },
       {
         chip: "Haftalık özet gönder",
         user: "Haftalık özet gönder",
         reply:
-          "📬 Haftalık özetiniz hazır:\n\n• Tamamlanan görev: 23 (geçen hafta 17)\n• Geciken görev: 3 — hepsi Üretim departmanında\n• Aktif proje: 7 · Bu hafta biten: 1\n• Ekip doluluk oranı: %78\n\nEn çok tıkanan yer: \"Teklif onayı\" adımı — 4 iş burada ortalama 3,2 gün bekliyor.\n\nHer Pazartesi 09:00'da otomatik göndermemi ister misiniz?",
+          "Haftalık özetiniz hazır:\n\n• Tamamlanan görev: 23 (geçen hafta 17)\n• Geciken görev: 3 — hepsi Üretim departmanında\n• Aktif proje: 7 · Bu hafta biten: 1\n• Ekip doluluk oranı: %78\n\nEn çok tıkanan yer: \"Teklif onayı\" adımı — 4 iş burada ortalama 3,2 gün bekliyor.\n\nHer Pazartesi 09:00'da otomatik göndermemi ister misiniz?",
       },
       {
         chip: "Yarın için görev oluştur",
         user: "Yarın 11:00'de Mehmet'e sözleşme taslağını gönder diye görev aç",
         reply:
-          "✅ Görev oluşturuldu.\n\nBaşlık: Mehmet'e sözleşme taslağını gönder\nTarih: Yarın 11:00\nAtanan: Siz\nProje: Aydın Yapı — Faz 2\nEtiket: Hukuk\n\n30 dakika önce hatırlatma kurdum. Başkasına atamak isterseniz \"Ayşe'ye ata\" yazmanız yeterli.",
+          "Görev oluşturuldu.\n\nBaşlık: Mehmet'e sözleşme taslağını gönder\nTarih: Yarın 11:00\nAtanan: Siz\nProje: Aydın Yapı — Faz 2\nEtiket: Hukuk\n\n30 dakika önce hatırlatma kurdum. Başkasına atamak isterseniz \"Ayşe'ye ata\" yazmanız yeterli.",
       },
     ],
   },
@@ -344,7 +344,7 @@ export const tr = {
   lio: {
     eyebrow: "Lio · yapay zekâ asistanı",
     title: "Ekibinizin en hızlı çalışanı",
-    lede: "Lio bir sohbet robotu değil; Projelio verinizin üzerinde gerçekten işlem yapan bir asistan. Ne istediğinizi kendi cümlenizle söyleyin, o anlasın ve yapsın.",
+    lede: "Lio, Projelio'daki verinizin üzerinde işlem yapar: görev açar, kişi atar, gideri getirir. Ne istediğinizi kendi cümlenizle söyleyin, o anlasın ve yapsın.",
     items: [
       {
         title: "Türkçe doğal dil",
@@ -364,7 +364,7 @@ export const tr = {
       },
       {
         title: "Tıkanan noktayı söyler",
-        text: "Hangi adımda kaç gün beklendiğini görür ve size sebebiyle birlikte bildirir. Rapor okumak değil, karar vermek kalır size.",
+        text: "Hangi adımda kaç gün beklendiğini görür ve size sebebiyle birlikte bildirir. Siz yalnızca karara odaklanırsınız.",
       },
       {
         title: "Yetkiye saygılı",
@@ -402,7 +402,7 @@ export const tr = {
     scenes: [
       { kicker: "Sinyal", title: "İş, bir cümleyle başlar.", text: "“Galata ana sayfasını yarın 11.00’e Ayşe’ye aç.” Lio tarihi, kişiyi ve projeyi ayrı ayrı sormaz." },
       { kicker: "Bağlam", title: "Lio parçaları birbirine bağlar.", text: "Müşteriyi, son yazışmayı, mevcut bütçeyi ve ekip yoğunluğunu aynı kararın çevresinde toplar." },
-      { kicker: "Hareket", title: "Tek komut, bütün sisteme işler.", text: "Görev açılır, sorumlu atanır, takvim değişir ve bütçe görünümü güncellenir. Veri girmek değil, karar vermek kalır." },
+      { kicker: "Hareket", title: "Tek komut, bütün sisteme işler.", text: "Görev açılır, sorumlu atanır, takvim değişir ve bütçe görünümü güncellenir; hepsi tek cümleyle." },
       { kicker: "Öngörü", title: "Siz sormadan önce söyler.", text: "Lio yalnızca komut beklemez. Tıkanan adımı görür, etkisini hesaplar ve en doğru müdahaleyi önerir." },
     ],
     command: "Galata ana sayfasını yarın 11.00’e Ayşe’ye aç.",
@@ -444,7 +444,7 @@ export const tr = {
 
   screenshots: {
     eyebrow: "Ekrandan görün",
-    title: "Karmaşık değil, kalabalık hiç değil",
+    title: "Sade ekranlar, az tıklama",
     lede: "Projelio'nun arayüzü tek bir şeye odaklanır: bugün ne yapılacağını bir bakışta göstermek.",
     items: [
       {

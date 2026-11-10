@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "./notifications.service";
 import type { Metin } from "../../common/i18n";
+import { yalnizAktifProjeGorevleri } from "../../common/aktif-proje";
 
 function startOfDay(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -49,8 +50,10 @@ export class DigestProcessor {
     // alır, göreve sonradan eklenenler hiçbir özet görmezdi.
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("id, title, deadline, status, task_assignees(user_id)")
+      .select("id, title, deadline, status, project_id, task_assignees(user_id)")
       .neq("status", "completed")
+      // Arşivlenen görev özete girmemeli — bu filtre eskiden eksikti.
+      .is("archived_at", null)
       .gte("deadline", from.toISOString())
       .lt("deadline", to.toISOString());
 
@@ -59,9 +62,11 @@ export class DigestProcessor {
       return;
     }
     if (!data || data.length === 0) return;
+    // Beklemede/pasif/tamamlanmış projenin görevi özete girmez (bkz. common/aktif-proje.ts).
+    const gorevler = await yalnizAktifProjeGorevleri(this.supabase.client, data);
 
     const tasksByUser = new Map<string, string[]>();
-    for (const task of data) {
+    for (const task of gorevler) {
       for (const assignee of (task as any).task_assignees ?? []) {
         const list = tasksByUser.get(assignee.user_id) ?? [];
         list.push(task.title);

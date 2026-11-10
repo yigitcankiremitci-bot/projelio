@@ -21,6 +21,7 @@ import type {
 } from "@projelio/shared";
 import { SupabaseService } from "../../database/supabase.service";
 import { parcalara } from "../../common/parcali-liste";
+import { yalnizAktifProjeGorevleri } from "../../common/aktif-proje";
 import { PersonalTodosService } from "../personal-todos/personal-todos.service";
 import { DepartmentsService } from "../departments/departments.service";
 import { GoogleTakvimService } from "../google-takvim/google-takvim.service";
@@ -1197,7 +1198,12 @@ export class PlanningService {
       }
     }
 
-    return [...byId.values()]
+    // Beklemede/pasif/tamamlanmış projenin görevi seçiciye gelmez (bkz.
+    // common/aktif-proje.ts). Kapsamda değil burada: kapsam bloğa bağlama
+    // YETKİSİNİ de belirliyor ve önceden bağlanmış blok kırılmamalı.
+    const satirlar = await yalnizAktifProjeGorevleri(this.supabase.client, [...byId.values()]);
+
+    return satirlar
       .map(mapSchedulableTask)
       // Teslim tarihi olanlar önce ve yakından uzağa; tarihi olmayanlar sonda.
       .sort((a, b) => {

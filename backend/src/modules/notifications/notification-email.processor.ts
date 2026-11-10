@@ -23,6 +23,7 @@ import {
 import { gunlukOzetSirasiGeldiMi, yerelAn } from "./notification-email.zaman";
 import { abonelikKapatmaAdresi } from "./notification-email.abonelik";
 import { gunlukOzetIcerigi } from "./notification-email.icerik";
+import { yalnizAktifProjeGorevleri } from "../../common/aktif-proje";
 
 /**
  * Bildirimleri e-posta olarak gönderen işleyici (bkz. migration 102).
@@ -433,7 +434,7 @@ export class NotificationEmailProcessor {
 
     const { data, error } = await this.supabase.client
       .from("tasks")
-      .select("id, title, deadline, deadline_time, task_assignees(user_id)")
+      .select("id, title, deadline, deadline_time, project_id, task_assignees(user_id)")
       .neq("status", "completed")
       .is("archived_at", null)
       .gte("deadline", pencereBasi.toISOString())
@@ -446,7 +447,10 @@ export class NotificationEmailProcessor {
     }
 
     const ilgili = new Set(userIds);
-    for (const task of data ?? []) {
+    // Beklemede/pasif/tamamlanmış projenin görevi "gecikti" diye sabah
+    // e-postasına girmez (bkz. common/aktif-proje.ts).
+    const gorevler = await yalnizAktifProjeGorevleri(this.supabase.client, (data ?? []) as any[]);
+    for (const task of gorevler) {
       const gun = typeof (task as any).deadline === "string" ? (task as any).deadline.slice(0, 10) : null;
       if (!gun) continue;
       for (const atanan of ((task as any).task_assignees ?? []) as { user_id: string }[]) {

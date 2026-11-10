@@ -403,8 +403,16 @@ export default function JobDetail() {
   // Kapatılan rutinler silinmiyor, yalnızca aktiflerin arasından çıkarılıyor:
   // geçmiş kayıtlarına ve eklerine erişim gerekiyor (bkz. 060).
   const endedOperations = operations.filter((o) => o.status === "ended");
-  const pendingTasksCount = tasks.filter((t) => t.status !== "completed").length;
-  const completedTasksCount = tasks.filter((t) => t.status === "completed").length;
+  // İşin görev sekmesinde ve sayaçlarında YALNIZCA aktif projelerin görevleri:
+  // beklemede/pasif/tamamlanmış projenin bitmemiş görevi burada da "gecikmiş"
+  // diye durmasın (kullanıcının kararı, 2026-11-10 — bkz. backend
+  // common/aktif-proje.ts). Görevlere projenin kendi sayfasından bakılır.
+  // Ekip paneli TÜM görevleri almaya devam ediyor: orada iş yükü değil,
+  // kimin hangi göreve bağlı olduğu gösteriliyor.
+  const aktifProjeIdleri = new Set(activeProjects.map((p) => p.id));
+  const aktifGorevler = tasks.filter((t) => !t.projectId || aktifProjeIdleri.has(t.projectId));
+  const pendingTasksCount = aktifGorevler.filter((t) => t.status !== "completed").length;
+  const completedTasksCount = aktifGorevler.filter((t) => t.status === "completed").length;
 
   // Tek dizi, iki yerleşim: geniş ekranda kapağın içinde, dar ekranda akışta
   // (bkz. StatGrid — hangisinin çizileceğine bileşenler karar veriyor).
@@ -672,15 +680,15 @@ export default function JobDetail() {
           {/* "Bugün yapılanlar" görev listesinin başında: bugün neyin bittiği,
               sıradaki işe bakarken anlam taşıyor — proje kartlarının üstünde
               değil. */}
-          {activeTab === "tasks" && <TodayCompletedPanel tasks={tasks} />}
+          {activeTab === "tasks" && <TodayCompletedPanel tasks={aktifGorevler} />}
 
           {activeTab === "tasks" && (
             <JobTasksPanel
               ref={tasksPanelRef}
               jobId={id}
               jobTitle={job?.title}
-              projects={projects}
-              tasks={tasks}
+              projects={activeProjects}
+              tasks={aktifGorevler}
               onCreateSubtask={handleCreateSubtask}
               onMoveTask={handleMoveTask}
               onToggleComplete={handleToggleComplete}

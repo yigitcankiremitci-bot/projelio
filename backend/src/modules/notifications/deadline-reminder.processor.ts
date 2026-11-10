@@ -3,6 +3,7 @@ import { Cron } from "@nestjs/schedule";
 import { SupabaseService } from "../../database/supabase.service";
 import { NotificationsService } from "./notifications.service";
 import { duvarSaatiAni } from "./hatirlatma-ani";
+import { yalnizAktifProjeGorevleri } from "../../common/aktif-proje";
 
 /** Hatırlatma ne kadar geç kalırsa kalsın gönderilsin; ama bu kadar eskiyse artık gönderme. */
 const MAX_LATE_MS = 6 * 60 * 60 * 1000;
@@ -83,6 +84,10 @@ export class DeadlineReminderProcessor {
       return;
     }
     if (!data?.length) return;
+    // Beklemede/pasif/tamamlanmış projenin görevine hatırlatma gitmez. Görev
+    // DAMGALANMIYOR: proje yeniden aktif olunca hatırlatma kaldığı yerden sürer
+    // (çok eskidiyse aşağıdaki kural onu sessizce kapatır).
+    const gorevler = await yalnizAktifProjeGorevleri(this.supabase.client, data as any[]);
 
     // Damgalanacak görevler biriktirilir, tur sonunda TEK sorguda yazılır.
     // Önceden satır başına ayrı UPDATE atılıyordu: 500 hatırlatma = 500 ardışık
@@ -90,7 +95,7 @@ export class DeadlineReminderProcessor {
     // binmesine yol açabiliyordu.
     const damgalanacak: string[] = [];
 
-    for (const task of data as any[]) {
+    for (const task of gorevler) {
       const dueMoment = duvarSaatiAni(task.deadline, task.deadline_time);
       if (!dueMoment) continue;
 

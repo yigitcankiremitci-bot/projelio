@@ -4334,9 +4334,13 @@ export class AiAssistantService {
    * projectId verildiyse arama tek projeye kilitlenir, departmanlar taranmaz.
    */
   private async searchTasks(userId: string, input: Record<string, any>): Promise<unknown> {
+    // Proje verilmediyse YALNIZCA aktif projeler taranır: beklemede/pasif/
+    // tamamlanmış projenin görevi proje dışında dolaşmaz (bkz.
+    // common/aktif-proje.ts). Proje açıkça verildiyse durumu ne olursa olsun
+    // aranır — kullanıcı o projeyi soruyor.
     const projects = input.projectId
       ? [await this.projectsService.findOne(input.projectId)]
-      : await this.projectsService.findAllForUser(userId);
+      : (await this.projectsService.findAllForUser(userId)).filter((p) => p.status === "active");
 
     if (input.projectId) {
       await this.requireProjectRole(input.projectId, userId, "freelancer", ["owner", "member", "subcontractor"]);
@@ -4415,6 +4419,8 @@ export class AiAssistantService {
 
   /** Kullanıcının genel durumu: proje sayıları, geciken ve yaklaşan işler. */
   private async getWorkspaceSummary(userId: string): Promise<unknown> {
+    // Proje sayıları TÜM projelerden; geciken/yaklaşan sayımı yalnızca aktif
+    // projelerden (bkz. common/aktif-proje.ts ve aşağıdaki döngü).
     const projects = await this.projectsService.findAllForUser(userId);
     const now = new Date();
     const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -4453,6 +4459,7 @@ export class AiAssistantService {
     };
 
     for (const project of projects) {
+      if (project.status !== "active") continue;
       say(await this.tasksService.findByProject(project.id, userId), { project: project.title });
     }
 

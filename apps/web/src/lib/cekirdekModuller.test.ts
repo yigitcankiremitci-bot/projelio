@@ -18,13 +18,29 @@ describe("çekirdek modüller", () => {
 
   // Yönetim departmanı olmayan şirkette kart ölü kalıyordu.
   test("yalnızca şirket kapsamında şirketin sekmesine gider", () => {
-    assert.equal(cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=tasks");
+    assert.equal(cekirdekModulAdresi("yonetim_gorev_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=tasks");
     assert.equal(cekirdekModulAdresi("yonetim_dosya_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=files");
-    // Departman varsa o kazanır.
+    // Görev/dosya modülünde departman varsa o kazanır.
     assert.equal(
-      cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1", departmentId: "d1" }),
+      cekirdekModulAdresi("yonetim_gorev_yonetimi", { organizationId: "o1", departmentId: "d1" }),
       "/departments/d1?tab=tasks"
     );
+  });
+
+  // Migration 191: şirketin kendi projeleri. Departmandan açılsa bile proje
+  // modülü şirketin Projeler sekmesine gider — departmanda proje yok.
+  test("proje ve çıktı modülü şirketin Projeler sekmesine gider", () => {
+    assert.equal(cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1" }), "/organizations/o1?tab=projects");
+    assert.equal(
+      cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1", departmentId: "d1" }),
+      "/organizations/o1?tab=projects"
+    );
+    assert.equal(
+      cekirdekModulAdresi("yonetim_cikti_yonetimi", { organizationId: "o1", departmentId: "d1" }),
+      "/organizations/o1?tab=projects"
+    );
+    // İş kapsamı her şeyden önce: serbest çalışanın kendi işi.
+    assert.equal(cekirdekModulAdresi("yonetim_proje_yonetimi", { organizationId: "o1", jobId: "j1" }), "/jobs/j1?tab=projects");
   });
 
   test("kapsamsız ya da çekirdek olmayan modülde adres yok", () => {

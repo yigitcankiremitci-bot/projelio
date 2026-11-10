@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useIsDesktop } from "../lib/useIsDesktop";
 import { isOpenableModule } from "../lib/entityModules";
+import { isCekirdekModul } from "../lib/cekirdekModuller";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { departmanModulAdresi, departmanModulleriniYukle } from "../lib/departmanModulleri";
@@ -78,6 +79,12 @@ export default function PageModulesBar(props: Props) {
   const hedef = (entry: ModuleCatalogEntry): { to?: string; onClick?: () => void } => {
     if (!isOpenableModule(entry.key, Boolean(MODULE_RECORD_CONFIGS[entry.key]))) return {};
     if (kartModaldaAcilir(entry.key)) return { onClick: () => setModalEntry(entry) };
+    // Çekirdek modül doğrudan modül sayfasına (o da kendi sekmesine yönlenir):
+    // Modüller sekmesi üzerinden aktarma, sekme sahibince kapatılmışsa hiçbir
+    // yere gitmiyordu.
+    if (props.kind === "department" && isCekirdekModul(entry.key)) {
+      return { to: `/departments/${props.departmentId}/modules/${encodeURIComponent(entry.key)}` };
+    }
     return props.kind === "department"
       ? { to: departmanModulAdresi(props.departmentId, entry.key) }
       : { to: `/jobs/${props.jobId}/modules/${encodeURIComponent(entry.key)}` };

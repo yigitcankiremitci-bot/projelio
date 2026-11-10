@@ -50,6 +50,8 @@ export interface MuzePlaketi {
   projeDurumu: MuzeProjeDurumu;
   /** Projenin BUGÜNKÜ adı (Arşiv listesi için); proje görülemiyorsa boş. Plakette projeAdi yazar. */
   projeGuncelAdi?: string;
+  /** Şirket proje alanından gelen plaket (migration 191): şirketin bütün çalışanları görür. */
+  sirketGeneli?: boolean;
 }
 
 /**
@@ -58,9 +60,19 @@ export interface MuzePlaketi {
  * yöneticisi, holding sahibi — AccessService.seesAllProjectsOfJob). İkincisi
  * proje sayfasındaki kuralla aynı; birincisi plaketin anı olmasından: projeden
  * sonradan çıkarılan kişi emeğinin plaketini görmeye devam eder.
+ *
+ * Şirket proje alanından gelen plaket (`sirketGeneli`, migration 191) ayrıca
+ * şirketin BÜTÜN çalışanlarına açıktır (kullanıcı kararı, 2026-11-10): müze
+ * şirketin ortak hafızası. Taşeron çalışan sayılmaz; şirkete bağlı DİĞER
+ * işlerin plaketleri bu genişlemeye girmez.
  */
-export function plaketiGorebilir(k: { katilimciMi: boolean; isiYonetiyor: boolean }): boolean {
-  return k.katilimciMi || k.isiYonetiyor;
+export function plaketiGorebilir(k: {
+  katilimciMi: boolean;
+  isiYonetiyor: boolean;
+  sirketGeneli?: boolean;
+  sirketCalisani?: boolean;
+}): boolean {
+  return k.katilimciMi || k.isiYonetiyor || (k.sirketGeneli === true && k.sirketCalisani === true);
 }
 
 /** Kaynak projenin bugünkü hâli. Proje yoksa ya da görülemiyorsa "kapali". */

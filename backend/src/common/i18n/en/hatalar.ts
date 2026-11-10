@@ -1215,4 +1215,6 @@ export const hatalar: TranslationDict = {
   "Portal kullanıcısının durumu geçersiz": "Invalid portal user status",
   // Pasif modül (shared aktifModuller.ts) — yalnızca platform yöneticisi açar
   "Bu modül şu anda kullanıma kapalı.": "This module isn't available right now.",
+  "Şirketin proje alanı şirketin parçası; ayrı olarak taşınamaz, silinemez ya da arşivlenemez.":
+    "The company's project space is part of the company; it can't be moved, deleted or archived on its own.",
 };

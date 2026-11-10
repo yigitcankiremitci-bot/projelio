@@ -35,7 +35,21 @@ function mapJob(row: any): Job {
     isSample: row.is_sample === true || undefined,
     // Kolon yoksa (migration 176 uygulanmadan) false: görev bütçeleri eskisi gibi ödenir.
     hizmetIsi: row.hizmet_isi === true,
+    // Kolon yoksa (migration 191 uygulanmadan) hiçbir iş alan değildir.
+    sirketProjeAlani: row.sirket_proje_alani === true || undefined,
   };
+}
+
+/** Şirket proje alanının ait olduğu modül (bkz. migration 191). */
+const PROJE_YONETIMI_MODULU = "yonetim_proje_yonetimi";
+
+/**
+ * Şirket proje alanı serbest çalışan yüzeylerinde (İşlerim, Stüdyom, kenar
+ * çubuğu, şirketin iş sayısı) iş olarak görünmez: kullanıcı onu bir iş olarak
+ * açmadı, şirketin Projeler sekmesi olarak görüyor.
+ */
+function alanDegil(row: any): boolean {
+  return row?.sirket_proje_alani !== true;
 }
 
 @Injectable()
@@ -116,7 +130,7 @@ export class JobsService {
     }
 
     const byId = new Map<string, any>();
-    for (const row of [...(owned ?? []), ...hiredJobs, ...memberJobs]) byId.set(row.id, row);
+    for (const row of [...(owned ?? []), ...hiredJobs, ...memberJobs]) if (alanDegil(row)) byId.set(row.id, row);
 
     const jobs = Array.from(byId.values())
       .map(mapJob)
@@ -210,7 +224,11 @@ export class JobsService {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    const jobs = (data ?? []).map(mapJob);
+    // Şirket proje alanı listede KALIR ve başa gelir: şirketin Projeler kartı
+    // projeleri bu listeden topluyor, "Yeni proje" de önce buraya açılıyor.
+    const jobs = (data ?? [])
+      .map(mapJob)
+      .sort((a, b) => Number(b.sirketProjeAlani ?? false) - Number(a.sirketProjeAlani ?? false));
     if (!requestingUserId) return jobs;
 
     const { data: org } = await this.supabase.client
@@ -235,9 +253,85 @@ export class JobsService {
       if (orgMember) return jobs;
     }
 
+    // findAllForUser alanı bilerek içermez (İşlerim'de görünmesin); alan için
+    // işin kendi kuralı sorulur: şirketi gören taşeron olmayan herkes görür.
     const visibleJobs = await this.findAllForUser(requestingUserId);
     const visibleIds = new Set(visibleJobs.map((j) => j.id));
+    for (const j of jobs) {
+      if (j.sirketProjeAlani && (await this.access.canViewJob(j.id, requestingUserId).catch(() => false))) visibleIds.add(j.id);
+    }
     return jobs.filter((j) => visibleIds.has(j.id));
+  }
+
+  /**
+   * Şirketin proje alanı (migration 191): "Proje yönetimi" modülü açıksa
+   * şirketin Projeler sekmesinin kabı olan iş. Yoksa ilk bakışta açılır —
+   * modül eklendiği an değil, çünkü modül birçok yoldan açılıyor (Modül ekle,
+   * Lio, eski sihirbaz) ve hepsine kanca takmak birini unutmak demekti.
+   *
+   * Alanın sahibi ŞİRKETİN SAHİBİ: proje onayları, Drive kökü ve "iş sahibi"
+   * yetkileri ona düşer — serbest çalışanda işin sahibi neyse burada şirket o.
+   * Taşeron alan AÇTIRAMAZ (yalnızca var olanı görür).
+   *
+   * Çağıran şirketi görebildiğini önceden doğrulamış olmalı.
+   */
+  async sirketProjeAlani(organizationId: string, requestingUserId?: string): Promise<{ acik: boolean; jobId?: string }> {
+    const db = this.supabase.client;
+    const { data: modul } = await db
+      .from("organization_modules")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("module_key", PROJE_YONETIMI_MODULU)
+      .maybeSingle();
+    if (!modul) return { acik: false };
+
+    const mevcut = await this.alaniBul(organizationId);
+    if (mevcut !== undefined) return { acik: true, jobId: mevcut ?? undefined };
+
+    if (requestingUserId && (await this.access.isSubcontractor(requestingUserId))) return { acik: true };
+    const { data: org } = await db.from("organizations").select("owner_id").eq("id", organizationId).maybeSingle();
+    if (!org?.owner_id) return { acik: true };
+
+    const { data: row, error } = await db
+      .from("jobs")
+      .insert({ owner_id: org.owner_id, title: "Şirket projeleri", organization_id: organizationId, sirket_proje_alani: true })
+      .select("id")
+      .single();
+    if (error) {
+      // Eşzamanlı ikinci açılış tekil indekse takılır: kazananı oku.
+      if ((error as any).code === "23505") return { acik: true, jobId: (await this.alaniBul(organizationId)) ?? undefined };
+      this.logger.warn(`Şirket proje alanı açılamadı (org=${organizationId}): ${error.message}`);
+      return { acik: true };
+    }
+    return { acik: true, jobId: row.id };
+  }
+
+  /**
+   * Şirketin alanının kimliği. undefined = alan yok, açılabilir. null =
+   * okunamadı (ör. migration 191 uygulanmadan sütun yok): alan açmaya
+   * kalkışılmaz, sayfa düşmez, yalnızca sekme boş kalır.
+   */
+  private async alaniBul(organizationId: string): Promise<string | null | undefined> {
+    const { data, error } = await this.supabase.client
+      .from("jobs")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("sirket_proje_alani", true)
+      .maybeSingle();
+    if (error) return null;
+    return data?.id ?? undefined;
+  }
+
+  /**
+   * Alan şirketin parçası: başka bir yere taşınamaz, tek başına silinemez ya
+   * da arşivlenemez — şirketle birlikte arşivlenir (OrganizationsService.archive,
+   * kullanıcı kimliği vermeden çağırır) ve şirket silinirken işareti kalkar.
+   */
+  private async assertAlanDegil(id: string): Promise<void> {
+    const { data } = await this.supabase.client.from("jobs").select("sirket_proje_alani").eq("id", id).maybeSingle();
+    if ((data as any)?.sirket_proje_alani === true) {
+      throw new BadRequestException("Şirketin proje alanı şirketin parçası; ayrı olarak taşınamaz, silinemez ya da arşivlenemez.");
+    }
   }
 
   // Bir Group'a doğrudan bağlı işler (bir Organization üzerinden değil).
@@ -250,7 +344,7 @@ export class JobsService {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: false });
     if (error) throw error;
-    const jobs = (data ?? []).map(mapJob);
+    const jobs = (data ?? []).filter(alanDegil).map(mapJob);
     if (!requestingUserId) return jobs;
 
     const { data: group } = await this.supabase.client.from("groups").select("owner_id").eq("id", groupId).maybeSingle();
@@ -299,6 +393,7 @@ export class JobsService {
     }
     if (data.hizmetIsi !== undefined) patch.hizmet_isi = !!data.hizmetIsi;
     if (data.organizationId !== undefined || data.groupId !== undefined) {
+      await this.assertAlanDegil(id);
       const nextOrgId = data.organizationId !== undefined ? data.organizationId : undefined;
       const nextGroupId = data.groupId !== undefined ? data.groupId : undefined;
       this.assertOrgGroupExclusive(nextOrgId, nextGroupId);
@@ -335,6 +430,7 @@ export class JobsService {
 
   async remove(id: string, requestingUserId?: string): Promise<void> {
     await this.assertOwner(id, requestingUserId);
+    if (requestingUserId) await this.assertAlanDegil(id);
     // Rutin programları ÖNCE: operations.job_id'de ON DELETE CASCADE yok
     // (bkz. 021) ve iş silinirken program varsa yabancı anahtar reddeder.
     // Rutin programı olan her iş — örnek iş dahil, onda hep bir program var —
@@ -347,6 +443,7 @@ export class JobsService {
 
   async archive(id: string, requestingUserId?: string): Promise<Job> {
     await this.assertOwner(id, requestingUserId);
+    if (requestingUserId) await this.assertAlanDegil(id);
     const { data: row, error } = await this.supabase.client
       .from("jobs")
       .update({ archived_at: new Date().toISOString() })

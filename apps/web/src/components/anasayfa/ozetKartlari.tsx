@@ -1212,10 +1212,13 @@ export function useSirketKatalogu({
   departmanlar,
   departmanlarHazir,
   modulKatalogu,
+  projeAlaniAcik,
 }: {
   organizationId: string;
   access?: OrganizationAccess;
   hiddenTabs?: string[];
+  /** Şirket proje alanı açık mı (Organization.projeAlani, migration 191). */
+  projeAlaniAcik?: boolean;
   departmanlar: Department[];
   departmanlarHazir: boolean;
   modulKatalogu: ModuleCatalogEntry[];
@@ -1226,7 +1229,7 @@ export function useSirketKatalogu({
   return useMemo(() => {
     const kok = `/organizations/${organizationId}`;
     // Görünürlük sekmelerle AYNI kuraldan geçer: yetkisi olmayana kart da çıkmaz.
-    const acik = new Set(visibleOrgTabs(access, hiddenTabs).map((s) => s.key));
+    const acik = new Set(visibleOrgTabs(access, hiddenTabs, projeAlaniAcik).map((s) => s.key));
     const liste: PanoKartTanimi[] = [];
     const ekle = (kosul: boolean, tanim: PanoKartTanimi) => {
       if (kosul) liste.push(tanim);
@@ -1263,7 +1266,7 @@ export function useSirketKatalogu({
       ),
     });
     ekle(true, YAPILACAKLAR(t("Yapılacaklar"), "yapilacaklar"));
-    ekle(true, { id: "projeler", ad: t("Projeler"), grup: "temel", Icon: IconActivity, boyut: "orta", sabitBoyut: "orta", hizliEylem: projeHizliEylemi(t), hedef: `${kok}`, ciz: () => <SirketProjeleriOzeti organizationId={organizationId} /> });
+    ekle(true, { id: "projeler", ad: t("Projeler"), grup: "temel", Icon: IconActivity, boyut: "orta", sabitBoyut: "orta", hizliEylem: projeHizliEylemi(t), hedef: acik.has("projects") ? `${kok}?tab=projects` : `${kok}`, ciz: () => <SirketProjeleriOzeti organizationId={organizationId} /> });
     ekle(acik.has("files"), { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: `${kok}?tab=files`, ciz: () => <SirketDosyalarOzeti organizationId={organizationId} /> });
     ekle(acik.has("flow"), { id: "akis", ad: t("Sosyal"), grup: "temel", Icon: IconMessageCircle, boyut: "kucuk", hedef: `${kok}?tab=flow`, ciz: () => <AkisOzeti organizationId={organizationId} /> });
     ekle(true, { id: "ofis", ad: t("3D ofis"), grup: "temel", Icon: IconLayers, boyut: "kucuk", satir: ofisSatiri, tamKaplama: true, hedef: `/yeni?ofis=${encodeURIComponent(organizationId)}`, ciz: () => <OfisOzeti ad={t("3D ofis")} /> });
@@ -1293,7 +1296,7 @@ export function useSirketKatalogu({
       });
     }
     return liste;
-  }, [organizationId, access, hiddenTabs, departmanlar, departmanlarHazir, modulKatalogu, moduller, prefs.showLio, t]);
+  }, [organizationId, access, hiddenTabs, projeAlaniAcik, departmanlar, departmanlarHazir, modulKatalogu, moduller, prefs.showLio, t]);
 }
 
 export function useSerbestKatalogu({ isler, projeler, pano }: { isler: Job[]; projeler: Project[]; pano: AnasayfaPano }): PanoKartTanimi[] {

@@ -20,6 +20,7 @@ import { modulDepartmani } from "../lib/modulYeri";
 import { coverActionButton } from "../components/EntityCover";
 import FeedPanel, { FeedPanelHandle } from "../components/panels/FeedPanel";
 import { useProjectFabAction } from "../lib/projectFab";
+import SirketProjeleriPanel, { type SirketProjeleriPanelHandle } from "../components/projeler/SirketProjeleriPanel";
 import { usePageHeader } from "../lib/pageHeader";
 import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { useIsDesktop } from "../lib/useIsDesktop";
@@ -108,7 +109,7 @@ export default function OrganizationDetail() {
   const access = organization?.viewerAccess;
   // Sahibinin ayarlardan kapattığı sekmeler de daraltır (bkz. Organization.hiddenTabs).
   const hiddenTabs = organization?.hiddenTabs;
-  const openCoreTabs = visibleOrgTabs(access, hiddenTabs).map((t) => t.key);
+  const openCoreTabs = visibleOrgTabs(access, hiddenTabs, organization?.projeAlani?.acik).map((t) => t.key);
   const requestedTab: OrgTab =
     CORE_ORG_TABS.includes(tabParam ?? "") || PANO_GORUNUMLERI.includes(tabParam ?? "") || openModuleTab
       ? (tabParam as OrgTab)
@@ -127,6 +128,7 @@ export default function OrganizationDetail() {
   const productsRef = useRef<ProductsPanelHandle>(null);
   const budgetRef = useRef<OrgBudgetPanelHandle>(null);
   const ekipRef = useRef<SirketEkibiPanelHandle>(null);
+  const projelerRef = useRef<SirketProjeleriPanelHandle>(null);
   const [addingFile, setAddingFile] = useState(false);
   // "+" menüsünden seçilen ekleme, ilgili panel kurulduğunda açılır: paneller
   // artık anasayfada değil kendi görünümünde yaşıyor, ref ancak geçişten sonra dolu.
@@ -148,6 +150,7 @@ export default function OrganizationDetail() {
     organizationId: id ?? "",
     access,
     hiddenTabs,
+    projeAlaniAcik: organization?.projeAlani?.acik,
     departmanlar: departments,
     departmanlarHazir,
     modulKatalogu: moduleCatalog,
@@ -275,6 +278,18 @@ export default function OrganizationDetail() {
             <ModulesPanel ref={modulesRef} organizationId={id} />
           </>
         )}
+        {/* Şirketin projeleri (migration 191): alan sunucuda ilk bakışta açılır;
+            jobId yoksa (taşeron ya da migration uygulanmadan) panel çizilmez. */}
+        {activeTab === "projects" &&
+          (organization?.projeAlani?.jobId ? (
+            <>
+              <TekFabRegistrar label={t("Yeni proje")} onClick={() => projelerRef.current?.openCreate()} />
+              <SirketProjeleriPanel ref={projelerRef} jobId={organization.projeAlani.jobId} alanSahibiId={organization.ownerId} />
+            </>
+          ) : (
+            <p style={{ color: c.textSecondary, fontSize: 15 }}>{t("Şirketin proje alanı henüz hazır değil.")}</p>
+          ))}
+
         {activeTab === "tasks" && <OrgTasksPanel organizationId={id} organizationName={organization?.name} />}
         {/* Sekme zaten gizli; ?tab= ile zorlansa da panel açılmasın (sunucu 403 döner). */}
         {activeTab === "products" && access?.canViewCommercial !== false && (

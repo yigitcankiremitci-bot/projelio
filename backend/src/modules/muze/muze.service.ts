@@ -11,7 +11,8 @@ import { AccessService } from "../../common/access/access.service";
  * de veritabanı korur — yazma, düzenleme ya da silme ucu bilerek yok.
  *
  * Görme kuralı `plaketiGorebilir` (packages/shared/src/muze.ts): bitiş anında
- * projede olanlar + işi bugün yönetenler.
+ * projede olanlar + işi bugün yönetenler + şirket proje alanının plaketlerinde
+ * şirketin bütün çalışanları (migration 191).
  */
 @Injectable()
 export class MuzeService {
@@ -43,6 +44,16 @@ export class MuzeService {
       const { data } = await db.from("muze_plaketleri").select("*").in("organization_id", orgIds);
       adaylar.push(...(data ?? []));
     }
+    // Şirket proje alanının plaketleri: çalıştığı şirketlerin hepsi (taşeronda boş).
+    const calistigi = new Set(await this.access.calistigiSirketler(userId));
+    if (calistigi.size) {
+      const { data } = await db
+        .from("muze_plaketleri")
+        .select("*")
+        .in("organization_id", [...calistigi])
+        .eq("sirket_geneli", true);
+      adaylar.push(...(data ?? []));
+    }
     const { data: gruplar } = await db.from("groups").select("id").eq("owner_id", userId);
     const grupIds = (gruplar ?? []).map((g: any) => g.id);
     if (grupIds.length) {
@@ -67,6 +78,12 @@ export class MuzeService {
     const taseron = await this.access.isSubcontractor(userId);
     for (const r of adaylar) {
       if (satirlar.has(r.id)) continue;
+      const sirketGeneli = r.sirket_geneli === true;
+      const sirketCalisani = !!r.organization_id && calistigi.has(r.organization_id);
+      if (plaketiGorebilir({ katilimciMi: false, isiYonetiyor: false, sirketGeneli, sirketCalisani })) {
+        satirlar.set(r.id, r);
+        continue;
+      }
       const yonetiyor = r.job_id && mevcutIsler.has(r.job_id) ? await isiYonetiyor(r.job_id) : !taseron;
       if (plaketiGorebilir({ katilimciMi: false, isiYonetiyor: yonetiyor })) satirlar.set(r.id, r);
     }
@@ -172,5 +189,7 @@ function mapPlaket(r: any, projeDurumu: MuzePlaketi["projeDurumu"]): MuzePlaketi
     sira: r.sira ?? undefined,
     siraKapsami: r.sira_kapsami ?? undefined,
     projeDurumu,
+    // Sütun yoksa (migration 191 uygulanmadan) false.
+    sirketGeneli: r.sirket_geneli === true || undefined,
   };
 }

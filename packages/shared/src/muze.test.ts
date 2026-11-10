@@ -8,6 +8,19 @@ describe("plaketiGorebilir", () => {
     assert.equal(plaketiGorebilir({ katilimciMi: false, isiYonetiyor: true }), true);
     assert.equal(plaketiGorebilir({ katilimciMi: false, isiYonetiyor: false }), false);
   });
+
+  // Migration 191: şirket proje alanının plaketleri şirketin bütün çalışanlarına.
+  test("şirket geneli plaketi şirketin çalışanı görür", () => {
+    assert.equal(plaketiGorebilir({ katilimciMi: false, isiYonetiyor: false, sirketGeneli: true, sirketCalisani: true }), true);
+  });
+
+  test("şirket geneli olmayan plaketi sıradan çalışan görmez", () => {
+    assert.equal(plaketiGorebilir({ katilimciMi: false, isiYonetiyor: false, sirketGeneli: false, sirketCalisani: true }), false);
+  });
+
+  test("çalışan olmayan (ör. taşeron) şirket geneli plaketi görmez", () => {
+    assert.equal(plaketiGorebilir({ katilimciMi: false, isiYonetiyor: false, sirketGeneli: true, sirketCalisani: false }), false);
+  });
 });
 
 describe("muzeProjeDurumu — plaket değil, Arşivde aç bağlantısı", () => {

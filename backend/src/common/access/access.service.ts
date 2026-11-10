@@ -166,7 +166,7 @@ export class AccessService {
    * Sıradan şirket/holding üyeliği yetmez: onlar da yalnızca atandıkları
    * projeleri görür (bkz. seesAllProjectsOfJob'un saf kuralı).
    */
-  private async manageJobsOfScope(
+  async manageJobsOfScope(
     organizationId: string | null | undefined,
     groupId: string | null | undefined,
     userId: string
@@ -187,6 +187,37 @@ export class AccessService {
   }
 
   // -------------------------------------------------------- Organizasyon
+
+  /**
+   * Kullanıcının ÇALIŞANI olduğu şirketler: sahibi, onaylı organizasyon üyesi
+   * ya da bir departmanın kadrosunda (ayrılma onayı bekleyen dahil) — taşeron
+   * HARİÇ. Tanım koltuk sayımıyla aynı (bkz. KoltukService.sinirVeKisiler):
+   * şirketin kişi hakkından düşen herkes çalışandır, gerisi değildir.
+   *
+   * Şirket geneli müze plaketleri bu daireye açılır (migration 191).
+   */
+  async calistigiSirketler(userId: string): Promise<string[]> {
+    if (await this.isSubcontractor(userId)) return [];
+    const db = this.supabase.client;
+    const [sahip, uye, kadro] = await Promise.all([
+      db.from("organizations").select("id").eq("owner_id", userId),
+      db.from("organization_members").select("organization_id").eq("user_id", userId).eq("status", "approved"),
+      db
+        .from("department_members")
+        .select("departments(organization_id)")
+        .eq("user_id", userId)
+        .in("status", ["approved", "leave_pending"])
+        .neq("role", "subcontractor"),
+    ]);
+    const ids = new Set<string>();
+    for (const o of sahip.data ?? []) ids.add((o as any).id);
+    for (const m of uye.data ?? []) if ((m as any).organization_id) ids.add((m as any).organization_id);
+    for (const k of kadro.data ?? []) {
+      const org = (k as any).departments?.organization_id;
+      if (org) ids.add(org);
+    }
+    return [...ids];
+  }
 
   async canViewOrganization(organizationId: string, userId: string): Promise<boolean> {
     const { data: org } = await this.supabase.client

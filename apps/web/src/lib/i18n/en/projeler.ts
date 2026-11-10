@@ -61,6 +61,8 @@ export const projeler: TranslationDict = {
   "Takip linki oluştur": "Create tracking link",
   "Henüz iş yok.": "No jobs yet.",
   "Bu işte henüz proje yok.": "No projects in this job yet.",
+  "Şirkette henüz proje yok.": "No company projects yet.",
+  "Şirketin proje alanı henüz hazır değil.": "The company's project space isn't ready yet.",
   "Bu işte henüz rutin yok.": "No routines in this job yet.",
   "Rutin, bitişi olmayan ve tekrarlayan işler içindir — aylık bakım, haftalık raporlama, sosyal medya yönetimi gibi. Bitişi olan işler proje olarak açılır.":
     "A routine is for ongoing, repeating work — monthly maintenance, weekly reporting, social media. Work with an end date belongs in a project.",

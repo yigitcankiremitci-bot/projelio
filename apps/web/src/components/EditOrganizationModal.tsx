@@ -188,6 +188,8 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           unavailable={[
             ...(organization.viewerAccess?.canViewBudget === true ? [] : ["budget"]),
             ...(organization.viewerAccess?.canViewCommercial === false ? ["products"] : []),
+            // Projeler modülle gelir: modül kapalıyken kapatılacak bir sekme yok.
+            ...(organization.projeAlani?.acik ? [] : ["projects"]),
           ]}
         />
 

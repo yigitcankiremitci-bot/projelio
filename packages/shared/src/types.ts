@@ -190,7 +190,9 @@ export const ENTITY_TAB_KEYS: Record<TabScope, string[]> = {
   // "departments" sekmesi 2026-09'da kaldırıldı: departmanlar Anasayfa'da
   // listeleniyor, ekleme anasayfanın "+" menüsünden ya da başlığa çift dokunarak.
   // Kayıtlı hiddenTabs'teki eski anahtarı sanitizeHiddenTabs sessizce atar.
-  organization: ["home", "flow", "tasks", "products", "budget", "files"],
+  // "projects": şirket proje alanı (migration 191) — yalnızca "Proje
+  // yönetimi" modülü açıkken görünür (bkz. apps/web OrgTabs.visibleOrgTabs).
+  organization: ["home", "flow", "projects", "tasks", "products", "budget", "files"],
   job: ["projects", "programs", "team", "tasks", "budget", "files", "modules"],
   department: ["flow", "team", "tasks", "budget", "modules", "files"],
   project: ["feed", "team", "tasks", "files", "budget", "process"],
@@ -266,6 +268,12 @@ export interface Job {
    * projelerindeki görev bütçeleri FİYAT KALEMİDİR, ödenmez ve deftere yazılmaz.
    */
   hizmetIsi?: boolean;
+  /**
+   * Şirket proje alanı (migration 191): şirketin Projeler sekmesinin kabı.
+   * Arayüzde iş olarak görünmez; adresine gelinirse şirketin Projeler
+   * sekmesine yönlenir.
+   */
+  sirketProjeAlani?: boolean;
 }
 
 // Holding katmanı. Tamamen opsiyonel — bir Grup birden çok Organization'a ve/veya
@@ -311,6 +319,12 @@ export interface Organization {
   // (bkz. anasayfaSirasi.ts). Kişiseldir — başkasının sırasını etkilemez.
   // Hiç kaydetmemişse boş: arayüz varsayılan sırayı kullanır.
   viewerHomeSections?: string[];
+  /**
+   * Sunucu tarafında eklenir: şirketin proje alanı (migration 191). `acik`
+   * = "Proje yönetimi" modülü şirkette açık; `jobId` alanın işi (henüz hiç
+   * proje açılmadıysa ve alan oluşturulamadıysa boş).
+   */
+  projeAlani?: { acik: boolean; jobId?: string };
 }
 
 // ============================================================ Departmanlar / Kadro

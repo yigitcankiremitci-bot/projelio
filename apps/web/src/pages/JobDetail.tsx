@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Job, Operation, Project, Task, TaskStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { useLiveRoom } from "../lib/liveRoom";
@@ -7,6 +7,7 @@ import ProjectCard from "../components/ProjectCard";
 import OperationCard from "../components/OperationCard";
 import CreateOperationModal from "../components/CreateOperationModal";
 import CreateProjectModal from "../components/CreateProjectModal";
+import ProjeBolumu from "../components/projeler/ProjeBolumu";
 import CreateTaskModal from "../components/CreateTaskModal";
 import EditJobModal from "../components/EditJobModal";
 import JobTabs, { JobTab, visibleJobTabs } from "../components/JobTabs";
@@ -407,6 +408,12 @@ export default function JobDetail() {
   );
 
   if (!id) return null;
+  // Şirket proje alanı bir iş olarak açılmaz: şirketin Projeler sekmesi onun
+  // sayfası (migration 191). Proje sayfasının "← iş" bağlantısı ve eski
+  // adresler buraya düşüyor; replace, geri tuşu bu ara durağa dönmesin.
+  if (job?.sirketProjeAlani && job.organizationId) {
+    return <Navigate to={`/organizations/${job.organizationId}?tab=projects`} replace />;
+  }
 
   const activeProjects = projects.filter((p) => p.status === "active");
   // Projeler sekmesinin üç bölümü (kullanıcının kararı, 2026-11-10): ana
@@ -850,70 +857,6 @@ export default function JobDetail() {
             setEditingTask(null);
           }}
         />
-      )}
-    </div>
-  );
-}
-
-/**
- * Projeler sekmesindeki ayrı bölüm (pasif / tamamlanan). Kapatılmış rutinler
- * bölümüyle aynı görünüm: başlık + sayı + göster/gizle, açılınca soluk ızgara.
- * Boşsa hiç çizilmez. Izgara sürüklenmiyor: sıralama ana ızgaranın işi.
- */
-function ProjeBolumu({
-  baslik,
-  projeler,
-  acik,
-  onToggle,
-  kart,
-}: {
-  baslik: string;
-  projeler: Project[];
-  acik: boolean;
-  onToggle: () => void;
-  kart: (p: Project) => React.ReactNode;
-}) {
-  const c = useThemeColors();
-  const t = useT();
-  if (projeler.length === 0) return null;
-  return (
-    <div style={{ marginTop: 28 }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={acik}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          background: "transparent",
-          border: "none",
-          padding: 0,
-          cursor: "pointer",
-          fontSize: 17,
-          fontWeight: 500,
-          color: c.textPrimary,
-        }}
-      >
-        {baslik}
-        <span style={{ fontSize: 13, color: c.textSecondary, fontWeight: 400 }}>
-          {t("{n} proje", { n: projeler.length })} · {acik ? t("gizle") : t("göster")}
-        </span>
-      </button>
-      {acik && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: 14,
-            marginTop: 12,
-            opacity: 0.72,
-          }}
-        >
-          {projeler.map((p) => (
-            <div key={p.id}>{kart(p)}</div>
-          ))}
-        </div>
       )}
     </div>
   );

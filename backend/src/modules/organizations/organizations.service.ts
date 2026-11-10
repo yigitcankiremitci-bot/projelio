@@ -117,11 +117,13 @@ export class OrganizationsService {
     if (orgIds.length > 0) {
       const { data: jobRows } = await this.supabase.client
         .from("jobs")
-        .select("organization_id")
+        // "*": sirket_proje_alani migration 191 uygulanmadan da sorgu düşmesin.
+        .select("*")
         .in("organization_id", orgIds)
         .is("archived_at", null);
       const counts = new Map<string, number>();
-      for (const j of jobRows ?? []) {
+      // Şirket proje alanı iş sayılmaz (bkz. JobsService.sirketProjeAlani).
+      for (const j of (jobRows ?? []).filter((r: any) => r.sirket_proje_alani !== true)) {
         counts.set(j.organization_id, (counts.get(j.organization_id) ?? 0) + 1);
       }
       for (const o of orgs) o.jobCount = counts.get(o.id) ?? 0;
@@ -146,11 +148,13 @@ export class OrganizationsService {
     if (orgIds.length > 0) {
       const { data: jobRows } = await this.supabase.client
         .from("jobs")
-        .select("organization_id")
+        // "*": sirket_proje_alani migration 191 uygulanmadan da sorgu düşmesin.
+        .select("*")
         .in("organization_id", orgIds)
         .is("archived_at", null);
       const counts = new Map<string, number>();
-      for (const j of jobRows ?? []) {
+      // Şirket proje alanı iş sayılmaz (bkz. JobsService.sirketProjeAlani).
+      for (const j of (jobRows ?? []).filter((r: any) => r.sirket_proje_alani !== true)) {
         counts.set(j.organization_id, (counts.get(j.organization_id) ?? 0) + 1);
       }
       for (const o of orgs) o.jobCount = counts.get(o.id) ?? 0;
@@ -200,6 +204,11 @@ export class OrganizationsService {
       }
       organization.viewerAccess = access;
       organization.viewerHomeSections = await this.anasayfaSirasiniOku(id, requestingUserId);
+      // Şirket proje alanı (migration 191). Okunamazsa sayfa DÜŞMEZ: Projeler
+      // sekmesi görünmez, gerisi çalışır.
+      organization.projeAlani = await this.jobsService
+        .sirketProjeAlani(id, requestingUserId)
+        .catch(() => ({ acik: false }));
     }
 
     return organization;
@@ -373,6 +382,15 @@ export class OrganizationsService {
 
   async remove(id: string, requestingUserId?: string): Promise<void> {
     await this.assertOwner(id, requestingUserId);
+    // Şirket proje alanının işareti önce kalkar (migration 191): jobs.organization_id
+    // bağının silme davranışı ne olursa olsun alan, şirkete bağlı sıradan bir
+    // iş gibi davranır — sahibinin İşlerim'inde görünür, gizli bir artık kalmaz.
+    // Sütun yoksa hata yutulur.
+    await this.supabase.client
+      .from("jobs")
+      .update({ sirket_proje_alani: false })
+      .eq("organization_id", id)
+      .eq("sirket_proje_alani", true);
     const { error } = await this.supabase.client.from("organizations").delete().eq("id", id);
     if (error) throw error;
   }

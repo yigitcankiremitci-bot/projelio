@@ -5,7 +5,7 @@ import TabBar from "./TabBar";
 // Terfi etmiş modüller de bu çubuğa girdiği için tip string'e açıldı: sabit
 // sekme anahtarları + modül katalog anahtarları.
 // Bkz. docs/moduller/24-yerlesim-modul-yuzeyleri.md §3
-export type OrgTab = "home" | "flow" | "tasks" | "products" | "budget" | "files" | (string & {});
+export type OrgTab = "home" | "flow" | "projects" | "tasks" | "products" | "budget" | "files" | (string & {});
 
 // Çekirdek sekme anahtarları ortak listeden gelir (bkz. shared ENTITY_TAB_KEYS):
 // ayarlar ekranındaki "kapatılabilir sekmeler" ile buradaki çubuk aynı kümeden
@@ -20,6 +20,8 @@ export const CORE_ORG_TABS = ENTITY_TAB_KEYS.organization;
 export const ORG_TABS = [
   { key: "home", label: "Anasayfa" }, // dil:anahtar
   { key: "flow", label: "Sosyal" }, // dil:anahtar
+  // Şirketin kendi projeleri (migration 191): "Proje yönetimi" modülü açıkken.
+  { key: "projects", label: "Projeler" }, // dil:anahtar
   // Departmanlarda dağınık duran görevlerin tek panosu (bkz. OrgTasksPanel).
   { key: "tasks", label: "Görevler" }, // dil:anahtar
   { key: "products", label: "Ürün/Hizmet" }, // dil:anahtar
@@ -69,10 +71,14 @@ interface Props {
  * Sıra önemli: kapatma tercihi bir yetki değil, yalnızca sadeleştirmedir —
  * yetkisi olmayan birine sekmeyi açamaz.
  */
-export function visibleOrgTabs(access?: OrganizationAccess, hiddenTabs?: string[]) {
+export function visibleOrgTabs(access?: OrganizationAccess, hiddenTabs?: string[], projeAlaniAcik = false) {
   const hidden = new Set(hiddenTabs ?? []);
   return ORG_TABS.filter((t) => {
     if (hidden.has(t.key)) return false;
+    // Projeler bir modülün yüzeyi: "Proje yönetimi" kapalıyken sekme yok
+    // (veri silinmez, modül yeniden açılınca geri gelir). Bilgiyi sunucu verir
+    // (Organization.projeAlani), çağıran geçirmezse sekme gizli kalır.
+    if (t.key === "projects") return projeAlaniAcik;
     if (t.key === "budget") return access?.canViewBudget === true;
     if (t.key === "products") return access?.canViewCommercial !== false;
     return true;

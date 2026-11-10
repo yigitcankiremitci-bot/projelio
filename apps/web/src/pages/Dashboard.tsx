@@ -86,13 +86,22 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   // Üstteki "Ben" geçişi: şirket sahibi de kişisel panosunu açabilsin.
   const benGorunumu = searchParams.get("gorunum") === "ben";
+  // Yönlendirme YALNIZCA sekmesiz anasayfada. Kenar çubuğundaki Kasa
+  // (?tab=budget) ve Dosyalar (?tab=files) bu sayfanın sekmeleri ve şirket
+  // sahibinin de KİŞİSEL kasası/dosyaları; her sekmede şirket sayfasına
+  // yönlendirilince şirket sahibi Kasa'ya hiç ulaşamıyordu (kullanıcının
+  // şikâyeti, 2026-11-10: "kasa anasayfaya yönlendiriyor").
+  const sekmeli = searchParams.has("tab");
 
   useEffect(() => {
+    // Sekmeden (ör. Kasa) sekmesiz anasayfaya geçilince karar yeniden veriliyor;
+    // o arada kişisel anasayfa bir an parlayıp şirket sayfasına atlamasın.
+    if (!benGorunumu && !sekmeli) setRedirectTo(undefined);
     api
       .get<User>("/auth/me")
       .then(async (me) => {
         setMyUserId(me.id);
-        if (benGorunumu) {
+        if (benGorunumu || sekmeli) {
           setRedirectTo(null);
         } else if (me.accountType === "organization_owner") {
           const orgs = await api.get<Organization[]>("/organizations").catch(() => []);
@@ -105,7 +114,7 @@ export default function Dashboard() {
         }
       })
       .catch(() => setRedirectTo(null));
-  }, [benGorunumu]);
+  }, [benGorunumu, sekmeli]);
 
   // Görünüm, URL'deki ?tab= ile eşleşir: kenar çubuğundan "/?tab=budget" gibi
   // bir bağlantıyla gelindiğinde ilgili tam görünüm açık başlasın diye.

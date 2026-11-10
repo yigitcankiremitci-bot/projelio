@@ -572,7 +572,11 @@ export default function Yeni() {
     <div className="yn">
       {/* Kenar çubuğu uygulamanınkiyle aynı: temanın koyu rengi + Ayarlar'da seçilen renk/desen. */}
       <aside className="yn-side" style={kenarStili}>
-        <Link to="/yeni" className="yn-logo" aria-label="Projelio anasayfa">
+        {/* Logo ve "Anasayfa" İLK anasayfaya (/) götürür, ofisin kendisine değil:
+            ikisi de /yeni'ye gidiyordu ve 3D ofisten anasayfaya dönmenin bir yolu
+            yoktu (kullanıcının şikâyeti, 2026-11-10). Uygulamanın kenar çubuğu bu
+            sayfada gizli (bkz. App.tsx sakinEkrani), çıkış yalnızca bu menüden. */}
+        <Link to="/" className="yn-logo" aria-label="Projelio anasayfa">
           <span className="yn-logo-kutu">
             <img src="/logo.png" alt="" />
           </span>
@@ -580,8 +584,9 @@ export default function Yeni() {
           <span>Projelio</span>
         </Link>
         <nav className="yn-nav">
-          <MenuOgesi to="/yeni" ikon="ev" aktif={location.pathname === "/yeni"}>Anasayfa</MenuOgesi>
-          <MenuOgesi to="/" ikon="klasor">Projeler</MenuOgesi>
+          <MenuOgesi to="/" ikon="ev">Anasayfa</MenuOgesi>
+          {/* "/" artık Anasayfa'nın; Projeler doğrudan İşlerim sekmesine. */}
+          <MenuOgesi to="/?tab=jobs" ikon="klasor">Projeler</MenuOgesi>
           <MenuOgesi to="/tasks" ikon="liste">Görevler</MenuOgesi>
           <MenuOgesi to={orgId ? `/organizations/${orgId}` : "/organizations"} ikon="ekip">Ekibim</MenuOgesi>
           <MenuOgesi to="/calendar" ikon="takvim">Takvim</MenuOgesi>
@@ -742,7 +747,7 @@ export default function Yeni() {
             <section className="yn-featured">
               <div className="yn-sec-head">
                 <h2>Öne çıkan projeler</h2>
-                <Link to="/">
+                <Link to="/?tab=jobs">
                   Tüm projeler <Ikon ad="ok" />
                 </Link>
               </div>

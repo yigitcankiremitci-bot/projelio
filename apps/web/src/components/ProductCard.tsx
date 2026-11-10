@@ -158,6 +158,9 @@ export default function ProductCard({ product, onOpen, onCoverUpdated, compact =
           <img
             src={photoUrl}
             alt=""
+            // Katalogda yüzlerce kart aynı anda çizilebiliyor; ekrana gelmeyenin
+            // fotoğrafı indirilmesin.
+            loading="lazy"
             // "cover", "contain" DEĞİL. Kartın görsel kutusu 4:3 değil: genişliği
             // ızgarayla değişiyor (en az 260 px), yüksekliği ise sabit 176 px —
             // yani oran 1.48 ve üzeri. 4:3'lük bir fotoğrafı bu kutuya

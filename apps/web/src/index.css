@@ -1215,3 +1215,13 @@ html[data-klavye="acik"] [data-klavyede-alt-bosluk] {
     animation: none;
   }
 }
+
+/* Ürün kataloğu liste görünümü (UrunTablosu): satırın tamamı tıklanır. */
+.urun-satiri:hover td,
+.urun-satiri:focus-visible td {
+  background: var(--color-background);
+}
+.urun-satiri:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}

@@ -14,9 +14,12 @@ import AddEditProductModal from "./AddEditProductModal";
 import ProductDetailModal from "./ProductDetailModal";
 import UrunExcelModal from "./UrunExcelModal";
 import UrunFotoTopluModal from "./UrunFotoTopluModal";
+import UrunKatalogu from "./urunler/UrunKatalogu";
 import { IconImage, IconUpload } from "./icons";
 import { useT } from "../lib/i18n";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
+
+const SERIT_TAVANI = 24;
 
 export interface ProductsPanelHandle {
   openAdd: () => void;
@@ -85,6 +88,11 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   };
 
   useEffect(load, [organizationId]);
+
+  // Anasayfa şeridi bir ÖZET: 3.586 ürünlük katalogda şerit binlerce fotoğraflı
+  // kartı yan yana çiziyor, sayfa açılırken donuyordu (2026-11-11). İlk
+  // SERIT_TAVANI kart yeter; arama ve geri kalanı Ürün/Hizmet sekmesinde.
+  const serit = layout === "scroll" ? products.slice(0, SERIT_TAVANI) : products;
 
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding(true) }));
 
@@ -178,38 +186,49 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
         >
           {t('Henüz ürün/hizmet yok. Sayfadaki "+" ile Ürün Yönetimi departmanına ürün/hizmet ekleyebilirsin.')}
         </div>
+      ) : layout === "grid" ? (
+        // Tam katalog: arama, kategori/marka, filtre, sıralama, görünüm.
+        <UrunKatalogu organizationId={organizationId} products={products} onOpen={setOpen} onCoverUpdated={load} />
       ) : compactCards ? (
-        <ProductStack products={products} onOpen={setOpen} onCoverUpdated={load} />
+        <ProductStack products={serit} onOpen={setOpen} onCoverUpdated={load} />
       ) : (
         <div
           ref={scrollRef}
-          style={
-            layout === "grid"
-              ? // min(260px, 100%): kap 260 px'ten darsa tek sütun kabın genişliğine
-                // iner; aksi hâlde kart kabın dışına taşıyordu.
-                { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))", gap: 14 }
-              : {
-                  display: "flex",
-                  flexWrap: "nowrap",
-                  gap: 14,
-                  overflowX: "auto",
-                  paddingBottom: 6,
-                  WebkitOverflowScrolling: "touch",
-                }
-          }
+          style={{
+            display: "flex",
+            flexWrap: "nowrap",
+            gap: 14,
+            overflowX: "auto",
+            paddingBottom: 6,
+            WebkitOverflowScrolling: "touch",
+          }}
         >
-          {products.map((p) => (
+          {serit.map((p) => (
             // Kaydırmalı satırda kart genişliği SABİT: flex öğeleri varsayılan
             // olarak büzülüyor ve otuz ürün eklendiğinde hepsi satıra sıkışıp
             // okunamaz hale geliyordu (bkz. DepartmentsPanel'deki aynı ölçü).
-            <div
-              key={p.id}
-              // minWidth 0: ızgara öğesi içeriğinin en dar hâlinden küçülemezse hücreyi aşar.
-              style={layout === "grid" ? { minWidth: 0 } : { flex: `0 0 ${cardWidth}px`, width: cardWidth }}
-            >
+            <div key={p.id} style={{ flex: `0 0 ${cardWidth}px`, width: cardWidth }}>
               <ProductCard product={p} onOpen={() => setOpen(p)} onCoverUpdated={() => load()} />
             </div>
           ))}
+          {products.length > serit.length && (
+            <div
+              style={{
+                flex: "0 0 160px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                textAlign: "center",
+                color: c.textSecondary,
+                fontSize: 14,
+                border: `1px dashed ${c.border}`,
+                borderRadius: 12,
+                padding: 12,
+              }}
+            >
+              {t("+{n} ürün/hizmet daha — tamamı Ürün/Hizmet sekmesinde", { n: (products.length - serit.length).toLocaleString("tr-TR") })}
+            </div>
+          )}
         </div>
       )}
 

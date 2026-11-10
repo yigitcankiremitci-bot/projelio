@@ -15,6 +15,7 @@ import {
   IconActivity,
   IconFile,
   IconCheck,
+  IconStar,
 } from "./icons";
 
 type IconComp = typeof IconBuilding;
@@ -37,6 +38,7 @@ const PAGE_OPTIONS: Option[] = [
   { path: "/calendar", label: "Takvim", icon: IconCalendar }, // dil:anahtar
   { path: "/tasks", label: "Yapılacaklar", icon: IconListCheck }, // dil:anahtar
   { path: "/worklog", label: "Yaptım", icon: IconCheck }, // dil:anahtar
+  { path: "/muze", label: "Müze", icon: IconStar }, // dil:anahtar
 ];
 
 interface Props {

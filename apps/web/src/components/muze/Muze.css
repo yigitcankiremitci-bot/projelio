@@ -1,0 +1,122 @@
+/* Müze plaketi: ceviz bir levhaya vidalanmış bronz plaka. Renkler temaya
+   bağlı DEĞİL — bronz, koyu temada da bronzdur; sayfanın zemini temayı izler. */
+
+.muze-levha {
+  position: relative;
+  padding: 10px;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #5a3a22 0%, #3e2715 55%, #2c1b0e 100%);
+  box-shadow: 0 10px 24px rgba(20, 12, 4, 0.28), inset 0 1px 0 rgba(255, 220, 170, 0.12);
+}
+
+.muze-plaket {
+  position: relative;
+  border-radius: 8px;
+  padding: 22px 18px 18px;
+  color: #3a2410;
+  text-align: center;
+  background:
+    radial-gradient(120% 80% at 20% 0%, rgba(255, 236, 196, 0.55), transparent 55%),
+    linear-gradient(135deg, #b98a4e 0%, #dcb27a 30%, #c4924f 55%, #a0703a 80%, #8a5d2e 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 232, 190, 0.55),
+    inset 0 0 0 4px rgba(120, 78, 36, 0.35),
+    inset 0 -8px 18px rgba(90, 56, 22, 0.25);
+}
+
+/* Köşelerdeki vidalar. */
+.muze-plaket::before,
+.muze-plaket::after,
+.muze-plaket .muze-vida-alt::before,
+.muze-plaket .muze-vida-alt::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f3dcb2, #7a5228 70%);
+  box-shadow: 0 1px 1px rgba(40, 22, 6, 0.5);
+}
+.muze-plaket::before { top: 7px; left: 7px; }
+.muze-plaket::after { top: 7px; right: 7px; }
+.muze-plaket .muze-vida-alt::before { bottom: 7px; left: 7px; }
+.muze-plaket .muze-vida-alt::after { bottom: 7px; right: 7px; }
+
+/* Kazınmış yazı: koyu harf, altında ince bir ışık. */
+.muze-kazi {
+  text-shadow: 0 1px 0 rgba(255, 238, 205, 0.6), 0 -1px 0 rgba(70, 40, 12, 0.25);
+}
+
+.muze-baslik {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  margin: 10px 0 2px;
+  overflow-wrap: anywhere;
+}
+
+.muze-ust-yazi {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.muze-madalyon {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  box-shadow: 0 0 0 3px rgba(255, 232, 190, 0.7), 0 0 0 5px rgba(120, 78, 36, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, serif;
+  font-weight: 700;
+  font-size: 22px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.muze-cizgi {
+  height: 1px;
+  margin: 12px 18%;
+  background: linear-gradient(90deg, transparent, rgba(90, 56, 22, 0.55), transparent);
+  box-shadow: 0 1px 0 rgba(255, 236, 200, 0.5);
+}
+
+.muze-kucuk {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: none;
+  width: 100%;
+  font: inherit;
+  text-align: inherit;
+}
+.muze-kucuk:hover,
+.muze-kucuk:focus-visible {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 30px rgba(20, 12, 4, 0.34), inset 0 1px 0 rgba(255, 220, 170, 0.12);
+}
+.muze-kucuk:focus-visible {
+  outline: 2px solid #dcb27a;
+  outline-offset: 3px;
+}
+
+.muze-izgara {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 22px;
+}
+
+.muze-katkilar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 14px;
+  font-family: Georgia, serif;
+  font-size: 15px;
+}

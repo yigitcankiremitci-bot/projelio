@@ -13,7 +13,7 @@
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import type { Department, DepartmentMember, Job, JobMember, Organization, PersonalBoardItem, Project, ProjeEtkinligi, Task, TaskStatus, User } from "@projelio/shared";
+import type { Department, DepartmentMember, Job, JobMember, MuzePlaketi, Organization, PersonalBoardItem, Project, ProjeEtkinligi, Task, TaskStatus, User } from "@projelio/shared";
 import { api } from "../api/client";
 import { askLio } from "../lib/askLio";
 import { usePresence } from "../lib/liveRoom";
@@ -32,7 +32,7 @@ import { isOpenableModule } from "../lib/entityModules";
 import { MODULE_RECORD_CONFIGS } from "../lib/moduleRecordConfigs";
 import { kartModaldaAcilir } from "../lib/moduleSurfaces";
 import { serbestIsMi, studyoOdalari, type StudyoIsi } from "../lib/studyoOfisi";
-import { KASA_MODULU, KUPA_RAFI, PROJE_ONEKI } from "../lib/ofisOyunu";
+import { KASA_MODULU, MUZE_ODASI, MUZE_PLAKETI_ONEKI, PROJE_ONEKI, RAF_KAPASITESI, kupaRafiMi, muzeRafi } from "../lib/ofisOyunu";
 import "./Yeni.css";
 
 // Proje sayfası büyük: yalnızca ofisteki bir panodan açılınca yüklenir.
@@ -129,6 +129,8 @@ export default function Yeni() {
   const [acikModul, setAcikModul] = useState<{ odaId: string; key: string } | null>(null);
   /** Ofisteki proje panosundan (ya da kupa rafındaki plaketten) açılan proje: sayfaya gitmeden modalda. */
   const [acikProje, setAcikProje] = useState<string | null>(null);
+  // Müze odasının plaketleri (bkz. pages/Muze.tsx); yüklenemezse oda kurulmaz.
+  const [muzePlaketleri, setMuzePlaketleri] = useState<MuzePlaketi[]>([]);
   // Stüdyom: serbest çalışanın işleri ofiste oda olur (bkz. lib/studyoOfisi.ts).
   // Şirketi olmayan kullanıcı doğrudan stüdyoyu görür.
   const [studyo, setStudyo] = useState(false);
@@ -155,6 +157,13 @@ export default function Yeni() {
   useEffect(() => () => window.clearTimeout(zamanlayici.current), []);
 
   // ------------------------------------------------------------ yükleme
+  useEffect(() => {
+    api
+      .get<MuzePlaketi[]>("/muze")
+      .then(setMuzePlaketleri)
+      .catch(() => undefined);
+  }, []);
+
   useEffect(() => {
     api.get<User>("/auth/me").then(setBen).catch(() => undefined);
     api
@@ -436,6 +445,35 @@ export default function Yeni() {
         }),
     [departmanlar, orgGorevleri, uyeler, bugun, emek, katalog, acikModuller, kasaYetkisi]
   );
+  // Müze odası: stüdyoda serbest işlerin, şirkette o şirketin plaketleri; her
+  // rafta RAF_KAPASITESI plaket, en yenisi ilk rafta. Plaket yoksa oda da yok.
+  const muzeOdasi: OyunDepartmani | null = useMemo(() => {
+    const liste = muzePlaketleri.filter((p) => (studyo ? !p.organizationId && !p.groupId : !!orgId && p.organizationId === orgId));
+    if (!liste.length) return null;
+    const raflar: NonNullable<OyunDepartmani["moduller"]> = [];
+    for (let i = 0; i * RAF_KAPASITESI < liste.length; i++) {
+      const parca = liste.slice(i * RAF_KAPASITESI, (i + 1) * RAF_KAPASITESI);
+      raflar.push({
+        key: muzeRafi(i),
+        ad: `Müze rafı ${i + 1}`,
+        bilgi: {
+          biten: 0,
+          toplam: 0,
+          kupa: parca.length,
+          plaketler: parca.map((p) => ({ projeId: p.projectId, ad: p.projeAdi, kapak: p.kapak, tarih: p.bitis.slice(0, 10) })),
+        },
+      });
+    }
+    return {
+      id: MUZE_ODASI,
+      ad: "Müze",
+      kapak: "linear-gradient(135deg, #dcb27a, #a0703a 60%, #6e4520)",
+      moduller: raflar,
+      kisiler: [],
+      acikGorev: 0,
+      gecikmis: 0,
+    };
+  }, [muzePlaketleri, studyo, orgId]);
   const bitenGorev = useMemo(
     () => (orgGorevleri?.length ? orgGorevleri : []).filter((t) => t.status === "completed").length || (pano ?? []).filter((i) => i.status === "completed").length,
     [orgGorevleri, pano]
@@ -634,19 +672,28 @@ export default function Yeni() {
               kapsam={studyo ? "kisisel" : orgId || "kisisel"}
               studyo={studyo}
               veriHazir={ofisHazir}
-              departmanlar={studyo ? studyoDepartmanlari : departmanlar === null ? [] : oyunDepartmanlari}
+              departmanlar={[
+                ...(studyo ? studyoDepartmanlari : departmanlar === null ? [] : oyunDepartmanlari),
+                ...(muzeOdasi ? [muzeOdasi] : []),
+              ]}
               bugunToplanti={etkinlikler === null ? null : bugunToplanti}
               bitenGorev={bitenGorev}
               hareketler={hareketler}
               cevrimici={cevrimiciIdler}
               benId={ben?.id}
-              onOdaSayfasi={(id) => navigate(id === "toplanti" ? "/calendar" : studyo ? `/jobs/${id}` : `/departments/${id}`)}
+              onOdaSayfasi={(id) =>
+                navigate(id === "toplanti" ? "/calendar" : id === MUZE_ODASI ? "/muze" : studyo ? `/jobs/${id}` : `/departments/${id}`)
+              }
               onModulAc={(odaId, key) =>
                 key === KASA_MODULU
                   ? setKasaAcik(studyo ? odaId : "org")
+                  : key.startsWith(MUZE_PLAKETI_ONEKI)
+                    ? navigate(`/muze?plaket=${key.slice(MUZE_PLAKETI_ONEKI.length)}`)
+                    : odaId === MUZE_ODASI || key === MUZE_ODASI
+                      ? navigate("/muze")
                   : key.startsWith(PROJE_ONEKI)
                     ? setAcikProje(key.slice(PROJE_ONEKI.length))
-                    : key === KUPA_RAFI
+                    : kupaRafiMi(key)
                       ? navigate(`/jobs/${odaId}`)
                       : isOpenableModule(key, Boolean(MODULE_RECORD_CONFIGS[key])) && kartModaldaAcilir(key)
                         ? setAcikModul({ odaId, key })

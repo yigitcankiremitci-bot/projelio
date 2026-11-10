@@ -41,7 +41,7 @@ import { OTURAKLAR, karakter, varlik, varlikVar, varliklariYukle, type Karakter3
 import { modulEsyasi } from "./modulEsyalari";
 import { temaEsyalari } from "./studyoEsyalari";
 import type { IsTemasi } from "../../lib/studyoOfisi";
-import { KUPA_RAFI, PROJE_ONEKI, TOPLANTI_MASASI, modulEsyasiTuru, type IstasyonBilgisi } from "../../lib/ofisOyunu";
+import { MUZE_PLAKETI_ONEKI, PROJE_ONEKI, TOPLANTI_MASASI, kupaRafiMi, modulEsyasiTuru, type IstasyonBilgisi } from "../../lib/ofisOyunu";
 import type { KarakterGorunumu, NesneDuzeni } from "@projelio/shared";
 import { bosNokta, izgaraKur, yolBul, type YolIzgarasi } from "../../lib/ofisYol";
 
@@ -3354,8 +3354,9 @@ export class OfisMotoru {
     }
     if (!u) return;
     if (u.tur === "plaket") {
+      // Plaket projenin kendisini değil, müzedeki değiştirilemez plaketini açar.
       const [odaId, projeId] = u.id.split("|");
-      this.onModulTikla?.(odaId, `${PROJE_ONEKI}${projeId}`);
+      this.onModulTikla?.(odaId, `${MUZE_PLAKETI_ONEKI}${projeId}`);
     } else if (u.tur === "esya" && this.duzenleme) this.onEsyaTikla?.(u.id, { x: e.clientX, y: e.clientY });
     else if (u.tur === "oda") this.onOdaTikla?.(u.id);
     else if (u.tur === "lio") this.onLioTikla?.();
@@ -3363,7 +3364,7 @@ export class OfisMotoru {
     else if (u.tur === "modul") {
       const [odaId, key] = u.id.split("|");
       // Kupa rafı ve proje panosu önce yakından gösterilir; panoya yine tıklanınca proje açılır.
-      if (key === KUPA_RAFI || (key.startsWith(PROJE_ONEKI) && this.rafta?.id !== u.id)) this.rafaYaklas(u.id);
+      if (kupaRafiMi(key) || (key.startsWith(PROJE_ONEKI) && this.rafta?.id !== u.id)) this.rafaYaklas(u.id);
       else this.onModulTikla?.(odaId, key);
     }
   };

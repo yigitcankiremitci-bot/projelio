@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ArchiveSummary, ArchivedTaskEntry, ThemeColors, Translate } from "@projelio/shared";
+import type { ArchiveSummary, ArchivedTaskEntry, MuzePlaketi, ThemeColors, Translate } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useRefreshOnUndo, useUndo } from "../lib/undo";
-import { IconArchive, IconRestore, IconTrash } from "../components/icons";
+import { IconArchive, IconRestore, IconStar, IconTrash } from "../components/icons";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
@@ -115,10 +115,17 @@ export default function Archive() {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ kind: EntityKind; id: string; title: string } | null>(null);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
+  // Biten projeler müzenin plaketlerinden gelir: projeyi kapatan her yol
+  // plaket bastığı için liste ile müze ayrışamaz (bkz. migration 189).
+  const [bitenler, setBitenler] = useState<MuzePlaketi[] | null>(null);
   const { pushDestructive } = useUndo();
 
   const reload = () => {
     api.get<ArchiveSummary>("/archive").then(setData).catch(() => setData(null));
+    api
+      .get<MuzePlaketi[]>("/muze")
+      .then((l) => setBitenler(l.filter((p) => p.projeDurumu === "tamamlandi")))
+      .catch(() => setBitenler([]));
   };
 
   useEffect(reload, []);
@@ -183,6 +190,17 @@ export default function Archive() {
       </div>
 
       {!data && <p style={{ fontSize: 16, color: c.textSecondary }}>{t("Yükleniyor…")}</p>}
+
+      <BitenProjeler bitenler={bitenler} c={c} />
+
+      {data && (
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "28px 0 4px" }}>{t("Arşivlenenler")}</h2>
+      )}
+      {data && (
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: "0 0 14px", maxWidth: 640 }}>
+          {t("Sildiğin yerine arşive eklediklerin. Geri getirebilir ya da kalıcı olarak silebilirsin.")}
+        </p>
+      )}
 
       {isEmpty && (
         <div
@@ -311,6 +329,85 @@ export default function Archive() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Arşiv > Biten projeler: durumu "tamamlandı" olan projeler. Bunlar NORMAL
+ * projeler — açılır, düzenlenir, gerekirse yeniden açılır. Her satırın müzede
+ * değiştirilemez bir plaketi var; iki yön de birbirine bağlı.
+ */
+function BitenProjeler({ bitenler, c }: { bitenler: MuzePlaketi[] | null; c: ThemeColors }) {
+  const t = useT();
+  if (!bitenler) return null;
+  const dugme: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    background: "transparent",
+    border: `1px solid ${c.border}`,
+    borderRadius: 7,
+    padding: "5px 10px",
+    fontSize: 15,
+    color: c.textPrimary,
+    textDecoration: "none",
+    flexShrink: 0,
+  };
+  return (
+    <section style={{ maxWidth: 640, marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: "4px 0" }}>{t("Biten projeler")}</h2>
+        <Link to="/muze" style={{ ...dugme, fontSize: 14 }}>
+          <IconStar size={13} color={c.textPrimary} />
+          {t("Müzeye git")}
+        </Link>
+      </div>
+      <p style={{ fontSize: 14, color: c.textSecondary, margin: "4px 0 14px" }}>
+        {t("Tamamlanan projelerin düzenlenebilir hâli. Burada yaptığın değişiklikler müzedeki plakete yansımaz.")}
+      </p>
+      {bitenler.length === 0 ? (
+        <div style={{ border: `1px dashed ${c.border}`, borderRadius: 12, padding: 20, color: c.textSecondary, fontSize: 15 }}>
+          {t("Henüz tamamlanan proje yok.")}
+        </div>
+      ) : (
+        <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 12, padding: "6px 16px" }}>
+          {bitenler.map((p, i) => (
+            <div
+              key={p.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 10,
+                padding: "10px 0",
+                borderTop: i ? `1px solid ${c.border}` : "none",
+                flexWrap: "wrap",
+              }}
+            >
+              <div style={{ minWidth: 0, flex: "1 1 200px" }}>
+                <div style={{ fontSize: 16, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.projeGuncelAdi ?? p.projeAdi}
+                </div>
+                <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 2 }}>
+                  {[p.isAdi, t("{tarih} tarihinde bitti", { tarih: new Date(p.bitis).toLocaleDateString(bicimDili()) })]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <Link to={`/projects/${p.projectId}`} style={dugme}>
+                  {t("Aç")}
+                </Link>
+                <Link to={`/muze?plaket=${p.id}`} style={dugme} aria-label={t("{ad} plaketini aç", { ad: p.projeAdi })}>
+                  <IconStar size={12} color={c.textPrimary} />
+                  {t("Plaket")}
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

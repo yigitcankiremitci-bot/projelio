@@ -247,6 +247,26 @@ export const KASA_MODULU = "__kasa";
 export const PROJE_ONEKI = "proje_";
 export const KUPA_RAFI = "__kupalar";
 
+/**
+ * Müze odası (bkz. pages/Muze.tsx, migration 189): ofiste ve stüdyoda masasız
+ * bir oda; duvarlarında kupa rafları, raflarda müzenin değiştirilemez
+ * plaketleri. Birden çok raf olabildiği için rafın anahtarı `__kupalar:<sıra>`.
+ */
+export const MUZE_ODASI = "__muze";
+
+/** Kupa rafı mı (iş odasındaki tek raf ya da müzedeki numaralı raflardan biri)? */
+export function kupaRafiMi(key: string): boolean {
+  return key === KUPA_RAFI || key.startsWith(`${KUPA_RAFI}:`);
+}
+
+/** Kupa rafındaki plakete tıklanınca giden anahtar: müzedeki plaketi açar (sonu proje kimliği). */
+export const MUZE_PLAKETI_ONEKI = "__plaket_";
+
+/** Müzedeki n. rafın anahtarı. */
+export function muzeRafi(n: number): string {
+  return `${KUPA_RAFI}:${n}`;
+}
+
 /** Proje istasyonunun yüzünde (ve kupa rafında) yazanlar. */
 export interface IstasyonBilgisi {
   /** Biten / toplam üst görev. */
@@ -264,7 +284,7 @@ export interface IstasyonBilgisi {
   plaketler?: Plaket[];
 }
 
-/** Kupa rafında biten bir projenin plaketi: kapağı ve adı yazılı. */
+/** Kupa rafında biten bir projenin plaketi: kapağı ve adı yazılı. Tıklanınca müzedeki plaketi açılır. */
 export interface Plaket {
   projeId: string;
   ad: string;
@@ -274,12 +294,13 @@ export interface Plaket {
   tarih?: string;
 }
 
-/** Kupa rafına sığan plaket sayısı (3 raf × 4); fazlası sergi odasına (ileride). */
+/** Kupa rafına sığan plaket sayısı (3 raf × 4); fazlası müze odasında (MUZE_ODASI). */
 export const RAF_KAPASITESI = 12;
 
 /** Anahtarın odadaki eşyası (proje istasyonları dahil); yoksa undefined. */
 export function modulEsyasiTuru(key: string): ModulEsyasi | undefined {
-  return key.startsWith(PROJE_ONEKI) ? "projeIstasyonu" : MODUL_ESYALARI[key];
+  if (key.startsWith(PROJE_ONEKI)) return "projeIstasyonu";
+  return kupaRafiMi(key) ? "kupaRafi" : MODUL_ESYALARI[key];
 }
 
 export const MODUL_ESYALARI: Record<string, ModulEsyasi> = {
@@ -416,15 +437,18 @@ const KORIDOR = -4;
  * büyür. Departmanı olmayan şirkette yalnızca ortak alan ve toplantı odası
  * çıkar — olmayan departmanın odası da yoktur.
  */
-export function ofisPlani(departmanlar: { id: string; kisi: number; moduller?: string[]; yonetici?: boolean }[]): OfisPlani {
+export function ofisPlani(
+  departmanlar: { id: string; kisi: number; moduller?: string[]; yonetici?: boolean; masasiz?: boolean }[]
+): OfisPlani {
   const hucreler: Hucre[] = departmanlar.map((d) => {
     // Yönetici kendi masasında oturur; ekip masaları geri kalanlar için.
     const ekip = d.kisi - (d.yonetici ? 1 : 0);
     return {
     id: d.id,
     tur: "departman",
-    patron: !!d.yonetici,
-    masa: d.yonetici && ekip <= 0 ? 0 : Math.min(EN_COK_MASA, Math.max(2, ekip + (ekip % 2))),
+    patron: !d.masasiz && !!d.yonetici,
+    // Masasız oda (müze): yalnızca duvar eşyaları.
+    masa: d.masasiz || (d.yonetici && ekip <= 0) ? 0 : Math.min(EN_COK_MASA, Math.max(2, ekip + (ekip % 2))),
     kisi: d.kisi,
     // Yalnızca odada eşyası olan modüller yer kaplar.
     moduller: (d.moduller ?? []).filter((k) => modulEsyasiTuru(k)),

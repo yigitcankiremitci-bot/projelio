@@ -28,6 +28,7 @@ import { uygulama } from "./uygulama";
 import { arkadaslar } from "./arkadaslar";
 import { bildirimTercihleri } from "./bildirimTercihleri";
 import { kartvizit } from "./kartvizit";
+import { muze } from "./muze";
 import { projeTakvimi } from "./projeTakvimi";
 import { baglantilar } from "./baglantilar";
 import { projelioPosta } from "./projelioPosta";
@@ -96,4 +97,5 @@ export const en: TranslationDict = {
   ...baglantilar,
   ...projelioPosta,
   ...siparis,
+  ...muze,
 };

@@ -19,7 +19,8 @@ import {
   ofisPlani,
   ofisSeviyesi,
   KASA_MODULU,
-  KUPA_RAFI,
+  MUZE_ODASI,
+  kupaRafiMi,
   PROJE_ONEKI,
   adSayisi,
   type IstasyonBilgisi,
@@ -393,7 +394,10 @@ export default function OfisOyunu({
   const odaDuzenlenebilir = (odaId: string) =>
     // Ortak alan da düzenlenir (bitkileri); şirkette sunucu gibi yalnızca sahibe
     // açık. Stüdyoda ortak alan kişinin kendisinin: listede gelir.
-    !!duzenUcu && (duzenleyebilir === "hepsi" || ((odaId !== "ortak" || studyo) && duzenleyebilir.includes(odaId)));
+    // Müze odasının düzeni yok: rafları plaket sayısından kurulur.
+    !!duzenUcu &&
+    odaId !== MUZE_ODASI &&
+    (duzenleyebilir === "hepsi" || ((odaId !== "ortak" || studyo) && duzenleyebilir.includes(odaId)));
   const ortakDuzenlenebilir = odaDuzenlenebilir("ortak");
   // Son hareketler açılışta birkaç saniye görünür, sonra kendiliğinden kapanır;
   // sol alttaki düğmeyle yeniden açılır. Tek tek de kapatılabilir.
@@ -491,6 +495,7 @@ export default function OfisOyunu({
           kisi: d.kisiler.length,
           moduller: (d.moduller ?? []).map((m) => m.key),
           yonetici: d.kisiler.some((k) => k.yonetici),
+          masasiz: d.id === MUZE_ODASI,
         }))
       ),
     [departmanlar]
@@ -529,6 +534,12 @@ export default function OfisOyunu({
         ...g,
       };
     });
+    if (e[MUZE_ODASI]) {
+      const plaket = departmanlar
+        .find((d) => d.id === MUZE_ODASI)
+        ?.moduller?.reduce((t, m) => t + (m.bilgi?.plaketler?.length ?? 0), 0);
+      e[MUZE_ODASI] = { ...e[MUZE_ODASI], alt: `${plaket ?? 0} plaket · biten projeler`, durum: "ok" };
+    }
     e.toplanti = {
       ad: studyo ? "Görüşme Odası" : "Toplantı Odası",
       alt: bugunToplanti === null ? "…" : bugunToplanti ? `Bugün ${bugunToplanti} toplantı` : "Bugün toplantı yok",
@@ -1275,7 +1286,7 @@ export default function OfisOyunu({
       {rafta && !duzenlenen && (
         <div className="of-hud of-oda-mini">
           <span className="of-raf-ipucu">
-            {rafta === "pano" ? "Panoya yine tıkla, projeyi aç · ‹ › ile yandaki panoya geç" : "Bir plakete tıkla, projeyi aç"}
+            {rafta === "pano" ? "Panoya yine tıkla, projeyi aç · ‹ › ile yandaki panoya geç" : "Bir plakete tıkla, müzedeki plaketini aç"}
           </span>
           {rafta === "pano" && (motorRef.current?.panoSayisi ?? 0) > 1 && (
             <>
@@ -1286,6 +1297,11 @@ export default function OfisOyunu({
                 ›
               </button>
             </>
+          )}
+          {rafta === "raf" && (
+            <button type="button" className="of-btn" onClick={() => onModulAc(MUZE_ODASI, MUZE_ODASI)}>
+              Müzeye git
+            </button>
           )}
           <button type="button" className="of-btn" onClick={() => motorRef.current?.raftanCik()}>
             {rafta === "pano" ? "Geri dön" : "Raftan çık"}
@@ -1386,9 +1402,10 @@ function OdaPaneli({
   onCik: () => void;
 }) {
   const toplanti = odaId === "toplanti";
+  const muze = odaId === MUZE_ODASI;
   // Stüdyoda projeler ayrı listelenir; kupa rafı listede yer almaz (odada durur).
   const projeler = (departman?.moduller ?? []).filter((m) => m.key.startsWith(PROJE_ONEKI));
-  const digerModuller = (departman?.moduller ?? []).filter((m) => !m.key.startsWith(PROJE_ONEKI) && m.key !== KUPA_RAFI);
+  const digerModuller = (departman?.moduller ?? []).filter((m) => !m.key.startsWith(PROJE_ONEKI) && !kupaRafiMi(m.key));
   return (
     <div className="of-hud of-oda-paneli" role="dialog" aria-label={etiket?.ad ?? "Oda"}>
       <div className="of-op-bas">
@@ -1471,7 +1488,7 @@ function OdaPaneli({
         )}
         {onSayfa && (
           <button type="button" className="of-btn birincil" onClick={onSayfa}>
-            {toplanti ? "Takvimi aç" : studyo ? "İş sayfasını aç" : "Departman sayfasını aç"}
+            {toplanti ? "Takvimi aç" : muze ? "Müzeyi aç" : studyo ? "İş sayfasını aç" : "Departman sayfasını aç"}
           </button>
         )}
         <button type="button" className="of-btn" onClick={onCik}>
@@ -1634,7 +1651,9 @@ function NesneMenusu({
   // Kasa modül eşyası gibi davranır ama bir modül değil: kapatılamaz.
   const kasa = nesneId === `modul:${KASA_MODULU}`;
   const proje = nesneId.startsWith(`modul:${PROJE_ONEKI}`);
-  const kupa = nesneId === `modul:${KUPA_RAFI}`;
+  const kupa = nesneId.startsWith("modul:") && kupaRafiMi(nesneId.slice("modul:".length));
+  // Müze odasındaki numaralı raflar (bkz. MUZE_ODASI): "aç" müzeyi açar.
+  const muzeRafi = kupa && nesneId.includes(":", "modul:".length);
   const modul = nesneId.startsWith("modul:");
   const masa = nesneId.startsWith("masa-");
   // Mağazadan alınan eşya kişiseldir: ekibin deposuna gitmez (Düzenle > Sat ile satılır).
@@ -1703,7 +1722,7 @@ function NesneMenusu({
           )}
           {modul && (
             <button type="button" role="menuitem" onClick={onModulAc}>
-              {kasa ? "Kasayı aç" : proje ? "Projeyi aç" : kupa ? "İşi aç" : "Modülü aç"}
+              {kasa ? "Kasayı aç" : proje ? "Projeyi aç" : muzeRafi ? "Müzeyi aç" : kupa ? "İşi aç" : "Modülü aç"}
             </button>
           )}
           {kisisel && <small className="of-nm-not">Senin eşyan: yeri yalnızca sende kaydedilir.</small>}

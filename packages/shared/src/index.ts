@@ -43,3 +43,4 @@ export * from "./modulHakki";
 export * from "./koltukHakki";
 export * from "./modulEvi";
 export * from "./ajan";
+export * from "./muze";

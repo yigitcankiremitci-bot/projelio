@@ -53,6 +53,7 @@ import { ModuleRecordsModule } from "./modules/module-records/module-records.mod
 import { FaturalarModule } from "./modules/faturalar/faturalar.module";
 import { PersonalTodosModule } from "./modules/personal-todos/personal-todos.module";
 import { WorklogModule } from "./modules/worklog/worklog.module";
+import { MuzeModule } from "./modules/muze/muze.module";
 import { OrnekIsModule } from "./modules/ornek-is/ornek-is.module";
 import { EpostaYonetimiModule } from "./modules/eposta-yonetimi/eposta-yonetimi.module";
 import { DemoRandevuModule } from "./modules/demo-randevu/demo-randevu.module";
@@ -136,6 +137,7 @@ import { RealtimeChangeInterceptor } from "./modules/realtime/realtime.intercept
     // Yaptım: kişisel iş günlüğü. Yapılacaklar'ın (PersonalTodosModule) tersi —
     // orada "yapacağım", burada "yaptım" (bkz. 097_yaptim.sql).
     WorklogModule,
+    MuzeModule,
     OrnekIsModule,
     EpostaYonetimiModule,
     // Canlı demo randevuları: herkese açık takvim + Admin > Demo randevuları.

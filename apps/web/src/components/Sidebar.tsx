@@ -64,6 +64,8 @@ export default function Sidebar({ open, onClose, overlay, isAdmin }: Props) {
     // Sosyal: arkadaşlar ve duvarlar. Mobilde alt çubukta yer yok; oraya
     // buradan (üstteki okla açılan kenar çubuğu) ulaşılıyor.
     { to: "/sosyal", label: t("Sosyal"), active: location.pathname.startsWith("/sosyal") },
+    // Müze: biten projelerin plaketleri; Arşiv'e geçişi sayfanın içinde.
+    { to: "/muze", label: t("Müze"), active: location.pathname.startsWith("/muze") },
     // Ayarlar diğer sayfalarla aynı listede, Yapılacaklar'ın hemen altında.
     // Önceden en altta, gezinme ağacından sonra, "Çıkış yap" ile birlikte ayrı
     // bir öbekteydi; orada bir sayfa değil bir "kapanış" gibi duruyordu.

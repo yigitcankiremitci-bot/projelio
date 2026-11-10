@@ -276,6 +276,7 @@ export const hatalar: TranslationDict = {
   "Ortaklık kaydı bulunamadı": "Partnership record not found",
   "Paylaşım bulunamadı": "Share not found",
   "Paylaşım linki bulunamadı": "Share link not found",
+  "Plaket bulunamadı": "Plaque not found",
   "Proje bulunamadı": "Project not found",
   "Rutin bulunamadı": "Routine not found",
   "Sohbet bulunamadı.": "Chat not found.",

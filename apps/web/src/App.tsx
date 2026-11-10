@@ -94,6 +94,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Archive = lazy(() => import("./pages/Archive"));
 const TasksOverview = lazy(() => import("./pages/TasksOverview"));
 const WorkLog = lazy(() => import("./pages/WorkLog"));
+const Muze = lazy(() => import("./pages/Muze"));
 // Deneme arayüzü (bkz. pages/Sakin.tsx) — mevcut ekranların yerine geçmez.
 const Sakin = lazy(() => import("./pages/Sakin"));
 // Yeni arayüz denemesi (bkz. pages/Yeni.tsx) — o da kendi menüsünü çizer.
@@ -965,6 +966,8 @@ export default function App() {
                 <Route path="/tasks" element={<TasksOverview />} />
                 {/* Yaptım: kişisel iş günlüğü. Yapılacaklar'ın tersi (bkz. pages/WorkLog.tsx). */}
                 <Route path="/worklog" element={<WorkLog />} />
+                {/* Müze: biten projelerin değiştirilemez plaketleri (bkz. pages/Muze.tsx). */}
+                <Route path="/muze" element={<Muze />} />
                 <Route path="/sakin" element={<Sakin />} />
                 <Route path="/yeni" element={<Yeni />} />
                 {/* Sosyal: arkadaşlar ve kişisel duvarlar — iş/şirket ilişkisinden bağımsız (migration 134). */}

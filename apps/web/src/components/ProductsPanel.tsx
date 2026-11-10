@@ -13,7 +13,8 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import AddEditProductModal from "./AddEditProductModal";
 import ProductDetailModal from "./ProductDetailModal";
 import UrunExcelModal from "./UrunExcelModal";
-import { IconUpload } from "./icons";
+import UrunFotoTopluModal from "./UrunFotoTopluModal";
+import { IconImage, IconUpload } from "./icons";
 import { useT } from "../lib/i18n";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 
@@ -69,6 +70,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [excelAcik, setExcelAcik] = useState(false);
+  const [fotoAcik, setFotoAcik] = useState(false);
   // Açık ürün kartı. Karta tıklamak artık düzenleme formunu değil ürün kartını
   // açar; düzenleme kartın "Bilgiler" sekmesinde (bkz. ProductDetailModal).
   const [open, setOpen] = useState<Product | null>(null);
@@ -126,6 +128,27 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
             }}
           >
             <IconUpload size={15} /> {t("Excel ile toplu ekle")}
+          </button>
+        )}
+        {/* Fotoğraflar ürünler açıldıktan sonra, adlarındaki stok koduyla eklenir. */}
+        {layout === "grid" && products.length > 0 && (
+          <button
+            onClick={() => setFotoAcik(true)}
+            title={t("Adı stok kodu olan fotoğrafları ürünlere ekle")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: `1px solid ${c.border}`,
+              background: "transparent",
+              color: c.textPrimary,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            <IconImage size={15} /> {t("Toplu fotoğraf")}
           </button>
         )}
         {collapsible && (
@@ -212,6 +235,8 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
           onDone={load}
         />
       )}
+
+      {fotoAcik && <UrunFotoTopluModal products={products} onClose={() => setFotoAcik(false)} onDone={load} />}
 
       {open && (
         <ProductDetailModal

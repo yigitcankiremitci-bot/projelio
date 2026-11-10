@@ -3,7 +3,8 @@ import CoverPicker from "./CoverPicker";
 import type { Group } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { resizeCoverImage } from "../lib/imageProcessing";
+import { kapakYukle } from "../lib/kapakYukle";
+import type { KapakOdagi } from "@projelio/shared";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import { notifySidebarChanged } from "../lib/sidebarEvents";
@@ -26,6 +27,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
   const [coverValue, setCoverValue] = useState<string | undefined>(group.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFocus, setCoverFocus] = useState<KapakOdagi | undefined>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +44,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
+    setCoverFocus(undefined);
     setCoverPreview(file ? URL.createObjectURL(file) : null);
   };
 
@@ -55,12 +58,7 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
         description: description || undefined,
         ...(coverValue !== group.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
-      if (coverFile) {
-        const resized = await resizeCoverImage(coverFile);
-        const formData = new FormData();
-        formData.append("file", resized);
-        await api.uploadFile(`/groups/${group.id}/cover`, formData);
-      }
+      if (coverFile) await kapakYukle(`/groups/${group.id}`, coverFile, coverFocus);
       notifySidebarChanged();
       onSaved();
       onClose();
@@ -94,6 +92,8 @@ export default function EditGroupModal({ group, onClose, onSaved, onDeleted, onA
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+          fileFocus={coverFocus}
+          onFileFocus={setCoverFocus}
         />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}

@@ -1,6 +1,8 @@
 import { useRef } from "react";
 import { useThemeColors } from "../theme/useThemeColors";
-import { COVER_PRESETS, coverBackground, coverPresetValue, findCoverPreset } from "../lib/covers";
+import { COVER_PRESETS, coverBackground, coverPresetValue, findCoverPreset, isCoverPreset } from "../lib/covers";
+import { kapakOdagiOku, kapakOdagiYaz, VARSAYILAN_KAPAK_ODAGI, type KapakOdagi } from "@projelio/shared";
+import KapakOdakSecici from "./KapakOdakSecici";
 import { IconCheck, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 
@@ -18,6 +20,13 @@ interface Props {
   filePreview?: string | null;
   onSelectPreset: (value: string | undefined) => void;
   onFile: (file: File | null) => void;
+  /**
+   * Henüz yüklenmemiş dosyanın odak noktası (bkz. KapakOdakSecici). Kayıtlı
+   * fotoğrafın odağı ayrı tutulmuyor: `value` adresinin içinde, değişince
+   * onSelectPreset ile yeni adres bildiriliyor.
+   */
+  fileFocus?: KapakOdagi;
+  onFileFocus?: (odak: KapakOdagi) => void;
 }
 
 /**
@@ -27,28 +36,44 @@ interface Props {
  * beklemesi ve boyut sıkıştırma yok — seçim anında görünür. Fotoğraf yüklemek
  * istemeyen kullanıcı da sayfasını boş bırakmak zorunda kalmıyor.
  */
-export default function CoverPicker({ value, seed, filePreview, onSelectPreset, onFile }: Props) {
+export default function CoverPicker({ value, seed, filePreview, onSelectPreset, onFile, fileFocus, onFileFocus }: Props) {
   const c = useThemeColors();
   const t = useT();
   const fileRef = useRef<HTMLInputElement>(null);
   const selectedPreset = findCoverPreset(value);
-  const previewBackground = filePreview
-    ? `center/cover no-repeat url(${filePreview})`
-    : coverBackground(value, seed);
+  const previewBackground = coverBackground(value, seed);
   const hasSomething = Boolean(filePreview || value);
+  // Fotoğraf varsa (yeni seçilmiş ya da kayıtlı) düz önizleme yerine odak
+  // seçici çıkar: kapak her yüzeyde farklı orana kırpıldığı için kullanıcı
+  // hangi kısmın görüneceğini kendisi belirlemeli (insanların kafası kesiliyordu).
+  const kayitliFoto = !filePreview && value && !isCoverPreset(value) ? value : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kapak")}</label>
 
-      <div
-        style={{
-          height: 90,
-          borderRadius: 8,
-          border: `1px solid ${c.border}`,
-          background: previewBackground,
-        }}
-      />
+      {filePreview ? (
+        <KapakOdakSecici
+          src={filePreview}
+          odak={fileFocus ?? VARSAYILAN_KAPAK_ODAGI}
+          onChange={(o) => onFileFocus?.(o)}
+        />
+      ) : kayitliFoto ? (
+        <KapakOdakSecici
+          src={kayitliFoto}
+          odak={kapakOdagiOku(kayitliFoto) ?? VARSAYILAN_KAPAK_ODAGI}
+          onChange={(o) => onSelectPreset(kapakOdagiYaz(kayitliFoto, o))}
+        />
+      ) : (
+        <div
+          style={{
+            height: 90,
+            borderRadius: 8,
+            border: `1px solid ${c.border}`,
+            background: previewBackground,
+          }}
+        />
+      )}
 
       <div style={{ display: "flex", gap: 8 }}>
         <button

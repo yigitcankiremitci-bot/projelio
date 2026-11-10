@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { katkilariDiz, teslimSonucu, type MuzePlaketi, type Translate } from "@projelio/shared";
-import { coverBackground, hasCover } from "../../lib/covers";
+import { coverBackground, fotoArkaPlani, hasCover } from "../../lib/covers";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import { Z } from "../../lib/layout";
@@ -33,7 +33,7 @@ function Madalyon({ p }: { p: MuzePlaketi }) {
   return (
     <div
       className="muze-madalyon"
-      style={{ background: foto ? `center / cover no-repeat url("${p.kapak}")` : coverBackground(p.kapak, p.projectId) }}
+      style={{ background: foto ? fotoArkaPlani(p.kapak!) : coverBackground(p.kapak, p.projectId) }}
       aria-hidden
     >
       {foto ? null : (p.projeAdi.trim()[0] ?? "").toLocaleUpperCase("tr")}

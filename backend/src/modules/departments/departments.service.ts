@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import type { Department, DepartmentAccess, DepartmanKuraliDurumu, DepartmentMemberRole } from "@projelio/shared";
+import { kapakOdagiYaz } from "@projelio/shared";
 import {
   defaultLocale,
   departmanAcilabilirMi,
@@ -444,7 +445,13 @@ export class DepartmentsService {
 
   async update(
     id: string,
-    data: { name?: string; description?: string; defaultTab?: string; hiddenTabs?: string[] },
+    data: {
+      name?: string;
+      description?: string;
+      defaultTab?: string;
+      hiddenTabs?: string[];
+      coverFocus?: { x: number; y: number } | null;
+    },
     requestingUserId?: string
   ): Promise<Department> {
     const existing = await this.findOne(id);
@@ -463,6 +470,18 @@ export class DepartmentsService {
     // Açılış sekmesinin gizlenmesi ENGELLENMİYOR: departmanda kilitli sekme yok
     // ve sayfa açık kalan ilk sekmeye düşüyor (bkz. DepartmentDetail defaultTab).
     if (data.hiddenTabs !== undefined) patch.hidden_tabs = sanitizeHiddenTabs("department", data.hiddenTabs);
+    // Kapak odak noktası (bkz. packages/shared kapakOdagi). İstemciden hazır
+    // adres ALINMAZ: odak mevcut kapak adresine sunucuda eklenir, yoksa bu uç
+    // departman kapağını herhangi bir adrese çevirmenin yolu olurdu. Katalog
+    // kapağında (kayıtta adres yok) odak tutulacak yer olmadığı için reddedilir.
+    if (data.coverFocus !== undefined) {
+      if (!existing.coverImageUrl) throw new BadRequestException("Önce bir kapak fotoğrafı yükle");
+      const odak = data.coverFocus;
+      if (odak !== null && (typeof odak !== "object" || !Number.isFinite(odak.x) || !Number.isFinite(odak.y))) {
+        throw new BadRequestException("Geçersiz kapak konumu");
+      }
+      patch.cover_image_url = kapakOdagiYaz(existing.coverImageUrl, odak);
+    }
 
     const { data: row, error } = await this.supabase.client
       .from("departments")

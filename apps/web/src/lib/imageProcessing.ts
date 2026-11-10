@@ -1,5 +1,5 @@
-// Kapak fotoğraflarını sunucuya göndermeden önce sabit boyuta kırpıp
-// sıkıştırır, böylece depolamada gereksiz yer kaplamazlar.
+// Kapak fotoğraflarını sunucuya göndermeden önce küçültüp sıkıştırır, böylece
+// depolamada gereksiz yer kaplamazlar.
 
 // Kapak ölçüsü 1200×400'dü ve "kapaklar çok kalitesiz" şikayetinin sebebi buydu:
 // kapak masaüstünde sayfanın tam genişliğini kaplıyor (~1400 CSS px) ve retina
@@ -7,8 +7,16 @@
 // oraya gerilince belirgin şekilde bulanıklaşıyordu. 2000×667 aynı 3:1 oranı
 // koruyor, %0.82 kalitede dosya birkaç yüz KB'de kalıyor — kapaklar zaten
 // kullanıcının kendi bulut deposunda değil, sunucuda ve sayfa başına bir tane.
-const TARGET_WIDTH = 2000;
-const TARGET_HEIGHT = 667;
+//
+// ARTIK KIRPILMIYOR, yalnızca küçültülüyor. Eskiden yüklemeden önce ORTADAN
+// 3:1'e kırpılıyordu: dikey ya da 4:3 bir ekip fotoğrafında insanların kafası
+// daha yüklemede, geri dönülmez biçimde kesiliyordu. Kapak her yüzeyde zaten
+// başka orana kırpılıyor (sayfada ~5:1, kartta 3:1); hangi kısmın görüneceğini
+// artık kullanıcı odak noktasıyla seçiyor (bkz. packages/shared kapakOdagi) ve
+// bunun için fotoğrafın tamamının sunucuda durması gerekiyor. Uzun kenar
+// tavanları dosyayı yine birkaç yüz KB'de tutuyor.
+const COVER_MAX_WIDTH = 2000;
+const COVER_MAX_HEIGHT = 1500;
 const JPEG_QUALITY = 0.82;
 
 function loadImageElement(file: File): Promise<HTMLImageElement> {
@@ -71,25 +79,21 @@ export async function resizeCoverImage(file: File): Promise<File> {
     // createImageBitmap sessizce başarısız olup işlenmemiş orijinal dosyanın (şeffaf
     // PNG dahil) olduğu gibi yüklenmesine yol açıyordu.
     const img = await loadImageElement(file);
+    // Oran korunur, yalnızca küçültülür (asla büyütülmez).
+    const scale = Math.min(1, COVER_MAX_WIDTH / img.naturalWidth, COVER_MAX_HEIGHT / img.naturalHeight);
+    const width = Math.max(1, Math.round(img.naturalWidth * scale));
+    const height = Math.max(1, Math.round(img.naturalHeight * scale));
     const canvas = document.createElement("canvas");
-    canvas.width = TARGET_WIDTH;
-    canvas.height = TARGET_HEIGHT;
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext("2d");
     if (!ctx) return file;
 
     // JPEG şeffaflığı desteklemez; PNG'lerin şeffaf alanları doldurulmazsa
     // siyah çıkar. Önce beyaz zemin çizip üstüne fotoğrafı yerleştiriyoruz.
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
-
-    // "cover" mantığıyla ortadan kırp: hedef alanı tamamen kaplayacak şekilde
-    // ölçekle, taşan kısımları kes.
-    const scale = Math.max(TARGET_WIDTH / img.naturalWidth, TARGET_HEIGHT / img.naturalHeight);
-    const drawWidth = img.naturalWidth * scale;
-    const drawHeight = img.naturalHeight * scale;
-    const dx = (TARGET_WIDTH - drawWidth) / 2;
-    const dy = (TARGET_HEIGHT - drawHeight) / 2;
-    ctx.drawImage(img, dx, dy, drawWidth, drawHeight);
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(img, 0, 0, width, height);
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY));
     if (!blob) return file;

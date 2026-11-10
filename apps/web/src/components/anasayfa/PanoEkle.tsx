@@ -85,7 +85,7 @@ export default function PanoEkle({
               .filter((s) => s.grup === aktif)
               .map((s) => (
                 <button key={s.id} type="button" onClick={() => onSec(s)} className="pano-ekle-kutu" style={{ borderColor: c.border, background: c.surface, color: c.textPrimary }}>
-                  <span style={{ width: 46, height: 46, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: s.kapakArka ?? c.background, backgroundSize: "cover", backgroundPosition: "center" }}>
+                  <span style={{ width: 46, height: 46, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", background: s.kapakArka ?? c.background }}>
                     {!s.kapakArka && <s.Icon size={22} color={c.accentDark} />}
                   </span>
                   <span className="pano-ekle-ad">{s.ad}</span>

@@ -83,7 +83,14 @@ export class DepartmentsController {
   @Patch("departments/:id")
   update(
     @Param("id") id: string,
-    @Body() body: { name?: string; description?: string; defaultTab?: string; hiddenTabs?: string[] },
+    @Body()
+    body: {
+      name?: string;
+      description?: string;
+      defaultTab?: string;
+      hiddenTabs?: string[];
+      coverFocus?: { x: number; y: number } | null;
+    },
     @Req() req: any
   ) {
     return this.departmentsService.update(id, body, req.user.userId);

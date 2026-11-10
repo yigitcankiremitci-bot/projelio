@@ -19,7 +19,7 @@ import EntityCover, { CoverBackLink, MobileBackRow, coverActionButton } from "..
 import AskLioButton from "../components/AskLioButton";
 import { useBackTarget, useGezintiAdi } from "../lib/backTarget";
 import { getDepartmentCoverUrl } from "../lib/departmentCovers";
-import { presetForSeed } from "../lib/covers";
+import { fotoArkaPlani, presetForSeed } from "../lib/covers";
 import { TOP_CHROME_BOTTOM, safeTop } from "../lib/layout";
 import { useProjectFabAction, type ProjectFabAction } from "../lib/projectFab";
 import { usePageHeader, usePageHeaderTabs } from "../lib/pageHeader";
@@ -272,7 +272,7 @@ export default function DepartmentDetail() {
           // kapağın üstüne de serilir: açık tonlu kapaklarda beyaz yazı ancak
           // onunla okunur kalıyor.
           background: coverUrl
-            ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), center/cover url(${coverUrl})`
+            ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), ${fotoArkaPlani(coverUrl)}`
             : department
             ? `linear-gradient(rgba(26,31,41,0.15), rgba(26,31,41,0.6)), ${presetForSeed(department.id).background}`
             : `linear-gradient(135deg, ${colors.light.primary}, ${colors.light.primaryDark})`,

@@ -1,3 +1,5 @@
+import { kapakDosyaAdresi, kapakKonumu } from "@projelio/shared";
+
 /**
  * Kapak görselleri — tek kaynak.
  *
@@ -244,10 +246,20 @@ export function findCoverPreset(value?: string | null): CoverPreset | undefined 
 export function coverBackground(coverImageUrl?: string | null, seed?: string): string {
   const preset = findCoverPreset(coverImageUrl);
   if (preset) return preset.background;
-  if (coverImageUrl && !isCoverPreset(coverImageUrl)) return `center/cover no-repeat url(${coverImageUrl})`;
+  if (coverImageUrl && !isCoverPreset(coverImageUrl)) return fotoArkaPlani(coverImageUrl);
   // Kapak seçilmemiş: kaydın kimliğinden türetilmiş bir hazır kapak. Tohum
   // verilmediyse (henüz kimliği olmayan bir önizleme) düz varsayılana düşülür.
   return seed ? presetForSeed(seed).background : DEFAULT_COVER.background;
+}
+
+/**
+ * Yüklenmiş bir kapak fotoğrafının CSS arka planı — kullanıcının seçtiği odak
+ * noktasıyla (bkz. packages/shared kapakOdagi). Odak seçilmemişse eskisi gibi
+ * ortalanır. Fotoğrafı kendi perdesiyle çizen yüzeyler de (departman kapağı,
+ * müze plaketi) bunu kullanmalı; elle "center/cover" yazınca odak kayboluyor.
+ */
+export function fotoArkaPlani(url: string): string {
+  return `${kapakKonumu(url)}/cover no-repeat url(${kapakDosyaAdresi(url)})`;
 }
 
 /**

@@ -1,3 +1,4 @@
+import { kapakKonumu } from "@projelio/shared";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { PublicProjectAccess, PublicProjectView, TaskStatus } from "@projelio/shared";
@@ -345,6 +346,7 @@ export default function PublicProject() {
             width: "100%",
             height: isDesktop ? 220 : 140,
             objectFit: "cover",
+            objectPosition: kapakKonumu(v.coverImageUrl),
             borderRadius: 12,
             display: "block",
           }}

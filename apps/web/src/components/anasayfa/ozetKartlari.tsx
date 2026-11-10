@@ -1095,7 +1095,7 @@ function KapakliKart({ ad, kapak, tohum, alt }: { ad: string; kapak?: string; to
   const c = useThemeColors();
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 130 }}>
-      <div style={{ flex: 1, minHeight: 66, background: coverBackground(kapak, tohum), backgroundSize: "cover", backgroundPosition: "center" }} />
+      <div style={{ flex: 1, minHeight: 66, background: coverBackground(kapak, tohum) }} />
       <div style={{ padding: "9px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
         <span style={{ fontSize: 14, color: c.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ad}</span>
         {alt}

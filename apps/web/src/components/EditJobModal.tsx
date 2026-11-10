@@ -3,7 +3,8 @@ import CoverPicker from "./CoverPicker";
 import type { Job } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { resizeCoverImage } from "../lib/imageProcessing";
+import { kapakYukle } from "../lib/kapakYukle";
+import type { KapakOdagi } from "@projelio/shared";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
@@ -35,6 +36,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
   const [coverValue, setCoverValue] = useState<string | undefined>(job.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFocus, setCoverFocus] = useState<KapakOdagi | undefined>();
   // Kapatılan sekmeler (bkz. TabVisibilitySection). Kaydedene kadar yalnızca
   // burada durur; sayfadaki çubuk "Kaydet"ten sonra tazelenir.
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(job.hiddenTabs ?? []);
@@ -65,6 +67,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
+    setCoverFocus(undefined);
     setCoverPreview(file ? URL.createObjectURL(file) : null);
   };
 
@@ -86,12 +89,7 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== job.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
-      if (coverFile) {
-        const resized = await resizeCoverImage(coverFile);
-        const formData = new FormData();
-        formData.append("file", resized);
-        await api.uploadFile(`/jobs/${job.id}/cover`, formData);
-      }
+      if (coverFile) await kapakYukle(`/jobs/${job.id}`, coverFile, coverFocus);
       notifySidebarChanged();
       onSaved();
       onClose();
@@ -140,6 +138,8 @@ export default function EditJobModal({ job, onClose, onSaved, onDeleted, onArchi
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+          fileFocus={coverFocus}
+          onFileFocus={setCoverFocus}
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

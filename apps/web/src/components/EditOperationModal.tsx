@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import type { Operation, OperationBudgetPeriod } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { resizeCoverImage } from "../lib/imageProcessing";
+import { kapakYukle } from "../lib/kapakYukle";
+import type { KapakOdagi } from "@projelio/shared";
 import CoverPicker from "./CoverPicker";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
@@ -49,6 +50,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
   const [coverValue, setCoverValue] = useState<string | undefined>(operation.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFocus, setCoverFocus] = useState<KapakOdagi | undefined>();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -65,6 +67,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
+    setCoverFocus(undefined);
     setCoverPreview(file ? URL.createObjectURL(file) : null);
   };
 
@@ -83,12 +86,7 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== operation.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
-      if (coverFile) {
-        const resized = await resizeCoverImage(coverFile);
-        const formData = new FormData();
-        formData.append("file", resized);
-        await api.uploadFile(`/operations/${operation.id}/cover`, formData);
-      }
+      if (coverFile) await kapakYukle(`/operations/${operation.id}`, coverFile, coverFocus);
       if (onSaved) {
         notifySidebarChanged();
         onSaved();
@@ -164,6 +162,8 @@ export default function EditOperationModal({ operation, onClose, onSaved}: Props
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+          fileFocus={coverFocus}
+          onFileFocus={setCoverFocus}
         />
 
         {error && <p style={{ color: c.danger, fontSize: 16, margin: 0 }}>{error}</p>}

@@ -1,3 +1,4 @@
+import { kapakKonumu } from "@projelio/shared";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { BilgiKartiAlani, BilgiKartiKapsami, BilgiKartiSayfasi } from "@projelio/shared";
@@ -288,7 +289,7 @@ function Basliklik({ sayfa }: { sayfa: BilgiKartiSayfasi }) {
         }}
       >
         {sayfa.coverImageUrl ? (
-          <img src={sayfa.coverImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={sayfa.coverImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: kapakKonumu(sayfa.coverImageUrl) }} />
         ) : (
           unvan.slice(0, 1).toUpperCase()
         )}

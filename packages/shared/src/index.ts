@@ -47,3 +47,4 @@ export * from "./ajan";
 export * from "./muze";
 export * from "./aktifModuller";
 export * from "./projeSablonu";
+export * from "./kapakOdagi";

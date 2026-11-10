@@ -5,7 +5,8 @@ import type { Group, Organization, OrgType } from "@projelio/shared";
 import { ORG_TYPE_LABEL } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { resizeCoverImage } from "../lib/imageProcessing";
+import { kapakYukle } from "../lib/kapakYukle";
+import type { KapakOdagi } from "@projelio/shared";
 import Modal from "./Modal";
 import OrganizationStorageSection from "./OrganizationStorageSection";
 import ShopifySection from "./ShopifySection";
@@ -39,6 +40,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
   const [coverValue, setCoverValue] = useState<string | undefined>(organization.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFocus, setCoverFocus] = useState<KapakOdagi | undefined>();
   // Kapatılan sekmeler (bkz. TabVisibilitySection). Kaydedene kadar yalnızca
   // burada durur; sayfadaki çubuk "Kaydet"ten sonra tazelenir.
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(organization.hiddenTabs ?? []);
@@ -97,6 +99,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
+    setCoverFocus(undefined);
     setCoverPreview(file ? URL.createObjectURL(file) : null);
   };
 
@@ -115,12 +118,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== organization.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
-      if (coverFile) {
-        const resized = await resizeCoverImage(coverFile);
-        const formData = new FormData();
-        formData.append("file", resized);
-        await api.uploadFile(`/organizations/${organization.id}/cover`, formData);
-      }
+      if (coverFile) await kapakYukle(`/organizations/${organization.id}`, coverFile, coverFocus);
       notifySidebarChanged();
       onSaved();
       onClose();
@@ -177,6 +175,8 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+          fileFocus={coverFocus}
+          onFileFocus={setCoverFocus}
         />
 
         {/* Yetki gereği zaten kapalı sekmeler listelenmez: onları açıp

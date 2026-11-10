@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { PROJECT_STATUSES, PROJECT_STATUS_LABELS, type Project, type ProjectStatus } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
-import { resizeCoverImage } from "../lib/imageProcessing";
+import { kapakYukle } from "../lib/kapakYukle";
+import type { KapakOdagi } from "@projelio/shared";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
@@ -43,6 +44,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
   const [coverValue, setCoverValue] = useState<string | undefined>(project.coverImageUrl);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [coverFocus, setCoverFocus] = useState<KapakOdagi | undefined>();
   // Kapatılan sekmeler (bkz. TabVisibilitySection).
   const [hiddenTabs, setHiddenTabs] = useState<string[]>(project.hiddenTabs ?? []);
   // İş sahibine hizmet verilen proje (bkz. Project.hizmetProjesi).
@@ -63,6 +65,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
 
   const handleCoverChange = (file: File | null) => {
     setCoverFile(file);
+    setCoverFocus(undefined);
     setCoverPreview(file ? URL.createObjectURL(file) : null);
   };
 
@@ -86,12 +89,7 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
         // dosya yüklemesi ayrı uçtan gider. Değişmediyse hiç gönderilmez.
         ...(coverValue !== project.coverImageUrl ? { coverImageUrl: coverValue ?? null } : {}),
       });
-      if (coverFile) {
-        const resized = await resizeCoverImage(coverFile);
-        const formData = new FormData();
-        formData.append("file", resized);
-        await api.uploadFile(`/projects/${project.id}/cover`, formData);
-      }
+      if (coverFile) await kapakYukle(`/projects/${project.id}`, coverFile, coverFocus);
       if (onSaved) {
         notifySidebarChanged();
         onSaved();
@@ -156,6 +154,8 @@ export default function EditProjectModal({ project, onClose, onSaved }: Props) {
           filePreview={coverPreview}
           onSelectPreset={setCoverValue}
           onFile={handleCoverChange}
+          fileFocus={coverFocus}
+          onFileFocus={setCoverFocus}
         />
 
         {project.jobId && (

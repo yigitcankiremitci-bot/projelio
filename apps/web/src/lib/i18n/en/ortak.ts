@@ -46,6 +46,13 @@ export const ortak: TranslationDict = {
   "Kapağı kaldır": "Remove cover",
   "Kapak fotoğrafını değiştir": "Change cover photo",
   "ya da hazır bir kapak seç": "or pick a ready-made cover",
+  "Görünmesini istediğin yere dokun ya da işareti sürükle — örneğin yüzlere.":
+    "Tap the part you want to keep visible, or drag the marker — faces, for example.",
+  Ortala: "Center",
+  "Kapak odak noktası": "Cover focal point",
+  Kartta: "On the card",
+  "Sayfa kapağında": "On the page cover",
+  "Kapak konumu kaydedilemedi. Tekrar dene.": "Couldn't save the cover position. Try again.",
   "Kapak seçmezsen bu kayda özel, kendiliğinden atanmış bir kapak gösterilir.":
     "If you don't pick one, a cover chosen automatically for this record is shown.",
   "Fotoğraf yükle": "Upload photo",

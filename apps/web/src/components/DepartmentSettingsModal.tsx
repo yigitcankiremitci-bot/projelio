@@ -1,9 +1,11 @@
 import { useRef, useState } from "react";
-import type { Department } from "@projelio/shared";
+import { kapakOdagiOku, VARSAYILAN_KAPAK_ODAGI, type Department, type KapakOdagi } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { resizeCoverImage } from "../lib/imageProcessing";
 import { getDepartmentCoverUrl, hasCustomDepartmentCover } from "../lib/departmentCovers";
+import { fotoArkaPlani } from "../lib/covers";
+import KapakOdakSecici from "./KapakOdakSecici";
 import Modal from "./Modal";
 import EntityDangerZone from "./EntityDangerZone";
 import TabVisibilitySection from "./TabVisibilitySection";
@@ -50,6 +52,8 @@ export default function DepartmentSettingsModal({
   const fileRef = useRef<HTMLInputElement>(null);
   const coverUrl = getDepartmentCoverUrl(current);
   const isCustomCover = hasCustomDepartmentCover(current);
+  // Sürüklerken yerel tutulur; bırakınca sunucuya yazılır (bkz. odagiKaydet).
+  const [odak, setOdak] = useState<KapakOdagi>(kapakOdagiOku(current.coverImageUrl) ?? VARSAYILAN_KAPAK_ODAGI);
 
   // Açılış sekmesi yalnızca AÇIK sekmelerden seçilebilir: kapattığı sekmeyi
   // açılış olarak bırakmak, sayfayı hiç görünmeyen bir sekmeyle açmak demekti
@@ -62,7 +66,20 @@ export default function DepartmentSettingsModal({
 
   const applyCover = (updated: Department) => {
     setCurrent(updated);
+    setOdak(kapakOdagiOku(updated.coverImageUrl) ?? VARSAYILAN_KAPAK_ODAGI);
     onCoverChanged?.(updated);
+  };
+
+  // Odak noktası da kapak gibi anında kaydedilir. Sunucu adresi kendisi
+  // birleştirir (bkz. DepartmentsService.update coverFocus): istemciden
+  // hazır adres alınsaydı departmanın kapağı herhangi bir adrese çevrilebilirdi.
+  const odagiKaydet = async (yeni: KapakOdagi) => {
+    setCoverError("");
+    try {
+      applyCover(await api.patch<Department>(`/departments/${department.id}`, { coverFocus: yeni }));
+    } catch {
+      setCoverError(t("Kapak konumu kaydedilemedi. Tekrar dene."));
+    }
   };
 
   const handleCoverSelected = async (file: File | null) => {
@@ -121,12 +138,24 @@ export default function DepartmentSettingsModal({
     <Modal title={t("Departman ayarları")} onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
         <label style={{ fontSize: 15, color: c.textSecondary }}>{t("Kapak")}</label>
+        {/* Odak yalnızca yüklenmiş kapakta seçilebilir: katalog fotoğrafları
+            kayda yazılmıyor, kodda duruyor (bkz. lib/departmentCovers). */}
+        {isCustomCover && current.coverImageUrl ? (
+          <div style={{ opacity: coverBusy ? 0.6 : 1 }}>
+            <KapakOdakSecici
+              src={current.coverImageUrl}
+              odak={odak}
+              onChange={setOdak}
+              onCommit={(o) => void odagiKaydet(o)}
+            />
+          </div>
+        ) : (
         <div
           style={{
             height: 90,
             borderRadius: 8,
             border: `1px solid ${c.border}`,
-            background: coverUrl ? `center/cover no-repeat url(${coverUrl})` : c.background,
+            background: coverUrl ? fotoArkaPlani(coverUrl) : c.background,
             display: coverUrl ? undefined : "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -137,6 +166,7 @@ export default function DepartmentSettingsModal({
         >
           {!coverUrl && t("Kapak yok")}
         </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"

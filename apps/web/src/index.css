@@ -27,6 +27,13 @@ body {
   padding: 0;
 }
 
+/* Kaydırma çubuğunun yeri hep ayrılı: pencere açılıp sayfa kilitlenince çubuk
+   kalkıyor, yer kaplayan çubuklu tarayıcıda her şey yana kayıyordu
+   (2026-11-11). Yedeği lib/scrollLock.ts'te. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     sans-serif;

@@ -24,7 +24,11 @@ export interface ScrollLockTarget {
   style: { overflow: string };
 }
 
-export function createScrollLock(getTarget: () => ScrollLockTarget | null) {
+export function createScrollLock(
+  getTarget: () => ScrollLockTarget | null,
+  /** İlk kilit alınınca / son kilit bırakılınca (bkz. kaydirmaCubuguTelafisi). */
+  kancalar: { kilitlendi?: () => void; birakildi?: () => void } = {}
+) {
   let depth = 0;
   let previousOverflow = "";
 
@@ -37,6 +41,7 @@ export function createScrollLock(getTarget: () => ScrollLockTarget | null) {
       if (depth === 0) {
         previousOverflow = target.style.overflow;
         target.style.overflow = "hidden";
+        kancalar.kilitlendi?.();
       }
       depth += 1;
 
@@ -50,6 +55,7 @@ export function createScrollLock(getTarget: () => ScrollLockTarget | null) {
         if (depth > 0) return;
         const current = getTarget();
         if (current) current.style.overflow = previousOverflow;
+        kancalar.birakildi?.();
       };
     },
 
@@ -60,7 +66,63 @@ export function createScrollLock(getTarget: () => ScrollLockTarget | null) {
   };
 }
 
+/**
+ * Kaydırma çubuğu kaybolunca sayfa yana kaymasın.
+ *
+ * Yer kaplayan kaydırma çubuklu tarayıcıda (Windows, "çubukları hep göster"li
+ * Mac) kilit çubuğu kaldırıyor, sayfa 15 px genişleyip her şey yarım çubuk
+ * sağa kayıyordu — her pencere açılışında (kullanıcı geri bildirimi,
+ * 2026-11-11). Asıl önlem index.css'teki `scrollbar-gutter: stable`: çubuğun
+ * yeri hep ayrılı kalır, sabit (fixed) üst çubuk da kıpırdamaz.
+ *
+ * Onu tanımayan tarayıcıda yedek: çubuğun genişliği kilitten ÖNCE ölçülür ve
+ * gövdeye o kadar sağ boşluk verilir. Kilitten SONRA ölçmek işe yaramıyor:
+ * Chromium çubuğu bir sonraki karede kaldırıyor, o an fark hep 0 görünüyor.
+ */
+function kaydirmaCubuguTelafisi() {
+  let cubuk = 0;
+  let sonCubuk = 0;
+  let oncekiBosluk: string | null = null;
+  const yerAyrili = () => typeof CSS !== "undefined" && CSS.supports?.("scrollbar-gutter", "stable");
+  return {
+    olc() {
+      if (yerAyrili()) return void (cubuk = 0);
+      // Kilit az önce bırakıldıysa çubuk henüz geri çizilmemiş, ölçüm 0 çıkar
+      // (geliştirmede StrictMode etkiyi iki kez çalıştırıyor): sayfa kayacak
+      // kadar uzunsa son ölçülen genişlik kullanılır.
+      const olculen = window.innerWidth - document.documentElement.clientWidth;
+      if (olculen > 0) sonCubuk = olculen;
+      const tasiyor = document.documentElement.scrollHeight > window.innerHeight;
+      cubuk = tasiyor ? olculen || sonCubuk : 0;
+    },
+    kilitlendi() {
+      if (cubuk <= 0) return;
+      oncekiBosluk = document.body.style.paddingRight;
+      const mevcut = parseFloat(getComputedStyle(document.body).paddingRight) || 0;
+      document.body.style.paddingRight = `${mevcut + cubuk}px`;
+    },
+    birakildi() {
+      if (oncekiBosluk === null) return;
+      document.body.style.paddingRight = oncekiBosluk;
+      oncekiBosluk = null;
+    },
+  };
+}
+
+const telafi = kaydirmaCubuguTelafisi();
+const govdeKilidi = createScrollLock(() => (typeof document === "undefined" ? null : document.body), {
+  kilitlendi: () => telafi.kilitlendi(),
+  birakildi: () => telafi.birakildi(),
+});
+
 /** Uygulamanın tek kilidi — bütün modallar bunu paylaşıyor. */
-export const bodyScrollLock = createScrollLock(() =>
-  typeof document === "undefined" ? null : document.body
-);
+export const bodyScrollLock = {
+  acquire(): () => void {
+    // Çubuk kilitten ÖNCE ölçülür (bkz. kaydirmaCubuguTelafisi).
+    if (govdeKilidi.depth === 0 && typeof document !== "undefined") telafi.olc();
+    return govdeKilidi.acquire();
+  },
+  get depth(): number {
+    return govdeKilidi.depth;
+  },
+};

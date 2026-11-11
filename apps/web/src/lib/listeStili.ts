@@ -25,8 +25,8 @@ export function listeSatiri(c: ThemeColors, sira: number): CSSProperties {
  */
 export function sekmeStili(c: ThemeColors, aktif: boolean): CSSProperties {
   return {
-    fontSize: 13,
-    padding: "5px 12px",
+    fontSize: 14,
+    padding: "7px 14px",
     borderRadius: 999,
     border: `1px solid ${aktif ? c.primary : c.border}`,
     background: aktif ? c.primary : c.surface,
@@ -36,16 +36,20 @@ export function sekmeStili(c: ThemeColors, aktif: boolean): CSSProperties {
   };
 }
 
-/** Sağ sütundaki ya da üstteki özet kutusu (Toplam, Müşteri, Beklenen…). */
+/**
+ * Yan sütundaki ya da üstteki özet kutusu (Toplam, Müşteri, Beklenen…).
+ * Listeyle aynı beyaz yüzey, tek ince kenar: zemin renginde kutu + üstüne
+ * başka çerçeveler göz yoruyordu (kullanıcı şikâyeti, 2026-11-11).
+ */
 export function ozetKutusu(c: ThemeColors): CSSProperties {
   return {
     display: "flex",
     flexDirection: "column",
     gap: 2,
-    padding: "6px 12px",
-    borderRadius: 8,
-    background: c.background,
+    padding: "10px 14px",
+    borderRadius: 10,
+    background: c.surface,
     border: `1px solid ${c.border}`,
-    minWidth: 84,
+    minWidth: 96,
   };
 }

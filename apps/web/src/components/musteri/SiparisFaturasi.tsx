@@ -39,7 +39,7 @@ export default function SiparisFaturasi({
   const fatura = siparis.fatura;
 
   const kucukDugme: React.CSSProperties = {
-    fontSize: 12,
+    fontSize: 13,
     padding: "3px 10px",
     borderRadius: 7,
     border: `1px solid ${c.border}`,
@@ -76,7 +76,8 @@ export default function SiparisFaturasi({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary, flex: 1, minWidth: 0 }}>
+        {/* Başlık, sipariş ayrıntısının öteki başlıklarıyla aynı biçimde (SiparisKarti). */}
+        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.3, textTransform: "uppercase", color: c.textSecondary, flex: 1, minWidth: 0 }}>
           {fatura
             ? [t("Fatura"), fatura.faturaNo ? `#${fatura.faturaNo}` : undefined, fatura.tarih ? fmtTarih(fatura.tarih) : undefined]
                 .filter(Boolean)
@@ -84,7 +85,7 @@ export default function SiparisFaturasi({
             : t("Fatura")}
         </span>
         {fatura && yazabilir && (
-          <button onClick={kaldir} style={{ ...kucukDugme, padding: "1px 8px", fontSize: 11 }}>
+          <button onClick={kaldir} style={{ ...kucukDugme, padding: "1px 8px", fontSize: 12 }}>
             {t("Bağı kaldır")}
           </button>
         )}
@@ -108,25 +109,25 @@ export default function SiparisFaturasi({
           <Alan label={t("Belge (isteğe bağlı)")}>
             <input type="file" onChange={(e) => setDosya(e.target.files?.[0] ?? null)} style={TAM_GENISLIK} />
           </Alan>
-          <span style={{ fontSize: 12, color: c.textSecondary }}>
+          <span style={{ fontSize: 13, color: c.textSecondary }}>
             {t("Fatura, Faturalar modülüne kaydedilir; belgesi fatura tarihinin ay klasörüne iner ve ay sonu arşivine girer.")}
           </span>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               onClick={ac}
               disabled={calisiyor}
-              style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 13 }}
+              style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
             >
               {calisiyor ? t("Kaydediliyor…") : t("Faturayı kaydet")}
             </button>
-            <button onClick={() => setForm(false)} style={{ ...kucukDugme, padding: "7px 14px", fontSize: 13 }}>
+            <button onClick={() => setForm(false)} style={{ ...kucukDugme, padding: "7px 14px", fontSize: 14 }}>
               {t("Vazgeç")}
             </button>
           </div>
         </div>
       )}
 
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
 
       {fatura && ayar && <KayitEkleri recordId={fatura.id} ayar={ayar} canWrite={yazabilir} />}
     </div>

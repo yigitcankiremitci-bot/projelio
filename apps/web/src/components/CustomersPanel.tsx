@@ -40,6 +40,7 @@ import {
 } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import type { ThemeColors } from "@projelio/shared";
 import {
   ALL_ROLES,
   BAGLANTI_PROFILE,
@@ -51,13 +52,13 @@ import {
 } from "../lib/partyProfiles";
 import { useUndo } from "../lib/undo";
 import { FAB_PRIORITY, useFabAvailable, useProjectFabAction } from "../lib/projectFab";
-import { IconCalendar, InlineIcon, IconEdit, IconHome, IconIdCard, IconMap, IconPaperclip, IconTrash, IconUpload, IconUser, IconX } from "./icons";
+import { IconCalendar, InlineIcon, IconEdit, IconHome, IconIdCard, IconMap, IconPaperclip, IconSortDescending, IconTrash, IconUpload, IconUser, IconX } from "./icons";
 import { useT } from "../lib/i18n";
 import MusteriAlacakBorcu, { useMusteriAlacakBorcu } from "./butce/MusteriAlacakBorcu";
 import { useCanliTazele } from "../lib/liveRoom";
 import { timeAgo } from "../lib/dates";
 import { useIsWide } from "../lib/useIsDesktop";
-import { listeCercevesi, listeSatiri, ozetKutusu, sekmeStili } from "../lib/listeStili";
+import { listeCercevesi } from "../lib/listeStili";
 import MusteriExcelModal from "./MusteriExcelModal";
 import { acilisApi, partyApi, portalApi } from "../api/party";
 import { filesApi } from "../api/files";
@@ -76,6 +77,9 @@ import { BaglantiListeSekmeleri, KartListeleri, PARTY_SURUKLE } from "./Baglanti
 import TaskFromRecordModal from "./TaskFromRecordModal";
 import FilePreviewModal from "./FilePreviewModal";
 import Modal from "./Modal";
+import { FiltreBasligi, FiltreBolumu, HarfIzgarasi, SecimListesi, basHarf, filtrePaneliStili, sayarakSecenekler } from "./musteri/FiltrePaneli";
+import { sorumluAdi } from "../lib/partySorumlu";
+import { useModulGeriHapi } from "../lib/modulGeri";
 import EpostaGonderSecimi from "./EpostaGonderSecimi";
 
 interface Props {
@@ -271,6 +275,16 @@ export default function CustomersPanel({
   const rolSecenekleri = baglantiModu ? BAGLANTI_ROLES : ALL_ROLES;
   // Geniş ekranda özet kutuları ve sıralama sağdaki dar sütuna geçer (bkz. yanSutun).
   const genisEkran = useIsWide();
+  // Panelin kendi genişliği: sütun sayısı buna göre (bkz. ikiBolme).
+  const kokRef = useRef<HTMLDivElement>(null);
+  const [kokGenislik, setKokGenislik] = useState(0);
+  useEffect(() => {
+    const el = kokRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setKokGenislik(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const [parties, setParties] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
@@ -301,6 +315,8 @@ export default function CustomersPanel({
   };
   const [duplicates, setDuplicates] = useState<PartyDuplicate[]>([]);
   const [search, setSearch] = useState("");
+  // Süz penceresi (rol, önem, sorumlu, sıralama) açık mı.
+  const [suzAcik, setSuzAcik] = useState(false);
   // Potansiyel müşterilerin kendi sekmesi var: Satış profilinin "lead"
   // varsayılanı artık bir filtre değil, panelin Potansiyel sekmesinde açılması.
   const varsayilanRol: PartyRole | "" = !baglantiModu && profile.defaultRole === "lead" ? "" : profile.defaultRole ?? "";
@@ -325,7 +341,14 @@ export default function CustomersPanel({
   // tercihe atlasaydı tahsilat listesi boşuna yüklenir, ekran sıçrardı.
   const [kayitliAcilis, setKayitliAcilis] = useState<string | null>(null);
   const [acilisHazir, setAcilisHazir] = useState(baglantiModu);
+  // Sorumlunun ADI (bkz. lib/partySorumlu): "-" = sorumlusu olmayanlar.
   const [sorumluFiltre, setSorumluFiltre] = useState("");
+  // Soldaki ayrıntılı filtreler (kullanıcı isteği, 2026-11-11).
+  const [ilSec, setIlSec] = useState<string[]>([]);
+  const [ilceSec, setIlceSec] = useState<string[]>([]);
+  const [harfSec, setHarfSec] = useState("");
+  const [takipSec, setTakipSec] = useState<"" | "gecikti" | "bugun" | "planli" | "hic">("");
+  const [iletisimSec, setIletisimSec] = useState<"" | "telefonsuz" | "epostasiz">("");
   const [ekip, setEkip] = useState<{ id: string; ad: string }[]>([]);
 
   const scopePath = jobId ? `/jobs/${jobId}/party` : `/organizations/${organizationId}/party`;
@@ -599,7 +622,22 @@ export default function CustomersPanel({
       // sekmede saklı olduğu için kullanıcı filtreyi kaldıramıyordu.
       if (roleFilter && gorunum !== "potansiyel" && !p.roles.includes(roleFilter)) return false;
       if (onemFiltre && p.baglanti?.onem !== onemFiltre) return false;
-      if (sorumluFiltre && (sorumluFiltre === "-" ? !!p.ownerUserId : p.ownerUserId !== sorumluFiltre)) return false;
+      if (sorumluFiltre) {
+        const ad = sorumluAdi(p);
+        if (sorumluFiltre === "-" ? !!ad : ad !== sorumluFiltre) return false;
+      }
+      if (ilSec.length && !ilSec.includes(ilAdi(p) ?? "")) return false;
+      if (ilceSec.length && !ilceSec.includes(ilceAdi(p) ?? "")) return false;
+      if (harfSec && basHarf(p.displayName) !== harfSec) return false;
+      if (takipSec) {
+        const d = aramaDurumu(p.sonrakiArama, bugun);
+        if (takipSec === "gecikti" && d !== "gecikti") return false;
+        if (takipSec === "bugun" && d !== "bugun") return false;
+        if (takipSec === "planli" && !p.sonrakiArama) return false;
+        if (takipSec === "hic" && p.temas?.sonTemas) return false;
+      }
+      if (iletisimSec === "telefonsuz" && p.phone) return false;
+      if (iletisimSec === "epostasiz" && p.email) return false;
       if (!q) return true;
       return [p.displayName, p.legalName, p.kurum, p.unvan, p.email, p.phone, p.taxNumber, p.baglanti?.tanismaYeri]
         .filter(Boolean)
@@ -608,7 +646,7 @@ export default function CustomersPanel({
         .includes(q);
     });
     return sirala(suzulen, siralama, ozelSiralar[ozelAnahtar]);
-  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, siralama, gorunum, ozelSiralar, ozelAnahtar]);
+  }, [sekmeKartlari, search, roleFilter, onemFiltre, sorumluFiltre, ilSec, ilceSec, harfSec, takipSec, iletisimSec, bugun, siralama, gorunum, ozelSiralar, ozelAnahtar]);
 
   // Harita listedekileri gösterir (süzgeçler uygulanmış hâliyle); Tahsilat
   // takibinde seçili listenin müşterilerini.
@@ -670,7 +708,15 @@ export default function CustomersPanel({
   };
 
   const hasActiveFilter =
-    search.trim() !== "" || roleFilter !== varsayilanRol || sorumluFiltre !== "" || onemFiltre !== "";
+    search.trim() !== "" ||
+    roleFilter !== varsayilanRol ||
+    sorumluFiltre !== "" ||
+    onemFiltre !== "" ||
+    ilSec.length > 0 ||
+    ilceSec.length > 0 ||
+    harfSec !== "" ||
+    takipSec !== "" ||
+    iletisimSec !== "";
   // Varsayılan filtre her şeyi gizlediyse de araç çubuğu çıkar; yoksa "eşleşen
   // kayıt yok" yazar ve filtreyi değiştirecek bir yer kalmazdı.
   const showToolbar =
@@ -1116,7 +1162,7 @@ export default function CustomersPanel({
 
           {form.partyType !== "person" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kişiler")}</span>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Kişiler")}</span>
               {form.yetkililer.map((y, i) => {
                 const degistir = (alan: keyof YetkiliSatiri, deger: string) =>
                   setForm((f) => ({
@@ -1150,7 +1196,7 @@ export default function CustomersPanel({
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, yetkililer: [...f.yetkililer, bosYetkili()] }))}
-                style={{ alignSelf: "flex-start", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+                style={{ alignSelf: "flex-start", fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
               >
                 {t("+ Kişi ekle")}
               </button>
@@ -1189,7 +1235,7 @@ export default function CustomersPanel({
               </Field>
               {oneriler.length > 0 && (
                 <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Son kullanılanlar:")}</span>
+                  <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Son kullanılanlar:")}</span>
                   {oneriler.slice(0, 4).map((o) => {
                     const secili = form.tanismaYeri === o.yer && (form.tanismaTarihi || undefined) === o.tarih;
                     return (
@@ -1198,7 +1244,7 @@ export default function CustomersPanel({
                         type="button"
                         onClick={() => setForm((f) => ({ ...f, tanismaYeri: o.yer, tanismaTarihi: o.tarih ?? "" }))}
                         style={{
-                          fontSize: 11,
+                          fontSize: 12,
                           padding: "2px 8px",
                           borderRadius: 999,
                           border: `1px solid ${secili ? c.primary : c.border}`,
@@ -1246,7 +1292,7 @@ export default function CustomersPanel({
             type="button"
             onClick={() => setSosyalAcik((a) => !a)}
             aria-expanded={sosyalAcik}
-            style={{ alignSelf: "flex-start", fontSize: 12, color: c.textSecondary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ alignSelf: "flex-start", fontSize: 13, color: c.textSecondary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {sosyalAcik ? "▾" : "▸"} {t("Web sitesi ve sosyal medya")}
             {!sosyalAcik && (form.website || Object.values(form.sosyal).some(Boolean)) ? ` · ${t("dolu")}` : ""}
@@ -1281,7 +1327,7 @@ export default function CustomersPanel({
             <select
               value=""
               onChange={(e) => e.target.value && setEkSosyal((l) => [...l, e.target.value as KartvizitSosyalAnahtar])}
-              style={{ alignSelf: "flex-start", fontSize: 12, padding: "4px 6px" }}
+              style={{ alignSelf: "flex-start", fontSize: 13, padding: "4px 6px" }}
               aria-label={t("Başka hesap ekle")}
             >
               <option value="">{t("+ Başka hesap ekle")}</option>
@@ -1351,7 +1397,7 @@ export default function CustomersPanel({
           {duplicates.length > 0 && (
             <div
               style={{
-                fontSize: 12,
+                fontSize: 13,
                 color: c.textSecondary,
                 background: c.surface,
                 border: `1px solid ${c.border}`,
@@ -1388,7 +1434,7 @@ export default function CustomersPanel({
                         }))
                       }
                       style={{
-                        fontSize: 12,
+                        fontSize: 13,
                         padding: "3px 10px",
                         borderRadius: 999,
                         border: `1px ${secili ? "solid" : "dashed"} ${secili ? c.primary : c.border}`,
@@ -1413,7 +1459,7 @@ export default function CustomersPanel({
                 type="file"
                 accept="image/*,application/pdf"
                 onChange={(e) => setKartvizit(e.target.files?.[0] ?? null)}
-                style={{ fontSize: 12 }}
+                style={{ fontSize: 13 }}
               />
             </Field>
             <Field label={t("Ek dosyalar (teklif, katalog…)")} style={{ flex: "1 1 200px" }}>
@@ -1421,12 +1467,12 @@ export default function CustomersPanel({
                 type="file"
                 multiple
                 onChange={(e) => setEkDosyalar(Array.from(e.target.files ?? []))}
-                style={{ fontSize: 12 }}
+                style={{ fontSize: 13 }}
               />
             </Field>
           </div>
 
-          {error && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{error}</p>}
           {/* Vazgeçme yolu formun İÇİNDE: eskiden başlıktaki ekleme düğmesi
               "Vazgeç"e dönüşüyordu, o düğme "+"a taşınınca formu kapatmanın
               yolu kalmıyordu. */}
@@ -1456,7 +1502,7 @@ export default function CustomersPanel({
                   closeForm();
                   await handleArchive(p);
                 }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${c.danger}60`, background: "transparent", color: c.danger, fontSize: 13, cursor: "pointer" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, border: `1px solid ${c.danger}60`, background: "transparent", color: c.danger, fontSize: 14, cursor: "pointer" }}
               >
                 <IconTrash size={14} color={c.danger} />
                 {baglantiModu ? t("Bağlantıyı sil") : t("Müşteriyi sil")}
@@ -1466,68 +1512,287 @@ export default function CustomersPanel({
         </div>
   ) : null;
 
-  // Özet kutuları: geniş ekranda filtrelerin/listenin yanındaki dar sağ
-  // sütunda, dar ekranda listenin üstünde. Üstte bir satır kaplıyorlardı ve
-  // listeyi aşağı itiyorlardı (kullanıcı geri bildirimi, 2026-10-12).
-  // Sıralama filtre satırında (bkz. siralamaSecici).
-  const yanSutun = genisEkran && !loading && parties.length > 0;
-  const ozetKutulari = (dikey: boolean) => (
-    <div style={{ display: "flex", flexDirection: dikey ? "column" : "row", flexWrap: dikey ? "nowrap" : "wrap", gap: 8 }}>
-      {stats.map((s) => (
-        <div key={s.label} style={ozetKutusu(c)}>
-          <span style={{ fontSize: 11, color: c.textSecondary }}>{t(s.label)}</span>
-          <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary }}>{s.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-  const siralamaSecici = (dikey: boolean) => (
-    <label
-      style={{
-        marginLeft: dikey ? 0 : "auto",
-        display: "inline-flex",
-        flexDirection: dikey ? "column" : "row",
-        alignItems: dikey ? "stretch" : "center",
-        gap: dikey ? 4 : 6,
-        fontSize: 12,
-        color: c.textSecondary,
-      }}
-    >
-      {/* "Sırala:" yazısı yok — seçenek adları zaten sıralama olduğunu söylüyor
-          (kullanıcı isteği, 2026-10-12); ekran okuyucu için aria-label. */}
-      <select
-        value={siralama}
-        onChange={(e) => siralamaSec(e.target.value as Siralama)}
-        aria-label={t("Sırala")}
-        title={t("Sırala")}
-        style={{ fontSize: 12, padding: "3px 6px" }}
-      >
-        {siralamaSecenekleri.map((s) => (
-          <option key={s} value={s}>
-            {t(SIRALAMA_ETIKETI[s])}
-          </option>
-        ))}
-      </select>
-    </label>
+  // İki bölmeli düzen (geniş ekran): liste solda, seçili kartın tamamı sağda.
+  // Kart eskiden satırın İÇİNDE açılıyordu: listeyi aşağı itiyor, nerede
+  // bitip listenin nerede başladığı seçilemiyordu, başka müşteriye geçmek için
+  // önce kapatmak gerekiyordu (kullanıcı şikâyeti, 2026-11-11). Dar ekranda
+  // kart tam ekran pencerede açılır.
+  // Sütun sayısı ekranın değil PANELİN genişliğine göre: yan menü açıkken
+  // pencere geniş olsa da panel daralıyor, üç sütun sıkışıyordu.
+  // Sekme boşsa (ör. henüz potansiyel yok) ikinci sütun açılmaz: boş listenin
+  // yanında "Bir müşteri seç" kutusu anlamsız duruyordu.
+  const ikiBolme = kokGenislik >= 760 && !loading && sekmeKartlari.length > 0;
+  // Ayrıntılı filtreler geniş panelde solda sabit; daha darda "Süz" penceresinde.
+  const filtreSolda = ikiBolme && kokGenislik >= 1100;
+  const seciliKart = openPartyId ? parties.find((p) => p.id === openPartyId) : undefined;
+  const musteriSayisi = parties.length - potansiyelSayisi;
+  // Kart penceresinin başlığı genel: kartın adı künyede büyük yazıyor,
+  // pencere başlığında da yazınca ad iki kez alt alta çıkıyordu.
+  const kartBasligi = baglantiModu ? t("Bağlantı kartı") : t("Müşteri kartı");
+  // Süz penceresindeki etkin filtre sayısı (arama hariç: o hep görünür).
+  const etkinFiltre =
+    (roleFilter !== varsayilanRol ? 1 : 0) +
+    (sorumluFiltre !== "" ? 1 : 0) +
+    (onemFiltre !== "" ? 1 : 0) +
+    ilSec.length +
+    ilceSec.length +
+    (harfSec ? 1 : 0) +
+    (takipSec ? 1 : 0) +
+    (iletisimSec ? 1 : 0);
+  const filtreleriTemizle = () => {
+    setRoleFilter(varsayilanRol);
+    setSorumluFiltre("");
+    setOnemFiltre("");
+    setIlSec([]);
+    setIlceSec([]);
+    setHarfSec("");
+    setTakipSec("");
+    setIletisimSec("");
+  };
+
+  const kartiAc = (id: string) => {
+    setDetaySekmesi(undefined);
+    // İki bölmede seçili satıra yeniden basmak kartı kapatmaz: sağ bölme
+    // boşalınca sayfa zıplıyordu. Pencere düzeninde kapatma pencerenin işi.
+    setOpenPartyId(id);
+  };
+
+  const kartDetayi = (p: Party) => (
+    <PartyDetail
+      key={`${p.id}-${detaySekmesi ?? ""}`}
+      ilkSekme={detaySekmesi}
+      party={p}
+      baglantiModu={baglantiModu}
+      baglantiYazar={baglantiYazar}
+      departmentId={jobId ? undefined : departmentId}
+      onDegisti={() => load()}
+      canWrite={canWrite}
+      // Sipariş/tahsilat yazma hakkı sorumluluktan gelir (bkz. backend
+      // siparis-erisim.ts): modülde salt okur olan satışçı da kendisine atanan
+      // müşterinin tahsilatını girer.
+      siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
+      profile={profile.primaryActionLabel}
+      // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
+      organizationId={baglantiModu ? undefined : organizationId}
+      sirketId={jobId ? undefined : organizationId}
+      listeler={listeler}
+      kapsamYolu={kapsamYolu}
+    />
   );
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        {/* Panelin kendi başlığı yok: modül sayfasının başlığı ya da şirket
-            sekmesinin adı zaten modülün adı — iki kez yazıyordu. */}
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-          {profile.key !== "base" && !baglantiModu && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{t(profile.label)}</span>
-          )}
-        </div>
+  const siralamaSecici = () => (
+    // "Sırala:" yazısı yok — seçenek adları zaten sıralama olduğunu söylüyor
+    // (kullanıcı isteği, 2026-10-12); ekran okuyucu için aria-label.
+    <select
+      value={siralama}
+      onChange={(e) => siralamaSec(e.target.value as Siralama)}
+      aria-label={t("Sırala")}
+      title={t("Sırala")}
+      style={{ fontSize: 14, padding: "6px 8px" }}
+    >
+      {siralamaSecenekleri.map((s) => (
+        <option key={s} value={s}>
+          {t(SIRALAMA_ETIKETI[s])}
+        </option>
+      ))}
+    </select>
+  );
+
+  // Satırın tek alt satırı: şehir · telefon · (yöneticiye) sorumlu. Rol, durum
+  // ve kaynak ("excel") her satırda aynıydı; göz 318 kez aynı dört kelimeyi
+  // okuyordu (kullanıcı şikâyeti, 2026-11-11). Bağlantılar'da kişinin unvanı ve
+  // tanışma yeri asıl bilgi olduğu için profil metni kalır.
+  const satirAlti = (p: Party): string => {
+    // Ekleyen değil sorumlu (bkz. lib/partySorumlu).
+    const sorumlu = yonetici && !sorumluFiltre ? sorumluAdi(p) ?? t("Sorumlu yok") : undefined;
+    if (baglantiModu) return [profile.detail(p), sorumlu].filter(Boolean).join(" · ");
+    const sehir = [p.address?.district, p.address?.city].filter(Boolean).join(" / ");
+    return [sehir, p.phone ?? p.email, sorumlu].filter(Boolean).join(" · ");
+  };
+  // Ayrıntılı filtrelerin içeriği: geniş ekranda soldaki sütunda, darda Süz
+  // penceresinde aynı bileşenler. Sayılar açık sekmenin (ve listenin)
+  // kartlarından; bir filtre seçilince öteki filtrelerin sayıları değişmez,
+  // ilçe listesi ise seçili illere daralır.
+  const filtreIcerigi = (pencerede: boolean) => {
+    const taban = sekmeKartlari;
+    const iller = sayarakSecenekler(taban.map(ilAdi));
+    const ilceTaban = ilSec.length ? taban.filter((p) => ilSec.includes(ilAdi(p) ?? "")) : taban;
+    const ilceler = sayarakSecenekler(ilceTaban.map(ilceAdi));
+    const harfler = new Map<string, number>();
+    for (const p of taban) {
+      const h = basHarf(p.displayName);
+      harfler.set(h, (harfler.get(h) ?? 0) + 1);
+    }
+    const sorumlular = sayarakSecenekler(taban.map((p) => sorumluAdi(p)));
+    const sorumsuz = taban.filter((p) => !sorumluAdi(p)).length;
+    const say = (f: (p: Party) => boolean) => taban.filter(f).length;
+    const takipSecenekleri = [
+      { deger: "gecikti", etiket: t("Araması gecikenler"), sayi: say((p) => aramaDurumu(p.sonrakiArama, bugun) === "gecikti"), renk: c.danger },
+      { deger: "bugun", etiket: t("Bugün aranacaklar"), sayi: say((p) => aramaDurumu(p.sonrakiArama, bugun) === "bugun") },
+      { deger: "planli", etiket: t("Planlı araması olanlar"), sayi: say((p) => !!p.sonrakiArama) },
+      { deger: "hic", etiket: t("Hiç görüşülmemiş"), sayi: say((p) => !p.temas?.sonTemas) },
+    ].filter((o) => o.sayi > 0 || takipSec === o.deger);
+    const roller = filtreRolleri
+      .map((r) => ({ deger: r, etiket: t(ROLE_LABELS[r], { ctx: "rol" }), sayi: say((p) => p.roles.includes(r)) }))
+      .filter((o) => o.sayi > 0 || roleFilter === o.deger);
+    const iletisim = [
+      { deger: "telefonsuz", etiket: t("Telefonu olmayanlar"), sayi: say((p) => !p.phone) },
+      { deger: "epostasiz", etiket: t("E-postası olmayanlar"), sayi: say((p) => !p.email) },
+    ].filter((o) => o.sayi > 0 || iletisimSec === o.deger);
+    return (
+      <>
+        <FiltreBasligi etkin={etkinFiltre} onTemizle={filtreleriTemizle} />
+        {!baglantiModu && takipSecenekleri.length > 0 && (
+          <FiltreBolumu baslik={t("Takip")}>
+            <SecimListesi
+              secenekler={takipSecenekleri}
+              secili={takipSec ? [takipSec] : []}
+              onDegis={(v) => setTakipSec((v[0] ?? "") as typeof takipSec)}
+            />
+          </FiltreBolumu>
+        )}
+        {baglantiModu && (
+          <FiltreBolumu baslik={t("Önem")}>
+            <SecimListesi
+              secenekler={BAGLANTI_ONEMLERI.map((o) => ({ deger: o, etiket: t(ONEM_LABELS[o]), sayi: say((p) => p.baglanti?.onem === o) }))}
+              secili={onemFiltre ? [onemFiltre] : []}
+              onDegis={(v) => setOnemFiltre((v[0] ?? "") as BaglantiOnem | "")}
+            />
+          </FiltreBolumu>
+        )}
+        {iller.length > 1 && (
+          <FiltreBolumu baslik={t("İl")}>
+            <SecimListesi
+              coklu
+              secenekler={iller}
+              secili={ilSec}
+              onDegis={(v) => {
+                setIlSec(v);
+                setIlceSec([]);
+              }}
+              ilkGoster={5}
+            />
+          </FiltreBolumu>
+        )}
+        {ilceler.length > 1 && (
+          <FiltreBolumu baslik={t("İlçe")}>
+            <SecimListesi coklu secenekler={ilceler} secili={ilceSec} onDegis={setIlceSec} ilkGoster={6} />
+          </FiltreBolumu>
+        )}
+        {taban.length > 1 && (
+          <FiltreBolumu baslik={t("Baş harf")}>
+            <HarfIzgarasi sayilar={harfler} secili={harfSec} onSec={setHarfSec} />
+          </FiltreBolumu>
+        )}
+        {sorumlular.length + (sorumsuz ? 1 : 0) > 1 && (
+          <FiltreBolumu baslik={t("Sorumlu")}>
+            <SecimListesi
+              secenekler={[...sorumlular, ...(sorumsuz ? [{ deger: "-", etiket: t("Sorumlusu yok"), sayi: sorumsuz }] : [])]}
+              secili={sorumluFiltre ? [sorumluFiltre] : []}
+              onDegis={(v) => setSorumluFiltre(v[0] ?? "")}
+            />
+          </FiltreBolumu>
+        )}
+        {gorunum !== "potansiyel" && roller.length > 1 && (
+          <FiltreBolumu baslik={t("Rol")}>
+            <SecimListesi
+              secenekler={roller}
+              secili={roleFilter ? [roleFilter] : []}
+              onDegis={(v) => setRoleFilter((v[0] ?? "") as PartyRole | "")}
+            />
+          </FiltreBolumu>
+        )}
+        {iletisim.length > 0 && (
+          <FiltreBolumu baslik={t("Eksik bilgi")}>
+            <SecimListesi
+              secenekler={iletisim}
+              secili={iletisimSec ? [iletisimSec] : []}
+              onDegis={(v) => setIletisimSec((v[0] ?? "") as typeof iletisimSec)}
+            />
+          </FiltreBolumu>
+        )}
+        {pencerede && visible.length > 1 && <FiltreBolumu baslik={t("Sırala")}>{siralamaSecici()}</FiltreBolumu>}
+      </>
+    );
+  };
+
+  // Rozet yalnızca açık sekmenin zaten söylemediği rolde: Müşteriler sekmesinde
+  // "Müşteri", Potansiyel'de "Potansiyel" yazmak bilgi değil.
+  const rozetGizli = (r: PartyRole) =>
+    !baglantiModu && ((gorunum === "musteriler" && r === "customer") || (gorunum === "potansiyel" && r === "lead"));
+
+  const dugme = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 7,
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: `1px solid ${c.border}`,
+    background: c.surface,
+    color: c.textPrimary,
+    fontSize: 14,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  } as const;
+
+  // Görünüm seçici (Tahsilat · Müşteriler · Potansiyel): bitişik seçici,
+  // liste haplarıyla aynı biçimde olsaydı hangisinin neyi süzdüğü belli
+  // olmazdı. Üstte ortada duruyor (aşağıda).
+  // Telefon genişliği: görünüm seçici tam satır, harita düğmesi yalnızca
+  // simge — liste hapları ile harita tek satıra sığsın.
+  const dar = kokGenislik > 0 && kokGenislik < 520;
+  // Modül sayfasında açıldıysa geri hapı sekmelerin altında (bkz. lib/modulGeri).
+  const geriHapi = useModulGeriHapi();
+  const gorunumSecici = baglantiModu ? undefined : (
+    <div
+      role="tablist"
+      style={{ display: dar ? "flex" : "inline-flex", flex: dar ? 1 : undefined, padding: 3, gap: 2, borderRadius: 10, background: c.surface, border: `1px solid ${c.border}`, maxWidth: "100%", overflowX: "auto" }}
+    >
+      {(modulSekmeleri(MUSTERI_MODUL_KEY) as readonly (typeof gorunum)[]).map((g) => {
+        const aktif = gorunum === g;
+        const sayi = g === "musteriler" ? musteriSayisi : g === "potansiyel" ? potansiyelSayisi : undefined;
+        return (
+          <button
+            key={g}
+            role="tab"
+            aria-selected={aktif}
+            onClick={() => setGorunum(g)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flex: dar ? 1 : undefined,
+              gap: 6,
+              padding: "7px 14px",
+              borderRadius: 7,
+              border: "none",
+              background: aktif ? c.primary : "transparent",
+              color: aktif ? c.onPrimary : c.textSecondary,
+              fontSize: 14,
+              fontWeight: aktif ? 600 : 500,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {g === "musteriler" ? t("Müşteriler") : g === "potansiyel" ? t("Potansiyel") : t("Tahsilat")}
+            {sayi !== undefined && !loading && (
+              <span style={{ fontSize: 12, opacity: 0.8, fontVariantNumeric: "tabular-nums" }}>{sayi}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+  // Ekle düğmesi (sayfada "+" yoksa) ve salt görüntüleme notu da aynı satırın sağında.
+  const ekleDugmesi = (
+    <>
         {!canWrite ? (
-          <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
+          <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Salt görüntüleme")}</span>
         ) : (
           !fabAvailable && (
             <button
               onClick={() => (formMode ? closeForm() : openCreate())}
-              style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+              style={{ ...dugme, border: "none", background: c.primary, color: c.onPrimary, fontWeight: 600 }}
             >
               {formMode
                 ? t("Vazgeç")
@@ -1539,56 +1804,35 @@ export default function CustomersPanel({
             </button>
           )
         )}
-      </div>
+    </>
+  );
 
-      {bildirim && <p style={{ color: c.warning, fontSize: 13, margin: 0 }}>{bildirim}</p>}
+  return (
+    // Geniş ekranda (yan menü kapalıyken) panel sayfanın soluna yapışıp sağda
+    // koca bir boşluk bırakıyordu; en geniş hâli sınırlı ve ortada
+    // (kullanıcı isteği, 2026-11-11).
+    <div ref={kokRef} style={{ display: "flex", flexDirection: "column", gap: 12, width: "100%", maxWidth: 1640, margin: "0 auto" }}>
+      {bildirim && <p style={{ color: c.warning, fontSize: 14, margin: 0 }}>{bildirim}</p>}
       {onizlenen && <FilePreviewModal file={onizlenen} onClose={() => setOnizlenen(null)} />}
 
-      {/* Tahsilat takibi: ay ay vadesi gelen siparişler + yöneticiye rapor.
-          Bağlantılar'da sipariş yok; sekme de yok. */}
-      {!baglantiModu && (
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {(modulSekmeleri(MUSTERI_MODUL_KEY) as readonly (typeof gorunum)[]).map((g) => {
-          const aktif = gorunum === g;
-          const acilis = (kayitliAcilis ?? ilkGorunum) === g;
-          const etiket =
-            g === "musteriler"
-              ? t("Müşteriler")
-              : g === "potansiyel"
-                ? potansiyelSayisi
-                  ? t("Potansiyel ({n})", { n: potansiyelSayisi })
-                  : t("Potansiyel")
-                : t("Tahsilat takibi");
-          const yazi = aktif ? c.onPrimary : c.textPrimary;
-          return (
-            // Hap: sekme adı + ev simgesi. Simge modülün kişisel açılış
-            // sekmesini seçer (dolu = açılış sekmesi). İç içe <button>
-            // geçersiz olduğu için hap bir kap, içinde iki ayrı düğme.
-            <span key={g} style={{ ...sekmeStili(c, aktif), display: "inline-flex", alignItems: "center", gap: 6, cursor: "default" }}>
-              <button
-                onClick={() => setGorunum(g)}
-                style={{ background: "transparent", border: "none", padding: 0, font: "inherit", color: yazi, cursor: "pointer" }}
-              >
-                {etiket}
-              </button>
-              <button
-                onClick={() => acilisYap(g, etiket)}
-                aria-label={acilis ? t("Açılış sekmesi") : t("Açılış sekmesi yap")}
-                title={acilis ? t("Modül bu sekmeyle açılıyor") : t("Modül bu sekmeyle açılsın")}
-                style={{ display: "inline-flex", background: "transparent", border: "none", padding: 0, cursor: acilis ? "default" : "pointer", opacity: acilis ? 1 : 0.55 }}
-              >
-                <IconHome size={13} color={yazi} filled={acilis} />
-              </button>
-            </span>
-          );
-        })}
-      </div>
-      )}
+      {/* Görünüm seçici kendi satırında, ortada (kullanıcı isteği, 2026-11-11:
+          "sekmeler üstte ortalansın") — başlık da üst şeritte ortada; ikisi
+          aynı eksende. Telefonda tam genişlik. */}
+      {/* Geri hapı aynı satırın solunda: kendi satırını kaplıyordu (kullanıcı
+          isteği, 2026-11-11). Eşit yan sütunlar (1fr) seçiciyi tam ortada
+          tutar. Telefonda ikisi bir satıra sığmıyor; orada hap aşağıda kalır. */}
+      {gorunumSecici &&
+        (dar ? (
+          <div style={{ display: "flex", justifyContent: "center" }}>{gorunumSecici}</div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 12 }}>
+            <div style={{ justifySelf: "start", minWidth: 0 }}>{geriHapi}</div>
+            {gorunumSecici}
+            <span />
+          </div>
+        ))}
 
-      {/* Listeler (gruplar): Bağlantılar'da ve Müşteriler'in üç sekmesinde
-          ortak. Haritada göster sekmelerin sağında, her sekmede (kullanıcı
-          isteği, 2026-10-26 — araç çubuğunun içindeydi; 8'den az kartta araç
-          çubuğu çıkmadığı için bazı hesaplarda hiç görünmüyordu). */}
+      {/* Listeler (gruplar): Bağlantılar'da ve Müşteriler'in üç sekmesinde ortak. */}
       {(baglantiModu || acilisHazir) && (
         <BaglantiListeSekmeleri
           listeler={listeler}
@@ -1602,38 +1846,52 @@ export default function CustomersPanel({
           onDegisti={() => load()}
           modul={listeModulu}
           onBirak={surukleVar ? listeyeBirak : undefined}
+          // Açılış sekmesi ve harita liste sekmelerinin sağında: üst çubukta
+          // telefonda kendi satırını kaplıyorlardı.
           sag={
-            haritaKartlari.length > 0 && (
-              <button
-                onClick={() => setHaritaAcik(true)}
-                title={t("Listedekileri il il haritada göster")}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 7,
-                  padding: "7px 14px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: c.primary,
-                  color: c.onPrimary,
-                  fontSize: 14,
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <IconMap size={17} color={c.onPrimary} />
-                {t("Haritada göster")}
-              </button>
-            )
+            <>
+          {!baglantiModu && (() => {
+              const acilis = (kayitliAcilis ?? ilkGorunum) === gorunum;
+              const etiket = gorunum === "musteriler" ? t("Müşteriler") : gorunum === "potansiyel" ? t("Potansiyel") : t("Tahsilat takibi");
+              return (
+                <button
+                  onClick={() => !acilis && acilisYap(gorunum, etiket)}
+                  aria-label={acilis ? t("Açılış sekmesi") : t("Açılış sekmesi yap")}
+                  title={acilis ? t("Modül bu sekmeyle açılıyor") : t("Modül bu sekmeyle açılsın")}
+                  style={{ display: "inline-flex", padding: 8, borderRadius: 8, border: "none", background: "transparent", cursor: acilis ? "default" : "pointer", opacity: acilis ? 0.9 : 0.5 }}
+                >
+                  <IconHome size={16} color={acilis ? c.primary : c.textSecondary} filled={acilis} />
+                </button>
+              );
+          })()}
+      {/* Haritada göster her sekmede (kullanıcı isteği, 2026-10-26 — araç
+          çubuğunun içindeydi; 8'den az kartta araç çubuğu çıkmadığı için
+          bazı hesaplarda hiç görünmüyordu). */}
+      {haritaKartlari.length > 0 && (
+        // Büyük ve dolu: sık kullanılan bir görünüm, küçük simge olarak
+        // gözden kaçıyordu (kullanıcı isteği, 2026-11-11).
+        <button
+          onClick={() => setHaritaAcik(true)}
+          title={t("Listedekileri il il haritada göster")}
+          aria-label={t("Haritada göster")}
+          style={{ ...dugme, padding: dar ? "8px 11px" : "8px 16px", fontSize: 15, fontWeight: 600, border: "none", background: c.primary, color: c.onPrimary }}
+        >
+          <IconMap size={19} color={c.onPrimary} />
+          {!dar && t("Haritada göster")}
+        </button>
+      )}
+      {ekleDugmesi}
+            </>
           }
         />
       )}
 
+      {geriHapi && (dar || !gorunumSecici) && <div style={{ alignSelf: "flex-start" }}>{geriHapi}</div>}
+
       {/* Liste süzgeci açıkken bu açıkça yazılır: yoksa listede olmayan kartlar
           kaybolmuş sanılıyordu (bkz. seciliListe). */}
       {etkinListe && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12, color: c.textSecondary }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
           <span>
             {t("Yalnızca \"{liste}\" listesindekiler gösteriliyor ({n} / {toplam}).", {
               liste: listeler.find((l) => l.id === etkinListe)?.ad ?? "",
@@ -1643,7 +1901,7 @@ export default function CustomersPanel({
           </span>
           <button
             onClick={() => setSeciliListe("")}
-            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {t("Tümünü göster")}
           </button>
@@ -1663,27 +1921,14 @@ export default function CustomersPanel({
         const p = haritaKartiId ? parties.find((x) => x.id === haritaKartiId) : undefined;
         if (!p) return null;
         return (
-          <Modal title={p.displayName} onClose={() => setHaritaKartiId(null)} maxWidth={760} mobileFullScreen>
-            <PartyDetail
-              party={p}
-              baglantiModu={baglantiModu}
-              baglantiYazar={baglantiYazar}
-              departmentId={jobId ? undefined : departmentId}
-              onDegisti={() => load()}
-              canWrite={canWrite}
-              siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
-              profile={profile.primaryActionLabel}
-              organizationId={baglantiModu ? undefined : organizationId}
-              sirketId={jobId ? undefined : organizationId}
-              listeler={listeler}
-              kapsamYolu={kapsamYolu}
-            />
+          <Modal title={kartBasligi} onClose={() => setHaritaKartiId(null)} maxWidth={1040} mobileFullScreen>
+            {kartDetayi(p)}
           </Modal>
         );
       })()}
 
       {!acilisHazir ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : gorunum === "tahsilat" && !baglantiModu ? (
         <TahsilatTakibi
           kapsamYolu={kapsamYolu}
@@ -1697,13 +1942,10 @@ export default function CustomersPanel({
           fabVar={fabAvailable}
           partySuzgeci={tahsilatSuzgeci}
           surukle={surukleVar && listeler.length > 0}
+          filtreSolda={kokGenislik >= 1100}
         />
       ) : (
       <>
-      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
-      )}
-
       {excelAcik && (
         <MusteriExcelModal
           scopePath={scopePath}
@@ -1719,85 +1961,6 @@ export default function CustomersPanel({
             load();
           }}
         />
-      )}
-
-      {!yanSutun && !loading && parties.length > 0 && ozetKutulari(false)}
-
-      {/* Filtreler + liste solda, özet kutuları sağda: sağ sütunun tepesi
-          filtrelerin (yoksa listenin) tepesiyle aynı hizada başlar — sayfanın
-          en üstünden başlayınca orantısız duruyordu (kullanıcı geri bildirimi,
-          2026-10-12). */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minWidth: 0 }}>
-      {showToolbar && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("Ara…")}
-            style={{ flex: "1 1 140px", minWidth: 120, fontSize: 13, padding: "5px 8px" }}
-          />
-          {gorunum !== "potansiyel" && (
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value as PartyRole | "")}
-            style={{ fontSize: 13, padding: "5px 6px" }}
-          >
-            <option value="">{t("Rol: tümü")}</option>
-            {filtreRolleri.map((r) => (
-              <option key={r} value={r}>
-                {t(ROLE_LABELS[r], { ctx: "rol" })}
-              </option>
-            ))}
-          </select>
-          )}
-          {baglantiModu && (
-            <select
-              value={onemFiltre}
-              onChange={(e) => setOnemFiltre(e.target.value as BaglantiOnem | "")}
-              style={{ fontSize: 13, padding: "5px 6px" }}
-              aria-label={t("Önem")}
-            >
-              <option value="">{t("Önem: tümü")}</option>
-              {BAGLANTI_ONEMLERI.map((o) => (
-                <option key={o} value={o}>
-                  {t(ONEM_LABELS[o])}
-                </option>
-              ))}
-            </select>
-          )}
-          {yonetici && (
-            <select
-              value={sorumluFiltre}
-              onChange={(e) => setSorumluFiltre(e.target.value)}
-              style={{ fontSize: 13, padding: "5px 6px" }}
-              aria-label={t("Sorumlu")}
-            >
-              <option value="">{t("Sorumlu: tümü")}</option>
-              <option value="-">{t("Sorumlusu olmayanlar")}</option>
-              {sorumluSecenekleri.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.ad}
-                </option>
-              ))}
-            </select>
-          )}
-          {hasActiveFilter && (
-            <button
-              onClick={() => {
-                setSearch("");
-                setRoleFilter(varsayilanRol);
-                setSorumluFiltre("");
-                setOnemFiltre("");
-              }}
-              style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
-            >
-              {t("Temizle")}
-            </button>
-          )}
-          {/* Sıralama filtrelerin yanında; filtre satırı yoksa listenin üstünde. */}
-          {visible.length > 1 && siralamaSecici(false)}
-        </div>
       )}
 
       {/* Ekleme ve düzenleme modal pencerede: listenin içinde açılan form uzun
@@ -1819,21 +1982,103 @@ export default function CustomersPanel({
         </Modal>
       )}
 
+      {/* Dar ekranda kart tam ekran pencerede (bkz. ikiBolme). */}
+      {!ikiBolme && seciliKart && (
+        <Modal title={kartBasligi} onClose={() => setOpenPartyId(null)} maxWidth={1040} mobileFullScreen>
+          {kartDetayi(seciliKart)}
+        </Modal>
+      )}
+
+      <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+      {/* ---- En sol: ayrıntılı filtreler ---- */}
+      {filtreSolda && showToolbar && (
+        // Yapışkan DEĞİL: panel ekrandan uzun olabiliyor, yapışınca alt
+        // bölümlerine hiç inilemiyordu.
+        <aside style={{ ...filtrePaneliStili(c), width: 236, flexShrink: 0 }}>
+          {filtreIcerigi(false)}
+        </aside>
+      )}
+      {/* ---- Liste: arama + satırlar ---- */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, width: ikiBolme ? 390 : "100%", flexShrink: 0, minWidth: 0 }}>
+      {showToolbar && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative" }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={baglantiModu ? t("Bağlantı ara…") : t("Müşteri ara…")}
+            aria-label={t("Ara")}
+            style={{ flex: 1, minWidth: 0, fontSize: 15, padding: "9px 12px", borderRadius: 8 }}
+          />
+          {filtreSolda ? (
+            visible.length > 1 && siralamaSecici()
+          ) : (
+            // Filtreler tek düğmenin arkasında: dar ekranda listenin önüne
+            // geçmesin (kullanıcı şikâyeti, 2026-11-11).
+            <button
+              onClick={() => setSuzAcik((a) => !a)}
+              aria-expanded={suzAcik}
+              style={{ ...dugme, padding: "9px 12px", ...(etkinFiltre > 0 ? { borderColor: c.primary, color: c.primary } : {}) }}
+            >
+              <IconSortDescending size={16} color={etkinFiltre > 0 ? c.primary : c.textSecondary} />
+              {genisEkran || etkinFiltre > 0 ? (etkinFiltre > 0 ? t("Süz ({n})", { n: etkinFiltre }) : t("Süz")) : null}
+            </button>
+          )}
+          {suzAcik && !filtreSolda && (
+            <>
+              {/* Dışarı tıklayınca kapansın. */}
+              <div onClick={() => setSuzAcik(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div
+                style={{
+                  ...filtrePaneliStili(c),
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  zIndex: 41,
+                  width: 300,
+                  maxWidth: "calc(100vw - 32px)",
+                  // Pencere ekrandan taşmasın; uzun içerik pencerenin içinde kayar.
+                  maxHeight: "70vh",
+                  overflowY: "auto",
+                  boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+                }}
+              >
+                {filtreIcerigi(true)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!loading && !yonetici && !baglantiModu && parties.length > 0 && (
+        <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Sana atanmış müşteriler listeleniyor.")}</span>
+      )}
+      {/* Bağlantılar'ın özeti (yüksek önem, temas zamanı gelen) sekmelerde
+          yazmayan bilgi; tek satır metin. Müşteriler'in sayıları sekmelerde. */}
+      {baglantiModu && !loading && parties.length > 0 && (
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
+          {stats.map((s) => (
+            <span key={s.label}>
+              {t(s.label)} <strong style={{ color: c.textPrimary, fontWeight: 600 }}>{s.value}</strong>
+            </span>
+          ))}
+        </div>
+      )}
+
       {loading ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       ) : parties.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
           {baglantiModu
             ? t("Henüz bağlantı yok. Fuarda, toplantıda tanıştığın kişileri buraya ekle; müşteri listesine karışmazlar.")
             : t("Henüz müşteri kaydı yok. Satış ve Müşteri İlişkileri aynı listeyi görür.")}
           {canWrite && fabAvailable ? t(' Eklemek için sayfadaki "+" düğmesini kullan.') : ""}
         </p>
       ) : sekmeKartlari.length === 0 && etkinListe ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
           {t("Bu listede bu sekmeye ait kart yok. Kartı tutup liste sekmesinin üstüne bırakabilir ya da kartın içinden listeye ekleyebilirsin.")}
         </p>
       ) : sekmeKartlari.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>
           {gorunum === "potansiyel"
             ? t("Henüz potansiyel müşteri yok. Anlaşması yapılmamış ama yakın olan kişi ve firmaları buraya ekle; anlaşma olunca tek tıkla müşteriye dönüştür.")
             : potansiyelSayisi
@@ -1843,35 +2088,72 @@ export default function CustomersPanel({
           {gorunum !== "potansiyel" && potansiyelSayisi > 0 && (
             <button
               onClick={() => setGorunum("potansiyel")}
-              style={{ marginLeft: 6, fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+              style={{ marginLeft: 6, fontSize: 14, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
             >
               {t("Potansiyel sekmesine geç")}
             </button>
           )}
         </p>
       ) : visible.length === 0 ? (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            {hasActiveFilter && (
-              <span style={{ fontSize: 12, color: c.textSecondary }}>
-                {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
-              </span>
-            )}
-            {!showToolbar && visible.length > 1 && siralamaSecici(false)}
-          </div>
-          {/* Satırlar tek bir çerçevede: aralarında ince çizgi, arka plan sıra
-              sıra değişir — simgeler ve rozetler eklenince ayrı kutular birbirine
-              karışıyordu, göz satırı takip edemiyordu. Renkler paletten. */}
-          <div style={listeCercevesi(c)}>
-          {visible.map((p, i) => (
+          {(hasActiveFilter || (!showToolbar && visible.length > 1)) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {hasActiveFilter && (
+                <span style={{ fontSize: 13, color: c.textSecondary }}>
+                  {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
+                </span>
+              )}
+              {!showToolbar && visible.length > 1 && <span style={{ marginLeft: "auto" }}>{siralamaSecici()}</span>}
+            </div>
+          )}
+          {/* Satırlar tek bir çerçevede, aralarında ince çizgi. Sıra sıra
+              değişen zemin (listeSatiri) burada yok: açılan kartla birlikte
+              ayrı tonlar üst üste biniyor, göz yoruyordu (kullanıcı şikâyeti,
+              2026-11-11). Seçili satır hafif zemin + soldaki vurgu çizgisiyle. */}
+          <div style={{ ...listeCercevesi(c), background: c.surface }}>
+          {visible.map((p, i) => {
+            const secili = openPartyId === p.id;
+            const rozetler = p.roles.filter((r) => !rozetGizli(r));
+            const alt = satirAlti(p);
+            return (
             <div
               key={p.id}
+              draggable={surukleVar}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(PARTY_SURUKLE, p.id);
+                e.dataTransfer.effectAllowed = "move";
+                setSuruklenen(p.id);
+              }}
+              onDragEnd={() => {
+                setSuruklenen(null);
+                setBirakmaYeri(null);
+              }}
+              onDragOver={(e) => {
+                if (!suruklenen || !e.dataTransfer.types.includes(PARTY_SURUKLE)) return;
+                e.preventDefault();
+                const kutu = e.currentTarget.getBoundingClientRect();
+                const once = e.clientY < kutu.top + kutu.height / 2;
+                if (birakmaYeri?.id !== p.id || birakmaYeri.once !== once) setBirakmaYeri({ id: p.id, once });
+              }}
+              onDrop={(e) => {
+                const id = e.dataTransfer.getData(PARTY_SURUKLE);
+                if (!id) return;
+                e.preventDefault();
+                siraTasi(id, p.id, birakmaYeri?.id === p.id ? birakmaYeri.once : true);
+                setSuruklenen(null);
+                setBirakmaYeri(null);
+              }}
               style={{
                 display: "flex",
-                flexDirection: "column",
-                ...listeSatiri(c, i),
+                alignItems: "center",
+                gap: 12,
+                padding: "11px 14px 11px 11px",
+                background: secili ? `color-mix(in srgb, ${c.primary} 12%, ${c.surface})` : c.surface,
+                borderTop: i === 0 ? "none" : `1px solid ${c.border}`,
+                borderLeft: `3px solid ${secili ? c.primary : "transparent"}`,
+                cursor: surukleVar ? "grab" : undefined,
                 opacity: suruklenen === p.id ? 0.45 : 1,
                 // Bırakılacak yer: satırın üst ya da alt kenarında vurgu çizgisi.
                 boxShadow:
@@ -1880,167 +2162,117 @@ export default function CustomersPanel({
                     : undefined,
               }}
             >
-              {/* Yalnızca başlık satırı sürüklenir: açık kartın içindeki alanlarda
-                  metin seçmek sürüklemeye dönüşmesin. */}
-              <div
-                draggable={surukleVar}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData(PARTY_SURUKLE, p.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  setSuruklenen(p.id);
-                }}
-                onDragEnd={() => {
-                  setSuruklenen(null);
-                  setBirakmaYeri(null);
-                }}
-                onDragOver={(e) => {
-                  if (!suruklenen || !e.dataTransfer.types.includes(PARTY_SURUKLE)) return;
-                  e.preventDefault();
-                  const kutu = e.currentTarget.getBoundingClientRect();
-                  const once = e.clientY < kutu.top + kutu.height / 2;
-                  if (birakmaYeri?.id !== p.id || birakmaYeri.once !== once) setBirakmaYeri({ id: p.id, once });
-                }}
-                onDrop={(e) => {
-                  const id = e.dataTransfer.getData(PARTY_SURUKLE);
-                  if (!id) return;
-                  e.preventDefault();
-                  siraTasi(id, p.id, birakmaYeri?.id === p.id ? birakmaYeri.once : true);
-                  setSuruklenen(null);
-                  setBirakmaYeri(null);
-                }}
+              {/* Baş harf yuvarlağı: 318 benzer satırda göz bir çapa bulsun. */}
+              <span
+                aria-hidden
                 style={{
-                  display: "flex",
+                  width: 36,
+                  height: 36,
+                  borderRadius: 999,
+                  flexShrink: 0,
+                  display: "inline-flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "8px 10px",
-                  cursor: surukleVar ? "grab" : undefined,
+                  justifyContent: "center",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: c.primary,
+                  background: `color-mix(in srgb, ${c.primary} 16%, ${c.surface})`,
                 }}
               >
-                {surukleVar && (
-                  <span aria-hidden title={t("Tutup sürükle")} style={{ color: c.textSecondary, fontSize: 13, lineHeight: 1, marginRight: -2, userSelect: "none" }}>
-                    ⋮⋮
+                {basHarfler(p.displayName)}
+              </span>
+              <button
+                type="button"
+                onClick={() => kartiAc(p.id)}
+                aria-current={secili || undefined}
+                style={{ flex: 1, minWidth: 0, textAlign: "left", background: "transparent", border: "none", padding: 0, cursor: "pointer" }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontSize: 15,
+                      fontWeight: secili ? 600 : 500,
+                      color: c.textPrimary,
+                      lineHeight: 1.3,
+                      // Ad iki satıra kadar kırılır: dar sol bölmede uzun firma
+                      // adları ("… ECZ/BAYINDIR-İZMİR ECZ. …") tek satırda
+                      // ayırt edilemeyecek kadar kesiliyordu.
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      overflowWrap: "anywhere",
+                      minWidth: 0,
+                    }}
+                    title={p.displayName}
+                  >
+                    {p.displayName}
                   </span>
-                )}
+                  {rozetler.map((r) => (
+                    <span key={r} style={{ ...rozetStili(ROLE_COLORS[r], c), flexShrink: 0 }}>
+                      {t(ROLE_LABELS[r], { ctx: "rol" })}
+                    </span>
+                  ))}
+                  {baglantiModu && p.baglanti?.onem === "yuksek" && (
+                    <span style={{ fontSize: 12, padding: "1px 7px", borderRadius: 6, background: c.accent, color: c.onPrimary, flexShrink: 0 }}>
+                      {t("Yüksek önem")}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3, minWidth: 0, flexWrap: "wrap" }}>
+                  {alt && (
+                    <span style={{ fontSize: 13, color: c.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>
+                      {alt}
+                    </span>
+                  )}
+                  {!baglantiModu && p.sonrakiArama && <AramaRozeti tarih={p.sonrakiArama} bugun={bugun} />}
+                  {baglantiModu && p.baglanti?.sonrakiTemas && <TemasRozeti tarih={p.baglanti.sonrakiTemas} bugun={bugun} />}
+                  {!baglantiModu && !p.sonrakiArama && p.temas?.sonTemas && <SonTemasSatiri p={p} />}
+                </div>
+              </button>
+              <SatirSimgeleri
+                party={p}
+                onDosya={dosyaAc}
+                onKisiler={() => {
+                  // Kişi sayısına basınca kart Kişiler sekmesinde açılır.
+                  setDetaySekmesi("contacts");
+                  setOpenPartyId(p.id);
+                }}
+              />
+              {canWrite && !baglantiModu && potansiyelMusteriMi(p) && (
                 <button
-                  type="button"
-                  onClick={() => {
-                    setDetaySekmesi(undefined);
-                    setOpenPartyId(openPartyId === p.id ? null : p.id);
-                  }}
+                  onClick={() => musteriyeDonustur(p)}
+                  disabled={donusturulen === p.id}
+                  title={t("Anlaşma yapıldı: kartı müşteriye dönüştür")}
                   style={{
-                    flex: 1,
-                    minWidth: 0,
-                    textAlign: "left",
+                    flexShrink: 0,
+                    fontSize: 13,
+                    padding: "4px 9px",
+                    borderRadius: 6,
+                    border: `1px solid ${ROLE_COLORS.customer}60`,
                     background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer",
+                    color: rozetStili(ROLE_COLORS.customer, c).color,
+                    cursor: donusturulen === p.id ? "default" : "pointer",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 14, color: c.textPrimary }}>{p.displayName}</span>
-                    {p.roles.map((r) => (
-                      <span
-                        key={r}
-                        style={{
-                          fontSize: 10,
-                          padding: "1px 6px",
-                          borderRadius: 6,
-                          color: ROLE_COLORS[r],
-                          border: `1px solid ${ROLE_COLORS[r]}40`,
-                        }}
-                      >
-                        {t(ROLE_LABELS[r], { ctx: "rol" })}
-                      </span>
-                    ))}
-                    {baglantiModu && p.baglanti?.onem === "yuksek" && (
-                      <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, background: c.accent, color: c.onPrimary }}>
-                        {t("Yüksek önem")}
-                      </span>
-                    )}
-                    {baglantiModu && p.baglanti?.sonrakiTemas && (
-                      <TemasRozeti tarih={p.baglanti.sonrakiTemas} bugun={bugun} />
-                    )}
-                    {!baglantiModu && p.sonrakiArama && <AramaRozeti tarih={p.sonrakiArama} bugun={bugun} />}
-                  </div>
-                  {!baglantiModu && p.temas?.sonTemas && <SonTemasSatiri p={p} />}
-                  {(profile.detail(p) || yonetici) && (
-                    <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-                      {[profile.detail(p), yonetici ? p.ownerName ?? t("Sorumlu yok") : undefined].filter(Boolean).join(" · ")}
-                    </div>
-                  )}
+                  {donusturulen === p.id ? t("Dönüştürülüyor…") : t("Müşteriye dönüştür")}
                 </button>
-                <SatirSimgeleri
-                  party={p}
-                  onDosya={dosyaAc}
-                  onKisiler={() => {
-                    // Kişi sayısına basınca kart Kişiler sekmesinde açılır.
-                    setDetaySekmesi("contacts");
-                    setOpenPartyId(p.id);
-                  }}
-                />
-                {canWrite && !baglantiModu && potansiyelMusteriMi(p) && (
-                  <button
-                    onClick={() => musteriyeDonustur(p)}
-                    disabled={donusturulen === p.id}
-                    title={t("Anlaşma yapıldı: kartı müşteriye dönüştür")}
-                    style={{
-                      flexShrink: 0,
-                      fontSize: 12,
-                      padding: "3px 8px",
-                      borderRadius: 6,
-                      border: `1px solid ${ROLE_COLORS.customer}60`,
-                      background: "transparent",
-                      color: ROLE_COLORS.customer,
-                      cursor: donusturulen === p.id ? "default" : "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {donusturulen === p.id ? t("Dönüştürülüyor…") : t("Müşteriye dönüştür")}
-                  </button>
-                )}
-                {canWrite && (
-                  <>
-                    <button
-                      onClick={() => (formMode?.kind === "edit" && formMode.party.id === p.id ? closeForm() : openEdit(p))}
-                      aria-label={formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
-                      title={formMode?.kind === "edit" && formMode.party.id === p.id ? t("Kapat") : t("Düzenle")}
-                      style={{ display: "inline-flex", padding: 4, background: "transparent", border: "none", cursor: "pointer" }}
-                    >
-                      {formMode?.kind === "edit" && formMode.party.id === p.id ? (
-                        <IconX size={15} color={c.primary} />
-                      ) : (
-                        <IconEdit size={15} color={c.textSecondary} />
-                      )}
-                    </button>
-                    {/* Silme düğmesi satırda yok: düzenleme kartının en altında (bkz. formAlani). */}
-                  </>
-                )}
-              </div>
-
-
-              {openPartyId === p.id && <PartyDetail
-                  key={`${p.id}-${detaySekmesi ?? ""}`}
-                  ilkSekme={detaySekmesi}
-                  party={p}
-                  baglantiModu={baglantiModu}
-                  baglantiYazar={baglantiYazar}
-                  departmentId={jobId ? undefined : departmentId}
-                  onDegisti={() => load()}
-                  canWrite={canWrite}
-                  // Sipariş/tahsilat yazma hakkı sorumluluktan gelir (bkz.
-                  // backend siparis-erisim.ts): modülde salt okur olan satışçı
-                  // da kendisine atanan müşterinin tahsilatını girer.
-                  siparisYazar={yonetici || (!!user && p.ownerUserId === user.id)}
-                  profile={profile.primaryActionLabel}
-                  // Bağlantılar'da alacak-borç sekmesi yok; hook'a şirket verilmezse sekme çıkmaz.
-                  organizationId={baglantiModu ? undefined : organizationId}
-                  sirketId={jobId ? undefined : organizationId}
-                  listeler={listeler}
-                  kapsamYolu={kapsamYolu}
-                />}
+              )}
+              {canWrite && (
+                // Silme düğmesi satırda yok: düzenleme kartının en altında (bkz. formAlani).
+                <button
+                  onClick={() => openEdit(p)}
+                  aria-label={t("Düzenle")}
+                  title={t("Düzenle")}
+                  style={{ display: "inline-flex", padding: 6, background: "transparent", border: "none", cursor: "pointer", flexShrink: 0 }}
+                >
+                  <IconEdit size={16} color={c.textSecondary} />
+                </button>
+              )}
             </div>
-          ))}
+            );
+          })}
           </div>
         </div>
       )}
@@ -2056,18 +2288,18 @@ export default function CustomersPanel({
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
-              padding: "4px 10px",
+              padding: "5px 10px",
               borderRadius: 6,
               border: `1px solid ${c.border}`,
               background: "transparent",
               color: c.textSecondary,
-              fontSize: 12,
+              fontSize: 13,
               cursor: "pointer",
             }}
           >
-            <IconUpload size={13} /> {t("Excel ile toplu ekle")}
+            <IconUpload size={14} /> {t("Excel ile toplu ekle")}
           </button>
-          <span style={{ flex: "1 1 200px", fontSize: 11, color: c.textSecondary }}>
+          <span style={{ flex: "1 1 200px", fontSize: 12, color: c.textSecondary }}>
             {baglantiModu
               ? t("Fuar dönüşü kartvizitleri tek seferde girmek için: şablonu indirin, doldurun, aynı yerden yükleyin.")
               : t("Şablonu indirin, doldurun, aynı yerden yükleyin — her satır bir müşteri kartı olur.")}
@@ -2075,27 +2307,77 @@ export default function CustomersPanel({
         </div>
       )}
       </div>
-      {yanSutun && (
-        <aside
+
+      {/* ---- Sağ bölme: seçili kartın tamamı ---- */}
+      {ikiBolme && (
+        <section
+          aria-label={seciliKart ? seciliKart.displayName : undefined}
           style={{
-            width: 150,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            gap: 10,
-            // Uzun listede kaydırırken de özet elde kalsın.
+            flex: 1,
+            minWidth: 0,
+            // Liste kayarken kart yerinde kalsın; uzun kart kendi içinde kayar.
+            // 72: sayfanın sabit üst çubuğu (eski özet sütunuyla aynı pay).
             position: "sticky",
             top: 72,
+            maxHeight: "calc(100vh - 88px)",
+            overflowY: "auto",
+            padding: "22px 26px",
+            borderRadius: 12,
+            background: c.surface,
+            border: `1px solid ${c.border}`,
           }}
         >
-          {ozetKutulari(true)}
-        </aside>
+          {seciliKart ? (
+            kartDetayi(seciliKart)
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 280, textAlign: "center" }}>
+              <IconUser size={28} color={c.textSecondary} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>
+                {baglantiModu ? t("Bir bağlantı seç") : t("Bir müşteri seç")}
+              </span>
+              <span style={{ fontSize: 14, color: c.textSecondary, maxWidth: 320 }}>
+                {t("Soldaki listeden birine tıkla; künyesi, görüşmeleri ve siparişleri burada açılır.")}
+              </span>
+            </div>
+          )}
+        </section>
       )}
       </div>
       </>
       )}
     </div>
   );
+}
+
+/** "--KARABENEK ECZ/BAYINDIR" → "KE": harf dışı işaretler atlanır. */
+function basHarfler(ad: string): string {
+  return (
+    ad
+      .replace(/[^\p{L}\s]/gu, " ")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((w) => w.charAt(0))
+      .join("")
+      .toLocaleUpperCase("tr") || "?"
+  );
+}
+
+/**
+ * Rol rozeti: rengin yazı rengiyle karışımı. ROLE_COLORS koyu tonlar; karanlık
+ * temada koyu yeşil yazı koyu zeminde 3,3:1 kalıyordu (en az 4,5 gerekir).
+ * textPrimary ile karıştırmak açık temada koyulaştırır, koyu temada açar.
+ */
+function rozetStili(renk: string, c: ThemeColors): React.CSSProperties {
+  const yazi = `color-mix(in srgb, ${renk} 55%, ${c.textPrimary})`;
+  return {
+    fontSize: 12,
+    padding: "1px 7px",
+    borderRadius: 6,
+    color: yazi,
+    border: `1px solid ${renk}55`,
+    whiteSpace: "nowrap",
+  };
 }
 
 function Field({
@@ -2110,7 +2392,7 @@ function Field({
   const c = useThemeColors();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, ...style }}>
-      <label style={{ fontSize: 12, color: c.textSecondary }}>{label}</label>
+      <label style={{ fontSize: 13, color: c.textSecondary }}>{label}</label>
       {children}
     </div>
   );
@@ -2128,7 +2410,7 @@ function AramaRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
   const renk = durum === "gecikti" ? c.danger : durum === "bugun" ? c.accent : c.textSecondary;
   const [y, a, g] = tarih.split("-");
   return (
-    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
+    <span style={{ fontSize: 12, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
       <InlineIcon><IconCalendar size={12} /></InlineIcon>
       {durum === "bugun"
         ? t("Bugün aranacak")
@@ -2146,13 +2428,14 @@ function SonTemasSatiri({ p }: { p: Party }) {
   const o = p.temas!;
   const son = o.sonTemas!;
   return (
-    <div style={{ fontSize: 11, color: c.textSecondary, marginTop: 2, display: "flex", gap: 6, flexWrap: "wrap" }}>
+    // Satırın alt satırında, şehir/telefonun yanında aynı satırda durur.
+    <span style={{ fontSize: 13, color: c.textSecondary, display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
       <span style={{ color: son.type === "ulasilamadi" ? c.danger : c.textSecondary }}>
         {t(GORUSME_TURU_ETIKETI[son.type])} · {timeAgo(son.occurredAt)}
       </span>
       {o.ulasilamadiSerisi >= 2 && <span style={{ color: c.danger }}>{t("({n}. deneme)", { n: o.ulasilamadiSerisi })}</span>}
       {o.notSayisi > 1 && <span>· {t("{n} not", { n: o.notSayisi })}</span>}
-    </div>
+    </span>
   );
 }
 
@@ -2164,7 +2447,7 @@ function TemasRozeti({ tarih, bugun }: { tarih: string; bugun: string }) {
   const renk = gecti ? c.danger : bugunMu ? c.accent : c.textSecondary;
   const [y, a, g] = tarih.split("-");
   return (
-    <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
+    <span style={{ fontSize: 12, padding: "1px 6px", borderRadius: 6, color: renk, border: `1px solid ${renk}60` }}>
       {bugunMu ? t("Bugün temas") : gecti ? t("Temas gecikti · {tarih}", { tarih: `${g}.${a}.${y}` }) : t("Temas · {tarih}", { tarih: `${g}.${a}.${y}` })}
     </span>
   );
@@ -2212,8 +2495,12 @@ function PartyDetail({
 }) {
   const c = useThemeColors();
   const t = useT();
-  const [tab, setTab] = useState<"activity" | "contacts" | "alacakBorc" | "siparisler" | "portal" | "iliski" | "gorevler" | "dosyalar">(
-    ilkSekme ?? (baglantiModu ? "iliski" : "siparisler")
+  // Görüşme notları eskiden sekmelerin ÜSTÜNDE hep açıktı; künye + not +
+  // görüşmeler + sekmeler alt alta yığılınca sekmeler kartın dibinde
+  // kayboluyordu (kullanıcı şikâyeti, 2026-11-11). Artık ilk sekme o: kart
+  // açılınca yine ilk görünen görüşmeler.
+  const [tab, setTab] = useState<"gorusmeler" | "activity" | "contacts" | "alacakBorc" | "siparisler" | "portal" | "iliski" | "gorevler" | "dosyalar">(
+    ilkSekme ?? (baglantiModu ? "iliski" : "gorusmeler")
   );
   const [gorevler, setGorevler] = useState<PartyGorevi[]>([]);
   const [gorevAcik, setGorevAcik] = useState(false);
@@ -2306,40 +2593,44 @@ function PartyDetail({
   // Sekmeler alt çizgili bir çubuk: önceden dolu renkli haplardı ve üstteki
   // kutularla aynı görünüyordu; açılan alan üst üste binmiş aynı renkli
   // şeritlere dönüyordu (kullanıcı şikâyeti, 2026-10-27).
+  // Sekmeler büyük ve tek satır: 13 px yazı + 2 px dolgu ile hedef küçüktü,
+  // sekmeler iki satıra kırılınca hangisinin seçili olduğu karışıyordu
+  // (kullanıcı şikâyeti, 2026-11-11). Sığmazsa çubuk yana kayar.
   const tabStyle = (active: boolean) => ({
-    fontSize: 13,
-    padding: "6px 2px",
+    fontSize: 14,
+    padding: "10px 2px",
     marginBottom: -1,
     border: "none",
     borderBottom: `2px solid ${active ? c.primary : "transparent"}`,
     cursor: "pointer",
     background: "transparent",
     color: active ? c.primary : c.textSecondary,
-    fontWeight: active ? 600 : 400,
+    fontWeight: active ? 600 : 500,
+    whiteSpace: "nowrap" as const,
+    flexShrink: 0,
   });
   // Künyenin altındaki bölümler kutu değil, ince bir çizgiyle ayrılır.
-  const bolum = { borderTop: `1px solid ${c.border}`, paddingTop: 10 } as const;
+  const bolum = { borderTop: `1px solid ${c.border}`, paddingTop: 12 } as const;
 
   return (
     <div
       style={{
-        // Açılan alan listeden ayrışsın diye kendi renginde (theme.acilanAlan);
-        // vurgulu kenar ve gölgeyle satırın altında belirgin dursun
-        // (kullanıcı isteği, 2026-10-20).
-        margin: "2px 8px 10px",
-        padding: "12px 14px",
-        borderRadius: 10,
-        background: c.acilanAlan,
-        border: `1px solid color-mix(in srgb, ${c.primary} 45%, ${c.border})`,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+        // Kartın kendi zemini, kenarı ve dolgusu yok: geniş ekranda sağ
+        // bölme, dar ekranda pencere çerçeveler. Eskiden satırın içinde kendi
+        // renginde (acilanAlan) gölgeli bir kutuydu, içindeki künye ayrı bir
+        // kutu, onun içindeki özetler bir kutu daha — üç katman göz yoruyordu
+        // (kullanıcı şikâyeti, 2026-11-11).
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        gap: 16,
       }}
     >
       {/* Künye: iletişim, adres, vergi ve sipariş özeti — önceden yalnızca
           düzenleme formunda görünüyordu (bkz. MusteriKunyesi). */}
       <MusteriKunyesi party={party} siparisOzetiGoster={!baglantiModu} />
+      {/* Web sitesi ve sosyal hesaplar künyenin hemen altında: eskiden
+          sekmelerin altında, içerikle karışık duruyordu. */}
+      <KartBaglantilari party={party} />
       {portalVar && (portalHesabi > 0 || portal!.yazabilir) && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           {portalHesabi === 0 ? (
@@ -2348,20 +2639,20 @@ function PartyDetail({
                 setTab("portal");
                 setPortalYeni(true);
               }}
-              style={{ fontSize: 13, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+              style={{ fontSize: 14, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
             >
               {t("Portal hesabı aç")}
             </button>
           ) : (
             <button
               onClick={() => setTab("portal")}
-              style={{ fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
+              style={{ fontSize: 14, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
             >
               {t("Web portalı · {n} hesap", { n: portalHesabi })}
             </button>
           )}
           {portalHesabi === 0 && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Bu müşteri portalda görünmüyor; hesap açılınca görünür.")}</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Bu müşteri portalda görünmüyor; hesap açılınca görünür.")}</span>
           )}
         </div>
       )}
@@ -2383,18 +2674,21 @@ function PartyDetail({
           Bağlantılar'dan aktarılan ilişki notu da buraya yazıldığı için açık
           kartta görünmesi şart (kullanıcı şikâyeti, 2026-10-11). */}
       {!baglantiModu && party.notes?.trim() && (
-        <div style={{ fontSize: 13, ...bolum }}>
-          <span style={{ fontSize: 11, color: c.textSecondary }}>{t("Not")}</span>
-          <p style={{ margin: "2px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap" }}>{party.notes}</p>
+        <div style={{ fontSize: 14, ...bolum }}>
+          <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Not")}</span>
+          <p style={{ margin: "4px 0 0", color: c.textPrimary, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>{party.notes}</p>
         </div>
       )}
-      {/* Aramalar ve görüşmeler notun altına, yazanı ve tarihiyle (bkz. GorusmeNotlari). */}
-      {!baglantiModu && (
-        <div style={bolum}>
-          <GorusmeNotlari party={party} canWrite={canWrite} onDegisti={() => { onDegisti(); load(); }} />
-        </div>
-      )}
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", borderBottom: `1px solid ${c.border}`, marginTop: 4 }}>
+      {/* Sekmeler sığmazsa alt satıra iner: yana kaydırınca çubuğun altında
+          kaydırma çubuğu çıkıyor, sekmeye basmayı zorlaştırıyordu
+          (kullanıcı şikâyeti, 2026-11-11). */}
+      <div style={{ display: "flex", flexWrap: "wrap", columnGap: 22, rowGap: 0, borderBottom: `1px solid ${c.border}`, marginTop: 4 }}>
+        {/* Aramalar ve görüşmeler, yazanı ve tarihiyle (bkz. GorusmeNotlari). */}
+        {!baglantiModu && (
+          <button onClick={() => setTab("gorusmeler")} style={tabStyle(tab === "gorusmeler")}>
+            {t("Görüşmeler")} {(party.temas?.notSayisi ?? 0) > 0 && `(${party.temas!.notSayisi})`}
+          </button>
+        )}
         {baglantiModu ? (
           <>
             <button onClick={() => setTab("iliski")} style={tabStyle(tab === "iliski")}>
@@ -2451,7 +2745,7 @@ function PartyDetail({
                   addActivity();
                 }
               }}
-              style={{ flex: 1, fontSize: 13, padding: "5px 8px", resize: "vertical", fontFamily: "inherit" }}
+              style={{ flex: 1, fontSize: 14, padding: "5px 8px", resize: "vertical", fontFamily: "inherit" }}
             />
           ) : (
             <input
@@ -2459,14 +2753,14 @@ function PartyDetail({
               onChange={(e) => setDraft(e.target.value)}
               placeholder={t("Kişi adı")}
               onKeyDown={(e) => e.key === "Enter" && addContact()}
-              style={{ flex: 1, fontSize: 13, padding: "5px 8px" }}
+              style={{ flex: 1, fontSize: 14, padding: "5px 8px" }}
             />
           )}
           <button
             onClick={tab === "activity" ? addActivity : addContact}
             disabled={busy || !draft.trim()}
             style={{
-              fontSize: 12,
+              fontSize: 13,
               padding: "5px 12px",
               borderRadius: 6,
               border: "none",
@@ -2480,46 +2774,9 @@ function PartyDetail({
         </div>
       )}
 
-      <KartBaglantilari party={party} />
-
-      {baglantiModu && canWrite && <AktarimSecenekleri party={party} onDegisti={onDegisti} />}
-
-      {defterButonu && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 12 }}>
-          {!defterSoru ? (
-            <button
-              onClick={() => setDefterSoru(true)}
-              style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
-            >
-              {baglantiModu ? t("Müşteri yap") : t("Bağlantılara ekle")}
-            </button>
-          ) : (
-            <>
-              <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>
-                {baglantiModu
-                  ? t("Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.")
-                  : t("Kart Bağlantı ve İlişkiler listesinde de görünecek.")}
-              </span>
-              <button
-                onClick={deftereEkle}
-                disabled={busy}
-                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
-              >
-                {t("Onayla")}
-              </button>
-              <button
-                onClick={() => setDefterSoru(false)}
-                style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
-              >
-                {t("Vazgeç")}
-              </button>
-            </>
-          )}
-          {defterHata && <span style={{ color: c.danger, flexBasis: "100%" }}>{defterHata}</span>}
-        </div>
-      )}
-
-      {tab === "iliski" ? (
+      {tab === "gorusmeler" && !baglantiModu ? (
+        <GorusmeNotlari party={party} canWrite={canWrite} onDegisti={() => { onDegisti(); load(); }} />
+      ) : tab === "iliski" ? (
         <>
           <IliskiOzeti baglanti={party.baglanti} />
           <KartDosyalari party={party} canWrite={canWrite} departmentId={departmentId} onDegisti={onDegisti} />
@@ -2531,20 +2788,20 @@ function PartyDetail({
           {canWrite && (departmentId || sirketId) && (
             <button
               onClick={() => setGorevAcik(true)}
-              style={{ alignSelf: "flex-start", fontSize: 12, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+              style={{ alignSelf: "flex-start", fontSize: 13, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
             >
               {t("+ Takip görevi aç")}
             </button>
           )}
           {gorevler.length === 0 ? (
-            <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
+            <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
               {departmentId || sirketId
                 ? t("Bu bağlantı için açılmış görev yok.")
                 : t("Takip görevi departman içinden açılır.")}
             </p>
           ) : (
             gorevler.map((g) => (
-              <div key={g.id} style={{ display: "flex", gap: 6, fontSize: 12, alignItems: "baseline" }}>
+              <div key={g.id} style={{ display: "flex", gap: 6, fontSize: 13, alignItems: "baseline" }}>
                 <span style={{ color: g.status === "completed" ? c.success : c.textSecondary }}>
                   {g.status === "completed" ? "✓" : "○"}
                 </span>
@@ -2599,11 +2856,11 @@ function PartyDetail({
         />
       ) : tab === "activity" ? (
         activities.length === 0 ? (
-          <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz temas kaydı yok.")}</p>
+          <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Henüz temas kaydı yok.")}</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {activities.map((a) => (
-              <div key={a.id} style={{ fontSize: 12, color: c.textPrimary }}>
+              <div key={a.id} style={{ fontSize: 13, color: c.textPrimary }}>
                 <span style={{ color: c.textSecondary }}>{a.occurredAt.slice(0, 10)} · </span>
                 {a.summary || t(GORUSME_TURU_ETIKETI[a.type])}
                 {a.userName && <span style={{ color: c.textSecondary }}> — {a.userName}</span>}
@@ -2612,11 +2869,11 @@ function PartyDetail({
           </div>
         )
       ) : contacts.length === 0 ? (
-        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz kişi eklenmemiş.")}</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Henüz kişi eklenmemiş.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           {contacts.map((ct) => (
-            <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <div key={ct.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
               <span style={{ flex: 1, color: c.textPrimary }}>
                 {ct.name}
                 {ct.title && <span style={{ color: c.textSecondary }}> · {ct.title}</span>}
@@ -2664,6 +2921,47 @@ function PartyDetail({
           ))}
         </div>
       )}
+      {/* Kartı başka deftere taşıma işleri en altta, çizgiyle ayrı: eskiden
+          sekmelerle içeriğin ARASINDA duruyordu ve sekmeye ait sanılıyordu. */}
+      {(defterButonu || (baglantiModu && canWrite)) && (
+        <div style={{ ...bolum, display: "flex", flexDirection: "column", gap: 10 }}>
+          {baglantiModu && canWrite && <AktarimSecenekleri party={party} onDegisti={onDegisti} />}
+          {defterButonu && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+          {!defterSoru ? (
+            <button
+              onClick={() => setDefterSoru(true)}
+              style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.primary}`, background: "transparent", color: c.primary, cursor: "pointer" }}
+            >
+              {baglantiModu ? t("Müşteri yap") : t("Bağlantılara ekle")}
+            </button>
+          ) : (
+            <>
+              <span style={{ color: c.textSecondary, flex: "1 1 220px" }}>
+                {baglantiModu
+                  ? t("Kart Müşteriler listesinde de görünecek; ilişki notu kartın notuna eklenir ve satış ekibi görür.")
+                  : t("Kart Bağlantı ve İlişkiler listesinde de görünecek.")}
+              </span>
+              <button
+                onClick={deftereEkle}
+                disabled={busy}
+                style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+              >
+                {t("Onayla")}
+              </button>
+              <button
+                onClick={() => setDefterSoru(false)}
+                style={{ fontSize: 13, padding: "4px 10px", borderRadius: 6, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
+              >
+                {t("Vazgeç")}
+              </button>
+            </>
+          )}
+          {defterHata && <span style={{ color: c.danger, flexBasis: "100%" }}>{defterHata}</span>}
+        </div>
+          )}
+        </div>
+      )}
       {epostaSecimi && (
         <EpostaGonderSecimi to={epostaSecimi.to} ad={epostaSecimi.ad} onClose={() => setEpostaSecimi(null)} />
       )}
@@ -2683,7 +2981,7 @@ function IliskiOzeti({ baglanti }: { baglanti?: PartyBaglanti }) {
     [t("Sonraki temas"), gun(baglanti?.sonrakiTemas)],
   ];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
       {satirlar
         .filter(([, v]) => v)
         .map(([k, v]) => (
@@ -2707,7 +3005,7 @@ function KartBaglantilari({ party }: { party: Party }) {
   const site = safeExternalUrl(party.website);
   const hesaplar = KARTVIZIT_SOSYAL.filter((s) => party.sosyal?.[s.anahtar]);
   if (!site && !hesaplar.length) return null;
-  const link = { fontSize: 12, color: c.primary, textDecoration: "none" } as const;
+  const link = { fontSize: 13, color: c.primary, textDecoration: "none" } as const;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 12px" }}>
       {site && (
@@ -2778,7 +3076,7 @@ function KartDosyalari({
       />
       {/* Yeni kullanıcı dosyaların nereye gittiğini buradan öğrenir. Drive
           bağlı değilse kart yine kaydedilir; yalnızca dosya saklanmaz. */}
-      <span style={{ fontSize: 11, color: c.textSecondary }}>
+      <span style={{ fontSize: 12, color: c.textSecondary }}>
         {t("Kartvizit ve dosyalar bağlı Google Drive ya da OneDrive hesabına kaydedilir (Ayarlar > Bağlı hesaplar). Bağlı değilse kartın bilgileri yine kaydedilir.")}
       </span>
       {acik && <FilePreviewModal file={acik} onClose={() => setAcik(null)} />}
@@ -2839,7 +3137,7 @@ function DosyaBolumu({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ color: c.textSecondary }}>
           {baslik}
@@ -2849,7 +3147,7 @@ function DosyaBolumu({
           <button
             onClick={() => girdi.current?.click()}
             disabled={yukleniyor}
-            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {yukleniyor ? t("Yükleniyor…") : ekleMetni}
           </button>
@@ -2858,7 +3156,7 @@ function DosyaBolumu({
         {canWrite && rol === "ek" && (
           <button
             onClick={() => setSeciciAcik(true)}
-            style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {t("+ Projelio'dan seç")}
           </button>
@@ -2880,7 +3178,7 @@ function DosyaBolumu({
         <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
             onClick={() => onAc(d)}
-            style={{ flex: 1, textAlign: "left", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ flex: 1, textAlign: "left", fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {d.name}
           </button>
@@ -2959,7 +3257,7 @@ export function SatirSimgeleri({
   const durdur = (e: React.MouseEvent) => e.stopPropagation();
   // Simgenin yanındaki küçük sayı (kişi, dosya): birden fazlaysa görünür.
   const sayi = (n?: number) =>
-    n && n > 1 ? <span style={{ fontSize: 10, marginLeft: 1, color: c.textSecondary }}>{n}</span> : null;
+    n && n > 1 ? <span style={{ fontSize: 12, marginLeft: 1, color: c.textSecondary }}>{n}</span> : null;
   const sayacli = { ...kutu, width: "auto", minWidth: 24, padding: "0 3px" } as const;
 
   return (
@@ -2976,7 +3274,7 @@ export function SatirSimgeleri({
           style={sayacli}
         >
           <IconUser size={15} />
-          <span style={{ fontSize: 10, marginLeft: 1, color: c.textSecondary }}>{kisi}</span>
+          <span style={{ fontSize: 12, marginLeft: 1, color: c.textSecondary }}>{kisi}</span>
         </button>
       )}
       {telefon && (
@@ -3176,7 +3474,7 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
   const geriAlinir = (h: PartyAktarimHedefi) => h === "musteri" || h === "potansiyel" || h === "tedarikci";
 
   const dugme = {
-    fontSize: 12,
+    fontSize: 13,
     padding: "4px 10px",
     borderRadius: 6,
     border: `1px solid ${c.primary}`,
@@ -3184,10 +3482,10 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
     color: c.primary,
     cursor: "pointer",
   } as const;
-  const kucukBaglanti = { fontSize: 11, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", padding: 0, textDecoration: "underline" } as const;
+  const kucukBaglanti = { fontSize: 12, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", padding: 0, textDecoration: "underline" } as const;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
         <span style={{ color: c.textSecondary }}>{t("Aktar:")}</span>
         {uygun.map((s) => (
@@ -3230,7 +3528,7 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
               <select
                 value={listeSecimi}
                 onChange={(e) => setListeSecimi(e.target.value)}
-                style={{ fontSize: 12, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+                style={{ fontSize: 13, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
               >
                 <option value="">{t("Listesiz")}</option>
                 {musteriListeleri.map((l) => (
@@ -3247,7 +3545,7 @@ function AktarimSecenekleri({ party, onDegisti }: { party: Party; onDegisti: () 
                   maxLength={80}
                   onChange={(e) => setYeniListeAdi(e.target.value)}
                   placeholder={t("Liste adı")}
-                  style={{ fontSize: 12, padding: "3px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+                  style={{ fontSize: 13, padding: "3px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
                 />
               )}
             </div>
@@ -3313,14 +3611,14 @@ export function BaglantiKartiModal({ partyId, onClose }: { partyId: string; onCl
   return (
     <Modal title={party?.displayName ?? t("Yükleniyor…")} subtitle={altSatir || undefined} onClose={onClose} maxWidth={640} mobileFullScreen>
       {hata ? (
-        <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>
+        <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{hata}</p>
       ) : party ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {party.roles.map((r) => (
               <span
                 key={r}
-                style={{ fontSize: 10, padding: "1px 6px", borderRadius: 6, color: ROLE_COLORS[r], border: `1px solid ${ROLE_COLORS[r]}40` }}
+                style={{ fontSize: 12, padding: "1px 6px", borderRadius: 6, color: ROLE_COLORS[r], border: `1px solid ${ROLE_COLORS[r]}40` }}
               >
                 {t(ROLE_LABELS[r], { ctx: "rol" })}
               </span>
@@ -3340,8 +3638,16 @@ export function BaglantiKartiModal({ partyId, onClose }: { partyId: string; onCl
           />
         </div>
       ) : (
-        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
+        <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>
       )}
     </Modal>
   );
+}
+
+/** Kartın ili / ilçesi — büyük harfe çevrilir: "İzmir" ile "İZMİR" ayrı seçenek olmasın. */
+function ilAdi(p: Party): string | undefined {
+  return p.address?.city?.trim().toLocaleUpperCase("tr") || undefined;
+}
+function ilceAdi(p: Party): string | undefined {
+  return p.address?.district?.trim().toLocaleUpperCase("tr") || undefined;
 }

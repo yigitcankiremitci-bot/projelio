@@ -81,7 +81,7 @@ export default function SatisKanallari({
     }
   };
 
-  if (!kanallar) return <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
+  if (!kanallar) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   // Seçicide listede olmayan mevcut sorumlu da görünsün (kaydetmek onu silmesin).
   const secenekler = (k: SatisKanali) =>
@@ -93,13 +93,13 @@ export default function SatisKanallari({
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 8, background: c.background, borderRadius: 10, padding: 10 }}>
-      <h6 style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Satış kanalları")}</h6>
-      <span style={{ fontSize: 12, color: c.textSecondary }}>
+      <h6 style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, margin: 0 }}>{t("Satış kanalları")}</h6>
+      <span style={{ fontSize: 13, color: c.textSecondary }}>
         {t("Yeni siparişin vadesi ve ödeme yöntemi kanaldan gelir. Müşteri kartı olmayan tek seferlik alıcıların siparişleri kanalda toplanır; sorumlusu kanalın sorumlusudur.")}
       </span>
       {kanallar.length > 0 && (
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${c.border}`, color: c.textSecondary, textAlign: "left" }}>
                 <th style={hucre}>{t("Kanal")}</th>
@@ -183,12 +183,12 @@ export default function SatisKanallari({
         <button
           onClick={ekle}
           disabled={!yeniAd.trim()}
-          style={{ fontSize: 12, padding: "5px 12px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+          style={{ fontSize: 13, padding: "5px 12px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
         >
           {t("Ekle")}
         </button>
       </div>
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
     </section>
   );
 }

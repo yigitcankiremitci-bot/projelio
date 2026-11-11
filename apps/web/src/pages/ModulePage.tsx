@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
 import type { Department, Job, ModuleAccess, ModuleCatalogEntry, Organization } from "@projelio/shared";
 import { api } from "../api/client";
@@ -11,6 +11,9 @@ import ModuleTeamPanel from "../components/ModuleTeamPanel";
 import { CoverBackLink } from "../components/EntityCover";
 import AskLioButton from "../components/AskLioButton";
 import { useT } from "../lib/i18n";
+import { useIsDesktop } from "../lib/useIsDesktop";
+import { ModulGeriContext } from "../lib/modulGeri";
+import { safeTop, TOP_CHROME, Z } from "../lib/layout";
 
 /**
  * Bir modülün kendi sayfası.
@@ -28,6 +31,7 @@ export default function ModulePage() {
   // sahiplik ve "geri" bağlantısı.
   const { departmentId, organizationId: orgParam, jobId, moduleKey } = useParams();
   const c = useThemeColors();
+  const masaustu = useIsDesktop();
   const t = useT();
 
   // Modül sayfası kendi odası: aynı departmanın iki farklı modülünde çalışan iki
@@ -108,6 +112,18 @@ export default function ModulePage() {
   // Önceki sayfa bilinmiyorsa (doğrudan bağlantı) sabit ebeveyn sürüyor.
   const back = useBackTarget(parent);
   const { key } = useLocation();
+  // Geri hapını modül kendi sekmelerinin altına aldıysa burada çizilmez (bkz. lib/modulGeri).
+  const [geriUstlenen, setGeriUstlenen] = useState(0);
+  const geriBaglami = useMemo(
+    () => ({
+      hap: <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} floating />,
+      ustlen: () => {
+        setGeriUstlenen((n) => n + 1);
+        return () => setGeriUstlenen((n) => n - 1);
+      },
+    }),
+    [back.to, back.label, back.geriGit]
+  );
   // Modülün adı geçmişe yazılır: buradan açılan sayfanın geri bağlantısı
   // "← Faturalar" diyebilsin.
   useEffect(() => {
@@ -127,31 +143,62 @@ export default function ModulePage() {
     // bırakıyor ve modüllerde kapak yok. 28 px + tek başına satır kaplayan Lio
     // simgesi + başlığın ÜSTÜNDEKİ geri hapı birlikte çalışma alanını ~150 px
     // aşağı itiyordu (kullanıcı geri bildirimi, 2026-10-10).
-    <div style={{ padding: "4px 28px 28px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 500, color: c.textPrimary, flex: 1, minWidth: 0 }}>
-            {title}
-          </h1>
-          {/* Lio simgesi başlığın yanında; ModuleSurface'e kendi satırını
-              çizmemesi söyleniyor (lioBaslikta), yoksa sayfada iki tane olurdu. */}
-          <AskLioButton subject={{ kind: "modul", title }} size={24} />
-        </div>
-        {/* Uygulamanın her yerindeki geri hapı (bkz. EntityCover CoverBackLink).
-            Burada kapak olmadığı için sayfa zeminine uygun "floating" hâli.
-            Başlığın ALTINDA: sayfayı ilk okuyan göz modülün adına çarpsın, geri
-            yolu ikincil bilgi. */}
-        <div style={{ alignSelf: "flex-start" }}>
-          <CoverBackLink to={back.to} label={back.label} geriGit={back.geriGit} floating />
-        </div>
+    <ModulGeriContext.Provider value={geriBaglami}>
+    <div style={{ padding: masaustu ? "4px 28px 28px" : "4px 16px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* Başlık üst şeritte: logo ile yardım düğmesinin arasında, ortada
+          (kullanıcı isteği, 2026-11-11). Önceden şeridin altında kendi
+          satırını kaplıyor, modülün listesini aşağı itiyordu. Sabit (fixed)
+          değil yapışkan (sticky): yan menü açıkken de İÇERİK sütununun
+          ortasında dursun. Negatif üst boşluk onu şeridin içine çeker; maske
+          (Z.headerMask) altında kalmasın diye üst süslerle aynı katmanda.
+          Kenardaki düğmelerin üstüne binmesin diye genişliği sınırlı. */}
+      <div
+        style={{
+          position: "sticky",
+          top: safeTop(TOP_CHROME.top),
+          zIndex: Z.topChrome,
+          height: TOP_CHROME.size,
+          marginTop: TOP_CHROME.top - (HEADER_UST + 4),
+          // Sonraki satır şeridin hemen altından başlasın (12 px aralıkla).
+          marginBottom: HEADER_UST - TOP_CHROME.top - TOP_CHROME.size - 8,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          pointerEvents: "none",
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: masaustu ? 22 : 19,
+            fontWeight: 600,
+            color: c.textPrimary,
+            maxWidth: masaustu ? "calc(100% - 260px)" : "calc(100% - 200px)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {title}
+        </h1>
+        {/* Lio simgesi başlığın yanında; ModuleSurface'e kendi satırını
+            çizmemesi söyleniyor (lioBaslikta), yoksa sayfada iki tane olurdu. */}
+        <span style={{ pointerEvents: "auto", display: "inline-flex" }}>
+          <AskLioButton subject={{ kind: "modul", title }} size={22} />
+        </span>
         {/* Katalog açıklaması BİLEREK gösterilmiyor.
             O cümle "bu modülü açarsam ne göreceğim" sorusunu yanıtlamak için
             yazıldı; yeri modül kartı ve "Modül ekle" seçim ekranı. Sayfanın
             içindeyken cevabı zaten ekranda — burada yalnızca yer kaplıyor ve
             modül geliştikçe eskiyor (E-posta modülü kampanya defteriyken
-            yazılan cümle, gelen kutusu eklendikten sonra yanlış kalmıştı).
+            yazılan cümle, gelen kutusu eklendikten sonra yanlış kaldı).
             Açıklama metni module_catalog.description'da duruyor. */}
       </div>
+
+      {/* Uygulamanın her yerindeki geri hapı (bkz. EntityCover CoverBackLink).
+          Sekmeli modüller onu kendi sekmelerinin altına alır (lib/modulGeri). */}
+      {geriUstlenen === 0 && <div style={{ alignSelf: "flex-start" }}>{geriBaglami.hap}</div>}
 
       <ModuleSurface
         moduleKey={moduleKey}
@@ -177,5 +224,9 @@ export default function ModulePage() {
         />
       </div>
     </div>
+    </ModulGeriContext.Provider>
   );
 }
+
+/** Üst şeridin yüksekliği (App.tsx HEADER_HEIGHT ile aynı): içerik bunun altından başlar. */
+const HEADER_UST = 76;

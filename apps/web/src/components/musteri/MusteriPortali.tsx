@@ -89,7 +89,7 @@ export default function MusteriPortali({
   };
 
   const kucuk: React.CSSProperties = {
-    fontSize: 12,
+    fontSize: 13,
     padding: "2px 8px",
     borderRadius: 7,
     border: `1px solid ${c.border}`,
@@ -101,8 +101,8 @@ export default function MusteriPortali({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 10, borderRadius: 10, border: `1px solid ${c.border}` }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary, flex: 1 }}>{t("Web portalı")}</span>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: c.textSecondary }}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary, flex: 1 }}>{t("Web portalı")}</span>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: c.textSecondary }}>
           {t("Müşteri iskontosu (%)")}
           <input
             inputMode="decimal"
@@ -112,19 +112,19 @@ export default function MusteriPortali({
             onChange={(e) => setIskonto(e.target.value)}
             onBlur={iskontoKaydet}
             onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
-            style={{ width: 64, fontSize: 12 }}
+            style={{ width: 64, fontSize: 13 }}
           />
         </label>
       </div>
-      <span style={{ fontSize: 11, color: c.textSecondary }}>
+      <span style={{ fontSize: 12, color: c.textSecondary }}>
         {t("İskonto KDV hariç liste fiyatına uygulanır, sonra KDV eklenir. Portal fiyatı sunucudan hesaplanmış alır.")}
       </span>
 
       {ozet.kullanicilar.length === 0 && !yeni && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Bu müşterinin henüz portal hesabı yok.")}</span>
+        <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Bu müşterinin henüz portal hesabı yok.")}</span>
       )}
       {ozet.kullanicilar.map((k) => (
-        <div key={k.id} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, opacity: k.durum === "aktif" ? 1 : 0.6 }}>
+        <div key={k.id} style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, opacity: k.durum === "aktif" ? 1 : 0.6 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <span style={{ color: c.textPrimary, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
               {k.ad ? `${k.ad} · ${k.eposta}` : k.eposta}
@@ -181,13 +181,13 @@ export default function MusteriPortali({
         ozet.yazabilir && (
           <button
             onClick={() => setYeni(true)}
-            style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+            style={{ alignSelf: "flex-start", fontSize: 14, fontWeight: 500, padding: "6px 14px", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
           >
             {ozet.kullanicilar.length === 0 ? t("Portal hesabı aç") : t("+ Portal kullanıcısı oluştur")}
           </button>
         )
       )}
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
     </div>
   );
 }
@@ -228,7 +228,7 @@ function YeniPortalKullanicisi({
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
       {ozet.baglantilar.length > 1 && (
         <select value={baglantiId} onChange={(e) => setBaglantiId(e.target.value)} style={TAM_GENISLIK}>
           {ozet.baglantilar.map((b) => (
@@ -259,18 +259,18 @@ function YeniPortalKullanicisi({
         <button
           disabled={kaydediliyor || !eposta.trim()}
           onClick={kaydet}
-          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+          style={{ fontSize: 13, padding: "4px 12px", borderRadius: 7, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
         >
           {t("Hesabı oluştur")}
         </button>
         <button
           onClick={onVazgec}
-          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 7, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
+          style={{ fontSize: 13, padding: "4px 12px", borderRadius: 7, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, cursor: "pointer" }}
         >
           {t("Vazgeç")}
         </button>
       </div>
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
     </div>
   );
 }

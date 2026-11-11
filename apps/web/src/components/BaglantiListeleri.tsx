@@ -173,7 +173,7 @@ export function BaglantiListeSekmeleri({
         {sag && <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>{sag}</span>}
       </div>
       {onBirak && canWrite && listeler.length > 0 && (
-        <span style={{ fontSize: 11, color: c.textSecondary }}>
+        <span style={{ fontSize: 12, color: c.textSecondary }}>
           {t("İpucu: bir kartı tutup liste sekmesinin üstüne bırakınca o listeye taşınır; listede sürükleyerek sırasını değiştirebilirsin.")}
         </span>
       )}
@@ -197,38 +197,38 @@ export function BaglantiListeSekmeleri({
             onChange={(e) => setAd(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && kaydet()}
             placeholder={t("Liste adı, ör. İTS 2026 Fuarı")}
-            style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+            style={{ fontSize: 14, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
           />
           {form.tur === "yeni" && gorunenIdler.length > 0 && (
-            <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: c.textPrimary, cursor: "pointer" }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, color: c.textPrimary, cursor: "pointer" }}>
               <input type="checkbox" checked={gorunenleriEkle} onChange={(e) => setGorunenleriEkle(e.target.checked)} />
               {modul === BAGLANTI_MODUL_KEY
                 ? t("Şu an listede görünen {n} bağlantıyı bu listeye ekle", { n: gorunenIdler.length })
                 : t("Şu an listede görünen {n} kartı bu listeye ekle", { n: gorunenIdler.length })}
             </label>
           )}
-          {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+          {hata && <span style={{ fontSize: 13, color: c.danger }}>{hata}</span>}
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
             {form.tur === "adlandir" && duzenlenen && (
               <button
                 onClick={async () => {
                   if (await sil(duzenlenen)) setForm(null);
                 }}
-                style={{ fontSize: 12, border: "none", background: "transparent", color: c.danger, cursor: "pointer", marginRight: "auto", padding: "4px 0" }}
+                style={{ fontSize: 13, border: "none", background: "transparent", color: c.danger, cursor: "pointer", marginRight: "auto", padding: "4px 0" }}
               >
                 {t("Listeyi sil")}
               </button>
             )}
-            <button onClick={() => setForm(null)} style={{ ...sekmeStili(c, false), fontSize: 12, padding: "4px 10px" }}>
+            <button onClick={() => setForm(null)} style={{ ...sekmeStili(c, false), fontSize: 13, padding: "4px 10px" }}>
               {t("Vazgeç")}
             </button>
-            <button onClick={kaydet} disabled={busy || !ad.trim()} style={{ ...sekmeStili(c, true), fontSize: 12, padding: "4px 12px", opacity: busy || !ad.trim() ? 0.6 : 1 }}>
+            <button onClick={kaydet} disabled={busy || !ad.trim()} style={{ ...sekmeStili(c, true), fontSize: 13, padding: "4px 12px", opacity: busy || !ad.trim() ? 0.6 : 1 }}>
               {form.tur === "yeni" ? t("Listeyi oluştur") : t("Kaydet")}
             </button>
           </div>
         </div>
       )}
-      {!form && hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+      {!form && hata && <span style={{ fontSize: 13, color: c.danger }}>{hata}</span>}
     </div>
   );
 }
@@ -310,7 +310,7 @@ export function KartListeleri({
         else if (tasimaMi) void tasi(v);
         else void ekle(v);
       }}
-      style={{ fontSize: 12, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+      style={{ fontSize: 13, padding: "3px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
     >
       <option value="">{etiket}</option>
       {secenekler.map((l) => (
@@ -328,7 +328,7 @@ export function KartListeleri({
         display: "flex",
         flexDirection: "column",
         gap: 6,
-        fontSize: 12,
+        fontSize: 13,
       }}
     >
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -341,7 +341,7 @@ export function KartListeleri({
               display: "inline-flex",
               alignItems: "center",
               gap: 4,
-              fontSize: 12,
+              fontSize: 13,
               padding: "2px 4px 2px 9px",
               borderRadius: 999,
               border: `1px solid ${c.primary}`,
@@ -356,7 +356,7 @@ export function KartListeleri({
                 disabled={busy}
                 title={t("Listeden çıkar")}
                 aria-label={t("Listeden çıkar")}
-                style={{ border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: "0 3px", fontSize: 13, lineHeight: 1 }}
+                style={{ border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: "0 3px", fontSize: 14, lineHeight: 1 }}
               >
                 ×
               </button>
@@ -385,12 +385,12 @@ export function KartListeleri({
               if (e.key === "Escape") setYeni(null);
             }}
             placeholder={t("Liste adı, ör. İTS 2026 Fuarı")}
-            style={{ flex: 1, fontSize: 12, padding: "4px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+            style={{ flex: 1, fontSize: 13, padding: "4px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
           />
-          <button onClick={() => void yeniListe()} disabled={busy || !yeni.ad.trim()} style={{ ...sekmeStili(c, true), fontSize: 12, padding: "3px 10px" }}>
+          <button onClick={() => void yeniListe()} disabled={busy || !yeni.ad.trim()} style={{ ...sekmeStili(c, true), fontSize: 13, padding: "3px 10px" }}>
             {t("Oluştur")}
           </button>
-          <button onClick={() => setYeni(null)} style={{ ...sekmeStili(c, false), fontSize: 12, padding: "3px 10px" }}>
+          <button onClick={() => setYeni(null)} style={{ ...sekmeStili(c, false), fontSize: 13, padding: "3px 10px" }}>
             {t("Vazgeç")}
           </button>
         </div>

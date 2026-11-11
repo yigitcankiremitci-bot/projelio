@@ -54,7 +54,7 @@ import {
 } from "./baglanti-erisim";
 import { hataMetni } from "../../common/i18n/index";
 import { type SheetData } from "../ai-assistant/ai-sheet-import";
-import { mevcutlariAyikla, MUSTERI_IMPORT_TAVANI, planMusteriImport, type MusteriAlani } from "./musteri-sablonu";
+import { mevcutlariAyikla, MUSTERI_IMPORT_TAVANI, planMusteriImport, sorumluEslestir, type MusteriAlani } from "./musteri-sablonu";
 
 // Kapsam düzeyindeki yetkinin varsayılan modülü. Kayda bağlı yetki ise
 // kaydın durduğu defterlerden okunur (bkz. baglanti-erisim.ts).
@@ -728,6 +728,7 @@ export class PartyService {
     }
     // Yalnızca okuyabildiği defterlerle karşılaştırılır: "zaten kayıtlı: X"
     // satırı göremediği defterdeki kartın adını söylerdi (bkz. checkDuplicates).
+    await this.sorumlulariEsle(scope, plan.planlanan, plan.uyarilar);
     const mevcut = await this.findAll(scope, { includeArchived: true, moduller: await this.okunanModuller(scope, userId) });
     const { yeni, zatenVar } = mevcutlariAyikla(plan.planlanan, mevcut);
     const islenecek = yeni.slice(0, MUSTERI_IMPORT_TAVANI);
@@ -755,6 +756,87 @@ export class PartyService {
 
     const { olusan, hatalar } = await this.createMany(scope, islenecek, userId, opts.kaynak ?? "excel", modul);
     return { ...sonuc, acilan: olusan.length, hatalar, acilanIdler: olusan.map((o) => o.party.id) };
+  }
+
+  /**
+   * Dosyadaki "Sorumlu" sütununu ekipteki kişilere bağlar.
+   *
+   * Eskiden toplu aktarımda her kartın sorumlusu yükleyen kişi oluyordu;
+   * şirketin listesindeki gerçek sorumlu ancak not alanına yazılabiliyordu ve
+   * 318 kartın hepsinde yükleyenin adı görünüyordu (kullanıcı şikâyeti,
+   * 2026-11-11). Eşleşmeyen ad (ekipte hesabı olmayan satışçı) kaybolmaz:
+   * kart yükleyene kalır, ad "Sorumlu: X" olarak nota yazılır — arayüz o adı
+   * gösterir (apps/web/src/lib/partySorumlu.ts). Uyarı satır başına değil AD
+   * başına: 165 satırlık aynı uyarı önizlemeyi okunmaz yapardı.
+   */
+  private async sorumlulariEsle(
+    scope: PartyScope,
+    planlanan: { satir: number; party: Partial<Party>; sorumlu?: string }[],
+    uyarilar: { satir: number; sebep: string }[]
+  ): Promise<void> {
+    const dolu = planlanan.filter((p) => p.sorumlu);
+    if (!dolu.length) return;
+    const adaylar = await this.sorumluAdaylari(scope);
+    const bulunamayan = new Map<string, { ilkSatir: number; sayi: number }>();
+    for (const p of dolu) {
+      const id = sorumluEslestir(p.sorumlu!, adaylar);
+      if (id) {
+        p.party.ownerUserId = id;
+        continue;
+      }
+      const not = `Sorumlu: ${p.sorumlu}`;
+      const eski = p.party.notes?.trim();
+      if (!eski?.includes(not)) p.party.notes = eski ? `${eski} · ${not}` : not;
+      const b = bulunamayan.get(p.sorumlu!) ?? { ilkSatir: p.satir, sayi: 0 };
+      b.sayi++;
+      bulunamayan.set(p.sorumlu!, b);
+    }
+    for (const [ad, b] of bulunamayan) {
+      uyarilar.push({
+        satir: b.ilkSatir,
+        sebep: `"${ad}" ekipte bulunamadı (${b.sayi} kart): kart yükleyene atanır, sorumlunun adı nota yazılır`,
+      });
+    }
+  }
+
+  /**
+   * Kartın atanabileceği kişiler (assertAtanabilir ile aynı çevre): işte işin
+   * sahibi + onaylı üyeler; şirkette sahip + onaylı şirket üyeleri + şirketin
+   * departmanlarının onaylı kadrosu.
+   */
+  private async sorumluAdaylari(scope: PartyScope): Promise<{ id: string; fullName?: string | null; email?: string | null }[]> {
+    const db = this.supabase.client;
+    const idler = new Set<string>();
+    if (scope.jobId) {
+      const { data: is } = await db.from("jobs").select("owner_id").eq("id", scope.jobId).maybeSingle();
+      if (is?.owner_id) idler.add(is.owner_id);
+      const { data } = await db.from("job_members").select("user_id").eq("job_id", scope.jobId).eq("status", "approved");
+      for (const r of data ?? []) idler.add((r as any).user_id);
+    } else if (scope.organizationId) {
+      const orgId = scope.organizationId;
+      const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
+      if (org?.owner_id) idler.add(org.owner_id);
+      const { data: uyeler } = await db
+        .from("organization_members")
+        .select("user_id")
+        .eq("organization_id", orgId)
+        .eq("status", "approved");
+      for (const r of uyeler ?? []) idler.add((r as any).user_id);
+      const { data: depts } = await db.from("departments").select("id").eq("organization_id", orgId);
+      const deptIds = (depts ?? []).map((d: any) => d.id);
+      if (deptIds.length) {
+        const { data: kadro } = await db
+          .from("department_members")
+          .select("user_id")
+          .in("department_id", deptIds)
+          .eq("status", "approved");
+        for (const r of kadro ?? []) idler.add((r as any).user_id);
+      }
+    }
+    const liste = [...idler].filter(Boolean);
+    if (!liste.length) return [];
+    const { data } = await db.from("users").select("id, full_name, email").in("id", liste.slice(0, LISTE_TAVANI));
+    return (data ?? []).map((u: any) => ({ id: u.id, fullName: u.full_name, email: u.email }));
   }
 
   /**
@@ -802,7 +884,8 @@ export class PartyService {
       source,
       modules: [modul],
       // Bkz. create(): sahipsiz müşteri kimsenin takip etmediği müşteridir.
-      owner_user_id: userId,
+      // Dosyadaki "Sorumlu" ekipten biriyle eşleştiyse o (sorumlulariEsle).
+      owner_user_id: p.ownerUserId ?? userId,
       data: {},
       notes: p.notes ?? null,
       created_by: userId,

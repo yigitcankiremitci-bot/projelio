@@ -48,6 +48,9 @@ export type MusteriAlani =
   | "contactPhone"
   | "contactEmail"
   | "notes"
+  // Müşteri şablonunda: kartın sorumlusu (ekipteki bir kişinin adı ya da
+  // e-postası). Kullanıcı isteği, 2026-11-11 — bkz. sorumluEslestir.
+  | "sorumlu"
   // Yalnızca Bağlantı ve İlişkiler şablonunda (migration 153).
   | "onem"
   | "tanismaYeri"
@@ -237,6 +240,17 @@ export const MUSTERI_SUTUNLARI: Sutun[] = [
     ornek: "ayse@denizlojistik.com",
   },
   {
+    alan: "sorumlu",
+    baslik: "Sorumlu",
+    esAdlar: [
+      "sorumlu", "sorumlu kişi", "sorumlu kisi", "sorumlu personel", "temsilci", "müşteri temsilcisi",
+      "satış temsilcisi", "satis temsilcisi", "plasiyer", "owner", "responsible", "sales rep", "account manager",
+    ],
+    genislik: 22,
+    aciklama: "Müşteriyle ilgilenen ekip üyesinin adı soyadı ya da e-postası. Boşsa ya da ekipte yoksa kart yükleyene atanır.",
+    ornek: "Ayşe Yılmaz",
+  },
+  {
     alan: "notes",
     baslik: "Not",
     esAdlar: ["not", "notlar", "açıklama", "aciklama", "notes", "note"],
@@ -379,6 +393,11 @@ const EN: Record<MusteriAlani, { baslik: string; aciklama: string; ornek: string
   contactPhone: { baslik: "Contact phone", aciklama: "", ornek: "+44 7700 900000" },
   contactEmail: { baslik: "Contact email", aciklama: "", ornek: "emma@harborlogistics.com" },
   notes: { baslik: "Notes", aciklama: "Free-form note.", ornek: "Monthly shipping agreement." },
+  sorumlu: {
+    baslik: "Owner",
+    aciklama: "Name or email of the team member who handles this customer. Empty or unknown means the uploader.",
+    ornek: "Emma Clarke",
+  },
   onem: { baslik: "Priority", aciklama: "High, Medium or Low. Empty means Medium. The list is sorted by this first.", ornek: "High" },
   tanismaYeri: { baslik: "Where met", aciklama: "Name of the fair, event or meeting.", ornek: "Istanbul Fair 2026" },
   sonrakiTemas: { baslik: "Next follow-up", aciklama: "When to get back in touch: DD.MM.YYYY or YYYY-MM-DD.", ornek: "15.10.2026" },
@@ -656,6 +675,8 @@ export interface PlanlananMusteri {
   satir: number;
   party: Partial<Party> & { displayName: string };
   kisi?: { name: string; phone?: string; email?: string };
+  /** Dosyadaki sorumlu (ad ya da e-posta), ekiple eşleştirilmeden önce. */
+  sorumlu?: string;
 }
 
 export interface MusteriPlani {
@@ -876,7 +897,7 @@ export function planMusteriImport(
       uyarilar.push({ satir: satirNo, sebep: "yetkili kişinin adı boş, telefonu/e-postası eklenmedi" });
     }
 
-    planlanan.push({ satir: satirNo, party, kisi });
+    planlanan.push({ satir: satirNo, party, kisi, sorumlu: al("sorumlu") });
   }
 
   return { toplamSatir, planlanan, atlanan, uyarilar, eslesenSutunlar, kullanilmayanSutunlar };
@@ -937,4 +958,35 @@ export function mevcutlariAyikla(
     ekle(p.party, { etiket: `${p.party.displayName} (dosyada ${p.satir}. satır)` });
   }
   return { yeni, zatenVar };
+}
+
+/**
+ * Dosyadaki sorumlu adını ekipteki bir kişiye bağlar: önce e-posta, sonra
+ * ad soyad (büyük/küçük harf ve Türkçe işaretler önemsiz: "MEHMET KİREMİTCİ"
+ * = "Mehmet Kiremitci"). Aynı adı taşıyan iki kişi varsa EŞLEŞTİRMEZ — yanlış
+ * kişiye atamak, atamamaktan kötü.
+ */
+export function sorumluEslestir(
+  deger: string,
+  adaylar: { id: string; fullName?: string | null; email?: string | null }[]
+): string | undefined {
+  const d = deger.trim();
+  if (!d) return undefined;
+  if (d.includes("@")) {
+    const e = normalizeEmail(d);
+    return adaylar.find((a) => a.email && normalizeEmail(a.email) === e)?.id;
+  }
+  const anahtar = sorumluAnahtari(d);
+  const bulunan = adaylar.filter((a) => a.fullName && sorumluAnahtari(a.fullName) === anahtar);
+  return bulunan.length === 1 ? bulunan[0].id : undefined;
+}
+
+export function sorumluAnahtari(ad: string): string {
+  return ad
+    .toLocaleLowerCase("tr")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/\s+/g, " ")
+    .trim();
 }

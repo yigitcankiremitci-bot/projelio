@@ -52,7 +52,7 @@ export default function KartDosyaOnizleme({
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <button
         onClick={onTumu}
-        style={{ alignSelf: "flex-start", fontSize: 11, color: c.textSecondary, background: "transparent", border: "none", padding: 0, cursor: onTumu ? "pointer" : "default" }}
+        style={{ alignSelf: "flex-start", fontSize: 12, color: c.textSecondary, background: "transparent", border: "none", padding: 0, cursor: onTumu ? "pointer" : "default" }}
       >
         {t("Dosyalar ({n})", { n: dosyalar.length })}
       </button>
@@ -79,7 +79,7 @@ export default function KartDosyaOnizleme({
             >
               <FileThumb file={f} thumbs={thumbs} variant="tile" />
             </span>
-            <span style={{ fontSize: 11, color: c.textPrimary, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+            <span style={{ fontSize: 12, color: c.textPrimary, width: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
               {f.name}
             </span>
           </button>
@@ -87,7 +87,7 @@ export default function KartDosyaOnizleme({
         {kalan > 0 && (
           <button
             onClick={onTumu}
-            style={{ width: 74, height: 74, borderRadius: 8, border: `1px dashed ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 13, cursor: "pointer" }}
+            style={{ width: 74, height: 74, borderRadius: 8, border: `1px dashed ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14, cursor: "pointer" }}
           >
             +{kalan}
           </button>

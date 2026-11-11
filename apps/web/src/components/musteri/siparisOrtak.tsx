@@ -31,7 +31,7 @@ export function DurumRozeti({ durum }: { durum: SiparisDurumu }) {
   return (
     <span
       style={{
-        fontSize: 11,
+        fontSize: 12,
         padding: "1px 7px",
         borderRadius: 6,
         color: renk,
@@ -51,7 +51,7 @@ export function AsamaRozeti({ asama }: { asama: SiparisAsamasi }) {
   if (asama === "iptal") return null;
   const renk = asama === "alindi" ? c.warning : asama === "teslim_edildi" ? c.textSecondary : c.primary;
   return (
-    <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 6, color: renk, background: `${renk}14`, whiteSpace: "nowrap" }}>
+    <span style={{ fontSize: 12, padding: "1px 7px", borderRadius: 6, color: renk, background: `${renk}14`, whiteSpace: "nowrap" }}>
       {t(SIPARIS_ASAMASI_ETIKET[asama])}
     </span>
   );
@@ -69,7 +69,7 @@ export function Alan({
   const c = useThemeColors();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0, ...style }}>
-      <label style={{ fontSize: 12, color: c.textSecondary }}>{label}</label>
+      <label style={{ fontSize: 13, color: c.textSecondary }}>{label}</label>
       {children}
     </div>
   );

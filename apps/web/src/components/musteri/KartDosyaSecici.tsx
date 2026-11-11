@@ -101,7 +101,7 @@ export default function KartDosyaSecici({
           <button
             type="button"
             onClick={geri}
-            style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: `1px solid ${c.border}`, borderRadius: 8, color: c.textPrimary, cursor: "pointer", padding: "3px 9px 3px 6px", fontSize: 13 }}
+            style={{ display: "flex", alignItems: "center", gap: 4, background: "transparent", border: `1px solid ${c.border}`, borderRadius: 8, color: c.textPrimary, cursor: "pointer", padding: "3px 9px 3px 6px", fontSize: 14 }}
           >
             <IconChevronLeft size={13} color={c.textSecondary} />
             {t("Geri")}
@@ -145,7 +145,7 @@ export default function KartDosyaSecici({
             <button key={k.anahtar} type="button" onClick={() => setKaynak(k)} style={satir(false)}>
               {k.anahtar.startsWith("organization:") ? <IconBuilding size={18} color={c.accent} /> : <IconFolder size={18} color={c.accent} />}
               <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, textAlign: "left" }}>{k.ad}</span>
-              <span style={{ fontSize: 12, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {k.anahtar.startsWith("organization:") ? t("Şirket dosyaları") : t("Departman")}
               </span>
             </button>
@@ -158,7 +158,7 @@ export default function KartDosyaSecici({
               <button key={k.id} type="button" onClick={() => setFolderId(k.id)} style={satir(false)}>
                 <IconFolder size={18} color={c.accent} />
                 <span style={{ flex: 1, fontSize: 15, color: c.textPrimary, textAlign: "left" }}>{k.name}</span>
-                <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Klasör")}</span>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Klasör")}</span>
               </button>
             ))}
             {veri.files.map((f: ProjectFile) => {
@@ -185,7 +185,7 @@ export default function KartDosyaSecici({
                     <span style={{ display: "block", fontSize: 15, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {f.name}
                     </span>
-                    <span style={{ display: "block", fontSize: 12, color: c.textSecondary }}>
+                    <span style={{ display: "block", fontSize: 13, color: c.textSecondary }}>
                       {[fileKindLabel(f), f.sizeBytes ? formatFileSize(f.sizeBytes) : null].filter(Boolean).join(" · ")}
                     </span>
                   </span>

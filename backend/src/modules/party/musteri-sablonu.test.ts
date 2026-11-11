@@ -10,6 +10,7 @@ import {
   musteriSutunlariniBul,
   planMusteriImport,
   SABLON_SAYFA_ADI,
+  sorumluEslestir,
   tabloyuOku,
   tarihiCoz,
   Workbook,
@@ -333,5 +334,32 @@ describe("Bağlantı ve İlişkiler şablonu", () => {
     assert.equal(tarihiCoz("05/03/2026"), "2026-03-05");
     assert.equal(tarihiCoz("31.02.2026"), undefined);
     assert.equal(tarihiCoz("yarın"), undefined);
+  });
+});
+
+describe("sorumlu sütunu", () => {
+  const ekip = [
+    { id: "m", fullName: "Mehmet KİREMİTCİ", email: "mehmet@ornek.com" },
+    { id: "o", fullName: "Onur Erdem", email: "onur@ornek.com" },
+  ];
+
+  test("plasiyer başlığı sorumlu olarak okunur", () => {
+    const plan = planMusteriImport(sayfa([["Ad", "Plasiyer"], ["Mavi Ajans", "MEHMET KİREMİTCİ"]]));
+    assert.equal(plan.planlanan[0].sorumlu, "MEHMET KİREMİTCİ");
+    assert.equal(plan.eslesenSutunlar.sorumlu, "Plasiyer");
+  });
+
+  test("ad büyük/küçük harf ve Türkçe işaretten bağımsız eşleşir", () => {
+    assert.equal(sorumluEslestir("mehmet kiremitci", ekip), "m");
+    assert.equal(sorumluEslestir("  ONUR   ERDEM ", ekip), "o");
+  });
+
+  test("e-postayla eşleşir", () => {
+    assert.equal(sorumluEslestir("Onur@Ornek.com", ekip), "o");
+  });
+
+  test("ekipte olmayan ya da iki kişiye uyan ad eşleşmez", () => {
+    assert.equal(sorumluEslestir("Mustafa Türk", ekip), undefined);
+    assert.equal(sorumluEslestir("Onur Erdem", [...ekip, { id: "o2", fullName: "Onur Erdem" }]), undefined);
   });
 });

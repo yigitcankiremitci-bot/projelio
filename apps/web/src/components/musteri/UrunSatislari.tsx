@@ -126,9 +126,9 @@ export default function UrunSatislari({ productId }: { productId: string }) {
             key={para}
             style={{ flex: "1 1 220px", border: `1px solid ${c.border}`, borderRadius: 12, padding: 14, display: "flex", flexDirection: "column", gap: 4 }}
           >
-            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Bu ürünün satışı")}</span>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>{t("Bu ürünün satışı")}</span>
             <span style={{ fontSize: 20, fontWeight: 600, color: c.textPrimary }}>{fmtPara(k.toplam, para)}</span>
-            <span style={{ fontSize: 13, color: c.textSecondary }}>
+            <span style={{ fontSize: 14, color: c.textSecondary }}>
               {[
                 t("Tahsil edilen {tutar}", { tutar: fmtPara(k.tahsil, para) }),
                 k.kalan >= 0.01 ? t("Kalan {tutar}", { tutar: fmtPara(k.kalan, para) }) : undefined,
@@ -140,12 +140,12 @@ export default function UrunSatislari({ productId }: { productId: string }) {
           </div>
         ))}
       </div>
-      <p style={{ margin: 0, fontSize: 13.5, color: c.textSecondary, lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: 14.5, color: c.textSecondary, lineHeight: 1.5 }}>
         {t("{siparis} sipariş · {musteri} müşteri", { siparis: veri.siparisler.length, musteri: musteriSayisi })}
         {!veri.yonetici && ` · ${t("Yalnızca sana atanmış müşteriler gösteriliyor.")}`}
       </p>
       {kanallar.length > 1 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 14 }}>
           {kanallar.map((k) => (
             <div key={`${k.ad}|${k.para}`} style={{ display: "flex", gap: 8, color: c.textPrimary }}>
               <span style={{ flex: 1, minWidth: 0 }}>{k.ad}</span>
@@ -170,7 +170,7 @@ export default function UrunSatislari({ productId }: { productId: string }) {
         {veri.siparisler.length > gosterilen && (
           <button
             onClick={() => setGosterilen((n) => n + SAYFA)}
-            style={{ alignSelf: "center", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
+            style={{ alignSelf: "center", fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}
           >
             {t("Daha fazla göster ({n} kaldı)", { n: veri.siparisler.length - gosterilen })}
           </button>

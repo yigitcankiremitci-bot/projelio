@@ -155,7 +155,7 @@ export default function GorusmeNotlari({
 
   const kucukDugme = (aktif: boolean) =>
     ({
-      fontSize: 12,
+      fontSize: 13,
       padding: "3px 8px",
       borderRadius: 6,
       border: `1px solid ${aktif ? c.primary : c.border}`,
@@ -183,10 +183,11 @@ export default function GorusmeNotlari({
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        padding: 10,
+        padding: 12,
         borderRadius: 8,
-        border: `1px solid ${c.border}`,
-        background: c.surface,
+        // Kart artık beyaz yüzeyde; form zeminin hafif tonuyla ayrışır,
+        // kenarlı ikinci bir kutu olmadan.
+        background: c.background,
       }}
     >
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -216,9 +217,9 @@ export default function GorusmeNotlari({
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) kaydet();
         }}
-        style={{ fontSize: 13, padding: "6px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+        style={{ fontSize: 14, padding: "6px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
       />
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 12, color: c.textSecondary }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
         <span>{t("Tekrar ara:")}</span>
         <button onClick={() => setTekrar("")} style={kucukDugme(tekrar === "")}>
           {t("Yok")}
@@ -233,10 +234,10 @@ export default function GorusmeNotlari({
           value={tekrar}
           min={bugun}
           onChange={(e) => setTekrar(e.target.value)}
-          style={{ fontSize: 12, padding: "2px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+          style={{ fontSize: 13, padding: "2px 6px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
         />
       </div>
-      {hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+      {hata && <span style={{ fontSize: 13, color: c.danger }}>{hata}</span>}
       <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
         <button onClick={() => setFormAcik(false)} style={kucukDugme(false)}>
           {t("Vazgeç")}
@@ -244,7 +245,7 @@ export default function GorusmeNotlari({
         <button
           onClick={kaydet}
           disabled={busy}
-          style={{ fontSize: 12, padding: "4px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
+          style={{ fontSize: 13, padding: "4px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer", opacity: busy ? 0.6 : 1 }}
         >
           {t("Kaydet")}
         </button>
@@ -256,11 +257,11 @@ export default function GorusmeNotlari({
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {/* Başlık: sayı + seri uyarısı */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: c.textPrimary }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: c.textPrimary }}>
           {t("Görüşme notları")} {notlar.length > 0 && `(${notlar.length})`}
         </span>
         {ozet.ulasilamadiSerisi >= 2 && (
-          <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 6, color: c.danger, border: `1px solid ${c.danger}60` }}>
+          <span style={{ fontSize: 12, padding: "1px 6px", borderRadius: 6, color: c.danger, border: `1px solid ${c.danger}60` }}>
             {t("Üst üste {n} kez ulaşılamadı", { n: ozet.ulasilamadiSerisi })}
           </span>
         )}
@@ -268,7 +269,7 @@ export default function GorusmeNotlari({
 
       {/* Tekrar arama günü */}
       {party.sonrakiArama && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 12, color: durumRengi }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontSize: 13, color: durumRengi }}>
           <span>
             <InlineIcon><IconCalendar size={12} /></InlineIcon>
             {durum === "gecikti"
@@ -281,7 +282,7 @@ export default function GorusmeNotlari({
             <button
               onClick={() => aramaGunuYaz(null)}
               disabled={busy}
-              style={{ fontSize: 11, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", textDecoration: "underline" }}
+              style={{ fontSize: 12, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", textDecoration: "underline" }}
             >
               {t("Planı kaldır")}
             </button>
@@ -292,7 +293,7 @@ export default function GorusmeNotlari({
       {/* Notlar, en yeni üstte; her biri ayrı kart */}
       {notlar.length === 0
         ? !formAcik && (
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>
               {t("Henüz görüşme notu yok. Aradığında \"+ Not ekle\" ile ne konuşulduğunu yaz.")}
             </span>
           )
@@ -318,7 +319,7 @@ export default function GorusmeNotlari({
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 600,
                       padding: "1px 8px",
                       borderRadius: 10,
@@ -328,11 +329,11 @@ export default function GorusmeNotlari({
                   >
                     {t(GORUSME_TURU_ETIKETI[a.type])}
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: c.textPrimary }}>
                     {a.userName ?? t("Bilinmeyen kullanıcı")}
                   </span>
                   <span style={{ flex: 1 }} />
-                  <span style={{ fontSize: 11, color: c.textSecondary }} title={timeAgo(a.occurredAt)}>
+                  <span style={{ fontSize: 12, color: c.textSecondary }} title={timeAgo(a.occurredAt)}>
                     {formatDateTime(a.occurredAt)}
                   </span>
                   {benim && canWrite && !duzenleniyor && (
@@ -361,7 +362,7 @@ export default function GorusmeNotlari({
                       value={duzenlenen.metin}
                       onChange={(e) => setDuzenlenen({ id: a.id, metin: e.target.value })}
                       rows={2}
-                      style={{ fontSize: 13, padding: "5px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
+                      style={{ fontSize: 14, padding: "5px 8px", resize: "vertical", fontFamily: "inherit", borderRadius: 6, border: `1px solid ${c.border}`, background: c.background, color: c.textPrimary }}
                     />
                     <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                       <button onClick={() => setDuzenlenen(null)} style={kucukDugme(false)}>
@@ -374,7 +375,7 @@ export default function GorusmeNotlari({
                   </div>
                 ) : (
                   a.summary && (
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{a.summary}</p>
+                    <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{a.summary}</p>
                   )
                 )}
               </div>
@@ -383,7 +384,7 @@ export default function GorusmeNotlari({
       {notlar.length > ILK_GOSTERIM && (
         <button
           onClick={() => setHepsi((h) => !h)}
-          style={{ alignSelf: "flex-start", fontSize: 12, border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: 0 }}
+          style={{ alignSelf: "flex-start", fontSize: 13, border: "none", background: "transparent", color: c.primary, cursor: "pointer", padding: 0 }}
         >
           {hepsi ? t("Daha az göster") : t("Tüm notlar ({n})", { n: notlar.length })}
         </button>
@@ -396,12 +397,12 @@ export default function GorusmeNotlari({
         ) : (
           <button
             onClick={() => formuAc("arama")}
-            style={{ alignSelf: "flex-start", fontSize: 12, padding: "5px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
+            style={{ alignSelf: "flex-start", fontSize: 13, padding: "5px 12px", borderRadius: 6, border: "none", background: c.primary, color: c.onPrimary, cursor: "pointer" }}
           >
             {t("+ Not ekle")}
           </button>
         ))}
-      {!formAcik && hata && <span style={{ fontSize: 12, color: c.danger }}>{hata}</span>}
+      {!formAcik && hata && <span style={{ fontSize: 13, color: c.danger }}>{hata}</span>}
     </div>
   );
 }

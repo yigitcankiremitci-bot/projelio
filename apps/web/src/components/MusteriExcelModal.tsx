@@ -117,7 +117,7 @@ export default function MusteriExcelModal({
           borderRadius: 999,
           background: c.primary,
           color: c.onPrimary,
-          fontSize: 12,
+          fontSize: 13,
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
@@ -130,7 +130,7 @@ export default function MusteriExcelModal({
     </div>
   );
   const satirListesi = (liste: { satir: number; sebep: string }[]) => (
-    <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 12, color: c.textSecondary }}>
+    <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 13, color: c.textSecondary }}>
       {liste.slice(0, 10).map((x, i) => (
         <li key={i}>{x.satir ? t("{n}. satır: {sebep}", { n: x.satir, sebep: x.sebep }) : x.sebep}</li>
       ))}
@@ -154,7 +154,7 @@ export default function MusteriExcelModal({
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {adim(1, t("Şablonu indirip doldurun"))}
-              <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>
+              <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>
                 {baglanti
                   ? t("Her satır bir bağlantı. Yalnızca Ad zorunlu; önem, nerede tanışıldığı ve sonraki temas da yazılabilir.")
                   : t("Her satır bir müşteri. Yalnızca Ad zorunlu; sütunların açıklaması dosyanın ikinci sayfasında.")}
@@ -211,7 +211,7 @@ export default function MusteriExcelModal({
                 <span style={{ fontSize: 14, color: c.textPrimary }}>
                   {dosya ? dosya.name : t("Dosyayı buraya bırakın ya da seçmek için tıklayın")}
                 </span>
-                <span style={{ fontSize: 12, color: c.textSecondary }}>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>
                   {baglanti
                     ? t("Kendi listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.")
                     : t("Kendi müşteri listeniz de olur (.xlsx ya da .csv); tanınan sütunlar aktarılır.")}
@@ -232,8 +232,8 @@ export default function MusteriExcelModal({
           </>
         )}
 
-        {calisiyor && <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Dosya okunuyor…")}</p>}
-        {hata && <p style={{ margin: 0, fontSize: 13, color: c.danger }}>{hata}</p>}
+        {calisiyor && <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Dosya okunuyor…")}</p>}
+        {hata && <p style={{ margin: 0, fontSize: 14, color: c.danger }}>{hata}</p>}
 
         {sonuc && !calisiyor && (
           <div
@@ -245,7 +245,7 @@ export default function MusteriExcelModal({
               borderRadius: 10,
               background: c.background,
               border: `1px solid ${c.border}`,
-              fontSize: 13,
+              fontSize: 14,
               color: c.textPrimary,
             }}
           >
@@ -255,7 +255,7 @@ export default function MusteriExcelModal({
                   ? t("{n} bağlantı kartı açıldı.", { n: sonuc.acilan ?? 0 })
                   : t("{n} müşteri kartı açıldı.", { n: sonuc.acilan ?? 0 })}
                 {sonuc.liste && (
-                  <div style={{ fontSize: 13, fontWeight: 400, color: c.textPrimary, marginTop: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 400, color: c.textPrimary, marginTop: 2 }}>
                     {t("\"{liste}\" listesinde {n} bağlantı var.", { liste: sonuc.liste.ad, n: sonuc.liste.eklenen })}
                   </div>
                 )}
@@ -283,7 +283,7 @@ export default function MusteriExcelModal({
               <div>
                 <button
                   onClick={() => setZatenAcik((v) => !v)}
-                  style={{ padding: 0, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", fontSize: 13 }}
+                  style={{ padding: 0, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", fontSize: 14 }}
                 >
                   {listeyeGidecek
                     ? t("{n} tanesi zaten kayıtlı; yeni kart açılmaz, mevcut kart listeye eklenir", { n: sonuc.zatenKayitli.length })
@@ -333,12 +333,12 @@ export default function MusteriExcelModal({
         )}
 
         {baglanti && sonuc && !bitti && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13, color: c.textPrimary }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 14, color: c.textPrimary }}>
             <span style={{ fontWeight: 500 }}>{t("Hangi bağlantı listesine eklensin?")}</span>
             <select
               value={listeSecimi}
               onChange={(e) => setListeSecimi(e.target.value)}
-              style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+              style={{ fontSize: 14, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
             >
               <option value={YENI_LISTE}>{t("+ Yeni liste")}</option>
               {listeler.map((l) => (
@@ -354,7 +354,7 @@ export default function MusteriExcelModal({
                 onChange={(e) => setYeniListeAdi(e.target.value)}
                 maxLength={80}
                 placeholder={t("Liste adı, ör. Firdevs — Ekim bağlantıları")}
-                style={{ fontSize: 13, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
+                style={{ fontSize: 14, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c.border}`, background: c.surface, color: c.textPrimary }}
               />
             )}
           </div>

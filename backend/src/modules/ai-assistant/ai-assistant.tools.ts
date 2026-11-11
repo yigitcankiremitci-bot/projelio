@@ -1797,7 +1797,7 @@ export const AI_TOOLS: Anthropic.Tool[] = [
           description:
             "İsteğe bağlı: alan -> sütun başlığı. Alanlar: displayName (zorunlu), partyType, roles, legalName, " +
             "taxNumber, taxOffice, email, phone, website, city, district, address, contactName, contactPhone, " +
-            "contactEmail, notes.",
+            "contactEmail, notes, sorumlu (kartın sorumlusu: ekipteki kişinin adı ya da e-postası).",
           additionalProperties: { type: "string" },
         },
         onizleme: { type: "boolean", description: "Varsayılan true." },

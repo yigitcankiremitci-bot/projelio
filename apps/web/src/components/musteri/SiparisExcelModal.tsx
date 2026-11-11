@@ -174,7 +174,7 @@ export default function SiparisExcelModal({
   };
 
   const bitti = sonuc && !sonuc.onizleme;
-  const secim: React.CSSProperties = { fontSize: 12, padding: "4px 6px", maxWidth: "100%" };
+  const secim: React.CSSProperties = { fontSize: 13, padding: "4px 6px", maxWidth: "100%" };
   const th: React.CSSProperties = { textAlign: "left", fontWeight: 500, color: c.textSecondary, padding: "4px 6px", whiteSpace: "nowrap" };
   const td: React.CSSProperties = { padding: "4px 6px", verticalAlign: "middle", color: c.textPrimary };
   const kutu: React.CSSProperties = {
@@ -185,7 +185,7 @@ export default function SiparisExcelModal({
     borderRadius: 10,
     background: c.background,
     border: `1px solid ${c.border}`,
-    fontSize: 13,
+    fontSize: 14,
     color: c.textPrimary,
   };
   const baslik = (s: string) => <span style={{ fontSize: 14, fontWeight: 500 }}>{s}</span>;
@@ -219,7 +219,7 @@ export default function SiparisExcelModal({
           >
             <IconUpload size={22} color={c.primary} />
             <span style={{ fontSize: 14, color: c.textPrimary }}>{dosya ? dosya.name : t("Sipariş listesini buraya bırakın ya da seçmek için tıklayın")}</span>
-            <span style={{ fontSize: 12, color: c.textSecondary }}>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>
               {t("Her satır bir sipariş: Tarih, Kanal (çıkış yeri), Alıcı, Tutar ve ürün başına adet sütunları. Ya da satır başına bir ürün: Ürün, Miktar.")}
             </span>
             <input
@@ -240,7 +240,7 @@ export default function SiparisExcelModal({
         )}
 
         {dosya && !bitti && (
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: c.textPrimary, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: c.textPrimary, flexWrap: "wrap" }}>
             {t("Bu tarihten itibaren al:")}
             <input
               type="date"
@@ -248,12 +248,12 @@ export default function SiparisExcelModal({
               onChange={(e) => duzelt((x) => ({ ...x, baslangic: e.target.value || undefined }))}
               style={secim}
             />
-            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Boşsa dosyadaki tüm tarihler.")}</span>
+            <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Boşsa dosyadaki tüm tarihler.")}</span>
           </label>
         )}
 
-        {calisiyor && <p style={{ margin: 0, fontSize: 13, color: c.textSecondary }}>{t("Dosya okunuyor…")}</p>}
-        {hata && <p style={{ margin: 0, fontSize: 13, color: c.danger }}>{hata}</p>}
+        {calisiyor && <p style={{ margin: 0, fontSize: 14, color: c.textSecondary }}>{t("Dosya okunuyor…")}</p>}
+        {hata && <p style={{ margin: 0, fontSize: 14, color: c.danger }}>{hata}</p>}
 
         {sonuc && (
           <div style={kutu}>
@@ -284,11 +284,11 @@ export default function SiparisExcelModal({
             {/* ------------------------------------------------ Ürün sütunları */}
             <div style={kutu}>
               {baslik(t("Ürünler"))}
-              <span style={{ fontSize: 12, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {t("Kalem fiyatları dosyadaki tutardan, katalog fiyatı (KDV dahil) oranında dağıtılır.")}
               </span>
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                       <th style={th}>{t("Dosyadaki sütun")}</th>
@@ -349,11 +349,11 @@ export default function SiparisExcelModal({
             {sonuc.kanallar.length > 0 && (
               <div style={kutu}>
                 {baslik(t("Satış kanalları"))}
-                <span style={{ fontSize: 12, color: c.textSecondary }}>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>
                   {t("Siparişin vadesi ve ödeme yöntemi kanaldan gelir. Var olan kanalın ayarı Satış kanalları ekranından değişir.")}
                 </span>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                         <th style={th}>{t("Kanal")}</th>
@@ -427,7 +427,7 @@ export default function SiparisExcelModal({
             {/* ------------------------------------------------ Alıcılar */}
             <div style={kutu}>
               {baslik(t("Alıcılar"))}
-              <span style={{ fontSize: 12, color: c.textSecondary }}>
+              <span style={{ fontSize: 13, color: c.textSecondary }}>
                 {t("Mevcut müşteriyle eşleşen alıcının siparişleri o karta yazılır. Eşleşmeyen ama birden çok siparişi olan için yeni kart açılır; tek seferlik alıcılar kanalında toplanır.")}
               </span>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -436,7 +436,7 @@ export default function SiparisExcelModal({
                     key={s}
                     onClick={() => setSekme(s)}
                     style={{
-                      fontSize: 12,
+                      fontSize: 13,
                       padding: "4px 10px",
                       borderRadius: 999,
                       border: `1px solid ${s === sekme ? c.primary : c.border}`,
@@ -450,9 +450,9 @@ export default function SiparisExcelModal({
                   </button>
                 ))}
               </div>
-              <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder={t("Alıcı ara")} style={{ ...secim, fontSize: 13 }} />
+              <input value={arama} onChange={(e) => setArama(e.target.value)} placeholder={t("Alıcı ara")} style={{ ...secim, fontSize: 14 }} />
               <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                       <th style={th}>{t("Dosyadaki alıcı")}</th>
@@ -466,7 +466,7 @@ export default function SiparisExcelModal({
                       <tr key={a.anahtar} style={{ borderBottom: `1px solid ${c.border}` }}>
                         <td style={td}>
                           {a.ad}
-                          <div style={{ fontSize: 11, color: c.textSecondary }}>{[a.kanallar.join(", "), a.il].filter(Boolean).join(" · ")}</div>
+                          <div style={{ fontSize: 12, color: c.textSecondary }}>{[a.kanallar.join(", "), a.il].filter(Boolean).join(" · ")}</div>
                         </td>
                         <td style={td}>{a.siparisSayisi}</td>
                         <td style={{ ...td, whiteSpace: "nowrap" }}>{fmtPara(a.tutar, "TRY")}</td>
@@ -504,7 +504,7 @@ export default function SiparisExcelModal({
                               </optgroup>
                             </select>
                             {a.karar === "mevcut" && a.guven && (
-                              <span style={{ fontSize: 11, color: a.guven === "kesin" ? c.success : c.textSecondary }}>
+                              <span style={{ fontSize: 12, color: a.guven === "kesin" ? c.success : c.textSecondary }}>
                                 {a.guven === "kesin" ? t("Eczane adı birebir eşleşti") : t("Olası eşleşme — kontrol edin")}
                               </span>
                             )}
@@ -524,7 +524,7 @@ export default function SiparisExcelModal({
                 </table>
               </div>
               {gorunen.length > SATIR_TAVANI && (
-                <span style={{ fontSize: 12, color: c.textSecondary }}>
+                <span style={{ fontSize: 13, color: c.textSecondary }}>
                   {t("İlk {n} alıcı gösteriliyor; diğerleri için arayın.", { n: SATIR_TAVANI })}
                 </span>
               )}
@@ -535,7 +535,7 @@ export default function SiparisExcelModal({
               <div style={kutu}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                   {baslik(t("{n} satır alınmayacak", { n: sonuc.atlanan.length }))}
-                  <button onClick={atlananlariIndir} style={{ fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}>
+                  <button onClick={atlananlariIndir} style={{ fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer" }}>
                     {t("CSV indir")}
                   </button>
                 </div>
@@ -548,12 +548,12 @@ export default function SiparisExcelModal({
                 </div>
                 <button
                   onClick={() => setAtlananAcik((x) => !x)}
-                  style={{ alignSelf: "flex-start", padding: 0, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", fontSize: 12 }}
+                  style={{ alignSelf: "flex-start", padding: 0, border: "none", background: "transparent", color: c.textSecondary, cursor: "pointer", fontSize: 13 }}
                 >
                   {atlananAcik ? t("Satırları gizle ▾") : t("Satırları göster ▸")}
                 </button>
                 {atlananAcik && (
-                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: c.textSecondary }}>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: c.textSecondary }}>
                     {sonuc.atlanan.slice(0, 200).map((a) => (
                       <li key={a.satir}>{t("{n}. satır: {neden} — {ozet}", { n: a.satir, neden: a.neden, ozet: a.ozet })}</li>
                     ))}

@@ -25,6 +25,7 @@ import { IconTrash } from "../icons";
 import SiparisFormu from "./SiparisFormu";
 import SiparisFaturasi from "./SiparisFaturasi";
 import { Alan, AsamaRozeti, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
+import { useIsDesktop } from "../../lib/useIsDesktop";
 
 /**
  * Tek sipariş: özet satırı + açılınca tahsilatlar, "tahsil et", düzenle, sil.
@@ -61,6 +62,7 @@ export default function SiparisKarti({
   const [acik, setAcik] = useState(false);
   const [mod, setMod] = useState<"tahsil" | "duzenle" | null>(null);
   const [hata, setHata] = useState("");
+  const masaustu = useIsDesktop();
 
   const bugun = bugunYerel();
   const durum = siparisDurumu(siparis, bugun);
@@ -128,8 +130,15 @@ export default function SiparisKarti({
     }
   };
 
-  const kucukDugme: React.CSSProperties = {
+  const ayrintiBasligi: React.CSSProperties = {
     fontSize: 12,
+    fontWeight: 600,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    color: c.textSecondary,
+  };
+  const kucukDugme: React.CSSProperties = {
+    fontSize: 13,
     padding: "3px 10px",
     borderRadius: 7,
     border: `1px solid ${c.border}`,
@@ -138,74 +147,117 @@ export default function SiparisKarti({
     cursor: "pointer",
   };
 
+  const vade = vadeDurumu(siparis.vadeTarihi, bugun, durum);
+  const vadeRengi = vade.ton === "kotu" ? c.danger : vade.ton === "dikkat" ? c.warning : vade.ton === "iyi" ? c.success : c.textSecondary;
+  // Meta satırı parça parça: "Faturasız" renkli olabilsin diye düz metin değil.
+  const meta: React.ReactNode[] = [
+    // Satırda siparişin günü; vade sağdaki sütunda (kullanıcı isteği, 2026-10-20 / 2026-11-11).
+    fmtTarih(siparis.siparisTarihi),
+    siparis.kanalAdi,
+    t(ODEME_YONTEMI_ETIKET[siparis.odemeYontemi]),
+    siparis.fatura ? (
+      siparis.fatura.faturaNo ? t("Fatura #{no}", { no: siparis.fatura.faturaNo }) : t("Faturalı")
+    ) : siparis.asama !== "iptal" ? (
+      // Faturası kesilmemiş sipariş görünür olsun: muhasebenin ay sonu işi bu.
+      <span style={{ color: c.warning }}>{t("Faturasız")}</span>
+    ) : undefined,
+    sorumluGoster ? siparis.sorumluAdi ?? t("Sorumlu yok") : undefined,
+  ].filter(Boolean);
+  // Telefonda satırda yer yok (ad beş satıra bölünüyordu): orada "Tahsil et"
+  // satır açılınca ayrıntıdaki düğmelerde.
+  const hizliTahsil = masaustu && yazabilir && kalan > 0 && siparis.asama !== "iptal" && !acik;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", ...(cerceveli ? {} : { background: c.background, borderRadius: 8 }) }}>
-      <div style={{ display: "flex", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, paddingRight: hizliTahsil ? 10 : 0 }}>
       {onSec && (
         <input
           type="checkbox"
           checked={!!secili}
-          disabled={kalan <= 0}
+          disabled={kalan <= 0 || siparis.asama === "iptal"}
           onChange={(e) => onSec(e.target.checked)}
           aria-label={t("Siparişi seç")}
-          style={{ marginLeft: 10 }}
+          style={{ marginLeft: 12, width: 16, height: 16, flexShrink: 0 }}
         />
       )}
       <button
         type="button"
         onClick={() => setAcik((x) => !x)}
+        aria-expanded={acik}
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
-          padding: "8px 10px",
+          gap: 12,
+          padding: "11px 12px",
           background: "transparent",
           border: "none",
           cursor: "pointer",
           textAlign: "left",
-          width: "100%",
+          flex: 1,
+          minWidth: 0,
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 14, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontSize: 15, fontWeight: 500, color: c.textPrimary, overflow: "hidden", textOverflow: "ellipsis" }}>
               {baslik || t("Sipariş")}
             </span>
+            {/* Tahsilat durumu sağdaki vade satırında yazıyor; burada yalnızca
+                orada görünmeyen iki hâl (kısmi, iptal) ve sipariş aşaması.
+                "Web sitesi" rozeti kalktı: kanal adı meta satırında zaten var. */}
             <AsamaRozeti asama={siparis.asama} />
-            <DurumRozeti durum={durum} />
-            {siparis.kaynak === "web_sitesi" && (
-              <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 6, color: c.textSecondary, border: `1px solid ${c.border}` }}>
-                {t("Web sitesi")}
-              </span>
-            )}
+            {(durum === "kismi" || durum === "iptal") && <DurumRozeti durum={durum} />}
           </div>
-          <div style={{ fontSize: 12, color: c.textSecondary, marginTop: 2 }}>
-            {[
-              // Satırda siparişin günü; vade açılınca ayrıntıda (kullanıcı isteği, 2026-10-20).
-              fmtTarih(siparis.siparisTarihi),
-              siparis.kanalAdi,
-              t(ODEME_YONTEMI_ETIKET[siparis.odemeYontemi]),
-              siparis.fatura ? (siparis.fatura.faturaNo ? t("Fatura #{no}", { no: siparis.fatura.faturaNo }) : t("Faturalı")) : undefined,
-              sorumluGoster ? siparis.sorumluAdi ?? t("Sorumlu yok") : undefined,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
+          <div style={{ fontSize: 13, color: c.textSecondary, marginTop: 3, display: "flex", flexWrap: "wrap", columnGap: 6 }}>
+            {meta.map((m, i) => (
+              <span key={i}>
+                {i > 0 && <span aria-hidden style={{ marginRight: 6 }}>·</span>}
+                {m}
+              </span>
+            ))}
           </div>
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 500, color: c.textPrimary }}>{fmtPara(siparis.tutar, para)}</div>
+        <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary, fontVariantNumeric: "tabular-nums" }}>{fmtPara(siparis.tutar, para)}</span>
           {odenen > 0 && kalan > 0 && (
-            <div style={{ fontSize: 11, color: durum === "gecikti" ? c.danger : c.textSecondary }}>
-              {t("Kalan {tutar}", { tutar: fmtPara(kalan, para) })}
-            </div>
+            <span style={{ fontSize: 12, color: c.textSecondary }}>{t("Kalan {tutar}", { tutar: fmtPara(kalan, para) })}</span>
           )}
+          <span style={{ fontSize: 12, fontWeight: 500, color: vadeRengi, whiteSpace: "nowrap" }}>{t(vade.metin, vade.degisken)}</span>
         </div>
       </button>
+      {/* Tek tık tahsilat: en sık iş, satırı açıp aramadan yapılsın. */}
+      {hizliTahsil && (
+        <button
+          onClick={() => {
+            setAcik(true);
+            setMod("tahsil");
+          }}
+          style={{ ...kucukDugme, padding: "5px 12px", color: c.primary, borderColor: `color-mix(in srgb, ${c.primary} 45%, transparent)`, whiteSpace: "nowrap", flexShrink: 0 }}
+        >
+          {t("Tahsil et")}
+        </button>
+      )}
       </div>
 
       {acik && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 10px 10px" }}>
-          <div style={{ fontSize: 12, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
+        // Ayrıntı satırın altında kendi zemininde: neyin satıra, neyin
+        // ayrıntıya ait olduğu karışmasın. Solda sipariş, sağda para (tahsilat +
+        // fatura) — dar alanda alt alta.
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            margin: "0 12px 12px",
+            padding: "14px 16px",
+            borderRadius: 10,
+            background: c.background,
+          }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "14px 24px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
+          <span style={ayrintiBasligi}>{t("Sipariş")}</span>
+          <div style={{ fontSize: 13, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
             <span>{t("Sipariş tarihi: {tarih}", { tarih: fmtTarih(siparis.siparisTarihi) })}</span>
             <span>
               {t("{gun} gün vade", { gun: siparis.vadeGun })} · {t("Vade {tarih}", { tarih: fmtTarih(siparis.vadeTarihi) })}
@@ -220,7 +272,7 @@ export default function SiparisKarti({
             )}
           </div>
           {siparis.alici && (siparis.partyId || siparis.alici.il) && (
-            <div style={{ fontSize: 12, color: c.textSecondary }}>
+            <div style={{ fontSize: 13, color: c.textSecondary }}>
               {t("Alıcı: {ad}", {
                 ad: [siparis.alici.ad, [siparis.alici.ilce, siparis.alici.il].filter(Boolean).join(" / ")].filter(Boolean).join(" · "),
               })}
@@ -229,7 +281,7 @@ export default function SiparisKarti({
           {siparis.kalemler.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
               {siparis.kalemler.map((k, i) => (
-                <div key={k.id ?? i} style={{ display: "flex", gap: 8, fontSize: 12, color: c.textPrimary }}>
+                <div key={k.id ?? i} style={{ display: "flex", gap: 8, fontSize: 13, color: c.textPrimary }}>
                   <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {k.productName ?? k.aciklama ?? t("Ürün")}
                   </span>
@@ -240,7 +292,7 @@ export default function SiparisKarti({
                 </div>
               ))}
               {sapma !== undefined && Math.abs(sapma) >= 0.01 && (
-                <span style={{ fontSize: 11, color: c.textSecondary }}>
+                <span style={{ fontSize: 12, color: c.textSecondary }}>
                   {sapma < 0
                     ? t("Katalog fiyatından %{oran} indirimli", { oran: Math.round(-sapma * 100) })
                     : t("Katalog fiyatından %{oran} yüksek", { oran: Math.round(sapma * 100) })}
@@ -248,15 +300,19 @@ export default function SiparisKarti({
               )}
             </div>
           )}
-          {siparis.notlar && <div style={{ fontSize: 12, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{siparis.notlar}</div>}
+          {siparis.notlar && <div style={{ fontSize: 13, color: c.textPrimary, whiteSpace: "pre-wrap" }}>{siparis.notlar}</div>}
+          </div>
 
-          {siparis.tahsilatlar.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <span style={{ fontSize: 12, fontWeight: 500, color: c.textPrimary }}>
-                {t("Tahsilatlar")} · {fmtPara(odenen, para)}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={ayrintiBasligi}>
+                {t("Tahsilat")} · {fmtPara(odenen, para)} / {fmtPara(siparis.tutar, para)}
               </span>
+              {siparis.tahsilatlar.length === 0 && (
+                <span style={{ fontSize: 13, color: c.textSecondary }}>{t("Henüz tahsilat yok.")}</span>
+              )}
               {siparis.tahsilatlar.map((x) => (
-                <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                <div key={x.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                   <span style={{ flex: 1, color: c.textPrimary, minWidth: 0 }}>
                     {fmtTarih(x.tarih)} · {fmtPara(x.tutar, para)} · {t(ODEME_YONTEMI_ETIKET[x.odemeYontemi])}
                     {x.evrakNo && <span style={{ color: c.textSecondary }}> · No {x.evrakNo}</span>}
@@ -264,16 +320,17 @@ export default function SiparisKarti({
                     {x.createdByName && <span style={{ color: c.textSecondary }}> — {x.createdByName}</span>}
                   </span>
                   {yazabilir && (
-                    <button onClick={() => geriAl(x.id)} style={{ ...kucukDugme, padding: "1px 8px", fontSize: 11 }}>
+                    <button onClick={() => geriAl(x.id)} style={{ ...kucukDugme, padding: "1px 8px", fontSize: 12 }}>
                       {t("Geri al")}
                     </button>
                   )}
                 </div>
               ))}
-            </div>
-          )}
+          </div>
 
           <SiparisFaturasi siparis={siparis} yazabilir={yazabilir} onDegisti={onDegisti} />
+          </div>
+          </div>
 
           {mod === "tahsil" ? (
             <TahsilatFormu
@@ -349,7 +406,7 @@ export default function SiparisKarti({
               </div>
             )
           )}
-          {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+          {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
         </div>
       )}
     </div>
@@ -435,25 +492,53 @@ function TahsilatFormu({
           </Alan>
         </div>
       )}
-      <span style={{ fontSize: 12, color: c.textSecondary }}>
+      <span style={{ fontSize: 13, color: c.textSecondary }}>
         {t("Kasaya gelir olarak işlenir. Kalan: {tutar}", { tutar: fmtPara(kalanTutar(siparis), siparis.paraBirimi) })}
       </span>
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={kaydet}
           disabled={kaydediliyor}
-          style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 13 }}
+          style={{ flex: 1, padding: "7px 0", borderRadius: 8, border: "none", background: c.primary, color: c.onPrimary, fontSize: 14 }}
         >
           {kaydediliyor ? t("Kaydediliyor…") : t("Tahsilatı kaydet")}
         </button>
         <button
           onClick={onVazgec}
-          style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 13 }}
+          style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${c.border}`, background: "transparent", color: c.textSecondary, fontSize: 14 }}
         >
           {t("Vazgeç")}
         </button>
       </div>
     </div>
   );
+}
+
+/**
+ * Sağ sütundaki vade satırı: ödeme takibinin asıl sorusu "kimin peşine
+ * düşeceğim" — kaç gün geciktiği ya da kaç gün kaldığı satırdan okunsun.
+ * Önceden yalnızca "Gecikti" rozeti vardı, gün sayısı için satırı açmak
+ * gerekiyordu (kullanıcı isteği, 2026-11-11).
+ */
+// dil:anahtar-baslangic — metinler kullanım yerinde t() ile çevriliyor
+export function vadeDurumu(
+  vadeTarihi: string,
+  bugun: string,
+  durum: ReturnType<typeof siparisDurumu>
+): { metin: string; degisken?: Record<string, string | number>; ton: "kotu" | "dikkat" | "iyi" | "sade" } {
+  if (durum === "iptal") return { metin: "İptal edildi", ton: "sade" };
+  if (durum === "tahsil_edildi") return { metin: "Tahsil edildi", ton: "iyi" };
+  const gun = gunFarki(bugun, vadeTarihi);
+  if (gun < 0) return { metin: "{n} gün gecikti", degisken: { n: -gun }, ton: "kotu" };
+  if (gun === 0) return { metin: "Bugün vadeli", ton: "dikkat" };
+  if (gun <= 7) return { metin: "{n} gün kaldı", degisken: { n: gun }, ton: "dikkat" };
+  return { metin: "Vade {tarih}", degisken: { tarih: fmtTarih(vadeTarihi) }, ton: "sade" };
+}
+// dil:anahtar-bitis
+
+/** b − a, gün (YYYY-MM-DD; saat dilimi oynamasın diye UTC). */
+export function gunFarki(a: string, b: string): number {
+  const g = (x: string) => Date.UTC(Number(x.slice(0, 4)), Number(x.slice(5, 7)) - 1, Number(x.slice(8, 10)));
+  return Math.round((g(b) - g(a)) / 86400000);
 }

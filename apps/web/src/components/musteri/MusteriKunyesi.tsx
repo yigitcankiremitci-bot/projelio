@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { sorumluAdi } from "../../lib/partySorumlu";
 import { kalanTutar, siparisDurumu, type MusteriSiparisi, type Party } from "@projelio/shared";
 import { siparisApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
@@ -79,7 +80,9 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
   }
 
   const altBilgi = [
-    party.ownerName ? t("Sorumlu: {ad}", { ad: party.ownerName }) : undefined,
+    // Ekleyen değil sorumlu: Excel aktarımında sistemdeki sorumlu aktaranın
+    // kendisi oluyor, gerçek sorumlu notta (bkz. lib/partySorumlu).
+    sorumluAdi(party) ? t("Sorumlu: {ad}", { ad: sorumluAdi(party)! }) : undefined,
     party.source ? t("Kaynak: {kaynak}", { kaynak: party.source }) : undefined,
     party.createdAt ? t("Eklendi: {tarih}", { tarih: fmtTarih(party.createdAt.slice(0, 10)) }) : undefined,
     party.lastActivityAt ? t("Son hareket: {tarih}", { tarih: fmtTarih(party.lastActivityAt.slice(0, 10)) }) : undefined,
@@ -93,16 +96,14 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
     .join("");
 
   return (
+    // Çerçevesiz: künye kartın kendi yüzeyinde durur. Eskiden açılan alanın
+    // içinde vurgu kenarlı, gölgeli ikinci bir kutuydu; içindeki özet kutularıyla
+    // üç katman oluyordu (kullanıcı şikâyeti, 2026-11-11).
     <section
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 12,
-        padding: 14,
-        borderRadius: 10,
-        background: c.surface,
-        border: `1px solid color-mix(in srgb, ${c.accent} 45%, ${c.border})`,
-        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+        gap: 14,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -125,9 +126,9 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
           {basHarfler || "?"}
         </span>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, color: c.textPrimary, overflowWrap: "anywhere" }}>{party.displayName}</div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: c.textPrimary, overflowWrap: "anywhere" }}>{party.displayName}</div>
           {party.legalName && party.legalName !== party.displayName && (
-            <div style={{ fontSize: 12, color: c.textSecondary, overflowWrap: "anywhere" }}>{party.legalName}</div>
+            <div style={{ fontSize: 13, color: c.textSecondary, overflowWrap: "anywhere" }}>{party.legalName}</div>
           )}
         </div>
       </div>
@@ -138,25 +139,25 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
             <div key={a.etiket} style={{ display: "flex", gap: 8, alignItems: "flex-start", minWidth: 0 }}>
               <span style={{ color: c.accent, flexShrink: 0, marginTop: 2, display: "inline-flex" }}>{a.simge}</span>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: c.textSecondary }}>{a.etiket}</div>
+                <div style={{ fontSize: 12, color: c.textSecondary }}>{a.etiket}</div>
                 {a.href ? (
                   <a
                     href={a.href}
                     target={a.href.startsWith("http") ? "_blank" : undefined}
                     rel={a.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                    style={{ fontSize: 13, color: c.primary, textDecoration: "none", overflowWrap: "anywhere" }}
+                    style={{ fontSize: 14, color: c.primary, textDecoration: "none", overflowWrap: "anywhere" }}
                   >
                     {a.deger}
                   </a>
                 ) : (
-                  <div style={{ fontSize: 13, color: c.textPrimary, overflowWrap: "anywhere" }}>{a.deger}</div>
+                  <div style={{ fontSize: 14, color: c.textPrimary, overflowWrap: "anywhere" }}>{a.deger}</div>
                 )}
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>
+        <span style={{ fontSize: 13, color: c.textSecondary }}>
           {t("Telefon, e-posta ya da adres girilmemiş. Düzenle ile ekleyebilirsin.")}
         </span>
       )}
@@ -182,7 +183,7 @@ export default function MusteriKunyesi({ party, siparisOzetiGoster }: { party: P
       )}
 
       {altBilgi.length > 0 && (
-        <div style={{ fontSize: 11, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
+        <div style={{ fontSize: 12, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
           {altBilgi.map((x) => (
             <span key={x}>{x}</span>
           ))}
@@ -200,14 +201,14 @@ function OzetKutusu({ etiket, deger, renk }: { etiket: string; deger: string; re
         display: "flex",
         flexDirection: "column",
         gap: 2,
-        padding: "6px 12px",
+        padding: "8px 14px",
         borderRadius: 8,
+        // Kenarsız, zeminin hafif tonu: kartın içinde tek katman kalsın.
         background: c.background,
-        border: `1px solid ${c.border}`,
-        minWidth: 96,
+        minWidth: 104,
       }}
     >
-      <span style={{ fontSize: 11, color: c.textSecondary }}>{etiket}</span>
+      <span style={{ fontSize: 12, color: c.textSecondary }}>{etiket}</span>
       <span style={{ fontSize: 14, fontWeight: 600, color: renk ?? c.textPrimary }}>{deger}</span>
     </div>
   );

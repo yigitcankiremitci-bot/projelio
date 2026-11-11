@@ -262,7 +262,7 @@ export default function SiparisFormu({
   };
 
   const kucukDugme: React.CSSProperties = {
-    fontSize: 12,
+    fontSize: 13,
     color: c.primary,
     background: "transparent",
     border: "none",
@@ -300,7 +300,7 @@ export default function SiparisFormu({
         </Alan>
       )}
       {musterisiz && kanallar.length === 0 && (!secimli || musteriSecimi === MUSTERISIZ) && (
-        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>
           {t("Müşterisi olmayan sipariş bir satış kanalına yazılır. Önce Kanallar sekmesinden bir kanal ekle.")}
         </p>
       )}
@@ -411,14 +411,14 @@ export default function SiparisFormu({
           </select>
         </Alan>
       </div>
-      <span style={{ fontSize: 12, color: c.textSecondary, marginTop: -4 }}>
+      <span style={{ fontSize: 13, color: c.textSecondary, marginTop: -4 }}>
         {elleTutar !== undefined
           ? t("Fiyatı boş kalemler tutarın kalanını katalog fiyatı oranında paylaşır.")
           : t("Boş bırakılırsa kalem toplamı: {tutar}", { tutar: fmtPara(kalemToplam, f.paraBirimi) })}
       </span>
 
       {mevcut && kalemlerKilitli(mevcut) && (
-        <span style={{ fontSize: 12, color: c.textSecondary }}>
+        <span style={{ fontSize: 13, color: c.textSecondary }}>
           {t("Onaylanan siparişin ürünleri ve adetleri kilitli; fiyat ve diğer bilgiler değiştirilebilir.")}
         </span>
       )}
@@ -461,7 +461,7 @@ export default function SiparisFormu({
         </Alan>
       </div>
       {f.siparisTarihi && (
-        <span style={{ fontSize: 12, color: c.textSecondary, marginTop: -4 }}>
+        <span style={{ fontSize: 13, color: c.textSecondary, marginTop: -4 }}>
           {t("Vade tarihi: {tarih}", { tarih: fmtTarih(vadeTarihiHesapla(f.siparisTarihi, vadeGun)) })}
         </span>
       )}
@@ -503,7 +503,7 @@ export default function SiparisFormu({
         />
       </Alan>
 
-      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 14, margin: 0 }}>{hata}</p>}
       <div style={{ display: "flex", gap: 8 }}>
         <button
           onClick={kaydet}

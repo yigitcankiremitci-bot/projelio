@@ -64,12 +64,12 @@ export default function MusteriSiparisleri({
 
   const degisti = (s: MusteriSiparisi) => setSiparisler((l) => (l ?? []).map((x) => (x.id === s.id ? s : x)));
 
-  if (!siparisler) return <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
+  if (!siparisler) return <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Yükleniyor…")}</p>;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {acikAlacak.length > 0 && (
-        <div style={{ fontSize: 12, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
+        <div style={{ fontSize: 13, color: c.textSecondary, display: "flex", flexWrap: "wrap", gap: "2px 12px" }}>
           {acikAlacak.map(([para, v]) => (
             <span key={para}>
               {t("Açık alacak: {tutar}", { tutar: fmtPara(v.kalan, para) })}
@@ -95,16 +95,16 @@ export default function MusteriSiparisleri({
         yazabilir && (
           <button
             onClick={() => setYeni(true)}
-            style={{ alignSelf: "flex-start", fontSize: 12, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
+            style={{ alignSelf: "flex-start", fontSize: 13, color: c.primary, background: "transparent", border: "none", cursor: "pointer", padding: 0 }}
           >
             {t("+ Sipariş ekle")}
           </button>
         )
       )}
 
-      {hata && <p style={{ color: c.danger, fontSize: 12, margin: 0 }}>{hata}</p>}
+      {hata && <p style={{ color: c.danger, fontSize: 13, margin: 0 }}>{hata}</p>}
       {siparisler.length === 0 && !yeni ? (
-        <p style={{ fontSize: 12, color: c.textSecondary, margin: 0 }}>{t("Henüz sipariş yok.")}</p>
+        <p style={{ fontSize: 13, color: c.textSecondary, margin: 0 }}>{t("Henüz sipariş yok.")}</p>
       ) : (
         siparisler.map((s) => (
           <SiparisKarti

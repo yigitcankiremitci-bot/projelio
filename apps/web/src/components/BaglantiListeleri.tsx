@@ -34,8 +34,11 @@ export function BaglantiListeSekmeleri({
   modul = BAGLANTI_MODUL_KEY,
   sayilar,
   onBirak,
+  sol,
   sag,
 }: {
+  /** Sekmelerin solunda duran öğe (Bağlantılar'da geri hapı). */
+  sol?: ReactNode;
   listeler: BaglantiListeKaydi[];
   /** "" = Tümü. */
   secili: string;
@@ -127,6 +130,7 @@ export function BaglantiListeSekmeleri({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {sol && <span style={{ display: "inline-flex", marginRight: 10 }}>{sol}</span>}
         <button onClick={() => onSec("")} style={{ ...sekmeStili(c, secili === ""), ...vurgu("") }} {...birakma("")}>
           {t("Tümü")} ({toplam})
         </button>

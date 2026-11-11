@@ -15,13 +15,13 @@ import { siparisApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { fmtPara } from "../butce/butceBicim";
-import { IconUpload } from "../icons";
+import { IconUpload, IconWallet } from "../icons";
 import { listeCercevesi } from "../../lib/listeStili";
 import { FiltreBasligi, FiltreBolumu, SecimListesi, filtrePaneliStili } from "./FiltrePaneli";
 import { useIsWide } from "../../lib/useIsDesktop";
 import Modal from "../Modal";
 import SiparisFormu from "./SiparisFormu";
-import SiparisKarti from "./SiparisKarti";
+import SiparisKarti, { SiparisAyrintisi } from "./SiparisKarti";
 import SatisKanallari from "./SatisKanallari";
 import SiparisExcelModal from "./SiparisExcelModal";
 import { PARTY_SURUKLE } from "../BaglantiListeleri";
@@ -96,7 +96,7 @@ export default function TahsilatTakibi({
   fabVar = false,
   partySuzgeci,
   surukle = false,
-  filtreSolda = false,
+  filtreSolda: filtreSoldaIstegi = false,
 }: {
   /**
    * Filtreler listenin solunda sabit bir sütunda (Müşteriler sekmesiyle aynı
@@ -163,6 +163,21 @@ export default function TahsilatTakibi({
   const [excel, setExcel] = useState(false);
   const [yenile, setYenile] = useState(0);
   const [suzAcik, setSuzAcik] = useState(false);
+  // Ayrıntısı açık sipariş: geniş alanda sağdaki panelde, darda pencerede
+  // (Müşteriler'in kart paneliyle aynı düzen — kullanıcı isteği, 2026-11-11).
+  // `n` her açılışta artar: aynı siparişte "Tahsil et"e yeniden basmak formu
+  // yeniden açabilsin (ayrıntı bu anahtarla baştan kurulur).
+  const [acikSiparis, setAcikSiparis] = useState<{ id: string; mod: "tahsil" | null; n: number } | null>(null);
+  // Bileşenin kendi genişliği: sağ panel ancak sığıyorsa açılır. Kök ilk
+  // çizimde yükleniyor yazısı olduğu için ref değil durum (callback ref).
+  const [kokEl, setKokEl] = useState<HTMLDivElement | null>(null);
+  const [genislik, setGenislik] = useState(0);
+  useEffect(() => {
+    if (!kokEl || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => setGenislik(Math.round(e.contentRect.width)));
+    ro.observe(kokEl);
+    return () => ro.disconnect();
+  }, [kokEl]);
   const organizationId = /^\/organizations\/([^/]+)/.exec(kapsamYolu)?.[1];
   useEffect(() => {
     if (yeniSiparisIstegi > 0) setPanel("yeni");
@@ -334,6 +349,19 @@ export default function TahsilatTakibi({
   );
 
   const degisti = (s: MusteriSiparisi) => setSiparisler((l) => (l ?? []).map((x) => (x.id === s.id ? s : x)));
+  const silindi = (id: string) => {
+    setSiparisler((l) => (l ?? []).filter((x) => x.id !== id));
+    setAcikSiparis((a) => (a?.id === id ? null : a));
+  };
+  const siparisiAc = (id: string, mod?: "tahsil") => setAcikSiparis((a) => ({ id, mod: mod ?? null, n: (a?.n ?? 0) + 1 }));
+  const acikKayit = acikSiparis ? tumu.find((s) => s.id === acikSiparis.id) : undefined;
+  // Sağ panel: liste + 380 px'lik ayrıntı yan yana sığıyorsa. Liste boşken
+  // yanında boş kutu anlamsız (Müşteriler'deki ikiBolme ile aynı kural).
+  const yanPanel = genislik >= 760 && liste.length > 0;
+  // Sol filtre sütunu + liste + ayrıntı paneli üçü birden ancak geniş alanda
+  // sığar; daha darda filtreler "Süz" penceresine döner, liste ezilmesin
+  // (1159 px'te satır başlıkları kelime kelime bölünüyordu).
+  const filtreSolda = filtreSoldaIstegi && (genislik === 0 || genislik >= 1240);
 
   // İptal edilen sipariş tahsil edilemez: toplu seçime girmesin.
   const acikListede = liste.filter((s) => kalanTutar(s) > 0 && s.asama !== "iptal");
@@ -574,8 +602,27 @@ export default function TahsilatTakibi({
     </>
   ) : null;
 
+  const ayrinti = acikKayit && acikSiparis && (
+    <SiparisAyrintisi
+      key={`${acikKayit.id}:${acikSiparis.n}`}
+      siparis={acikKayit}
+      yazabilir
+      baslikli
+      musteriAdiGoster
+      ilkMod={acikSiparis.mod}
+      onDegisti={degisti}
+      onSilindi={silindi}
+      onKapat={yanPanel ? () => setAcikSiparis(null) : undefined}
+    />
+  );
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div ref={setKokEl} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {!yanPanel && ayrinti && (
+        <Modal title={t("Sipariş")} onClose={() => setAcikSiparis(null)} maxWidth={600} mobileFullScreen>
+          {ayrinti}
+        </Modal>
+      )}
       {panel === "yeni" && (
         <Modal title={t("Sipariş ekle")} onClose={() => setPanel(null)} maxWidth={640} mobileFullScreen>
           <SiparisFormu
@@ -627,7 +674,7 @@ export default function TahsilatTakibi({
           <aside style={filtrePaneliStili(c)}>{filtreIcerigi(false)}</aside>
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 0 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, ...(yanPanel ? { flex: "1 1 0", minWidth: 340 } : { flex: 1, minWidth: 0 }) }}>
       {!dikey && ozetSeridi}
       {/* Sığmayan düğmeler alt satıra geçer: telefonda arama kutusu
           düğmelerin arasında eziliyor, sayfa yana kayıyordu. */}
@@ -866,7 +913,12 @@ export default function TahsilatTakibi({
                   sorumluGoster={yonetici}
                   cerceveli
                   onDegisti={degisti}
-                  onSilindi={(id) => setSiparisler((l) => (l ?? []).filter((x) => x.id !== id))}
+                  onSilindi={silindi}
+                  onAc={(mod) => siparisiAc(s.id, mod)}
+                  // Sağ panelde "Tahsil et" en üstte duruyor; satırdaki kısayol
+                  // yalnızca listeye yer açmak için gizli.
+                  hizliTahsilYok={yanPanel}
+                  acikta={acikSiparis?.id === s.id && (yanPanel || !!acikKayit)}
                   secili={secili.has(s.id)}
                   onSec={(v) =>
                     setSecili((x) => {
@@ -985,6 +1037,39 @@ export default function TahsilatTakibi({
         </section>
       )}
       </div>
+
+      {/* ---- Sağ panel: seçili siparişin ayrıntısı (Müşteriler'in kart paneli gibi) ---- */}
+      {yanPanel && (
+        <section
+          aria-label={t("Sipariş ayrıntısı")}
+          style={{
+            // Müşteri kartından biraz dar: siparişte sekme yok, liste geniş kalsın.
+            flex: "0 1 540px",
+            minWidth: 380,
+            boxSizing: "border-box",
+            // Liste kayarken ayrıntı yerinde kalsın; uzunsa kendi içinde kayar.
+            position: "sticky",
+            top: 72,
+            maxHeight: "calc(100vh - 88px)",
+            overflowY: "auto",
+            scrollbarWidth: "thin",
+            padding: "22px 26px",
+            borderRadius: 12,
+            background: c.surface,
+            border: `1px solid ${c.border}`,
+          }}
+        >
+          {ayrinti || (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, minHeight: 280, textAlign: "center" }}>
+              <IconWallet size={28} color={c.textSecondary} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: c.textPrimary }}>{t("Bir sipariş seç")}</span>
+              <span style={{ fontSize: 14, color: c.textSecondary, maxWidth: 320 }}>
+                {t("Listeden bir siparişe tıkla; tahsilatları, faturası ve ürünleri burada açılır.")}
+              </span>
+            </div>
+          )}
+        </section>
+      )}
       </div>
     </div>
   );

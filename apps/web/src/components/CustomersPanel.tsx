@@ -1524,6 +1524,10 @@ export default function CustomersPanel({
   const ikiBolme = kokGenislik >= 760 && !loading && sekmeKartlari.length > 0;
   // Ayrıntılı filtreler geniş panelde solda sabit; daha darda "Süz" penceresinde.
   const filtreSolda = ikiBolme && kokGenislik >= 1100;
+  // Sol filtre sütunu varken arama da her zaman var: az kartlı sekmede
+  // (Potansiyel, Bağlantılar) araç çubuğu gizlendiği için bu sekmeler
+  // Müşteriler'den farklı görünüyordu (kullanıcı isteği, 2026-11-11).
+  const aracCubugu = showToolbar || filtreSolda;
   const seciliKart = openPartyId ? parties.find((p) => p.id === openPartyId) : undefined;
   const musteriSayisi = parties.length - potansiyelSayisi;
   // Kart penceresinin başlığı genel: kartın adı künyede büyük yazıyor,
@@ -1848,6 +1852,9 @@ export default function CustomersPanel({
           onBirak={surukleVar ? listeyeBirak : undefined}
           // Açılış sekmesi ve harita liste sekmelerinin sağında: üst çubukta
           // telefonda kendi satırını kaplıyorlardı.
+          // Görünüm seçicisi olmayan defterde (Bağlantılar) geri hapı liste
+          // haplarının solunda: ayrı satır kaplamasın.
+          sol={!gorunumSecici && geriHapi ? geriHapi : undefined}
           sag={
             <>
           {!baglantiModu && (() => {
@@ -1886,7 +1893,7 @@ export default function CustomersPanel({
         />
       )}
 
-      {geriHapi && (dar || !gorunumSecici) && <div style={{ alignSelf: "flex-start" }}>{geriHapi}</div>}
+      {geriHapi && dar && gorunumSecici && <div style={{ alignSelf: "flex-start" }}>{geriHapi}</div>}
 
       {/* Liste süzgeci açıkken bu açıkça yazılır: yoksa listede olmayan kartlar
           kaybolmuş sanılıyordu (bkz. seciliListe). */}
@@ -1991,7 +1998,7 @@ export default function CustomersPanel({
 
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
       {/* ---- En sol: ayrıntılı filtreler ---- */}
-      {filtreSolda && showToolbar && (
+      {filtreSolda && (
         // Yapışkan: sayfa kayarken yalnızca liste kaysın, filtreler yerinde
         // dursun (kullanıcı isteği, 2026-11-11). Panel ekrandan uzun
         // olabiliyor — eskiden bu yüzden yapışkan değildi, alt bölümlerine
@@ -2009,6 +2016,18 @@ export default function CustomersPanel({
             boxSizing: "border-box",
           }}
         >
+          {/* Bağlantılar'ın özeti (yüksek önem, temas zamanı gelen) geniş
+              ekranda filtrelerin başında; listenin üstünde satır kaplamasın. */}
+          {baglantiModu && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, paddingBottom: 12, borderBottom: `1px solid ${c.border}` }}>
+              {stats.map((s) => (
+                <div key={s.label} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: c.textSecondary }}>
+                  <span>{t(s.label)}</span>
+                  <strong style={{ color: c.textPrimary, fontWeight: 600 }}>{s.value}</strong>
+                </div>
+              ))}
+            </div>
+          )}
           {filtreIcerigi(false)}
         </aside>
       )}
@@ -2017,7 +2036,7 @@ export default function CustomersPanel({
           çok büyüktü, adlar listede iki satıra bölünüyordu (kullanıcı
           isteği, 2026-11-11). */}
       <div style={{ display: "flex", flexDirection: "column", gap: 10, ...(ikiBolme ? { flex: "1 1 0", minWidth: 340 } : { width: "100%", minWidth: 0 }) }}>
-      {showToolbar && (
+      {aracCubugu && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative" }}>
           <input
             value={search}
@@ -2071,7 +2090,7 @@ export default function CustomersPanel({
       )}
       {/* Bağlantılar'ın özeti (yüksek önem, temas zamanı gelen) sekmelerde
           yazmayan bilgi; tek satır metin. Müşteriler'in sayıları sekmelerde. */}
-      {baglantiModu && !loading && parties.length > 0 && (
+      {baglantiModu && !loading && parties.length > 0 && !filtreSolda && (
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13, color: c.textSecondary }}>
           {stats.map((s) => (
             <span key={s.label}>
@@ -2115,14 +2134,14 @@ export default function CustomersPanel({
         <p style={{ fontSize: 14, color: c.textSecondary, margin: 0 }}>{t("Aramanla eşleşen kayıt yok.")}</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {(hasActiveFilter || (!showToolbar && visible.length > 1)) && (
+          {(hasActiveFilter || (!aracCubugu && visible.length > 1)) && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               {hasActiveFilter && (
                 <span style={{ fontSize: 13, color: c.textSecondary }}>
                   {t("{n} / {toplam} kayıt", { n: visible.length, toplam: sekmeKartlari.length })}
                 </span>
               )}
-              {!showToolbar && visible.length > 1 && <span style={{ marginLeft: "auto" }}>{siralamaSecici()}</span>}
+              {!aracCubugu && visible.length > 1 && <span style={{ marginLeft: "auto" }}>{siralamaSecici()}</span>}
             </div>
           )}
           {/* Satırlar tek bir çerçevede, aralarında ince çizgi. Sıra sıra

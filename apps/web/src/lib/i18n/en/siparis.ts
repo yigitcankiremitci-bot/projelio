@@ -64,4 +64,12 @@ export const siparis: TranslationDict = {
   "Excel'den aktar": "Import from Excel",
   "Raporlar": "Reports",
   "Çalışan bazında": "By employee",
+  "Bir sipariş seç": "Select an order",
+  "Evrak no": "Document no.",
+  "Evrak vadesi": "Document due date",
+  "Listeden bir siparişe tıkla; tahsilatları, faturası ve ürünleri burada açılır.": "Click an order in the list; its payments, invoice and products open here.",
+  "Sipariş ayrıntısı": "Order details",
+  "Sipariş bilgileri": "Order information",
+  "Vade": "Due date",
+  "{gun} gün": "{gun} days",
 };

@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Product } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
@@ -18,6 +18,7 @@ import UrunKatalogu from "./urunler/UrunKatalogu";
 import { IconImage, IconUpload } from "./icons";
 import { useT } from "../lib/i18n";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
+import { useModulGeriHapi } from "../lib/modulGeri";
 
 const SERIT_TAVANI = 24;
 
@@ -96,6 +97,48 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   useImperativeHandle(ref, () => ({ openAdd: () => setAdding(true) }));
 
+  // Modül sayfasında (ModulePage) geri hapı katalogun üst satırına alınır ve
+  // "Ürün/Hizmet" başlığı yazılmaz: başlık zaten üst şeritte. Üstte beş satır
+  // (geri, başlık + toplu düğmeler, arama, çipler, kayıt sayısı) listeyi
+  // aşağı itiyordu (kullanıcı isteği, 2026-11-11 — Müşteriler'le aynı kural).
+  const geriHapi = useModulGeriHapi();
+  const izgara = layout === "grid";
+  // Toplu düğmeler katalog varken onun üst satırında; boş katalogda (ilk
+  // Excel aktarımı) başlık satırında kalır.
+  const katalogda = izgara && !loading && products.length > 0;
+  const topluDugme: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 12px",
+    borderRadius: 8,
+    border: `1px solid ${c.border}`,
+    background: "transparent",
+    color: c.textPrimary,
+    fontSize: 13,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  };
+  // Toplu ekleme yalnızca ızgara görünümünde (departman sayfası ve Ürün/Hizmet
+  // sekmesi): anasayfa şeridi bir özet, katalog orada yönetilmiyor. Yetkiyi
+  // sunucu tek tek eklemeyle aynı kuralla verir.
+  const topluDugmeler = izgara && (
+    <>
+      {/* Telefonda yalnızca simge: yazılı hâlleri çiplerin altında kendi
+          satırını kaplıyordu. */}
+      <button onClick={() => setExcelAcik(true)} title={t("Excel ile toplu ürün/hizmet ekle")} aria-label={t("Excel ile toplu ekle")} style={topluDugme}>
+        <IconUpload size={15} /> {isDesktop && t("Excel ile toplu ekle")}
+      </button>
+      {/* Fotoğraflar ürünler açıldıktan sonra, adlarındaki stok koduyla eklenir. */}
+      {products.length > 0 && (
+        <button onClick={() => setFotoAcik(true)} title={t("Adı stok kodu olan fotoğrafları ürünlere ekle")} aria-label={t("Toplu fotoğraf")} style={topluDugme}>
+          <IconImage size={15} /> {isDesktop && t("Toplu fotoğraf")}
+        </button>
+      )}
+    </>
+  );
+  const baslikSatiri = !(katalogda && geriHapi);
+
   const fabAvailable = useFabAvailable();
   useProjectFabAction(
     useFab && fabAvailable ? { label: t("Ürün/Hizmet ekle"), onClick: () => setAdding(true) } : null,
@@ -105,60 +148,21 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {/* Çift dokunuş "Ürün/Hizmet ekle" penceresini açar (bkz. DepartmentsPanel başlığı). */}
-        <h2
-          onDoubleClick={() => setAdding(true)}
-          title={t("Eklemek için çift tıkla")}
-          style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0, userSelect: "none", cursor: "default", touchAction: "manipulation" }}
-        >
-          {t("Ürün/Hizmet")}
-        </h2>
-        {/* Toplu ekleme yalnızca ızgara görünümünde (departman sayfası ve
-            Ürün/Hizmet sekmesi): anasayfa şeridi bir özet, katalog orada
-            yönetilmiyor. Yetkiyi sunucu tek tek eklemeyle aynı kuralla verir. */}
-        {layout === "grid" && (
-          <button
-            onClick={() => setExcelAcik(true)}
-            title={t("Excel ile toplu ürün/hizmet ekle")}
-            style={{
-              marginLeft: "auto",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 8,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textPrimary,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+      {baslikSatiri && (
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+        {izgara && geriHapi ? (
+          geriHapi
+        ) : (
+          // Çift dokunuş "Ürün/Hizmet ekle" penceresini açar (bkz. DepartmentsPanel başlığı).
+          <h2
+            onDoubleClick={() => setAdding(true)}
+            title={t("Eklemek için çift tıkla")}
+            style={{ fontSize: 18, fontWeight: 500, color: c.textPrimary, margin: 0, userSelect: "none", cursor: "default", touchAction: "manipulation" }}
           >
-            <IconUpload size={15} /> {t("Excel ile toplu ekle")}
-          </button>
+            {t("Ürün/Hizmet")}
+          </h2>
         )}
-        {/* Fotoğraflar ürünler açıldıktan sonra, adlarındaki stok koduyla eklenir. */}
-        {layout === "grid" && products.length > 0 && (
-          <button
-            onClick={() => setFotoAcik(true)}
-            title={t("Adı stok kodu olan fotoğrafları ürünlere ekle")}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 12px",
-              borderRadius: 8,
-              border: `1px solid ${c.border}`,
-              background: "transparent",
-              color: c.textPrimary,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            <IconImage size={15} /> {t("Toplu fotoğraf")}
-          </button>
-        )}
+        {!katalogda && topluDugmeler && <span style={{ marginLeft: "auto", display: "inline-flex", gap: 6 }}>{topluDugmeler}</span>}
         {collapsible && (
           <SectionToggle
             collapsed={collapsed}
@@ -170,6 +174,7 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
         )}
         {basliktaSag && <div style={{ marginLeft: "auto" }}>{basliktaSag}</div>}
       </div>
+      )}
 
       {collapsed ? null : loading ? (
         <p style={{ fontSize: 15, color: c.textSecondary }}>{t("Yükleniyor…")}</p>
@@ -188,7 +193,14 @@ const ProductsPanel = forwardRef<ProductsPanelHandle, Props>(function ProductsPa
         </div>
       ) : layout === "grid" ? (
         // Tam katalog: arama, kategori/marka, filtre, sıralama, görünüm.
-        <UrunKatalogu organizationId={organizationId} products={products} onOpen={setOpen} onCoverUpdated={load} />
+        <UrunKatalogu
+          organizationId={organizationId}
+          products={products}
+          onOpen={setOpen}
+          onCoverUpdated={load}
+          ustSol={geriHapi ?? undefined}
+          ustEylemler={topluDugmeler || undefined}
+        />
       ) : compactCards ? (
         <ProductStack products={serit} onOpen={setOpen} onCoverUpdated={load} />
       ) : (

@@ -34,9 +34,14 @@ interface Props {
   products: Product[];
   onOpen: (p: Product) => void;
   onCoverUpdated: () => void;
-  /** Başlık satırındaki düğmeler (Excel, toplu fotoğraf) — araç çubuğunun yanında kalsınlar. */
+  /** Toplu düğmeler (Excel, toplu fotoğraf): çip satırının sağında. */
   ustEylemler?: ReactNode;
+  /** Çip satırının solu: modül sayfasının geri hapı (bkz. lib/modulGeri). */
+  ustSol?: ReactNode;
 }
+
+/** Sayfanın sabit üst çubuğu (Müşteriler'deki yapışkan sütunlarla aynı pay). */
+const UST_CUBUK = 72;
 
 const PARCA: Record<UrunGorunumu, number> = { kart: 48, kompakt: 96, liste: 100 };
 
@@ -71,7 +76,7 @@ const filtreMi = (v: unknown): v is UrunFiltresi =>
 const yerel = typeof window !== "undefined" ? window.localStorage : undefined;
 const oturum = typeof window !== "undefined" ? window.sessionStorage : undefined;
 
-export default function UrunKatalogu({ organizationId, products, onOpen, onCoverUpdated, ustEylemler }: Props) {
+export default function UrunKatalogu({ organizationId, products, onOpen, onCoverUpdated, ustEylemler, ustSol }: Props) {
   const c = useThemeColors();
   const t = useT();
 
@@ -104,6 +109,18 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
   }, []);
   const kenarCubugu = genislik >= 900;
   const dar = genislik < 640;
+  // Yapışkan üst satırların yüksekliği: sol filtreler onların altına yapışır.
+  const aracRef = useRef<HTMLDivElement>(null);
+  const [aracYuksekligi, setAracYuksekligi] = useState(0);
+  useLayoutEffect(() => {
+    const el = aracRef.current;
+    if (!el) return;
+    setAracYuksekligi(el.offsetHeight);
+    const ro = new ResizeObserver(() => setAracYuksekligi(el.offsetHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const kenarUst = UST_CUBUK + (dar ? 0 : aracYuksekligi) + 4;
   // Tablo kendi alanına bakar: kenar çubuğu açıkken ondan geriye kalan yer.
   // Kök genişliğine bakınca tablo 760 px'lik tam düzenini sıkışık alana
   // zorluyor, ad sütunu tek harfe ("Ş…") iniyordu.
@@ -217,7 +234,73 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
 
   return (
     <div ref={kokRef} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      {/* Üst satır: arama + sıralama + görünüm + eylemler */}
+      {/* Üst iki satır birlikte yapışkan: kaydırınca üst çubuğun altında
+          kalır, yalnızca ürünler kayar (kullanıcı isteği, 2026-11-11 — geri
+          düğmesi de kaybolmasın). Zemin ve dikey pay altından geçen kartları
+          örtmek için; eksi pay boşluğu eski hâlinde tutar. Telefonda satırlar
+          dörde bölündüğü için yapışmaz — ekranın yarısını kaplardı. */}
+      <div
+        ref={aracRef}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          ...(dar
+            ? {}
+            : {
+                position: "sticky",
+                top: UST_CUBUK,
+                zIndex: 5,
+                background: c.background,
+                padding: "8px 0",
+                margin: "-8px 0",
+              }),
+        }}
+      >
+      {/* Üst satır: geri hapı + hızlı filtreler (kataloğun tamamındaki
+          sayılarla) + toplu düğmeler. Eskiden geri, başlık + toplu düğmeler,
+          arama, çipler ve kayıt sayısı beş ayrı satırdı; liste aşağıda
+          başlıyordu (kullanıcı isteği, 2026-11-11). */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
+        {ustSol && <span style={{ display: "inline-flex", marginRight: 6 }}>{ustSol}</span>}
+        <Cip c={c} secili={!filtre.tur} onClick={() => degistir({ tur: "" })}>
+          {t("Tümü")} <Sayi>{products.length}</Sayi>
+        </Cip>
+        {sayilar.urun > 0 && sayilar.hizmet > 0 && (
+          <>
+            <Cip c={c} secili={filtre.tur === "product"} onClick={() => degistir({ tur: filtre.tur === "product" ? "" : "product" })}>
+              {t("Ürünler")} <Sayi>{sayilar.urun}</Sayi>
+            </Cip>
+            <Cip c={c} secili={filtre.tur === "service"} onClick={() => degistir({ tur: filtre.tur === "service" ? "" : "service" })}>
+              {t("Hizmetler")} <Sayi>{sayilar.hizmet}</Sayi>
+            </Cip>
+          </>
+        )}
+        <span style={{ width: 1, background: c.border, margin: "2px 4px" }} />
+        {sayilar.tukendi > 0 && (
+          <Cip c={c} renk={c.danger} secili={filtre.stok === "tukendi"} onClick={() => degistir({ stok: filtre.stok === "tukendi" ? "" : "tukendi" })}>
+            {t("Stokta yok")} <Sayi>{sayilar.tukendi}</Sayi>
+          </Cip>
+        )}
+        {sayilar.kritik > 0 && (
+          <Cip c={c} renk={c.warning} secili={filtre.stok === "kritik"} onClick={() => degistir({ stok: filtre.stok === "kritik" ? "" : "kritik" })}>
+            {t("Kritik stok")} <Sayi>{sayilar.kritik}</Sayi>
+          </Cip>
+        )}
+        {sayilar.fotografsiz > 0 && (
+          <Cip c={c} secili={filtre.foto === "yok"} onClick={() => degistir({ foto: filtre.foto === "yok" ? "" : "yok" })}>
+            {t("Fotoğrafsız")} <Sayi>{sayilar.fotografsiz}</Sayi>
+          </Cip>
+        )}
+        {sayilar.satisDisi > 0 && (
+          <Cip c={c} secili={filtre.durum === "inactive"} onClick={() => degistir({ durum: filtre.durum === "inactive" ? "" : "inactive" })}>
+            {t("Satış dışı")} <Sayi>{sayilar.satisDisi}</Sayi>
+          </Cip>
+        )}
+        {ustEylemler && <span style={{ marginLeft: "auto", display: "inline-flex", flexWrap: "wrap", gap: 6 }}>{ustEylemler}</span>}
+      </div>
+
+      {/* İkinci satır: arama + sıralama + görünüm + dışa aktar */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
         <div style={{ position: "relative", flex: "1 1 260px", minWidth: 0 }}>
           <input
@@ -306,45 +389,8 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
         >
           <IconDownload size={15} /> {!dar && t("Dışa aktar")}
         </button>
-        {ustEylemler}
       </div>
 
-      {/* Hızlı filtreler: kataloğun tamamındaki sayılarla */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        <Cip c={c} secili={!filtre.tur} onClick={() => degistir({ tur: "" })}>
-          {t("Tümü")} <Sayi>{products.length}</Sayi>
-        </Cip>
-        {sayilar.urun > 0 && sayilar.hizmet > 0 && (
-          <>
-            <Cip c={c} secili={filtre.tur === "product"} onClick={() => degistir({ tur: filtre.tur === "product" ? "" : "product" })}>
-              {t("Ürünler")} <Sayi>{sayilar.urun}</Sayi>
-            </Cip>
-            <Cip c={c} secili={filtre.tur === "service"} onClick={() => degistir({ tur: filtre.tur === "service" ? "" : "service" })}>
-              {t("Hizmetler")} <Sayi>{sayilar.hizmet}</Sayi>
-            </Cip>
-          </>
-        )}
-        <span style={{ width: 1, background: c.border, margin: "2px 4px" }} />
-        {sayilar.tukendi > 0 && (
-          <Cip c={c} renk={c.danger} secili={filtre.stok === "tukendi"} onClick={() => degistir({ stok: filtre.stok === "tukendi" ? "" : "tukendi" })}>
-            {t("Stokta yok")} <Sayi>{sayilar.tukendi}</Sayi>
-          </Cip>
-        )}
-        {sayilar.kritik > 0 && (
-          <Cip c={c} renk={c.warning} secili={filtre.stok === "kritik"} onClick={() => degistir({ stok: filtre.stok === "kritik" ? "" : "kritik" })}>
-            {t("Kritik stok")} <Sayi>{sayilar.kritik}</Sayi>
-          </Cip>
-        )}
-        {sayilar.fotografsiz > 0 && (
-          <Cip c={c} secili={filtre.foto === "yok"} onClick={() => degistir({ foto: filtre.foto === "yok" ? "" : "yok" })}>
-            {t("Fotoğrafsız")} <Sayi>{sayilar.fotografsiz}</Sayi>
-          </Cip>
-        )}
-        {sayilar.satisDisi > 0 && (
-          <Cip c={c} secili={filtre.durum === "inactive"} onClick={() => degistir({ durum: filtre.durum === "inactive" ? "" : "inactive" })}>
-            {t("Satış dışı")} <Sayi>{sayilar.satisDisi}</Sayi>
-          </Cip>
-        )}
       </div>
 
       {!kenarCubugu && filtrePaneliAcik && (
@@ -357,10 +403,14 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
             style={{
               flex: "0 0 250px",
               width: 250,
+              // Sayfa kayarken yerinde kalsın (Müşteriler'le aynı): 72, sayfanın
+              // sabit üst çubuğu — 12'de çubuğun altına giriyordu. Ekrandan
+              // uzunsa kendi içinde kayar.
               position: "sticky",
-              top: 12,
-              maxHeight: "calc(100vh - 24px)",
+              top: kenarUst,
+              maxHeight: `calc(100vh - ${kenarUst + 16}px)`,
               overflowY: "auto",
+              scrollbarWidth: "thin",
               border: `1px solid ${c.border}`,
               borderRadius: 12,
               padding: 12,
@@ -373,7 +423,9 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
         )}
 
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-          {/* Sonuç satırı + etkin filtre etiketleri */}
+          {/* Sonuç satırı + etkin filtre etiketleri — yalnızca süzülünce: toplam
+              zaten "Tümü" çipinde yazıyor, boşuna satır kaplamasın. */}
+          {(sonuc.length !== products.length || etkin > 0 || !!filtre.arama) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", fontSize: 13.5, color: c.textSecondary }}>
             <span>
               {sonuc.length === products.length
@@ -408,6 +460,7 @@ export default function UrunKatalogu({ organizationId, products, onOpen, onCover
               </button>
             )}
           </div>
+          )}
 
           {sonuc.length === 0 ? (
             <div

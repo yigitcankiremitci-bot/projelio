@@ -101,7 +101,7 @@ export default function TahsilatTakibi({
   acilacakSiparis,
 }: {
   /** Bildirimden gelindi: bu sipariş yüklenince ayrıntısı açılır (bkz. CustomersPanel ?siparis=). */
-  acilacakSiparis?: { id: string; n: number } | null;
+  acilacakSiparis?: { id?: string; no?: string; n: number } | null;
   /**
    * Filtreler listenin solunda sabit bir sütunda (Müşteriler sekmesiyle aynı
    * düzen); değilse "Süz" penceresinde. Panelin genişliğine göre üst bileşen verir.
@@ -364,19 +364,21 @@ export default function TahsilatTakibi({
 
   // Bildirimden istenen sipariş: liste yüklenince açılır. Listede yoksa (sayfa
   // sipariş gelmeden önce yüklenmişti) bir kez tazelenir.
-  const istenenSiparis = useRef<string | null>(null);
+  // Kimlikle ya da (eski bildirimde) sipariş numarasıyla aranır.
+  const istenenSiparis = useRef<{ id?: string; no?: string } | null>(null);
   const tazelendi = useRef(false);
   useEffect(() => {
     if (!acilacakSiparis) return;
-    istenenSiparis.current = acilacakSiparis.id;
+    istenenSiparis.current = { id: acilacakSiparis.id, no: acilacakSiparis.no };
     tazelendi.current = false;
   }, [acilacakSiparis]);
   useEffect(() => {
-    const id = istenenSiparis.current;
-    if (!id || !siparisler) return;
-    if (siparisler.some((s) => s.id === id)) {
+    const istek = istenenSiparis.current;
+    if (!istek || !siparisler) return;
+    const bulunan = siparisler.find((s) => (istek.id ? s.id === istek.id : !!istek.no && s.siparisNo === istek.no));
+    if (bulunan) {
       istenenSiparis.current = null;
-      siparisiAc(id);
+      siparisiAc(bulunan.id);
     } else if (!tazelendi.current) {
       tazelendi.current = true;
       setYenile((x) => x + 1);

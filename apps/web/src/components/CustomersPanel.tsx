@@ -478,17 +478,21 @@ export default function CustomersPanel({
   );
   // ?siparis=<id>: sipariş bildiriminden gelindi (bkz. backend
   // siparisBildirimBaglantisi) — Tahsilat'ta o sipariş açılır. `n` her
-  // istekte artar: aynı bildirime ikinci kez basmak da açsın.
-  const [acilacakSiparis, setAcilacakSiparis] = useState<{ id: string; n: number } | null>(null);
+  // istekte artar: aynı bildirime ikinci kez basmak da açsın. Eski
+  // bildirimlerde kimlik yok, sipariş numarası var (?siparisNo=, bkz.
+  // lib/bildirimBaglantisi).
+  const [acilacakSiparis, setAcilacakSiparis] = useState<{ id?: string; no?: string; n: number } | null>(null);
   // Adres her değiştiğinde bakılır, yalnızca açılışta değil: sayfa zaten
   // açıkken bildirime basılınca bileşen yeniden kurulmuyor.
   useEffect(() => {
     const liste = aramaParametreleri.get("liste");
     const sekme = aramaParametreleri.get("sekme");
     const siparis = aramaParametreleri.get("siparis");
-    if (!sekme && !liste && !siparis) return;
+    const siparisNo = aramaParametreleri.get("siparisNo");
+    if (!sekme && !liste && !siparis && !siparisNo) return;
     if (liste) setSeciliListe(liste);
-    if (siparis) setAcilacakSiparis((a) => ({ id: siparis, n: (a?.n ?? 0) + 1 }));
+    if (siparis || siparisNo)
+      setAcilacakSiparis((a) => ({ id: siparis ?? undefined, no: siparisNo ?? undefined, n: (a?.n ?? 0) + 1 }));
     // Açılış tercihi henüz okunmadıysa sekmeyi o akış uygular (istenenSekme);
     // okunduysa (sayfa açıktı) doğrudan geçilir.
     if (istenenSekme.current === null && (sekme === "musteriler" || sekme === "potansiyel" || sekme === "tahsilat")) setGorunum(sekme);
@@ -498,6 +502,7 @@ export default function CustomersPanel({
         yeni.delete("sekme");
         yeni.delete("liste");
         yeni.delete("siparis");
+        yeni.delete("siparisNo");
         return yeni;
       },
       { replace: true }

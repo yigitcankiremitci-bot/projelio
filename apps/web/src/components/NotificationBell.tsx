@@ -19,6 +19,7 @@ import { IconBell } from "./icons";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
 import { sor } from "../lib/onay";
+import { bildirimBaglantisi } from "../lib/bildirimBaglantisi";
 
 export default function NotificationBell() {
   const c = useThemeColors();
@@ -210,7 +211,9 @@ export default function NotificationBell() {
       setAdminMesaji(n);
       return;
     }
-    if (n.link) navigate(n.link);
+    // Eski sipariş bildirimleri de Tahsilat'ta siparişi açsın (bkz. lib/bildirimBaglantisi).
+    const hedef = bildirimBaglantisi(n);
+    if (hedef) navigate(hedef);
   };
 
   const handleMarkAllRead = () => {

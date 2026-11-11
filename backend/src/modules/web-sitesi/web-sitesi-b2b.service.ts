@@ -171,12 +171,15 @@ export class WebSitesiB2bService {
    * etmezse sipariş orada unutulur. Bildirim siparişi BEKLETMEZ: portal
    * yanıtını almadan önce bir bildirim hatası siparişi düşürmemeli.
    */
-  private async siparisiHaberVer(party: Party, siparis: { siparisNo?: string; tutar: number; paraBirimi: string }): Promise<void> {
+  private async siparisiHaberVer(party: Party, siparis: { id: string; siparisNo?: string; tutar: number; paraBirimi: string }): Promise<void> {
     if (!party.organizationId) return;
     const { kisiler, departmentId } = await this.moduleMembers.organizasyonYoneticileri(party.organizationId, MUSTERI_MODUL_KEY);
     const alicilar = new Set(kisiler);
     if (party.ownerUserId) alicilar.add(party.ownerUserId);
-    const link = departmentId ? `/departments/${departmentId}/modules/${MUSTERI_MODUL_KEY}` : undefined;
+    // Bildirime basınca modülün Tahsilat sekmesi o sipariş açık gelir; önceden
+    // modülün açılış sekmesine (çoğu zaman Müşteriler) düşüp siparişi
+    // aratıyordu (kullanıcı isteği, 2026-11-11). Parametreler: CustomersPanel.
+    const link = departmentId ? siparisBildirimBaglantisi(departmentId, siparis.id) : undefined;
     const tutar = `${siparis.tutar.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${siparis.paraBirimi}`;
     for (const userId of alicilar) {
       this.notifications.notifyUserSafe(
@@ -428,4 +431,9 @@ export class WebSitesiB2bService {
       kapatildiAt: r.kapatildi_at ?? null,
     };
   }
+}
+
+/** Sipariş bildiriminin bağlantısı: müşteri modülü, Tahsilat sekmesi, sipariş açık. */
+export function siparisBildirimBaglantisi(departmentId: string, siparisId: string): string {
+  return `/departments/${departmentId}/modules/${MUSTERI_MODUL_KEY}?sekme=tahsilat&siparis=${encodeURIComponent(siparisId)}`;
 }

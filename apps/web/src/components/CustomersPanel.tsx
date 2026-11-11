@@ -476,21 +476,34 @@ export default function CustomersPanel({
       return s === "musteriler" || s === "potansiyel" || s === "tahsilat" ? s : null;
     })()
   );
+  // ?siparis=<id>: sipariş bildiriminden gelindi (bkz. backend
+  // siparisBildirimBaglantisi) — Tahsilat'ta o sipariş açılır. `n` her
+  // istekte artar: aynı bildirime ikinci kez basmak da açsın.
+  const [acilacakSiparis, setAcilacakSiparis] = useState<{ id: string; n: number } | null>(null);
+  // Adres her değiştiğinde bakılır, yalnızca açılışta değil: sayfa zaten
+  // açıkken bildirime basılınca bileşen yeniden kurulmuyor.
   useEffect(() => {
     const liste = aramaParametreleri.get("liste");
-    if (!aramaParametreleri.has("sekme") && !liste) return;
+    const sekme = aramaParametreleri.get("sekme");
+    const siparis = aramaParametreleri.get("siparis");
+    if (!sekme && !liste && !siparis) return;
     if (liste) setSeciliListe(liste);
+    if (siparis) setAcilacakSiparis((a) => ({ id: siparis, n: (a?.n ?? 0) + 1 }));
+    // Açılış tercihi henüz okunmadıysa sekmeyi o akış uygular (istenenSekme);
+    // okunduysa (sayfa açıktı) doğrudan geçilir.
+    if (istenenSekme.current === null && (sekme === "musteriler" || sekme === "potansiyel" || sekme === "tahsilat")) setGorunum(sekme);
     setAramaParametreleri(
       (once) => {
         const yeni = new URLSearchParams(once);
         yeni.delete("sekme");
         yeni.delete("liste");
+        yeni.delete("siparis");
         return yeni;
       },
       { replace: true }
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [aramaParametreleri]);
   // ?il=<plaka>: karttaki bir ile tıklanınca pencere o ilin ilçeleriyle açılır.
   const [haritaAcilisIli, setHaritaAcilisIli] = useState<number | undefined>();
   useEffect(() => {
@@ -1951,6 +1964,7 @@ export default function CustomersPanel({
           partySuzgeci={tahsilatSuzgeci}
           surukle={surukleVar && listeler.length > 0}
           filtreSolda={kokGenislik >= 1100}
+          acilacakSiparis={acilacakSiparis}
         />
       ) : (
       <>

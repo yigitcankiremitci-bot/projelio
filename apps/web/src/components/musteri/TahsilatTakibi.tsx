@@ -98,7 +98,10 @@ export default function TahsilatTakibi({
   partySuzgeci,
   surukle = false,
   filtreSolda: filtreSoldaIstegi = false,
+  acilacakSiparis,
 }: {
+  /** Bildirimden gelindi: bu sipariş yüklenince ayrıntısı açılır (bkz. CustomersPanel ?siparis=). */
+  acilacakSiparis?: { id: string; n: number } | null;
   /**
    * Filtreler listenin solunda sabit bir sütunda (Müşteriler sekmesiyle aynı
    * düzen); değilse "Süz" penceresinde. Panelin genişliğine göre üst bileşen verir.
@@ -355,7 +358,33 @@ export default function TahsilatTakibi({
     setAcikSiparis((a) => (a?.id === id ? null : a));
   };
   const siparisiAc = (id: string, mod?: "tahsil") => setAcikSiparis((a) => ({ id, mod: mod ?? null, n: (a?.n ?? 0) + 1 }));
-  const acikKayit = acikSiparis ? tumu.find((s) => s.id === acikSiparis.id) : undefined;
+  // Süzgeçlerden bağımsız: bildirimden açılan sipariş bu ayın ya da seçili
+  // listenin dışında olsa da ayrıntısı görünsün.
+  const acikKayit = acikSiparis ? (siparisler ?? []).find((s) => s.id === acikSiparis.id) : undefined;
+
+  // Bildirimden istenen sipariş: liste yüklenince açılır. Listede yoksa (sayfa
+  // sipariş gelmeden önce yüklenmişti) bir kez tazelenir.
+  const istenenSiparis = useRef<string | null>(null);
+  const tazelendi = useRef(false);
+  useEffect(() => {
+    if (!acilacakSiparis) return;
+    istenenSiparis.current = acilacakSiparis.id;
+    tazelendi.current = false;
+  }, [acilacakSiparis]);
+  useEffect(() => {
+    const id = istenenSiparis.current;
+    if (!id || !siparisler) return;
+    if (siparisler.some((s) => s.id === id)) {
+      istenenSiparis.current = null;
+      siparisiAc(id);
+    } else if (!tazelendi.current) {
+      tazelendi.current = true;
+      setYenile((x) => x + 1);
+    } else {
+      istenenSiparis.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siparisler, acilacakSiparis]);
   // Sağ panel: liste + 380 px'lik ayrıntı yan yana sığıyorsa. Liste boşken
   // yanında boş kutu anlamsız (Müşteriler'deki ikiBolme ile aynı kural).
   const yanPanel = genislik >= 760 && liste.length > 0;

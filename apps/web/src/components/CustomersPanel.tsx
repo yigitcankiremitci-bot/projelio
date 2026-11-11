@@ -1992,14 +1992,31 @@ export default function CustomersPanel({
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
       {/* ---- En sol: ayrıntılı filtreler ---- */}
       {filtreSolda && showToolbar && (
-        // Yapışkan DEĞİL: panel ekrandan uzun olabiliyor, yapışınca alt
-        // bölümlerine hiç inilemiyordu.
-        <aside style={{ ...filtrePaneliStili(c), width: 236, flexShrink: 0 }}>
+        // Yapışkan: sayfa kayarken yalnızca liste kaysın, filtreler yerinde
+        // dursun (kullanıcı isteği, 2026-11-11). Panel ekrandan uzun
+        // olabiliyor — eskiden bu yüzden yapışkan değildi, alt bölümlerine
+        // inilemiyordu; artık ekran boyuyla sınırlı ve kendi içinde kayıyor.
+        <aside
+          style={{
+            ...filtrePaneliStili(c),
+            width: 236,
+            flexShrink: 0,
+            position: "sticky",
+            top: 72,
+            maxHeight: "calc(100vh - 88px)",
+            overflowY: "auto",
+            scrollbarWidth: "thin",
+            boxSizing: "border-box",
+          }}
+        >
           {filtreIcerigi(false)}
         </aside>
       )}
       {/* ---- Liste: arama + satırlar ---- */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, width: ikiBolme ? 390 : "100%", flexShrink: 0, minWidth: 0 }}>
+      {/* İki bölmede liste genişler, kart ~600 px'te kalır: kart listeden
+          çok büyüktü, adlar listede iki satıra bölünüyordu (kullanıcı
+          isteği, 2026-11-11). */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10, ...(ikiBolme ? { flex: "1 1 0", minWidth: 340 } : { width: "100%", minWidth: 0 }) }}>
       {showToolbar && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", position: "relative" }}>
           <input
@@ -2313,8 +2330,9 @@ export default function CustomersPanel({
         <section
           aria-label={seciliKart ? seciliKart.displayName : undefined}
           style={{
-            flex: 1,
-            minWidth: 0,
+            flex: "0 1 600px",
+            minWidth: 380,
+            boxSizing: "border-box",
             // Liste kayarken kart yerinde kalsın; uzun kart kendi içinde kayar.
             // 72: sayfanın sabit üst çubuğu (eski özet sütunuyla aynı pay).
             position: "sticky",

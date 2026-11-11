@@ -607,7 +607,22 @@ export default function TahsilatTakibi({
           aynı düzen (kullanıcı isteği, 2026-11-11). */}
       <div style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
       {filtreSolda && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, width: 236, flexShrink: 0 }}>
+        // Yapışkan: sayfa kayarken yalnızca liste kayar (Müşteriler'le aynı);
+        // ekrandan uzunsa sütun kendi içinde kayar.
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            width: 236,
+            flexShrink: 0,
+            position: "sticky",
+            top: 72,
+            maxHeight: "calc(100vh - 88px)",
+            overflowY: "auto",
+            scrollbarWidth: "thin",
+          }}
+        >
           {ozetSeridi}
           <aside style={filtrePaneliStili(c)}>{filtreIcerigi(false)}</aside>
         </div>

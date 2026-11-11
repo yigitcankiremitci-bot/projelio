@@ -48,4 +48,20 @@ export const siparis: TranslationDict = {
   "{n} ürün stok koduyla eşleşti, stok hariç güncellenecek.": "{n} products matched by SKU and will be updated, excluding stock.",
   "{n} ekle, {m} güncelle": "Add {n}, update {m}",
   "{n} ürünü güncelle": "Update {n} products",
+
+  // ─────────────────────────────────────────────── Tahsilat takibi (2026-11-11)
+  "Sipariş ya da müşteri ara…": "Search orders or customers…",
+  "Aramayı ve filtreleri temizle": "Clear search and filters",
+  "Açık siparişlerin hepsini seç": "Select all open orders",
+  "Tutar · vade": "Amount · due",
+  "Bugün vadeli": "Due today",
+  "{n} gün gecikti": "{n} days overdue",
+  "{n} gün kaldı": "{n} days left",
+  "Henüz tahsilat yok.": "No payments yet.",
+  "Faturasız": "Not invoiced",
+  "Faturası kesilmemiş": "Not invoiced yet",
+  "Vadesi 7 gün içinde": "Due within 7 days",
+  "Excel'den aktar": "Import from Excel",
+  "Raporlar": "Reports",
+  "Çalışan bazında": "By employee",
 };

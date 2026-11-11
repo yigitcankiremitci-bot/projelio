@@ -1563,4 +1563,26 @@ export const moduller: TranslationDict = {
   "Tümünü temizle": "Clear all",
   "Varsayılan sıra": "Default order",
   "Ürün ara": "Search products",
+
+  // ─────────────────────────────────────────────── Müşteriler: sade düzen + filtre paneli (2026-11-11)
+  "Müşteri ara…": "Search customers…",
+  "Bağlantı ara…": "Search contacts…",
+  "Müşteri kartı": "Customer card",
+  "Bağlantı kartı": "Contact card",
+  "Bir müşteri seç": "Select a customer",
+  "Bir bağlantı seç": "Select a contact",
+  "Soldaki listeden birine tıkla; künyesi, görüşmeleri ve siparişleri burada açılır.":
+    "Click one in the list on the left; their details, calls and orders open here.",
+  "Görüşmeler": "Calls",
+  "Süz": "Filter",
+  "Süz ({n})": "Filter ({n})",
+  "Baş harf": "First letter",
+  "Eksik bilgi": "Missing info",
+  "Telefonu olmayanlar": "Without phone",
+  "E-postası olmayanlar": "Without email",
+  "Sorumlusu yok": "No owner",
+  "Hiç görüşülmemiş": "Never contacted",
+  "Araması gecikenler": "Overdue calls",
+  "Bugün aranacaklar": "To call today",
+  "Planlı araması olanlar": "Calls scheduled",
 };

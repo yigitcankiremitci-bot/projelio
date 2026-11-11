@@ -7,6 +7,7 @@ import { notifyCloudStorageChanged, onCloudStorageChanged } from "../lib/cloudSt
 import ConfirmDialog from "./ConfirmDialog";
 import { IconGoogleDrive, IconOneDrive } from "./icons";
 import { useT } from "../lib/i18n";
+import { sor } from "../lib/onay";
 
 /**
  * Ayarlar > Bağlı bulut hesapları.
@@ -65,7 +66,7 @@ export default function CloudAccountsCard() {
       // ayırt etmenin tek yolu.
       const label =
         (accounts?.some((a) => a.provider === provider)
-          ? window.prompt(t("Bu hesaba bir ad verin (örn. Şirket Drive'ı):")) ?? ""
+          ? (await sor(t("Bu hesaba bir ad verin (örn. Şirket Drive'ı):"))) ?? ""
           : ""
         ).trim() || undefined;
 

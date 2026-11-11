@@ -47,6 +47,7 @@ import { useGorunurAlan } from "../lib/useGorunurAlan";
 import { satinAlmaGosterilir } from "../lib/mobilKabuk";
 import { DOKUNMATIK_CIHAZ } from "../lib/dokunmatikCihaz";
 import { bicimDili } from "../lib/i18n/depo";
+import { bildir } from "../lib/onay";
 
 interface Props {
   open: boolean;
@@ -2409,7 +2410,7 @@ function Bubble({
                     // ne olduğunu söylüyor, o cümleyi olduğu gibi gösteriyoruz.
                     aiChat
                       .downloadExport(segment.exportId, segment.label)
-                      .catch((e) => alert(e instanceof Error ? e.message : t("Rapor indirilemedi.")));
+                      .catch((e) => void bildir(e instanceof Error ? e.message : t("Rapor indirilemedi.")));
                   }}
                   title={t("Raporu indir")}
                   style={{

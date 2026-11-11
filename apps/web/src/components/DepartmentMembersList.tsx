@@ -7,6 +7,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import { useFabAvailable } from "../lib/projectFab";
 import { IconTrash } from "./icons";
 import { useT } from "../lib/i18n";
+import { bildir, onayla } from "../lib/onay";
 
 export interface DepartmentMembersListHandle {
   openCreate: () => void;
@@ -189,14 +190,14 @@ const DepartmentMembersList = forwardRef<DepartmentMembersListHandle, Props>(fun
     : undefined;
 
   const handleLeave = async () => {
-    if (!window.confirm(t("Bu departmanın kadrosundan ayrılmak istediğine emin misin?"))) return;
+    if (!(await onayla(t("Bu departmanın kadrosundan ayrılmak istediğine emin misin?")))) return;
     // Son yönetici ayrılıyorsa sunucu ayrılmayı hemen uygulamaz, organizasyon
     // sahibinin onayına düşürür (bkz. 061) — kullanıcı beklediğini sanmasın.
     const result = await api
       .patch<{ success: true; pendingApproval: boolean }>(`/departments/${departmentId}/members/me/leave`, {})
       .catch(() => null);
     if (result?.pendingApproval) {
-      window.alert(
+      void bildir(
         t("Bu departmanın son yöneticisisin. Ayrılma talebin şirket kurucusuna iletildi; onaylanana kadar yöneticiliğin sürüyor.")
       );
     }

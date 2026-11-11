@@ -12,6 +12,7 @@ import { useLocale, useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import { useThemeColors } from "../theme/useThemeColors";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 /**
  * Paket (abonelik) ekranı.
@@ -271,7 +272,7 @@ export default function BillingPage() {
   const satinAl = (plan: BillingPlanView, tutar: number, koltuk?: number) => kartFormunuAc({ tur: "ilk", plan, tutar, koltuk });
 
   const iptalEt = async (abonelik: Subscription) => {
-    if (!window.confirm(t("Paketin dönem sonuna kadar açık kalacak, sonra ücretsiz plana düşeceksin. İptal edilsin mi?"))) {
+    if (!(await onayla(t("Paketin dönem sonuna kadar açık kalacak, sonra ücretsiz plana düşeceksin. İptal edilsin mi?")))) {
       return;
     }
     setIslemde("iptal");

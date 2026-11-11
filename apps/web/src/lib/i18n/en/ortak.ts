@@ -102,4 +102,9 @@ export const ortak: TranslationDict = {
   Cum: "Fri",
   Cmt: "Sat",
   Paz: "Sun",
+  // Uygulamanın onay / bilgi / soru penceresi (components/OnayKatmani.tsx).
+  "Bilgi": "Notice",
+  "Bilgi gir": "Enter information",
+  "Emin misin?": "Are you sure?",
+  "Evet": "Yes",
 };

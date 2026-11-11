@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { IconPlus, IconX } from "./icons";
+import { onayla } from "../lib/onay";
 
 /**
  * Yapılacaklar listeleri (migration 185): kanban sayfasının ve anasayfadaki
@@ -169,8 +170,8 @@ export function YapilacakListeSekmeleri({
                 type="button"
                 aria-label={t("Listeyi sil")}
                 title={t("Listeyi sil")}
-                onClick={() => {
-                  if (window.confirm(t("\"{ad}\" listesi silinsin mi? İçindeki yapılacaklar silinmez.", { ad: s.ad }))) {
+                onClick={async () => {
+                  if ((await onayla(t("\"{ad}\" listesi silinsin mi? İçindeki yapılacaklar silinmez.", { ad: s.ad })))) {
                     onSil(s.id);
                     onSec("");
                   }

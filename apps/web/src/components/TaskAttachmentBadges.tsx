@@ -6,6 +6,7 @@ import { IconExternalLink, IconFile } from "./icons";
 import Modal from "./Modal";
 import { useTaskAttachmentSnapshot, type AttachedFile } from "../lib/taskAttachmentEvents";
 import { useT } from "../lib/i18n";
+import { bildir } from "../lib/onay";
 
 /**
  * Bağlantı ekleri kullanıcı tarafından yazılıyor. `javascript:` ile başlayan bir
@@ -19,7 +20,7 @@ import { useT } from "../lib/i18n";
 function openLink(url: string, t: Translate): void {
   const safe = safeExternalUrl(url);
   if (!safe) {
-    alert(t("Bu bağlantı açılamıyor: adres geçerli bir web adresi değil."));
+    void bildir(t("Bu bağlantı açılamıyor: adres geçerli bir web adresi değil."));
     return;
   }
   window.open(safe, "_blank", "noreferrer");

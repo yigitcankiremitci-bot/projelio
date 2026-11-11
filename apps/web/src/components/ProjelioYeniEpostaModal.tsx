@@ -5,6 +5,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { IconLio, IconPaperclip, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
+import { onayla } from "../lib/onay";
 
 interface Props {
   account: MailAccount;
@@ -112,8 +113,8 @@ export default function ProjelioYeniEpostaModal({ account, initialTo, initialSub
     }
   };
 
-  const requestClose = () => {
-    if ((text.trim() || subject.trim()) && !window.confirm(t("Yazdığınız e-posta kaybolacak. Kapatılsın mı?"))) return;
+  const requestClose = async () => {
+    if ((text.trim() || subject.trim()) && !(await onayla(t("Yazdığınız e-posta kaybolacak. Kapatılsın mı?")))) return;
     onClose();
   };
 

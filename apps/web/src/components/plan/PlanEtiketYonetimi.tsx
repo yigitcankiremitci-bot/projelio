@@ -6,6 +6,7 @@ import { planning } from "../../api/planning";
 import { useT } from "../../lib/i18n";
 import { inputStyle } from "./PlanTargetsModal";
 import { RenkPaleti, siradakiEtiketRengi, YeniEtiketFormu } from "./PlanEtiketSecici";
+import { onayla } from "../../lib/onay";
 
 /**
  * Etiket listesini düzenleme: sıra, ad, renk, silme, yeni etiket.
@@ -44,7 +45,7 @@ export function EtiketDuzenleyici({
   };
 
   const sil = async (label: PlanLabel) => {
-    if (!window.confirm(t("\"{name}\" etiketi silinsin mi? Bloklardan da kaldırılır, bloklar silinmez.", { name: label.name }))) return;
+    if (!(await onayla(t("\"{name}\" etiketi silinsin mi? Bloklardan da kaldırılır, bloklar silinmez.", { name: label.name })))) return;
     setHata(null);
     try {
       await planning.deleteLabel(label.id);

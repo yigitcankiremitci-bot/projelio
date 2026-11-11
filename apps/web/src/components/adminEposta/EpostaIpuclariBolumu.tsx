@@ -4,6 +4,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { epostaYonetimi, type IpucuYamasi } from "../../api/epostaYonetimi";
 import { alan, dugme, etiket, kart, metinAlani, rozet } from "./stiller";
+import { onayla } from "../../lib/onay";
 
 /**
  * Admin > E-posta > İpuçları.
@@ -229,12 +230,12 @@ export default function EpostaIpuclariBolumu() {
                       type="button"
                       disabled={mesgul}
                       style={{ ...dugme(c, "tehlike"), padding: "5px 10px", fontSize: 13 }}
-                      onClick={() => {
+                      onClick={async () => {
                         const soru =
                           ipucu.kaynak === "ozel"
                             ? t("Bu ipucu silinsin mi?")
                             : t("Bu ipucu varsayılan metnine ve ayarlarına dönsün mü?");
-                        if (window.confirm(soru)) void calistir(() => epostaYonetimi.ipucuSil(ipucu.anahtar));
+                        if ((await onayla(soru))) void calistir(() => epostaYonetimi.ipucuSil(ipucu.anahtar));
                       }}
                     >
                       {ipucu.kaynak === "ozel" ? t("Sil") : t("Varsayılana dön")}

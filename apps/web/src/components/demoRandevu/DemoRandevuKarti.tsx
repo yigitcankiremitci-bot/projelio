@@ -10,6 +10,7 @@ import TakvimeEkle from "./TakvimeEkle";
 import OzetKutusu from "./OzetKutusu";
 import { uzunTarih } from "./demoBicim";
 import { anaDugme, girdi, ikincilDugme } from "./stiller";
+import { onayla } from "../../lib/onay";
 
 /**
  * Ayarlar > Yardımcılar'daki "Canlı demo" kartının içi.
@@ -198,7 +199,7 @@ function MeetBaglantisi() {
   };
 
   const kes = async () => {
-    if (!window.confirm(t("Google Meet bağlantısı kesilsin mi? Yeni randevulara otomatik Meet açılmaz; mevcut bağlantılar çalışmaya devam eder."))) return;
+    if (!(await onayla(t("Google Meet bağlantısı kesilsin mi? Yeni randevulara otomatik Meet açılmaz; mevcut bağlantılar çalışmaya devam eder.")))) return;
     setCalisiyor(true);
     try {
       setMeet(await demoRandevuApi.meetKes());

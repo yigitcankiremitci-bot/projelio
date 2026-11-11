@@ -28,6 +28,7 @@ import { PARTY_SURUKLE } from "../BaglantiListeleri";
 import { ayEtiketi, bugunYerel } from "./siparisOrtak";
 import { gunFarki } from "./SiparisKarti";
 import { IconChevronDown } from "../icons";
+import { onayla } from "../../lib/onay";
 
 type DurumSuzgeci = "acik" | "yaklasan" | "gecikti" | "tahsil_edildi" | "hepsi";
 /** Fatura süzgeci: "yok" = faturası kesilmemiş (iptal hariç), "var" = faturalı. */
@@ -374,7 +375,7 @@ export default function TahsilatTakibi({
   const topluTahsilEt = async () => {
     if (!toplu || secili.size === 0) return;
     const metin = seciliToplam.map(([p, v]) => fmtPara(v, p)).join(" + ");
-    if (!window.confirm(t("{n} sipariş tahsil edildi olarak işaretlensin mi? Kasaya {tutar} gelir yazılır.", { n: secili.size, tutar: metin }))) return;
+    if (!(await onayla(t("{n} sipariş tahsil edildi olarak işaretlensin mi? Kasaya {tutar} gelir yazılır.", { n: secili.size, tutar: metin })))) return;
     setIsleniyor(true);
     setTopluSonuc("");
     try {

@@ -18,6 +18,7 @@ import { useT } from "../lib/i18n";
 import { useCurrentUser } from "../lib/useCurrentUser";
 import ConfirmDialog from "./ConfirmDialog";
 import { IconLogout } from "./icons";
+import { bildir } from "../lib/onay";
 
 interface Props {
   organization: Organization;
@@ -70,7 +71,7 @@ export default function EditOrganizationModal({ organization, onClose, onSaved, 
       return;
     }
     if (sonuc.pendingDepartments.length > 0) {
-      window.alert(
+      void bildir(
         t(
           "Şirketten ayrıldın. Son yöneticisi olduğun departmanlarda ({departmanlar}) ayrılma talebin şirket kurucusunun onayını bekliyor.",
           { departmanlar: sonuc.pendingDepartments.join(", ") }

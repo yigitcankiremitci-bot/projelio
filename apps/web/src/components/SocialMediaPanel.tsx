@@ -54,6 +54,7 @@ import { useIsDesktop } from "../lib/useIsDesktop";
 import { popupSettingsHint } from "../lib/popupSettings";
 import { getAccountOrder, moveItem, setAccountOrder, sortByOrder } from "../lib/socialAccountOrder";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 interface Props {
   organizationId?: string;
@@ -322,9 +323,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
   const archivePost = async (post: SocialPost) => {
     if (
-      !window.confirm(
+      !(await onayla(
         t('"{ad}" kaldırılsın mı? Kayıt arşivlenir, gerekirse geri alınabilir.', { ad: post.title })
-      )
+      ))
     )
       return;
     setPosts((ps) => ps.filter((p) => p.id !== post.id));
@@ -360,9 +361,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
   const disconnectInstagram = async (account: SocialAccount) => {
     if (
-      !window.confirm(
+      !(await onayla(
         t("@{hesap} bağlantısı kesilsin mi? Hesap kaydı ve geçmiş gönderiler kalır.", { hesap: account.handle })
-      )
+      ))
     )
       return;
     try {
@@ -389,9 +390,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
       return;
     }
     if (
-      !window.confirm(
+      !(await onayla(
         t('"{ad}" şimdi {n} kanalda yayımlansın mı?', { ad: post.title, n: connected.length })
-      )
+      ))
     )
       return;
 
@@ -476,9 +477,9 @@ export default function SocialMediaPanel({ organizationId, departmentId, jobId, 
 
   const archiveAccount = async (account: SocialAccount) => {
     if (
-      !window.confirm(
+      !(await onayla(
         t("{hesap} hesabı arşivlensin mi? Geçmiş gönderiler korunur.", { hesap: accountLabel(account) })
-      )
+      ))
     )
       return;
     setAccounts((as) => as.filter((a) => a.id !== account.id));

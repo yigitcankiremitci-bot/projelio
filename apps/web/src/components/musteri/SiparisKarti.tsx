@@ -26,6 +26,7 @@ import SiparisFormu from "./SiparisFormu";
 import SiparisFaturasi from "./SiparisFaturasi";
 import { Alan, AsamaRozeti, DurumRozeti, TAM_GENISLIK, bugunYerel } from "./siparisOrtak";
 import { useIsDesktop } from "../../lib/useIsDesktop";
+import { onayla } from "../../lib/onay";
 
 /**
  * Tek sipariş satırı: özet + sağda tutar/vade.
@@ -273,7 +274,7 @@ export function SiparisAyrintisi({
   const oran = siparis.tutar > 0 ? Math.min(1, odenen / siparis.tutar) : 0;
 
   const geriAl = async (tahsilatId: string) => {
-    if (!window.confirm(t("Bu tahsilat geri alınsın mı? Kasadaki gelir kaydı da silinir."))) return;
+    if (!(await onayla(t("Bu tahsilat geri alınsın mı? Kasadaki gelir kaydı da silinir.")))) return;
     setHata("");
     try {
       onDegisti(await siparisApi.tahsilatiGeriAl(tahsilatId));
@@ -296,7 +297,7 @@ export function SiparisAyrintisi({
           : yeni === "iptal"
             ? t("Sipariş iptal edilsin mi? İptal geri alınamaz.")
             : null;
-    if (soru && !window.confirm(soru)) return;
+    if (soru && !(await onayla(soru))) return;
     setHata("");
     try {
       onDegisti(await siparisApi.asama(siparis.id, yeni));
@@ -308,7 +309,7 @@ export function SiparisAyrintisi({
   const silinebilir = siparis.tahsilatlar.length === 0 && !(stokTakipli(siparis.kaynak) && onayliMi(siparis.asama));
 
   const sil = async () => {
-    if (!window.confirm(t("Sipariş silinsin mi?"))) return;
+    if (!(await onayla(t("Sipariş silinsin mi?")))) return;
     setHata("");
     try {
       await siparisApi.sil(siparis.id);

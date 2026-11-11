@@ -4,6 +4,7 @@ import type { Task, TaskPriority, TaskStatus } from "@projelio/shared";
 import { MAX_TASK_PRIORITY } from "@projelio/shared";
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
+import { bildir } from "../lib/onay";
 
 /** Alt görevi olmayan kartlar için sabit boş dizi: her çağrıda yenisini
  *  üretmek gereksiz referans değişikliği (ve gereksiz render) yaratır. */
@@ -734,7 +735,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
       reload?.();
     } catch (err: any) {
       // Sunucu kuralı reddedebilir (ör. kaydın kendi alt görevleri var).
-      window.alert(err?.message ?? t("Alt göreve dönüştürülemedi."));
+      void bildir(err?.message ?? t("Alt göreve dönüştürülemedi."));
       reload?.();
     }
   };
@@ -848,7 +849,7 @@ const TaskColumn = forwardRef<TaskColumnHandle, Props>(function TaskColumn({
           },
         });
       } catch (err: any) {
-        window.alert(err?.message ?? t("Göreve dönüştürülemedi."));
+        void bildir(err?.message ?? t("Göreve dönüştürülemedi."));
       }
       reload();
       return;

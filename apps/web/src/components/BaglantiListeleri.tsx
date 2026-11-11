@@ -5,6 +5,7 @@ import { partyApi } from "../api/party";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { IconEdit } from "./icons";
+import { onayla } from "../lib/onay";
 
 /**
  * Bağlantı listeleri (migration 163) — oynatma listesi mantığı.
@@ -115,7 +116,7 @@ export function BaglantiListeSekmeleri({
       modul === BAGLANTI_MODUL_KEY
         ? t("\"{ad}\" listesi silinsin mi? İçindeki {n} bağlantı silinmez, Tümü'nde kalır.", { ad: l.ad, n: l.sayi })
         : t("\"{ad}\" listesi silinsin mi? İçindeki kartlar silinmez, Tümü'nde kalır.", { ad: l.ad });
-    if (!window.confirm(soru)) return false;
+    if (!(await onayla(soru))) return false;
     try {
       await partyApi.listeSil(l.id);
       if (secili === l.id) onSec("");

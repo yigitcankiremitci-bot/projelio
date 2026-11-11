@@ -1,4 +1,5 @@
 import { cevirmenSuAn } from "./i18n/anlik";
+import { bildir } from "./onay";
 /**
  * Görev durumu sunucuda reddedildiğinde sebebini kullanıcıya söyler.
  *
@@ -12,13 +13,14 @@ import { cevirmenSuAn } from "./i18n/anlik";
  * kullanıcının önüne dikmek olurdu. 400 ise "bunu yapamazsın, sebebi şu"
  * demektir ve tek anlamlı yanıt sebebi göstermek.
  *
- * window.alert bilinçli: uygulamada bu akış için bir bildirim şeridi yok ve
- * aynı desen TaskColumn'daki dönüştürme hatasında da kullanılıyor.
+ * Uygulamanın bilgi penceresi (lib/onay.ts `bildir`): bu akış için bir
+ * bildirim şeridi yok; aynı desen TaskColumn'daki dönüştürme hatasında da var.
+ * Tarayıcının alert'i Chrome'da adres çubuğunun altında açılıyordu (2026-11-11).
  */
 export function gorevDurumHatasiniBildir(err: unknown): void {
   const hata = err as { status?: number; message?: string } | null;
   if (hata?.status !== 400 || !hata.message) return;
-  window.alert(hata.message);
+  void bildir(hata.message);
 }
 
 /**
@@ -37,8 +39,8 @@ export function altGorevHatasiniBildir(err: unknown): void {
   const hata = err as { status?: number; message?: string } | null;
   if (hata?.status === 401) return;
   if (hata?.status === 400 && hata.message) {
-    window.alert(hata.message);
+    void bildir(hata.message);
     return;
   }
-  window.alert(t("Alt görev kaydedilemedi. Lütfen tekrar deneyin."));
+  void bildir(t("Alt görev kaydedilemedi. Lütfen tekrar deneyin."));
 }

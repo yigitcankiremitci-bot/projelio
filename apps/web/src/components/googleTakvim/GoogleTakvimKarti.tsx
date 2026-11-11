@@ -5,6 +5,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import { takvimAraligi } from "./takvimAraligi";
+import { onayla } from "../../lib/onay";
 
 /**
  * Ayarlar › Bağlı hesaplar'daki Google Takvim kartı.
@@ -195,8 +196,8 @@ export default function GoogleTakvimKarti() {
             <button
               type="button"
               disabled={mesgul}
-              onClick={() => {
-                if (!window.confirm(t("Google Takvim bağlantısı kesilsin mi? Projelio'dan eklediğin etkinlikler Google Takvim'de kalır."))) return;
+              onClick={async () => {
+                if (!(await onayla(t("Google Takvim bağlantısı kesilsin mi? Projelio'dan eklediğin etkinlikler Google Takvim'de kalır.")))) return;
                 void calistir(() => googleTakvimApi.kes());
               }}
               style={{ ...dugme(false), color: c.danger }}

@@ -13,6 +13,7 @@ import Modal from "../Modal";
 import SifreGirdisi from "../SifreGirdisi";
 import HesapKilidi, { useKilit } from "./HesapKilidi";
 import { bicimDili } from "../../lib/i18n/depo";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   hesap: ServiceAccount;
@@ -140,7 +141,7 @@ export default function HesapKimlikModal({ hesap, canManage, canWrite, onClose, 
   };
 
   const sil = async (satir: ServiceCredential) => {
-    if (!window.confirm(t("“{etiket}” kaydı silinsin mi? Şifre geri getirilemez.", { etiket: satir.label }))) return;
+    if (!(await onayla(t("“{etiket}” kaydı silinsin mi? Şifre geri getirilemez.", { etiket: satir.label })))) return;
     try {
       await hesaplarApi.kimlikSil(satir.id);
       yukle();

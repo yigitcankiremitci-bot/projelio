@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
+import { onayla } from "../../lib/onay";
 
 /**
  * Panonun Not kartı: araç çubuklu küçük bir zengin metin defteri.
@@ -200,11 +201,11 @@ export default function NotDefteri({ kapsam }: { kapsam: string }) {
     guncelle({ notlar: [...d.notlar, yeni], secili: yeni.id });
     setTimeout(() => ref.current?.focus(), 0);
   };
-  const notSil = (id: string) => {
+  const notSil = async (id: string) => {
     const d = defterRef.current;
     const not = d.notlar.find((n) => n.id === id);
     if (!not) return;
-    if (not.baslik && !window.confirm(t("\"{ad}\" notu silinsin mi?", { ad: not.baslik }))) return;
+    if (not.baslik && !(await onayla(t("\"{ad}\" notu silinsin mi?", { ad: not.baslik })))) return;
     const kalan = d.notlar.filter((n) => n.id !== id);
     const notlar = kalan.length ? kalan : [yeniNot()];
     guncelle({ notlar, secili: notlar[Math.max(0, d.notlar.findIndex((n) => n.id === id) - 1)]?.id ?? notlar[0].id });

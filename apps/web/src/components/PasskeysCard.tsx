@@ -6,6 +6,7 @@ import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { bicimDili } from "../lib/i18n/depo";
 import SifreGirdisi from "./SifreGirdisi";
+import { onayla } from "../lib/onay";
 
 /**
  * GEÇİŞ ANAHTARLARI — kullanıcının cihazları.
@@ -74,7 +75,7 @@ export default function PasskeysCard({ hasPassword = true }: { hasPassword?: boo
   };
 
   const sil = async (anahtar: Passkey) => {
-    if (!window.confirm(t("Bu geçiş anahtarı kaldırılsın mı? Bu cihazla kilit açamazsınız."))) return;
+    if (!(await onayla(t("Bu geçiş anahtarı kaldırılsın mı? Bu cihazla kilit açamazsınız.")))) return;
     setBusy(true);
     try {
       await passkeysApi.sil(anahtar.id);

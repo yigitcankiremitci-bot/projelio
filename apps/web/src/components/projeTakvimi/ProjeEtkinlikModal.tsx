@@ -9,6 +9,7 @@ import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "../plan/PlanTargetsModal";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   projectId: string;
@@ -90,9 +91,9 @@ export default function ProjeEtkinlikModal({ projectId, etkinlik, taslak, projey
     void calistir(() => (etkinlik ? projeTakvimiApi.duzenle(etkinlik.id, girdi) : projeTakvimiApi.ekle(projectId, girdi)));
   };
 
-  const sil = () => {
+  const sil = async () => {
     if (!etkinlik) return;
-    if (!window.confirm(t("Bu etkinlik proje takviminden silinsin mi? Ekipteki herkesin takviminden kalkar."))) return;
+    if (!(await onayla(t("Bu etkinlik proje takviminden silinsin mi? Ekipteki herkesin takviminden kalkar.")))) return;
     void calistir(() => projeTakvimiApi.sil(etkinlik.id));
   };
 

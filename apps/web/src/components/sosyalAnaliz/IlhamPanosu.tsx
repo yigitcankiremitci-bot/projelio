@@ -14,6 +14,7 @@ import Modal from "../Modal";
 import { IconPaperclip, InlineIcon } from "../icons";
 import BenzerHesapKesfi from "./BenzerHesapKesfi";
 import { MaddeListesi, useAnalizStilleri } from "./ortak";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   scope: SocialScope;
@@ -71,7 +72,7 @@ export default function IlhamPanosu({
   };
 
   const sil = async (ilham: SocialInspiration) => {
-    if (!window.confirm(t("Bu ilham kaydı silinsin mi? Yüklediğin referans dosyası dosyalarında kalır."))) return;
+    if (!(await onayla(t("Bu ilham kaydı silinsin mi? Yüklediğin referans dosyası dosyalarında kalır.")))) return;
     try {
       await socialMediaApi.ilhamSil(ilham.id);
       onDegisti(ilhamlar.filter((i) => i.id !== ilham.id));

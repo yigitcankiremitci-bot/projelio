@@ -20,6 +20,7 @@ import { useUndo } from "../lib/undo";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
 import KartEtiketi from "./KartEtiketi";
+import { onayla } from "../lib/onay";
 
 interface Props {
   task: Task;
@@ -146,7 +147,7 @@ export default function TaskEditModal({
 
   const handleLeaveTask = async () => {
     if (!currentUser) return;
-    if (!window.confirm(t("Bu görevden ayrılmak istiyor musun? Görev silinmez, üzerinden düşersin."))) return;
+    if (!(await onayla(t("Bu görevden ayrılmak istiyor musun? Görev silinmez, üzerinden düşersin.")))) return;
     const updated = await api.delete<Task>(`/tasks/${task.id}/assignees/me`).catch(() => null);
     if (updated) {
       setAssigneeIds(updated.assignees?.map((a) => a.userId) ?? []);

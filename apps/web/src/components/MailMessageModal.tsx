@@ -6,6 +6,7 @@ import Modal from "./Modal";
 import { IconExternalLink, IconLio, IconPaperclip, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 interface Props {
   accountId: string;
@@ -152,8 +153,8 @@ export default function MailMessageModal({ accountId, message, canWrite, onClose
    * Modal'ın kendi kapatma yolları (Escape, karartmaya tıklama) yazılmış bir
    * metni sessizce çöpe atıyordu. Boş kutuda soru sorulmaz.
    */
-  const requestClose = () => {
-    if (replyText.trim() && !window.confirm(t("Yazdığınız yanıt kaybolacak. Kapatılsın mı?"))) return;
+  const requestClose = async () => {
+    if (replyText.trim() && !(await onayla(t("Yazdığınız yanıt kaybolacak. Kapatılsın mı?")))) return;
     onClose();
   };
 

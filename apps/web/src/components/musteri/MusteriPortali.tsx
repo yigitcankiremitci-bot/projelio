@@ -5,6 +5,7 @@ import { portalApi } from "../../api/party";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import { TAM_GENISLIK } from "./siparisOrtak";
+import { onayla } from "../../lib/onay";
 
 const YETKILER: PortalYetkisi[] = ["siparis_ver", "fiyat_gor", "siparis_gecmisi"];
 
@@ -136,7 +137,7 @@ export default function MusteriPortali({
                 <button
                   disabled={calisiyor}
                   style={kucuk}
-                  onClick={() => window.confirm(t("Portal hesabı kapatılsın mı? Kişi portala giremez.")) && guncelle(k, { durum: "kapali" })}
+                  onClick={async () => (await onayla(t("Portal hesabı kapatılsın mı? Kişi portala giremez."))) && guncelle(k, { durum: "kapali" })}
                 >
                   {t("Hesabı kapat")}
                 </button>

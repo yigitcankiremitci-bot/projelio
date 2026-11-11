@@ -8,6 +8,7 @@ import TeamMemberModal from "../TeamMemberModal";
 import { isAssignedTo } from "../../lib/taskAssignees";
 import { useCurrentUser } from "../../lib/useCurrentUser";
 import { useT } from "../../lib/i18n";
+import { onayla } from "../../lib/onay";
 
 export interface TeamPanelHandle {
   openCreate: () => void;
@@ -69,7 +70,7 @@ const TeamPanel = forwardRef<TeamPanelHandle, Props>(function TeamPanel({ projec
   const isProjectOwner = currentUser?.id === ownerId;
 
   const handleLeave = async () => {
-    if (!window.confirm(t("Bu projeden ayrılmak istediğine emin misin? Sana atanmış görevler ekipte kalır."))) return;
+    if (!(await onayla(t("Bu projeden ayrılmak istediğine emin misin? Sana atanmış görevler ekipte kalır.")))) return;
     await api.delete(`/projects/${projectId}/members/me`).catch(() => {});
     load();
   };

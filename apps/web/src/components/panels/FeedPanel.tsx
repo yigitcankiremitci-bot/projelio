@@ -9,6 +9,7 @@ import { IconCheck, IconHeart, IconMessageCircle, IconTrash } from "../icons";
 import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import IkiliSecim from "../IkiliSecim";
+import { onayla } from "../../lib/onay";
 
 type Gorunurluk = "arkadaslar" | "herkes";
 const GORUNURLUK_ANAHTARI = "projelio_sosyal_gorunurluk";
@@ -491,7 +492,7 @@ function PostCard({ post, onLikeToggled, onCommentCountChanged, onDeleted }: Pos
   // doldurur). Onay penceresi yerine confirm: 140 karakterlik bir paylaşım
   // için modal ağır kaçıyordu.
   const handleDelete = async () => {
-    if (deleting || !window.confirm(t("Bu paylaşım silinsin mi?"))) return;
+    if (deleting || !(await onayla(t("Bu paylaşım silinsin mi?")))) return;
     setDeleting(true);
     try {
       await api.delete(`/sosyal/paylasim/${post.id}`);

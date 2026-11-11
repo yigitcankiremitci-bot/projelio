@@ -6,6 +6,7 @@ import { ignoreAbort } from "../../api/client";
 import { markdownBloklari, type SatirIci } from "../../lib/ajanMetin";
 import { useThemeColors } from "../../theme/useThemeColors";
 import Modal from "../Modal";
+import { onayla } from "../../lib/onay";
 
 /**
  * Ajan paneli: ofisteki ajan robotuna tıklanınca açılır (migration 177).
@@ -329,7 +330,7 @@ function Raporlar({ c, durum, tazele }: { c: ThemeColors; durum: AjanDurumu | nu
           type="button"
           style={{ ...dugme(c), marginTop: 12 }}
           onClick={async () => {
-            if (!window.confirm("Rapor silinsin mi?")) return;
+            if (!(await onayla("Rapor silinsin mi?"))) return;
             await ajanApi.raporSil(acik.id).catch(() => undefined);
             setRaporlar((l) => l.filter((x) => x.id !== acik.id));
             setAcik(null);
@@ -621,7 +622,7 @@ function Mac({ c, durum, onDurum }: { c: ThemeColors; durum: AjanDurumu | null; 
   }, [durum, ad]);
 
   const uret = async () => {
-    if (durum?.kurulu && !window.confirm("Yeni anahtar üretilince Mac'teki eski anahtar çalışmayı bırakır. Devam edilsin mi?")) return;
+    if (durum?.kurulu && !(await onayla("Yeni anahtar üretilince Mac'teki eski anahtar çalışmayı bırakır. Devam edilsin mi?"))) return;
     setHata(null);
     try {
       setAnahtar((await ajanApi.anahtarUret()).anahtar);
@@ -1090,7 +1091,7 @@ function Otomasyonlar({ c, durum }: { c: ThemeColors; durum: AjanDurumu | null }
               style={dugme(c)}
               onClick={() =>
                 void yap(async () => {
-                  if (!window.confirm(`"${o.ad}" silinsin mi?`)) return;
+                  if (!(await onayla(`"${o.ad}" silinsin mi?`))) return;
                   await ajanApi.otomasyonSil(o.id);
                   setListe((l) => l.filter((x) => x.id !== o.id));
                 })

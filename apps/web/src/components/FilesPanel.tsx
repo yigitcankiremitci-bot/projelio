@@ -41,6 +41,7 @@ import InlineRenameText from "./InlineRenameText";
 import FileThumb from "./FileThumb";
 import LinkFileModal from "./LinkFileModal";
 import { useT } from "../lib/i18n";
+import { sor } from "../lib/onay";
 import {
   IconChevronLeft,
   IconDownload,
@@ -527,7 +528,7 @@ const FilesPanel = forwardRef<FilesPanelHandle, Props>(function FilesPanel(
 
   const handleCreateFolder = async () => {
     if (!folderOwner) return;
-    const ad = window.prompt(t("Klasör adı:"))?.trim();
+    const ad = (await sor({ baslik: t("Yeni klasör"), mesaj: t("Klasör adı:") }))?.trim();
     if (!ad) return;
     try {
       // Proje kökünde yeni klasör projenin klasörünün İÇİNE açılır.

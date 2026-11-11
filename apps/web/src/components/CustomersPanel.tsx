@@ -67,6 +67,7 @@ import MusteriSiparisleri from "./musteri/MusteriSiparisleri";
 import MusteriPortali from "./musteri/MusteriPortali";
 import TahsilatTakibi from "./musteri/TahsilatTakibi";
 import MusteriKunyesi from "./musteri/MusteriKunyesi";
+import { onayla } from "../lib/onay";
 // Harita ancak "Haritada göster"e basılınca yüklenir: il sınırlarının verisi
 // (~110 KB) Müşteriler ekranını her açanın paketine girmesin.
 const MusteriHaritasi = lazy(() => import("./musteri/MusteriHaritasi"));
@@ -539,7 +540,7 @@ export default function CustomersPanel({
 
   const acilisYap = async (g: typeof gorunum, etiket: string) => {
     if ((kayitliAcilis ?? ilkGorunum) === g) return;
-    if (!window.confirm(t("Modül her açılışta \"{sekme}\" sekmesinde açılsın mı?", { sekme: etiket }))) return;
+    if (!(await onayla(t("Modül her açılışta \"{sekme}\" sekmesinde açılsın mı?", { sekme: etiket })))) return;
     try {
       const r = await acilisApi.kaydet(kapsamYolu, MUSTERI_MODUL_KEY, g);
       setKayitliAcilis(r.sekme);
@@ -995,7 +996,7 @@ export default function CustomersPanel({
         ? t("{ad} Bağlantı ve İlişkiler listesinden çıkarılsın mı? Kart diğer listelerde kalır.", { ad: p.displayName })
         : t("{ad} Müşteriler listesinden çıkarılsın mı? Kart diğer listelerde (Bağlantılar, Tedarik) kalır.", { ad: p.displayName })
       : t("{ad} silinsin mi? Kart arşive kaldırılır; hemen ardından Geri Al ile geri getirebilirsin.", { ad: p.displayName });
-    if (!window.confirm(soru)) return;
+    if (!(await onayla(soru))) return;
     let sonuc: "defterdenCikti" | "arsivlendi";
     try {
       sonuc = (await api.delete<{ sonuc: "defterdenCikti" | "arsivlendi" }>(`/party/${p.id}?modul=${defter}`))?.sonuc ?? "arsivlendi";

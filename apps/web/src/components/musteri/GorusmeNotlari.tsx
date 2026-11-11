@@ -15,6 +15,7 @@ import { useT } from "../../lib/i18n";
 import { useCurrentUser } from "../../lib/useCurrentUser";
 import { formatDateTime, timeAgo } from "../../lib/dates";
 import { IconCalendar, IconEdit, IconTrash, InlineIcon } from "../icons";
+import { onayla } from "../../lib/onay";
 
 /**
  * Müşteri / potansiyel müşteri kartının görüşme notları.
@@ -140,7 +141,7 @@ export default function GorusmeNotlari({
   };
 
   const sil = async (a: PartyActivity) => {
-    if (!window.confirm(t("Bu not silinsin mi?"))) return;
+    if (!(await onayla(t("Bu not silinsin mi?")))) return;
     try {
       await api.delete(`/party-activities/${a.id}`);
       yukle();

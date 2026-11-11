@@ -18,6 +18,7 @@ import Modal from "../Modal";
 import SlotSecici from "./SlotSecici";
 import { gunAnahtari, uzunTarih } from "./demoBicim";
 import { anaDugme, girdi, ikincilDugme } from "./stiller";
+import { sor } from "../../lib/onay";
 
 type Bolum = "randevular" | "saatler" | "sunucular";
 
@@ -314,7 +315,7 @@ function RandevuSatiri({
   };
 
   const iptalEt = async () => {
-    const neden = window.prompt(t("İptal nedeni (ekip için not, isteğe bağlı)")) ;
+    const neden = await sor({ baslik: t("Randevuyu iptal et"), mesaj: t("İptal nedeni (ekip için not, isteğe bağlı)") });
     if (neden === null) return;
     setCalisiyor(true);
     try {

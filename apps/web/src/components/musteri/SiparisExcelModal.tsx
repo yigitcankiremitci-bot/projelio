@@ -18,6 +18,7 @@ import { useT } from "../../lib/i18n";
 import { fmtPara, fmtTarih } from "../butce/butceBicim";
 import { IconUpload } from "../icons";
 import Modal from "../Modal";
+import { onayla } from "../../lib/onay";
 
 // dil:anahtar-baslangic — etiketler; çeviri kullanım yerinde (t())
 const KARAR_ETIKET: Record<AliciKarari, string> = {
@@ -576,9 +577,9 @@ export default function SiparisExcelModal({
           <button
             data-primary
             disabled={!dosya || !sonuc || sonuc.siparisSayisi === 0 || calisiyor}
-            onClick={() => {
+            onClick={async () => {
               if (!dosya || !sonuc) return;
-              if (!window.confirm(t("{n} sipariş aktarılsın mı?", { n: sonuc.siparisSayisi }))) return;
+              if (!(await onayla(t("{n} sipariş aktarılsın mı?", { n: sonuc.siparisSayisi })))) return;
               void gonder(dosya, d, false);
             }}
             style={{

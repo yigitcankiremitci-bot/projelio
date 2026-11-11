@@ -17,6 +17,7 @@ import HesapKimlikModal from "./HesapKimlikModal";
 import HesapModal from "./HesapModal";
 import HesapPaylasModal from "./HesapPaylasModal";
 import { bicimDili } from "../../lib/i18n/depo";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   organizationId?: string;
@@ -125,9 +126,9 @@ export default function HesaplarPanel({ organizationId, departmentId, jobId, can
 
   const sil = async (hesap: ServiceAccount) => {
     if (
-      !window.confirm(
+      !(await onayla(
         t("“{ad}” hesabı ve kayıtlı tüm giriş bilgileri silinsin mi? Geri getirilemez.", { ad: hesap.name })
-      )
+      ))
     ) {
       return;
     }

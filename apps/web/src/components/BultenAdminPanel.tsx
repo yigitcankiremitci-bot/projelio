@@ -4,6 +4,7 @@ import { bultenApi } from "../api/bulten";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 /**
  * Yönetici: tanıtım sitesindeki (projelio.app) bülten formundan gelen adresler.
@@ -43,7 +44,7 @@ export default function BultenAdminPanel() {
   }, [liste, ara, iptallerGorunsun]);
 
   const iptalEt = async (a: BultenAbonesi) => {
-    if (!window.confirm(t("{eposta} bülten listesinden çıkarılsın mı?", { eposta: a.eposta }))) return;
+    if (!(await onayla(t("{eposta} bülten listesinden çıkarılsın mı?", { eposta: a.eposta })))) return;
     setMesgul(a.id);
     try {
       const yeni = await bultenApi.iptal(a.id);
@@ -56,7 +57,7 @@ export default function BultenAdminPanel() {
   };
 
   const sil = async (a: BultenAbonesi) => {
-    if (!window.confirm(t("{eposta} kalıcı olarak silinsin mi? Rıza kaydı da gider.", { eposta: a.eposta }))) return;
+    if (!(await onayla(t("{eposta} kalıcı olarak silinsin mi? Rıza kaydı da gider.", { eposta: a.eposta })))) return;
     setMesgul(a.id);
     try {
       await bultenApi.sil(a.id);

@@ -17,6 +17,7 @@ import { useThemeColors } from "../theme/useThemeColors";
 import Modal from "./Modal";
 import { bicimDili } from "../lib/i18n/depo";
 import SifreGirdisi from "./SifreGirdisi";
+import { onayla } from "../lib/onay";
 
 interface Props {
   scope: SocialScope;
@@ -142,7 +143,7 @@ export default function SocialCredentialsModal({ scope, account, onClose }: Prop
   };
 
   const remove = async (row: SocialCredential) => {
-    if (!window.confirm(t('"{etiket}" girişi silinsin mi? Şifre kalıcı olarak silinir.', { etiket: row.label })))
+    if (!(await onayla(t('"{etiket}" girişi silinsin mi? Şifre kalıcı olarak silinir.', { etiket: row.label }))))
       return;
     setBusyId(row.id);
     try {

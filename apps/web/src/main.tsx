@@ -7,6 +7,7 @@ import { AppPrefsProvider } from "./lib/appPrefs";
 import { I18nProvider } from "./lib/i18n";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import BaglantiSeridi from "./components/BaglantiSeridi";
+import OnayKatmani from "./components/OnayKatmani";
 import "./index.css";
 
 // Hata sınırı EN DIŞTA: ThemeProvider ya da AppPrefsProvider'ın kendisi patlasa
@@ -21,6 +22,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <App />
               {/* App'in dışında: giriş ekranı dahil her yüzeyde görünsün. */}
               <BaglantiSeridi />
+              {/* Tarayıcının confirm/alert/prompt'u yerine uygulamanın penceresi (lib/onay.ts). */}
+              <OnayKatmani />
             </BrowserRouter>
           </I18nProvider>
         </AppPrefsProvider>

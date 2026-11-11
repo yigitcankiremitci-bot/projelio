@@ -4,6 +4,7 @@ import type { AiCreditOrder } from "../api/aiChat";
 import { useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 function formatTry(amount: number): string {
   return `${amount.toLocaleString(bicimDili(), { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ₺`;
@@ -145,10 +146,10 @@ export default function AiCreditOrdersAdmin({ onCredited }: Props) {
                 {busyId === o.id ? t("İşleniyor…") : t("Ödemeyi onayla")}
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   // Bildirimi henüz gelmemiş gerçek bir ödeme de burada görünebilir;
                   // iptal edilen sipariş sonradan gelen bildirimle bakiye YÜKLEMEZ.
-                  if (!window.confirm(t("Bu sipariş iptal edilsin mi? Ödemesi sonradan gelirse bakiye otomatik yüklenmez."))) return;
+                  if (!(await onayla(t("Bu sipariş iptal edilsin mi? Ödemesi sonradan gelirse bakiye otomatik yüklenmez.")))) return;
                   act(o.id, () => aiChat.adminCancelCreditOrder(o.id));
                 }}
                 disabled={busyId === o.id}

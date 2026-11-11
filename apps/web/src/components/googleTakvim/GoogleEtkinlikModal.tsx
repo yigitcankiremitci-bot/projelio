@@ -8,6 +8,7 @@ import { useT } from "../../lib/i18n";
 import { bicimDili } from "../../lib/i18n/depo";
 import { askLio } from "../../lib/askLio";
 import { inputStyle, labelStyle, primaryButton, secondaryButton } from "../plan/PlanTargetsModal";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   /** Var olan etkinlik; boşsa yeni etkinlik formu açılır. */
@@ -169,8 +170,8 @@ export default function GoogleEtkinlikModal({ etkinlik, tarih, onClose, onSaved 
         {e.kaynak === "projelio" ? (
           <>
             <button
-              onClick={() => {
-                if (!window.confirm(t("Etkinlik Google Takvim'den de silinsin mi?"))) return;
+              onClick={async () => {
+                if (!(await onayla(t("Etkinlik Google Takvim'den de silinsin mi?")))) return;
                 void calistir(() => googleTakvimApi.sil(e.id));
               }}
               disabled={mesgul}

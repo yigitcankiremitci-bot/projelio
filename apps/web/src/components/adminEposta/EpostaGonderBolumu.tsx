@@ -12,6 +12,7 @@ import { useLocale, useT } from "../../lib/i18n";
 import { adminKullanicilar } from "../../api/adminKullanicilar";
 import { epostaYonetimi } from "../../api/epostaYonetimi";
 import { alan, birimYaz, dugme, etiket, kart, metinAlani, rozet } from "./stiller";
+import { onayla } from "../../lib/onay";
 
 /**
  * Admin > E-posta > Gönder.
@@ -206,9 +207,9 @@ export default function EpostaGonderBolumu({ onGonderildi }: { onGonderildi: () 
       return;
     }
     if (!tekil && !planli) {
-      const onay = window.confirm(
+      const onay = (await onayla(
         t("{n} kişiye e-posta gönderilecek. Bu işlem geri alınamaz. Devam edilsin mi?", { n: aliciSayisi ?? "?" })
-      );
+      ));
       if (!onay) return;
     }
     setHata("");

@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n";
 import { fmtTarih } from "../butce/butceBicim";
 import KayitEkleri from "../KayitEkleri";
 import { Alan, TAM_GENISLIK } from "./siparisOrtak";
+import { onayla } from "../../lib/onay";
 
 /**
  * Siparişin faturası (bkz. migration 166).
@@ -62,7 +63,7 @@ export default function SiparisFaturasi({
   };
 
   const kaldir = async () => {
-    if (!window.confirm(t("Fatura bu siparişten ayrılsın mı? Fatura kaydı ve belgesi Faturalar'da kalır."))) return;
+    if (!(await onayla(t("Fatura bu siparişten ayrılsın mı? Fatura kaydı ve belgesi Faturalar'da kalır.")))) return;
     setHata("");
     try {
       onDegisti(await faturalarApi.siparisFaturasiniKaldir(siparis.id));

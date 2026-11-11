@@ -5,6 +5,7 @@ import { api } from "../../api/client";
 import { useThemeColors } from "../../theme/useThemeColors";
 import { useT } from "../../lib/i18n";
 import Modal from "../Modal";
+import { onayla } from "../../lib/onay";
 
 /**
  * "Yeni proje" penceresindeki şablon listesi: kişinin kendi şablonları, şirketin
@@ -28,7 +29,7 @@ export default function SablonSecici({ onClose, onSec }: { onClose: () => void; 
   }, []);
 
   const sil = async (s: ProjeSablonu) => {
-    if (!window.confirm(t("Bu şablon silinsin mi? Ondan açılmış projeler etkilenmez."))) return;
+    if (!(await onayla(t("Bu şablon silinsin mi? Ondan açılmış projeler etkilenmez.")))) return;
     try {
       await api.delete(`/proje-sablonlari/${encodeURIComponent(s.id)}`);
       setListe((onceki) => (onceki ?? []).filter((x) => x.id !== s.id));

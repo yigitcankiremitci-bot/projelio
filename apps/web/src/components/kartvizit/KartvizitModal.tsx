@@ -21,6 +21,7 @@ import Modal from "../Modal";
 import AvatarCropper from "../AvatarCropper";
 import { IconCopy, IconDownload, IconExternalLink, IconQr, IconUser } from "../icons";
 import { pngIndir, svgIndir, svgVeriAdresi } from "./kartvizitIndir";
+import { onayla, sor } from "../../lib/onay";
 
 /**
  * Dijital kartvizit penceresi: kişi kartındaki QR rozetinden ya da "Profili
@@ -178,7 +179,7 @@ export default function KartvizitModal({ onClose, onProfilDegisti }: Props) {
     if (adresBos === false) return setHata(t("Bu adres alınmış, başka bir adres seç."));
     const hataliSosyal = KARTVIZIT_SOSYAL.find((s) => kartvizitSosyalNormallestir(s.anahtar, form.sosyal[s.anahtar]) === null);
     if (hataliSosyal) return setHata(t("{ad} hesabı tanınmadı. Kullanıcı adını ya da profil adresini yaz.", { ad: hataliSosyal.ad }));
-    if (adresDegisti && !window.confirm(t("Adresi değiştirirsen eski adres ve daha önce basılmış ya da paylaşılmış QR kodları artık açılmaz. Devam edilsin mi?"))) return;
+    if (adresDegisti && !(await onayla(t("Adresi değiştirirsen eski adres ve daha önce basılmış ya da paylaşılmış QR kodları artık açılmaz. Devam edilsin mi?")))) return;
 
     setKaydediliyor(true);
     try {
@@ -207,7 +208,7 @@ export default function KartvizitModal({ onClose, onProfilDegisti }: Props) {
   };
 
   const sil = async () => {
-    if (!window.confirm(t("Kartvizitin silinsin mi? Adresin boşa çıkar ve QR kodu artık açılmaz."))) return;
+    if (!(await onayla(t("Kartvizitin silinsin mi? Adresin boşa çıkar ve QR kodu artık açılmaz.")))) return;
     try {
       await api.delete("/kartvizit/me");
       yukle();
@@ -243,7 +244,7 @@ export default function KartvizitModal({ onClose, onProfilDegisti }: Props) {
       setKopyalandi(true);
       setTimeout(() => setKopyalandi(false), 1800);
     } catch {
-      window.prompt(t("Bağlantıyı kopyala"), kartvizitAdresi(kayitli.adres));
+      void sor({ mesaj: t("Bağlantıyı kopyala"), varsayilan: kartvizitAdresi(kayitli.adres) });
     }
   };
 

@@ -9,6 +9,7 @@ import { IconActivity, IconHeart, IconLink, IconMessageCircle, IconUser, InlineI
 import { BolumBasligi, useBolumRenkleri } from "./gezinme";
 import { CizgiGrafik } from "./grafikler";
 import { katYazisi, kisaSayi, useAnalizStilleri } from "./ortak";
+import { onayla } from "../../lib/onay";
 
 interface Props {
   scope: SocialScope;
@@ -138,8 +139,8 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
                 )}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(t("Facebook bağlantısı kaldırılsın mı? Rakip ve hashtag geçmişi kalır, yeni veri gelmez.")))
+                  onClick={async () => {
+                    if ((await onayla(t("Facebook bağlantısı kaldırılsın mı? Rakip ve hashtag geçmişi kalır, yeni veri gelmez."))))
                       void is("kaldir", () => socialMediaApi.facebookKaldir(scope));
                   }}
                   style={{ ...ikincilDugme, color: c.danger }}
@@ -215,9 +216,9 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
             onAc={() => setAcik(acik === r.inspirationId ? null : r.inspirationId)}
             takipEdilebilir={canWrite && !!b && (r.takip || takipte.length < MAX_RAKIP)}
             mesgul={mesgul === r.inspirationId}
-            onTakip={(takip) => {
+            onTakip={async (takip) => {
               // Bırakmak tek tıkla olmasın: düğme "Takipte" yazarken basılınca bırakıyor.
-              if (!takip && !window.confirm(t("@{hesap} takibi bırakılsın mı? Toplanan geçmiş kalır, yeni veri gelmez.", { hesap: r.handle })))
+              if (!takip && !(await onayla(t("@{hesap} takibi bırakılsın mı? Toplanan geçmiş kalır, yeni veri gelmez.", { hesap: r.handle }))))
                 return;
               void is(r.inspirationId, () => socialMediaApi.rakipTakip(r.inspirationId, takip));
             }}
@@ -275,8 +276,8 @@ export default function RakiplerPaneli({ scope, canWrite }: Props) {
             canWrite={canWrite}
             mesgul={mesgul === h.id}
             onAyarla={(aktif) => void is(h.id, () => socialMediaApi.hashtagAyarla(h.id, aktif))}
-            onSil={() => {
-              if (window.confirm(t("#{etiket} takibi silinsin mi? Toplanan gönderiler de silinir.", { etiket: h.hashtag })))
+            onSil={async () => {
+              if ((await onayla(t("#{etiket} takibi silinsin mi? Toplanan gönderiler de silinir.", { etiket: h.hashtag }))))
                 void is(h.id, () => socialMediaApi.hashtagSil(h.id));
             }}
           />

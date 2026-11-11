@@ -18,6 +18,7 @@ import {
 import { IconBell } from "./icons";
 import Modal from "./Modal";
 import { useT } from "../lib/i18n";
+import { sor } from "../lib/onay";
 
 export default function NotificationBell() {
   const c = useThemeColors();
@@ -58,7 +59,7 @@ export default function NotificationBell() {
     try {
       const note = approve
         ? undefined
-        : window.prompt(t("Ret gerekçesi (isteğe bağlı) — talep sahibi görecek:")) ?? undefined;
+        : (await sor({ baslik: t("Reddet"), mesaj: t("Ret gerekçesi (isteğe bağlı) — talep sahibi görecek:") })) ?? undefined;
       await respondToCreationRequest(request.id, approve, note);
       setApprovals((prev) => prev.filter((r) => r.id !== request.id));
     } finally {

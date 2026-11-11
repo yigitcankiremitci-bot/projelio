@@ -5,6 +5,7 @@ import { useLocale, useT } from "../../lib/i18n";
 import { epostaYonetimi } from "../../api/epostaYonetimi";
 import { birimYaz, dugme, kart, rozet } from "./stiller";
 import { tarihYaz } from "./EpostaGonderBolumu";
+import { onayla } from "../../lib/onay";
 
 /**
  * Admin > E-posta > Geçmiş: gönderilen ve kuyrukta bekleyen e-postalar.
@@ -78,11 +79,11 @@ export default function EpostaGecmisBolumu({ yenile }: { yenile: number }) {
             <button
               type="button"
               style={{ ...dugme(c, "tehlike"), padding: "5px 10px", fontSize: 13, marginTop: 8 }}
-              onClick={() => {
+              onClick={async () => {
                 const soru = planliBekliyor(k)
                   ? t("Planlanan gönderim iptal edilsin mi?")
                   : t("Kalan alıcılara gönderim durdurulsun mu?");
-                if (window.confirm(soru))
+                if ((await onayla(soru)))
                   void epostaYonetimi.kampanyaIptal(k.id).then(() => yukle());
               }}
             >

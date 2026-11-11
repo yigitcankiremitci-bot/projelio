@@ -8,6 +8,7 @@ import { getSocket } from "../lib/liveRoom";
 import { IconPaperclip, IconTrash, InlineIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { bicimDili } from "../lib/i18n/depo";
+import { onayla } from "../lib/onay";
 
 interface Props {
   organizationId?: string;
@@ -269,7 +270,7 @@ export default function MailboxPanel({ organizationId, departmentId, jobId, canW
       target.provider === "projelio"
         ? t("{address} kutusu kapatılsın mı? Bu adrese gelen posta artık hiçbir kutuya düşmez.", { address: target.address })
         : t("{address} kutusu modülden kaldırılsın mı? Microsoft bağlantınız durur.", { address: target.address });
-    if (!window.confirm(soru)) return;
+    if (!(await onayla(soru))) return;
     try {
       await mailboxApi.unlink(target.id);
       setAccountId("");

@@ -383,3 +383,31 @@ budnal.app, app.budnal.app {
 www.budnal.app {
 	redir https://budnal.app{uri} permanent
 }
+
+# ------------------------------------------------- Müzik Öğren (ayrı proje)
+# Pilot test adresi. Müzik Öğren bu VPS'te AYRI bir compose yığınında duruyor
+# (~projelio/apps/muzikogren/docker-compose.yml, kaynak: Belgeler/Muzik-Ogren/web).
+# muzikogren-app yalnız HTTP konuşuyor; `projelio` ağına bağlı olduğu için
+# adıyla çözülüyor. Yığın kapalıysa YALNIZ bu alan adı 502 verir.
+#
+# Açık ad olduğu için yukarıdaki kartvizit joker bloğuna (https://) düşmez;
+# sertifikasını kendisi alır.
+#
+# TEST SÜRESİNCE ŞİFRELİ: pilot öğretmenlere kullanıcı adı/şifre verilir.
+# Şifrenin açık hâli Müzik Öğren klasöründe (.env.test-sifre), burada yalnız
+# bcrypt özeti var. Pilot herkese açılınca basic_auth ve X-Robots-Tag kalkar.
+muzikogren.projelio.app {
+	encode zstd gzip
+	basic_auth {
+		pilot $2a$14$XevzyZEC3vcZfwF3JCwfUOYYGHt7jrR5b0VMzwSRk2itS5mb..2yy
+	}
+	reverse_proxy muzikogren-app:3000
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		X-Robots-Tag "noindex, nofollow"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}

@@ -1234,4 +1234,11 @@ export const hatalar: TranslationDict = {
 
   // ─────────────────────────────────────────────── Kullanıcı ayrıcalıkları
   "Ayrıcalık tablosu yok: önce migration 192 uygulanmalı.": "The privileges table is missing: migration 192 must be applied first.",
+
+  // ─────────────────────────────────────────────── Apple ile giriş
+  "Apple e-posta adresini paylaşmadı. iPhone Ayarlar > Apple Hesabı > Apple ile giriş'ten Projelio'yu kaldırıp tekrar dene.": "Apple didn't share your email address. Remove Projelio under iPhone Settings > Apple Account > Sign in with Apple, then try again.",
+  "Apple e-postanı doğrulanmış olarak vermedi; bu e-postayla var olan hesaba bağlanamaz.": "Apple didn't provide your email as verified, so it can't be linked to an existing account with that address.",
+  "Apple ile giriş doğrulanamadı. Lütfen tekrar dene.": "Sign in with Apple couldn't be verified. Please try again.",
+  "Apple ile giriş şu an doğrulanamıyor. Lütfen biraz sonra tekrar dene.": "Sign in with Apple can't be verified right now. Please try again in a moment.",
+  "Bu Projelio hesabına zaten başka bir Apple hesabı bağlı.": "A different Apple account is already linked to this Projelio account.",
 };

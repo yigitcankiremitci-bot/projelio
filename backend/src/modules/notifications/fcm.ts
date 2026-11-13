@@ -91,6 +91,15 @@ export function fcmMesaji(
           notification_priority: "PRIORITY_HIGH",
         },
       },
+      // iPhone (APNs). `sound` verilmezse iOS bildirimi SESSİZ gösterir —
+      // Android'deki kanal karşılığı yok. Kullanıcının seçtiği ses iPhone'da
+      // henüz uygulanmıyor (ses dosyaları uygulama paketinde değil), sistem
+      // sesi çalar. apns-expiration bilerek yok: mutlak zaman ister, bu
+      // fonksiyon saf kalsın diye (APNs varsayılanı zaten sınırlı süre saklar).
+      apns: {
+        headers: { "apns-priority": "10" },
+        payload: { aps: { sound: "default" } },
+      },
     },
   };
 }

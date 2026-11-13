@@ -9,7 +9,9 @@
     "esitle": "cap sync",
     "android:hazirla": "npm run web:derle && cap sync android",
     "android:apk": "npm run android:hazirla && node scripts/apk-uret.mjs",
-    "android:aab": "npm run android:hazirla && node scripts/apk-uret.mjs --aab"
+    "android:aab": "npm run android:hazirla && node scripts/apk-uret.mjs --aab",
+    "ios:hazirla": "VITE_API_URL=${VITE_API_URL:-https://api.projelio.app} npm run web:derle && cap sync ios",
+    "ios:ac": "npm run ios:hazirla && cap open ios"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
@@ -18,6 +20,7 @@
     "@capacitor/app": "^8.1.1",
     "@capacitor/browser": "^8.0.4",
     "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@capacitor/keyboard": "^8.0.5",
     "@capacitor/push-notifications": "^8.1.2",
     "@capacitor/splash-screen": "^8.0.2"

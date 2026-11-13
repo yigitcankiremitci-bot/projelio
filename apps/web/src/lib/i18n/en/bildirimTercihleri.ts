@@ -106,6 +106,8 @@ export const bildirimTercihleri: TranslationDict = {
     "Couldn't show the test notification. Allow Projelio notifications in your phone's settings.",
   "Telefonda ve uygulama açıkken bildirimler bu sesle gelir. Seçince bir kez çalar.":
     "Notifications on your phone and in the open app use this sound. It plays once when you pick it.",
+  "Uygulama açıkken bildirimler bu sesle gelir. Telefon bildirimleri iPhone'un bildirim sesiyle çalar.":
+    "While the app is open, notifications use this sound. Phone notifications use the iPhone's notification sound.",
   "Seçtiğin ses telefonda uygulamanın yeni sürümüyle (1.4.0) çalmaya başlar; güncellemeyi Play Store'dan alabilirsin.":
     "Your phone will use the chosen sound from the new app version (1.4.0) on; you can get the update from the Play Store.",
 };

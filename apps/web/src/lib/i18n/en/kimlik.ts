@@ -132,11 +132,15 @@ export const kimlik: TranslationDict = {
   // Bu yüzden her sağlayıcı ve kip için ayrı anahtar var, yer tutucu yok.
   veya: "or",
   "Google ile giriş yap": "Sign in with Google",
+  "Apple ile giriş yap": "Sign in with Apple",
+  "Apple ile kayıt ol": "Sign up with Apple",
+  "Apple ile giriş tamamlanamadı.": "Sign in with Apple couldn't be completed.",
   "Google ile kayıt ol": "Sign up with Google",
   "Microsoft ile giriş yap": "Sign in with Microsoft",
   "Microsoft ile kayıt ol": "Sign up with Microsoft",
   "Outlook, Hotmail, Live ya da iş/okul hesabı": "Outlook, Hotmail, Live or a work/school account",
   "Yönlendiriliyor…": "Redirecting…",
+  "Bekleniyor…": "Waiting…",
   "Bu giriş yöntemi şu anda kullanılamıyor.": "This sign-in method isn't available right now.",
   "Giriş başlatılamadı.": "Could not start the sign-in.",
   "Demoyu geliştirmek için bu ziyarette hangi sayfalara baktığın ve hangi düğmelere bastığın anonim olarak ölçülür; kim olduğun ve yazdıkların kaydedilmez.":

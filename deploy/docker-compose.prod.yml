@@ -330,7 +330,11 @@ services:
       # (bkz. SupabaseService.publicStorageUrl).
       PUBLIC_STORAGE_URL: https://api.projelio.app
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      CORS_ORIGINS: https://app.projelio.app
+      # İkinci adres iPhone uygulaması: WKWebView "https" şemasını uygulamaya
+      # devretmediği için kabuğun kaynağı capacitor://app.projelio.app
+      # (bkz. apps/mobile/capacitor.config.ts, docs/mobil-ios.md). Android'in
+      # kaynağı https://app.projelio.app, ayrıca eklemeye gerek yok.
+      CORS_ORIGINS: https://app.projelio.app,capacitor://app.projelio.app
       WEB_APP_URL: https://app.projelio.app
       BACKEND_URL: https://api.projelio.app
       GOOGLE_REDIRECT_URI: https://api.projelio.app/auth/google/callback

@@ -57,7 +57,7 @@ import SupportPanel from "../components/SupportPanel";
 import { bicimDili } from "../lib/i18n/depo";
 import { bildirimCihaziniBirak } from "../push";
 import SifreGirdisi from "../components/SifreGirdisi";
-import { kabuktaMi, magazaSayfasiniAc } from "../lib/mobilKabuk";
+import { kabukPlatformu, kabuktaMi, magazaAdresi, magazaSayfasiniAc } from "../lib/mobilKabuk";
 
 /**
  * AYARLAR — iki yerleşim, tek içerik.
@@ -1127,10 +1127,14 @@ export default function Settings() {
             sayfası önermenin anlamı yok. Düğme Play Store'u AÇAR; Google'ın
             uygulama içi penceresi kota yüzünden bazen hiç çıkmadığı için
             düğmenin arkasına konmadı (bkz. lib/mobilKabuk.ts). */}
-        {kabuktaMi() && (
+        {kabuktaMi() && magazaAdresi() && (
           <SettingCard
             title={t("Projelio'yu değerlendir")}
-            description={t("Projelio işine yarıyorsa Google Play'de birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.")}
+            description={
+              kabukPlatformu() === "ios"
+                ? t("Projelio işine yarıyorsa App Store'da birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.")
+                : t("Projelio işine yarıyorsa Google Play'de birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.")
+            }
           >
             <button
               type="button"
@@ -1145,7 +1149,7 @@ export default function Settings() {
                 fontWeight: 500,
               }}
             >
-              {t("Google Play'de değerlendir")}
+              {kabukPlatformu() === "ios" ? t("App Store'da değerlendir") : t("Google Play'de değerlendir")}
             </button>
           </SettingCard>
         )}

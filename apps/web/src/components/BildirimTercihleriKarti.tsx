@@ -18,7 +18,7 @@ import {
 import { api } from "../api/client";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { kabukDenemeBildirimi, kabukSesSecimiVarMi, kabuktaMi } from "../lib/mobilKabuk";
+import { kabukDenemeBildirimi, kabukPlatformu, kabukSesSecimiVarMi, kabuktaMi } from "../lib/mobilKabuk";
 import { bildirimSesiniAyarla, bildirimSesiniDene, bildirimSesiSeciminiAyarla } from "../lib/bildirimSesi";
 import { initPush } from "../push";
 import { IconChevronDown, IconChevronRight } from "./icons";
@@ -315,7 +315,12 @@ export default function BildirimTercihleriKarti() {
         <section style={kutu}>
           <h3 style={baslik}>{t("Bildirim sesi")}</h3>
           <p style={aciklama}>
-            {kabukta && !sesSecimiVar
+            {/* iPhone'da ses eklentisi YOK (Android kanallarına bağlı) ve
+                "Play Store'dan güncelle" demek Apple'da ret sebebi; orada
+                telefon bildirimi sistemin sesiyle çalar. */}
+            {kabukPlatformu() === "ios"
+              ? t("Uygulama açıkken bildirimler bu sesle gelir. Telefon bildirimleri iPhone'un bildirim sesiyle çalar.")
+              : kabukta && !sesSecimiVar
               ? t("Seçtiğin ses telefonda uygulamanın yeni sürümüyle (1.4.0) çalmaya başlar; güncellemeyi Play Store'dan alabilirsin.")
               : t("Telefonda ve uygulama açıkken bildirimler bu sesle gelir. Seçince bir kez çalar.")}
           </p>

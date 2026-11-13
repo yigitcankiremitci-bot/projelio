@@ -26,6 +26,7 @@ import type { ThemeMode } from "@projelio/shared";
  */
 interface CapacitorBridge {
   isNativePlatform?: () => boolean;
+  getPlatform?: () => string;
   Plugins?: {
     SafeArea?: {
       setSystemBarsStyle?: (options: { style: "DARK" | "LIGHT" | "DEFAULT" }) => unknown;
@@ -48,6 +49,9 @@ interface CapacitorBridge {
       requestPermissions?: () => unknown;
       register?: () => unknown;
       addListener?: (event: string, handler: (data: any) => void) => unknown;
+    };
+    AppleGiris?: {
+      giris?: (options: { nonce: string }) => unknown;
     };
     BildirimSesi?: {
       sec?: (options: { ses: string; ad: string }) => unknown;
@@ -76,6 +80,23 @@ function guvenliCagir(fn: (() => unknown) | undefined): boolean {
 /** Uygulama mobil kabuğun içinde mi çalışıyor? Tarayıcıda her zaman false. */
 export function kabuktaMi(): boolean {
   return kopru() !== null;
+}
+
+/**
+ * Kabuk hangi işletim sisteminde? Tarayıcıda null.
+ *
+ * Yalnızca MAĞAZAYA özgü metin ve bağlantılar için: Apple, uygulamada başka
+ * bir mağazanın adının geçmesini ret sebebi sayıyor (2.3.10) — iPhone'da
+ * "Google Play'de değerlendir" yazan bir düğme incelemeden geçmez.
+ */
+export function kabukPlatformu(): "ios" | "android" | null {
+  const cap = kopru();
+  if (!cap) return null;
+  try {
+    return cap.getPlatform?.() === "ios" ? "ios" : "android";
+  } catch {
+    return "android";
+  }
 }
 
 /**
@@ -184,6 +205,42 @@ export function kabukDonusunuDinle(handler: (yol: string) => void): () => void {
   }
 
   return () => guvenliCagir(handle?.remove && (() => handle!.remove!()));
+}
+
+/* ------------------------------------------------------------------ *
+ * APPLE İLE GİRİŞ (yalnızca iPhone)                                  *
+ * ------------------------------------------------------------------ */
+
+/**
+ * iPhone kabuğunda Apple ile giriş eklentisi var mı? Eklenti uygulamanın
+ * içinde (apps/mobile/ios/App/App/YerelEklentiler.swift); Android'de ve
+ * tarayıcıda yok.
+ */
+export function kabukAppleGirisiVarMi(): boolean {
+  return kabukPlatformu() === "ios" && Boolean(kopru()?.Plugins?.AppleGiris?.giris);
+}
+
+/**
+ * iPhone'un yerel "Apple ile giriş" penceresini açar.
+ *
+ * `nonce` ham haliyle verilir; eklenti ÖZETİNİ Apple'a iletir, sunucu jetondaki
+ * özetin bu ham değerle eşleştiğine bakar (backend apple-kimlik.ts).
+ *
+ * Kullanıcı vazgeçerse null döner (hata değil). Diğer hatalar fırlatılır.
+ */
+export async function kabukAppleIleGiris(
+  nonce: string
+): Promise<{ identityToken: string; adSoyad?: string } | null> {
+  const giris = kopru()?.Plugins?.AppleGiris?.giris;
+  if (!giris) throw new Error("Apple ile giriş bu cihazda yok.");
+  try {
+    const sonuc = (await Promise.resolve(giris({ nonce }))) as { identityToken?: string; adSoyad?: string };
+    if (!sonuc?.identityToken) throw new Error("Apple giriş jetonu vermedi.");
+    return { identityToken: sonuc.identityToken, adSoyad: sonuc.adSoyad || undefined };
+  } catch (e) {
+    if ((e as { code?: string })?.code === "IPTAL") return null;
+    throw e;
+  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -404,6 +461,23 @@ export function kabukKlavyesiniDinle(degisti: (acik: boolean) => void): (() => v
 export const MAGAZA_ADRESI = "https://play.google.com/store/apps/details?id=app.projelio.mobile";
 
 /**
+ * App Store'daki uygulama kimliği (apps.apple.com/app/id<kimlik>).
+ *
+ * BOŞ BIRAKILDI: kimlik App Store Connect'te uygulama kaydı açılınca verilir.
+ * Boşken iPhone'da "değerlendir" kartı hiç görünmez — Play bağlantısına
+ * düşmek Apple incelemesinde ret sebebi olurdu (bkz. kabukPlatformu).
+ */
+export const APP_STORE_KIMLIGI = "";
+
+/** Bu cihazın mağaza sayfası; gösterilecek bir sayfa yoksa null. */
+export function magazaAdresi(): string | null {
+  if (kabukPlatformu() === "ios") {
+    return APP_STORE_KIMLIGI ? `https://apps.apple.com/app/id${APP_STORE_KIMLIGI}?action=write-review` : null;
+  }
+  return MAGAZA_ADRESI;
+}
+
+/**
  * Google'ın uygulama içi değerlendirme penceresini ister (uygulamadan
  * çıkmadan yıldız verilen alt pencere).
  *
@@ -430,11 +504,13 @@ export function uygulamaIciDegerlendirmeIste(): boolean {
  * uygulamanın kendisi terk edilmesin.
  */
 export function magazaSayfasiniAc(): void {
+  const adres = magazaAdresi();
+  if (!adres) return;
   if (kabuktaMi()) {
-    window.location.href = MAGAZA_ADRESI;
+    window.location.href = adres;
     return;
   }
-  window.open(MAGAZA_ADRESI, "_blank", "noopener");
+  window.open(adres, "_blank", "noopener");
 }
 
 /* ------------------------------------------------------------------ *

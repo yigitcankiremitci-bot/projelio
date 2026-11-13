@@ -2,7 +2,16 @@ import { useEffect, useState } from "react";
 import { driveApi, oneDriveApi } from "../api/files";
 import { useThemeColors } from "../theme/useThemeColors";
 import { useT } from "../lib/i18n";
-import { girisAdresiniSistemTarayicisindaAc, kabukDonusHedefi, kabuktaMi } from "../lib/mobilKabuk";
+import {
+  girisAdresiniSistemTarayicisindaAc,
+  kabukAppleGirisiVarMi,
+  kabukAppleIleGiris,
+  kabukDonusHedefi,
+  kabukPlatformu,
+  kabuktaMi,
+} from "../lib/mobilKabuk";
+import { api } from "../api/client";
+import { useLocale } from "../lib/i18n";
 
 /**
  * Giriş/kayıt ekranlarındaki sağlayıcı düğmeleri (Google, Microsoft).
@@ -27,8 +36,16 @@ export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" 
   const [googleReady, setGoogleReady] = useState(false);
   const [microsoftReady, setMicrosoftReady] = useState(false);
   const [error, setError] = useState("");
+  // iPhone'da Google/Microsoft GİZLİ (kullanıcı kararı, 2026-11-12): dönüş
+  // bağlantısı (Universal Link) cihazda denenmedi. Onların yerine iPhone'da
+  // "Apple ile giriş" var (App Store kuralı 4.8, bkz. AppleButonu).
+  // DİKKAT: yalnızca Google/Microsoft ile açılmış (şifresiz) hesaplar
+  // iPhone'a GİREMEZ — şifre sıfırlama şifresiz hesaba bağlantı göndermiyor
+  // (password-reset.service.ts). Android ve web etkilenmez.
+  const gizli = kabukPlatformu() === "ios";
 
   useEffect(() => {
+    if (gizli) return;
     driveApi
       .loginUrl()
       .then((r) => setGoogleReady(Boolean(r.configured && r.url)))
@@ -37,9 +54,10 @@ export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" 
       .loginUrl()
       .then((r) => setMicrosoftReady(Boolean(r.configured && r.url)))
       .catch(() => setMicrosoftReady(false));
-  }, []);
+  }, [gizli]);
 
-  if (!googleReady && !microsoftReady) return null;
+  const apple = kabukAppleGirisiVarMi();
+  if (gizli ? !apple : !googleReady && !microsoftReady) return null;
 
   return (
     <div>
@@ -50,6 +68,7 @@ export default function SocialSignInButtons({ verb }: { verb: "giris" | "kayit" 
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {apple && <AppleButonu verb={verb} onError={setError} />}
         {googleReady && (
           <ProviderButton
             requestUrl={(next) => driveApi.loginUrl(next)}
@@ -152,6 +171,90 @@ function ProviderButton({
       {glyph}
       {busy ? t("Yönlendiriliyor…") : label}
     </button>
+  );
+}
+
+/** Ham nonce: 32 rastgele bayt, hex. Sunucu özetini jetonda arar. */
+function rastgeleNonce(): string {
+  const baytlar = new Uint8Array(32);
+  crypto.getRandomValues(baytlar);
+  return Array.from(baytlar, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * iPhone'daki "Apple ile giriş" düğmesi.
+ *
+ * Google'dan farkı: yönlendirme yok. iPhone'un yerel penceresi jetonu
+ * doğrudan verir, jeton /auth/apple'a gider, dönen oturumla sayfa yenilenir.
+ *
+ * GÖRÜNÜM Apple'ın kuralına göre: siyah ya da beyaz zemin, Apple logosu,
+ * "Apple ile giriş yap". Renkler temadan (ana metin rengi zemin olur): açık
+ * temada siyah, koyu temada beyaz düğme — ikisi de Apple'ın izin verdiği stil.
+ */
+function AppleButonu({ verb, onError }: { verb: "giris" | "kayit"; onError: (message: string) => void }) {
+  const t = useT();
+  const c = useThemeColors();
+  const { locale } = useLocale();
+  const [busy, setBusy] = useState(false);
+
+  const handleClick = async () => {
+    setBusy(true);
+    onError("");
+    try {
+      const nonce = rastgeleNonce();
+      const sonuc = await kabukAppleIleGiris(nonce);
+      if (!sonuc) return; // vazgeçti
+      const { token } = await api.post<{ token: string }>("/auth/apple", {
+        identityToken: sonuc.identityToken,
+        nonce,
+        adSoyad: sonuc.adSoyad,
+        locale,
+      });
+      localStorage.setItem("projelio_token", token);
+      window.location.replace("/");
+    } catch (err) {
+      onError(err instanceof Error && err.message ? err.message : t("Apple ile giriş tamamlanamadı."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={busy}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        padding: "11px 16px",
+        borderRadius: 9,
+        border: `1px solid ${c.textPrimary}`,
+        background: c.textPrimary,
+        color: c.surface,
+        fontSize: 16,
+        fontWeight: 500,
+        cursor: busy ? "wait" : "pointer",
+      }}
+    >
+      <AppleGlyph />
+      {busy ? t("Bekleniyor…") : verb === "giris" ? t("Apple ile giriş yap") : t("Apple ile kayıt ol")}
+    </button>
+  );
+}
+
+/** Apple logosu — düğmenin metin rengini alır (Apple'ın tek renkli kuralı). */
+function AppleGlyph() {
+  return (
+    <svg width={17} height={17} viewBox="0 0 384 512" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"
+      />
+    </svg>
   );
 }
 

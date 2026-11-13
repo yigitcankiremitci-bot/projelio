@@ -1,6 +1,7 @@
 import type { Locale } from "@projelio/shared";
 import { useLocale, useT } from "../lib/i18n";
 import { useThemeColors } from "../theme/useThemeColors";
+import { safeTop } from "../lib/layout";
 
 /**
  * Giriş/kayıt ekranlarının sağ üstündeki dil seçici.
@@ -28,7 +29,9 @@ export default function GirisDilSecici() {
       aria-label={t("Dil")}
       style={{
         position: "fixed",
-        top: 16,
+        // Çentik/Dynamic Island payı: iPhone uygulamasında seçici saat ve
+        // pilin üstüne biniyordu (bkz. lib/layout.ts SAFE_TOP).
+        top: safeTop(16),
         right: 16,
         zIndex: 10,
         display: "flex",

@@ -35,6 +35,18 @@ const config: CapacitorConfig = {
     // (varsayılan tema karanlık, bkz. 369ddf5).
     backgroundColor: "#1C222C",
   },
+  ios: {
+    // Android'deki gerekçeyle aynı: açılışta beyaz çakma olmasın.
+    //
+    // iOS'TA KAYNAK FARKLI: WKWebView "https" şemasını uygulamaya devretmeye
+    // izin vermiyor, bu yüzden iPhone'daki kaynak
+    // capacitor://app.projelio.app olur. Backend'in CORS_ORIGINS listesine BU
+    // ADRES EKLENMEDEN iPhone'da hiçbir istek geçmez (bkz. docs/mobil-ios.md).
+    backgroundColor: "#1C222C",
+    // Güvenli alan payını Android'deki gibi safe-area eklentisi + CSS veriyor;
+    // WebView'in kendi payını da eklemek çift boşluk bırakırdı.
+    contentInset: "never",
+  },
   plugins: {
     // Güvenli alan ve klavye payını @capacitor-community/safe-area yönetiyor.
     // Capacitor 8'in yerleşik SystemBars'ı da AYNI pencereye kendi dinleyicisini

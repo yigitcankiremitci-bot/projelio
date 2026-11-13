@@ -75,6 +75,9 @@ export const ayarlar: TranslationDict = {
   "Projelio işine yarıyorsa Google Play'de birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.":
     "If Projelio is useful to you, a few words on Google Play go a long way in helping others find us.",
   "Google Play'de değerlendir": "Rate on Google Play",
+  "Projelio işine yarıyorsa App Store'da birkaç kelime yazman, başkalarının bizi bulmasına çok yardımcı olur.":
+    "If Projelio is useful to you, a few words on the App Store go a long way in helping others find us.",
+  "App Store'da değerlendir": "Rate on the App Store",
   "Düğmelerde ve seçili öğelerde kullanılan rengi Projelio paletinden değiştir.":
     "Change the colour used on buttons and selected items, from the Projelio palette.",
   "Kenar çubuğu rengi": "Sidebar colour",

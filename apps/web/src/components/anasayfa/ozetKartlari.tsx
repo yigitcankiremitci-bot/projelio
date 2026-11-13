@@ -1125,7 +1125,14 @@ function sekmeliModulKarti(key: string, kok: string, hedef: string) {
   return key === MUSTERI_MODUL_KEY ? <MusteriModulKarti kok={kok} hedef={hedef} /> : <BaglantiModulKarti kok={kok} hedef={hedef} />;
 }
 
-/** Sadelik varsayılanın kendisi: modül ve araç kartları rafta bekler, isteyen ekler. */
+/**
+ * Sadelik varsayılanın kendisi: modül ve araç kartları rafta bekler, isteyen ekler.
+ * Yeni açılan şirkette anasayfa kalabalık açılıyordu (kullanıcı, 2026-11-12:
+ * "yeni açılan hesapta anasayfaya çok fazla şey açmayalım"); pomodoro, haber,
+ * döviz, borsa, not, görevler, ürünler, dosyalar ve sosyal artık rafta.
+ * Müşteri haritası, e-posta ve projeler ilgili modül açık değilse zaten çizilmez.
+ * Düzenini bir kez kaydetmiş panolar bundan etkilenmez.
+ */
 export const SIRKET_VARSAYILAN_PANO: PanoKart[] = [
   { id: "kasa", boyut: "orta" },
   { id: "yapilacaklar", boyut: "kucuk" },
@@ -1133,20 +1140,10 @@ export const SIRKET_VARSAYILAN_PANO: PanoKart[] = [
   { id: "projeler", boyut: "orta" },
   { id: "musteri-haritasi", boyut: "orta" },
   { id: "modul:pd_email", boyut: "orta" },
-  { id: "pomodoro", boyut: "kucuk" },
-  { id: "ofis", boyut: "kucuk" },
-  { id: "haber", boyut: "orta" },
-  { id: "doviz", boyut: "kucuk" },
-  { id: "borsa", boyut: "kucuk" },
-  { id: "gorevler", boyut: "kucuk" },
-  { id: "ekip", boyut: "kucuk" },
   { id: "departmanlar", boyut: "orta" },
-  // Tam satır: önündeki satırlar dolu bitsin ki geniş kartın üstünde boş hücre kalmasın.
-  { id: "not", boyut: "genis" },
+  { id: "ekip", boyut: "kucuk" },
   { id: "moduller", boyut: "kucuk" },
-  { id: "urunler", boyut: "kucuk" },
-  { id: "dosyalar", boyut: "kucuk" },
-  { id: "akis", boyut: "kucuk" },
+  { id: "ofis", boyut: "kucuk" },
 ];
 
 export const SERBEST_VARSAYILAN_PANO: PanoKart[] = [
@@ -1267,7 +1264,11 @@ export function useSirketKatalogu({
       ),
     });
     ekle(true, YAPILACAKLAR(t("Yapılacaklar"), "yapilacaklar"));
-    ekle(true, { id: "projeler", ad: t("Projeler"), grup: "temel", Icon: IconActivity, boyut: "orta", sabitBoyut: "orta", hizliEylem: projeHizliEylemi(t), hedef: acik.has("projects") ? `${kok}?tab=projects` : `${kok}`, ciz: () => <SirketProjeleriOzeti organizationId={organizationId} /> });
+    // Proje sekmesiyle AYNI kural: "Proje yönetimi" modülü kapalıyken kart da
+    // yok. Yeni açılan şirkette ne proje alanı ne iş vardı; kartın "Yeni proje"
+    // düğmesi açacak iş bulamayıp sessizce hiçbir şey yapmıyordu (2026-11-12:
+    // "proje ekle dedim ekleyemedim").
+    ekle(acik.has("projects"), { id: "projeler", ad: t("Projeler"), grup: "temel", Icon: IconActivity, boyut: "orta", sabitBoyut: "orta", hizliEylem: projeHizliEylemi(t), hedef: `${kok}?tab=projects`, ciz: () => <SirketProjeleriOzeti organizationId={organizationId} /> });
     ekle(acik.has("files"), { id: "dosyalar", ad: t("Dosyalar"), grup: "temel", Icon: IconFile, boyut: "kucuk", hedef: `${kok}?tab=files`, ciz: () => <SirketDosyalarOzeti organizationId={organizationId} /> });
     ekle(acik.has("flow"), { id: "akis", ad: t("Sosyal"), grup: "temel", Icon: IconMessageCircle, boyut: "kucuk", hedef: `${kok}?tab=flow`, ciz: () => <AkisOzeti organizationId={organizationId} /> });
     ekle(true, { id: "ofis", ad: t("3D ofis"), grup: "temel", Icon: IconLayers, boyut: "kucuk", satir: ofisSatiri, tamKaplama: true, hedef: `/yeni?ofis=${encodeURIComponent(organizationId)}`, ciz: () => <OfisOzeti ad={t("3D ofis")} /> });
